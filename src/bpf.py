@@ -1,9 +1,16 @@
+from utility import generate_struct_with_fields
+
+
 class SK_SKB_PROG:
     def __init__(self):
         self.connection_state = []
+        self.declerations = []
 
     def add_connection_state(self, state):
         self.connection_state.append(state)
+
+    def add_decleration(self, text):
+        self.declerations.append(text)
 
     def required_headers(self):
         return [
@@ -16,6 +23,9 @@ class SK_SKB_PROG:
                 '#include <bpf/bpf_endian.h>',
                 ]
 
+    def type_decleration(self):
+        return self.declerations
+
     def license(self):
         return ['char _license[] SEC("license") = "GPL";',]
 
@@ -23,11 +33,7 @@ class SK_SKB_PROG:
         return ([
                 '/* Put state of each socket in this struct (This will be used in sockops.h as',
                 ' * part of per socket metadata) */',
-                'struct connection_state {',
-                ] 
-                + [s.get_c_code() for s in self.connection_state]
-                + [
-                '};',
+                generate_struct_with_fields('connection_state', self.connection_state),
                 '#include "my_bpf/sockops.h"',
                 ])
 
@@ -51,6 +57,7 @@ class SK_SKB_PROG:
     def get_code(self):
         code = ([]
                 + self.required_headers()
+                + self.type_decleration()
                 + self.per_connection_state()
                 + self.parser_prog()
                 + self.verdict_prog()

@@ -46,3 +46,10 @@ def get_code(cursor):
             text += '\n'
             new_line = True
     return text
+
+def generate_struct_with_fields(name, fields):
+    """
+    fields: an array of type StateObject
+    """
+    struct = [f'struct {name} {{'] + [f.get_c_code() for f in fields] + ['};']
+    return '\n'.join(struct)

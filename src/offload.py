@@ -17,10 +17,21 @@ def generate_offload(file_path, entry_func):
     #         for c2 in c.get_children():
     #             print(c2.spelling, c2.kind)
 
-    # Expect to store per connection state on this class
-    states = extract_state(cursor)
+    # Get the state needed for handling the request
+    states, decls = extract_state(cursor)
+
+    # Check if there is any type declaration that we need (enum or struct)
+    # for s in states:
+    #     # print(s.kind, s)
+    #     if s.kind == clang.TypeKind.ELABORATED:
+    #         c = s.cursor.type.get_declaration()
+    #         decl = get_code(c) + ';'
+    #         prog.add_decleration(decl)
+
     for s in states:
         prog.add_connection_state(s)
+    for d in decls:
+        prog.add_decleration(d)
 
     # Print the code we have generated
     print(prog.get_code())
