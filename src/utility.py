@@ -1,5 +1,29 @@
 import clang.cindex as clang
 
+PRIMITIVE_TYPES = [
+clang.TypeKind.BOOL, 
+clang.TypeKind.CHAR_U, 
+clang.TypeKind.UCHAR,
+clang.TypeKind.CHAR16,
+clang.TypeKind.CHAR32,
+clang.TypeKind.USHORT,
+clang.TypeKind.UINT,
+clang.TypeKind.ULONG,
+clang.TypeKind.ULONGLONG,
+clang.TypeKind.UINT128,
+clang.TypeKind.CHAR_S,
+clang.TypeKind.SCHAR,
+clang.TypeKind.WCHAR,
+clang.TypeKind.SHORT,
+clang.TypeKind.INT,
+clang.TypeKind.LONG,
+clang.TypeKind.LONGLONG,
+clang.TypeKind.INT128,
+clang.TypeKind.FLOAT,
+clang.TypeKind.DOUBLE,
+clang.TypeKind.LONGDOUBLE,
+]
+
 
 def parse_file(file_path):
     # compiler_args = '-I /usr/include/ -I /opt/clang-16/include/c++/v1/'.split()

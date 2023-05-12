@@ -4,16 +4,10 @@ from utility import generate_struct_with_fields
 class SK_SKB_PROG:
     def __init__(self):
         self.connection_state = []
-        self.declerations = []
-
-    def add_connection_state(self, state):
-        self.connection_state.append(state)
-
-    def add_decleration(self, text):
-        self.declerations.append(text)
-
-    def required_headers(self):
-        return [
+        self.declarations = []
+        self.parser_code = []
+        self.verdict_code = []
+        self.headers = [
                 # headers
                 '#include <sys/types.h>',
                 '#include <sys/socket.h>',
@@ -22,12 +16,14 @@ class SK_SKB_PROG:
                 '#include <bpf/bpf_helpers.h>',
                 '#include <bpf/bpf_endian.h>',
                 ]
+        self.license = 'GPL'
 
-    def type_decleration(self):
-        return self.declerations
 
-    def license(self):
-        return ['char _license[] SEC("license") = "GPL";',]
+    def add_connection_state(self, state):
+        self.connection_state.append(state)
+
+    def add_declaration(self, text):
+        self.declarations.append(text)
 
     def per_connection_state(self):
         return ([
@@ -39,28 +35,32 @@ class SK_SKB_PROG:
 
 
     def parser_prog(self):
-        return [
+        return ([
                 'SEC("sk_skb/stream_parser")',
                 'int parser(struct __sk_buff *skb)',
                 '{',
-                '}',
                 ]
+                + self.parser_code
+                + ['}']
+                )
 
     def verdict_prog(self):
-        return [
+        return ([
                 'SEC("sk_skb/stream_verdict")',
                 'int verdict(struct __sk_buff *skb)',
                 '{',
-                '}',
                 ]
+                + self.verdict_code
+                + ['}']
+                )
 
     def get_code(self):
         code = ([]
-                + self.required_headers()
-                + self.type_decleration()
+                + self.headers
+                + self.declarations
                 + self.per_connection_state()
                 + self.parser_prog()
                 + self.verdict_prog()
-                + self.license()
+                + [f'char _license[] SEC("license") = "{self.license}";',]
                 )
         return '\n'.join(code)
