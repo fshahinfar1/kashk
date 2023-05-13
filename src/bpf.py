@@ -4,7 +4,7 @@ from utility import generate_struct_with_fields
 class SK_SKB_PROG:
     def __init__(self):
         self.connection_state = []
-        self.declarations = []
+        self.declarations = set()
         self.parser_code = []
         self.verdict_code = []
         self.headers = [
@@ -23,7 +23,7 @@ class SK_SKB_PROG:
         self.connection_state.append(state)
 
     def add_declaration(self, text):
-        self.declarations.append(text)
+        self.declarations.add(text)
 
     def per_connection_state(self):
         return ([
@@ -57,7 +57,7 @@ class SK_SKB_PROG:
     def get_code(self):
         code = ([]
                 + self.headers
-                + self.declarations
+                + [d.get_c_code() for d in self.declarations]
                 + self.per_connection_state()
                 + self.parser_prog()
                 + self.verdict_prog()

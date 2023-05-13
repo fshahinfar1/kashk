@@ -23,10 +23,7 @@ def generate_offload(file_path, entry_func):
     # entry_func_params = [get_state_for(arg) for arg in entry_func.get_arguments()]
     tcp_conn = find_elem(cursor, 'TCPConnection')
     states, decls = extract_state(tcp_conn)
-    for s in states:
-        prog.add_connection_state(s)
-    for d in decls:
-        prog.add_declaration(d)
+    add_state_decl_to_bpf(prog, states, decls)
 
     # Find the event-loop
     ev_loop = find_event_loop(entry_func)
@@ -34,11 +31,11 @@ def generate_offload(file_path, entry_func):
     # one connection
     all_declerations_before_loop = get_variable_declaration_before_elem(entry_func, ev_loop)
     for d in all_declerations_before_loop:
-        states, decl = get_state_for(d.cursor)
-        for s in states:
-            prog.add_connection_state(s)
-        for d in decls:
-            prog.add_declaration(d)
+        states, decls = get_state_for(d.cursor)
+        add_state_decl_to_bpf(prog, states, decls)
+
+    # TODO: all the initialization and operations done before the event loop is
+    # probably part of the control program setting up the BPF program.
 
     # # Get logic code
     # prog.parser_prog = logic_code
@@ -46,3 +43,9 @@ def generate_offload(file_path, entry_func):
     # Print the code we have generated
     print(prog.get_code())
 
+
+def add_state_decl_to_bpf(prog, states, decls):
+    for s in states:
+        prog.add_connection_state(s)
+    for d in decls:
+        prog.add_declaration(d)

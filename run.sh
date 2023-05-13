@@ -1,4 +1,5 @@
 #! /bin/bash
+source ./venv/bin/activate
 SCRIPT=./src/main.py
 FILE=~/asio_case_study/src/kv/kv.cpp
 ENTRY=Server::handle_connection

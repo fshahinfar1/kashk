@@ -17,6 +17,41 @@ class StateObject:
         return f'<StateObject: {self.type} {self.name}>'
 
 
+class TypeDefinition:
+    def __init__(self, name):
+        self.name = name
+
+    def __hash__(self):
+        return self.name.__hash__()
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.name == other.name
+        return False
+
+    def get_c_code(self):
+        raise Exception('Not implemented')
+
+
+class Elaborate(TypeDefinition):
+    def __init__(self, c):
+        super().__init__(c.spelling)
+        self.cursor = c
+
+    def get_c_code(self):
+        d = get_code(self.cursor) + ';'
+        return d
+
+
+class Record(TypeDefinition):
+    def __init__(self, name, fields):
+        super().__init__(name)
+        self.fields = fields
+
+    def get_c_code(self):
+        return generate_struct_with_fields(self.name, self.fields)
+
+
 def generate_decleration_for(cursor):
     """
     cursor is a class, struct, enum, ...
@@ -24,22 +59,23 @@ def generate_decleration_for(cursor):
     """
     # print('*', cursor.spelling, cursor.kind, cursor.type.kind)
     type_name = cursor.spelling
+
     # List of type dependencies for this specific type
     decl = []
+
     if cursor.type.kind == clang.TypeKind.RECORD:
         # Go through the fields, add any dependencies field might have, then
         # define a struct for it.
         fields, new_decl = extract_state(cursor)
         decl += new_decl
-        new_struct = generate_struct_with_fields(type_name, fields)
-        decl.append(new_struct)
+        r = Record(type_name, fields)
+        decl.append(r)
     elif cursor.type.kind == clang.TypeKind.ELABORATED:
         # For enum, union, typedef
         c = cursor.type.get_declaration()
         d = generate_decleration_for(c)
         decl.extend(d)
-        d = get_code(c) + ';'
-        decl.append(d)
+        decl.append(Elaborate(c))
     elif cursor.type.kind == clang.TypeKind.ENUM:
         # No further deps
         return []
@@ -48,9 +84,11 @@ def generate_decleration_for(cursor):
             t = cursor.underlying_typedef_type
             under_kind = t.kind
         else:
+            print('Typedef if not declaration, I do not udnerstand this.')
             under_kind = cursor.kind
             # print('--', under_kind)
         if under_kind in PRIMITIVE_TYPES:
+            # No further type decleration needed
             return []
         # print([(c.spelling, c.kind) for c in cursor.get_children()])
         for c in cursor.get_children():
@@ -60,7 +98,11 @@ def generate_decleration_for(cursor):
 
     return decl
 
+
 def extract_state(cursor):
+    """
+    Extract fields and dependant type declartion from a class or struct
+    """
     states = []
     decl = []
     for c in cursor.type.get_fields():
@@ -72,6 +114,10 @@ def extract_state(cursor):
 
 
 def get_state_for(cursor):
+    """
+    Get state definition and needed decleration for a variable or parameter
+    declartion
+    """
     states = []
     decl = []
     k = cursor.kind
