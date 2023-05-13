@@ -4,7 +4,8 @@ import queue
 
 from utility import parse_file, find_elem, get_code
 from understand_program_state import extract_state, get_state_for
-from understand_logic import find_event_loop, get_variable_declaration_before_elem
+from understand_logic import (find_event_loop,
+        get_variable_declaration_before_elem, get_all_read)
 from bpf import SK_SKB_PROG
 
 
@@ -37,11 +38,31 @@ def generate_offload(file_path, entry_func):
     # TODO: all the initialization and operations done before the event loop is
     # probably part of the control program setting up the BPF program.
 
+    # TODO: make a framework agnostic interface, allow for porting to other
+    # functions
+    # Find the buffer representing the packet
+    buf = None
+    reads = get_all_read(ev_loop)
+    for r in reads:
+        # the buffer is in the first arg
+        first_arg = list(r.get_arguments())[0]
+        buf = first_arg.get_definition()
+        print(get_code(buf))
+        # TODO: if there are reads from different sockets, bail out!
+    if buf is None:
+        print('Failed to find the packet buffer', file=sys.stderr)
+        return
+
+    # Go through the instructions, replace access to the buffer and read/write
+    # instructions
+
+
+
     # # Get logic code
     # prog.parser_prog = logic_code
 
     # Print the code we have generated
-    print(prog.get_code())
+    # print(prog.get_code())
 
 
 def add_state_decl_to_bpf(prog, states, decls):

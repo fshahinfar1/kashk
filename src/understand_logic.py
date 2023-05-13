@@ -78,12 +78,54 @@ def find_event_loop(cursor):
             if __has_read(c):
                 # This is the event loop
                 return c
-            
+
 
         # Continue deeper
         for child in reversed(list(c.get_children())):
             q.append(child)
     return None
+
+
+def get_all_read(cursor):
+    """
+    Get all the read instructions under the cursor
+    """
+    result = []
+    q = [cursor]
+    # Outside the connection polling loop
+    while q:
+        c = q.pop()
+
+        if c.kind == clang.CursorKind.CALL_EXPR:
+            func_name = c.spelling
+            if func_name in ('await_resume', 'await_transform', 'await_ready',
+                    'await_suspend'):
+                # These functions are for coroutine and make things complex
+                continue
+
+            if c.spelling == 'async_read_some':
+                result.append(c)
+                continue
+
+        # Continue deeper
+        for child in reversed(list(c.get_children())):
+            q.append(child)
+    return result
+
+
+def visualize_ast(cursor):
+    q = [(cursor, 0)]
+    # Outside the connection polling loop
+    while q:
+        c, l = q.pop()
+
+        print('|  '*l + f'+- {c.spelling} {c.kind}')
+
+        # Continue deeper
+        children = list(reversed(list(c.get_children())))
+        for child in children:
+            q.append((child, l+1))
+    pass
 
 
 def __has_read(cursor):
