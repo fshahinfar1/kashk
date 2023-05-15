@@ -48,7 +48,9 @@ def generate_offload(file_path, entry_func):
         # the buffer is in the first arg
         first_arg = list(r.get_arguments())[0]
         buf = first_arg.get_definition()
+        print('\nThe buffer for reading request:')
         print(get_code(buf))
+        print('')
         # TODO: if there are reads from different sockets, bail out!
     if buf is None:
         print('Failed to find the packet buffer', file=sys.stderr)
@@ -60,6 +62,7 @@ def generate_offload(file_path, entry_func):
     inst = gather_instructions_under(body_of_loop, buf, None)
 
     # Show what are the instructions
+    print('\n\n')
     __show_insts(inst)
 
     # # Get logic code
@@ -74,6 +77,9 @@ def __show_insts(lst, depth=0):
         print('  '*depth + str(i))
         if i.has_children():
             __show_insts(i.body, depth=depth+1)
+            print('  '*depth + '<OTHERWISE>')
+            __show_insts(i.other_body, depth=depth+1)
+            print('  '*depth + '<END>')
 
 
 

@@ -1,6 +1,6 @@
 import itertools
 import clang.cindex as clang
-from utility import get_code
+from utility import get_code,report_on_cursor
 
 
 class Instruction:
@@ -18,8 +18,23 @@ class Instruction:
         return self.__str__()
 
 
+class Call(Instruction):
+    def __init__(self, cursor):
+        super().__init__()
+
+        self.kind = clang.CursorKind.CALL_EXPR
+        self.func_name = cursor.spelling
+        self.func_ptr = cursor.referenced
+        self.args = []
+
+    def __str__(self):
+        return f'<Call {self.func_name} ({self.args})>'
+
+
 class VarDecl(Instruction):
     def __init__(self, c):
+        super().__init__()
+
         # TODO: get rid of cursor pointer.
         # TODO: this is because I am not following a solid design in
         # implementing things
@@ -36,12 +51,14 @@ class VarDecl(Instruction):
     def __str__(self):
         return f'<VarDecl {self.kind}: {self.type} {self.name} = {self.init}>'
 
-    def __repr__(self):
-        return self.__str__()
-
 
 class ControlFlowInst(Instruction):
     def __init__(self):
+        super().__init__()
+        self.kind = None
+        self.cond = []
+        self.body = []
+        self.other_body = []
         pass
 
     def has_children(self):
@@ -49,9 +66,6 @@ class ControlFlowInst(Instruction):
 
     def __str__(self):
         return f'<CtrlFlow {self.kind}: {self.cond}>'
-
-    def __repr__(self):
-        return self.__str__()
 
 
 class BinOp(Instruction):
@@ -65,11 +79,14 @@ class BinOp(Instruction):
     CLOSE_GROUP = ')}]'
 
     def __init__(self, cursor):
+        super().__init__()
+
         # TODO: I do not know how to get information about binary
         # operations. My idea is to parse it my self.
         self.kind = clang.CursorKind.BINARY_OPERATOR
         text = self.__get_raw_c_code(cursor)
         tks = self.__parse(text)
+        print(tks)
         for index, t in enumerate(tks):
             if t in BinOp.ALL_OP:
                 self.op = t
@@ -118,6 +135,7 @@ class BinOp(Instruction):
                 if not parsing_op and tk:
                     tokens.append(tk)
                     tk = ''
+                    parsing_op = False
                 tk += c
                 parsing_op = True
                 if tk not in BinOp.ALL_OP:
@@ -125,6 +143,11 @@ class BinOp(Instruction):
                     parsing_op = False
                     # Connect it to the prev token
                     tk = tokens.pop() + tk
+            elif parsing_op:
+                # End of operator
+                tokens.append(tk)
+                tk = ''
+                parsing_op = False
             else:
                 tk += c
         # print(text)
@@ -147,19 +170,6 @@ class BinOp(Instruction):
 
     def __repr__(self):
         return self.__str__()
-
-
-def __report_on_cursor(c):
-    # What are we processing?
-    print(c.spelling, c.kind)
-    # DEBUGING: Show every line of code
-    if c.location.file:
-        fname = c.location.file.name
-        with open(fname) as f:
-            l = f.readlines()[c.location.line-1]
-            l = l.rstrip()
-            print(l)
-            print(' ' * (c.location.column -1) + '^')
 
 
 def get_variable_declaration_before_elem(cursor, target_cursor):
@@ -277,6 +287,9 @@ def __has_read(cursor):
 
 
 def gather_instructions_from(cursor, read_buf, write_buf):
+    """
+    Convert the cursor to a instruction
+    """
     ops = []
     q = [cursor]
     # Outside the connection polling loop
@@ -285,9 +298,13 @@ def gather_instructions_from(cursor, read_buf, write_buf):
 
         if c.kind == clang.CursorKind.CALL_EXPR:
             # A call to the function
-            inst = Instruction()
-            inst.kind = c.kind
-            inst.func_name = c.spelling
+            inst = Call(c)
+            args = []
+            for x in cursor.get_arguments():
+                arg = gather_instructions_from(x, read_buf, write_buf)
+                args.append(arg)
+            inst.args = args
+
             ops.append(inst)
             print("I need the reference to function implementation")
             continue
@@ -322,14 +339,21 @@ def gather_instructions_from(cursor, read_buf, write_buf):
             ops.append(inst)
         elif c.kind == clang.CursorKind.IF_STMT:
             children = list(c.get_children())
-            body = children[1]
-            print('--', children[0].spelling, children[0].kind)
+            # print('if-stmt', children)
+            # print('--', children[0].spelling, children[0].kind)
             cond = gather_instructions_from(children[0], read_buf, write_buf)
+            body = []
+            other_body = []
+            if len(children) > 1:
+                body = gather_instructions_from(children[1], read_buf, write_buf)
+            if len(children) > 2:
+                other_body = gather_instructions_from(children[2], read_buf, write_buf)
 
             inst = ControlFlowInst()
             inst.kind = c.kind
             inst.cond = cond
-            inst.body = gather_instructions_under(body, read_buf, write_buf)
+            inst.body = body
+            inst.other_body = other_body 
 
             ops.append(inst)
             print("I need to find the reference to branching condition")
@@ -344,6 +368,10 @@ def gather_instructions_from(cursor, read_buf, write_buf):
             inst.cond = gather_instructions_from(cond, read_buf, write_buf)
             inst.body = gather_instructions_under(body, read_buf, write_buf)
             ops.append(inst)
+        elif c.kind == clang.CursorKind.COMPOUND_STMT:
+            # Continue deeper
+            for child in reversed(list(c.get_children())):
+                q.append(child)
         elif c.kind == clang.CursorKind.UNEXPOSED_EXPR:
             # Continue deeper
             for child in reversed(list(c.get_children())):
@@ -356,11 +384,15 @@ def gather_instructions_from(cursor, read_buf, write_buf):
                 inst.kind = clang.CursorKind.RETURN_STMT
                 ops.append(inst)
         else:
-            __report_on_cursor(c)
+            report_on_cursor(c)
     return ops
 
 
 def gather_instructions_under(cursor, read_buf, write_buf):
+    """
+    Get the list of instruction in side a block of code.
+    (Expecting the cursor to be a block of code) 
+    """
     # Gather instructions in this list
     ops = []
     for c in cursor.get_children():

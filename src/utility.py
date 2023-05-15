@@ -101,3 +101,15 @@ def visualize_ast(cursor):
         for child in children:
             q.append((child, l+1))
 
+
+def report_on_cursor(c):
+    # What are we processing?
+    print(c.spelling, c.kind)
+    # DEBUGING: Show every line of code
+    if c.location.file:
+        fname = c.location.file.name
+        with open(fname) as f:
+            l = f.readlines()[c.location.line-1]
+            l = l.rstrip()
+            print(l)
+            print(' ' * (c.location.column -1) + '^')
