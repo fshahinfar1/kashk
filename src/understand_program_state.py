@@ -34,9 +34,14 @@ class TypeDefinition:
 
 
 class Elaborate(TypeDefinition):
+    directory = {}
+
     def __init__(self, c):
         super().__init__(c.spelling)
         self.cursor = c
+        if self.name in Elaborate.directory:
+            raise Exception('Unexpected error')
+        Elaborate.directory[self.name] = self
 
     def get_c_code(self):
         d = get_code(self.cursor) + ';'
@@ -44,9 +49,14 @@ class Elaborate(TypeDefinition):
 
 
 class Record(TypeDefinition):
+    directory = {}
+
     def __init__(self, name, fields):
         super().__init__(name)
         self.fields = fields
+        if self.name in Record.directory:
+            raise Exception('Unexpected error')
+        Record.directory[self.name] = self
 
     def get_c_code(self):
         return generate_struct_with_fields(self.name, self.fields)

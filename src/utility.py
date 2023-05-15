@@ -1,5 +1,6 @@
 import clang.cindex as clang
 
+
 PRIMITIVE_TYPES = [
 clang.TypeKind.BOOL, 
 clang.TypeKind.CHAR_U, 
@@ -37,7 +38,7 @@ def parse_file(file_path):
         print(d.format())
     print('---------------------------------------')
     cursor = tu.cursor
-    return cursor
+    return index, tu, cursor
 
 
 def find_elem(cursor, func_name):
@@ -78,9 +79,25 @@ def get_code(cursor):
             new_line = True
     return text
 
+
 def generate_struct_with_fields(name, fields):
     """
     fields: an array of type StateObject
     """
     struct = [f'struct {name} {{'] + [f.get_c_code() for f in fields] + ['};']
     return '\n'.join(struct)
+
+
+def visualize_ast(cursor):
+    q = [(cursor, 0)]
+    # Outside the connection polling loop
+    while q:
+        c, l = q.pop()
+
+        print('|  '*l + f'+- {c.spelling} {c.kind}')
+
+        # Continue deeper
+        children = list(reversed(list(c.get_children())))
+        for child in children:
+            q.append((child, l+1))
+

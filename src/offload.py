@@ -5,7 +5,8 @@ import queue
 from utility import parse_file, find_elem, get_code
 from understand_program_state import extract_state, get_state_for
 from understand_logic import (find_event_loop,
-        get_variable_declaration_before_elem, get_all_read)
+        get_variable_declaration_before_elem, get_all_read,
+        gather_instructions_under, VarDecl)
 from bpf import SK_SKB_PROG
 
 
@@ -13,7 +14,7 @@ def generate_offload(file_path, entry_func):
     # This is the BPF program object we want to build
     prog = SK_SKB_PROG()
     # This is the AST generated with Clang
-    cursor = parse_file(file_path)
+    index, tu, cursor = parse_file(file_path)
     # Find the entry function
     entry_func = find_elem(cursor, 'Server::handle_connection')
     if entry_func is None:
@@ -55,14 +56,25 @@ def generate_offload(file_path, entry_func):
 
     # Go through the instructions, replace access to the buffer and read/write
     # instructions
+    body_of_loop = list(ev_loop.get_children())[-1]
+    inst = gather_instructions_under(body_of_loop, buf, None)
 
-
+    # Show what are the instructions
+    __show_insts(inst)
 
     # # Get logic code
     # prog.parser_prog = logic_code
 
     # Print the code we have generated
     # print(prog.get_code())
+
+
+def __show_insts(lst, depth=0):
+    for i in lst:
+        print('  '*depth + str(i))
+        if i.has_children():
+            __show_insts(i.body, depth=depth+1)
+
 
 
 def add_state_decl_to_bpf(prog, states, decls):
