@@ -146,3 +146,22 @@ def show_insts(lst, depth=0):
             # __show_insts(i.other_body, depth=depth+1)
             # print('  '*depth + '<END>')
 
+
+def get_owner(cursor):
+    res = []
+    children = list(cursor.get_children())
+    assert len(children) > 0
+    parent = children[0]
+    if parent.kind == clang.CursorKind.DECL_REF_EXPR: 
+        res.append(parent.spelling)
+    elif parent.kind == clang.CursorKind.MEMBER_REF_EXPR:
+        res.append(parent.spelling)
+        res += get_owner(parent)
+    elif parent.kind == clang.CursorKind.CALL_EXPR:
+        res += get_owner(parent)
+    elif parent.kind == clang.CursorKind.UNEXPOSED_EXPR:
+        res += get_owner(parent)
+    else:
+        print('get_owner: unhandled cursor kind')
+
+    return res

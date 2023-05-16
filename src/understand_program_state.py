@@ -1,112 +1,9 @@
 import sys
 import clang.cindex as clang
+
 from utility import find_elem, get_code, generate_struct_with_fields, PRIMITIVE_TYPES
-
-
-class Info:
-    def __init__(self):
-        self.scope = VariableTracker()
-        self.rd_buf = None
-        self.wr_buf = None
-
-
-class VariableTracker:
-    def __init__(self):
-        self.local = {}
-        self.glbl = {}
-
-    def is_local(self, name):
-        if name in self.local:
-            return True, self.local[name]
-        return False, None
-
-    def is_global(self, name):
-        if name in self.glbl:
-            return True, self.glbl[name]
-        return False, None
-
-    def add_local(self, name, ref):
-        if name in self.local:
-            raise Exception(f'Shadowing local variables is not implemented yet ({name})')
-        self.local[name] = ref
-
-    def add_global(self, name, ref):
-        if name in self.glbl:
-            raise Exception('Global variables with the duplicate name is not allowed')
-        self.glbl[name] = ref
-
-    def get(self, name):
-        if name == 'conn':
-            # TODO: This is hack fix this
-            return self.glbl
-        # TODO: this implementation is ridiculous
-        res, obj = self.is_local(name)
-        if res:
-            return obj
-        res, obj = self.is_global(name)
-        if res:
-            return obj
-        return None
-
-
-
-class StateObject:
-    def __init__(self, c):
-        self.cursor = c
-        self.name = c.spelling
-        self.type = c.type.spelling 
-        self.kind = c.type.kind
-
-    def get_c_code(self):
-        return f'{self.type} {self.name};'
-
-    def __repr__(self):
-        return f'<StateObject: {self.type} {self.name}>'
-
-
-class TypeDefinition:
-    def __init__(self, name):
-        self.name = name
-
-    def __hash__(self):
-        return self.name.__hash__()
-
-    def __eq__(self, other):
-        if isinstance(other, self.__class__):
-            return self.name == other.name
-        return False
-
-    def get_c_code(self):
-        raise Exception('Not implemented')
-
-
-class Elaborate(TypeDefinition):
-    directory = {}
-
-    def __init__(self, c):
-        super().__init__(c.spelling)
-        self.cursor = c
-        if self.name in Elaborate.directory:
-            raise Exception('Unexpected error')
-        Elaborate.directory[self.name] = self
-
-    def get_c_code(self):
-        d = get_code(self.cursor) + ';'
-        return d
-
-
-class Record(TypeDefinition):
-    directory = {}
-
-    def __init__(self, name, fields):
-        super().__init__(name)
-        self.fields = fields
-        if self.name in Record.directory:
-            raise Exception('Unexpected error')
-        Record.directory[self.name] = self
-
-    def get_c_code(self):
-        return generate_struct_with_fields(self.name, self.fields)
+from bpf import SK_SKB_PROG
+from data_structure import *
 
 
 def generate_decleration_for(cursor):
@@ -114,7 +11,6 @@ def generate_decleration_for(cursor):
     cursor is a class, struct, enum, ...
     return a list of strings having codes for defining the types needed.
     """
-    # print('*', cursor.spelling, cursor.kind, cursor.type.kind)
     type_name = cursor.spelling
 
     # List of type dependencies for this specific type
@@ -143,11 +39,9 @@ def generate_decleration_for(cursor):
         else:
             print('Typedef if not declaration, I do not udnerstand this.')
             under_kind = cursor.kind
-            # print('--', under_kind)
         if under_kind in PRIMITIVE_TYPES:
             # No further type decleration needed
             return []
-        # print([(c.spelling, c.kind) for c in cursor.get_children()])
         for c in cursor.get_children():
             decl += generate_decleration_for(c)
     else:
@@ -163,10 +57,17 @@ def extract_state(cursor):
     states = []
     decl = []
     for c in cursor.type.get_fields():
+        obj = StateObject(c)
         if c.type.kind in (clang.TypeKind.RECORD, clang.TypeKind.ELABORATED):
             d = generate_decleration_for(c)
             decl += d
-        states.append(StateObject(c))
+
+            if c.type.kind == clang.TypeKind.RECORD:
+                obj.type_ref = Record.directory.get(c.type.spelling)
+                if obj.type_ref:
+                    for f in obj.type_ref.fields:
+                        f.parent_object = obj
+        states.append(obj)
     return states, decl
 
 
@@ -187,4 +88,3 @@ def get_state_for(cursor):
     else:
         raise Exception('Not implemented! ' + str(k))
     return states, decl
-
