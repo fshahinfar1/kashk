@@ -42,6 +42,9 @@ def parse_file(file_path):
 
 
 def find_elem(cursor, func_name):
+    """
+    Find a AST node with matching name
+    """
     candid = [cursor]
     h = func_name.split('::')
     for name in h:
@@ -56,6 +59,9 @@ def find_elem(cursor, func_name):
 
 
 def get_code(cursor):
+    """
+    Convert a cursor to a line of code (naively)
+    """
     text = ''
     indent = 0
     new_line = False
@@ -82,6 +88,7 @@ def get_code(cursor):
 
 def generate_struct_with_fields(name, fields):
     """
+    Create a struct definition with the given name and fields.
     fields: an array of type StateObject
     """
     struct = [f'struct {name} {{'] + [f.get_c_code() for f in fields] + ['};']
@@ -89,6 +96,9 @@ def generate_struct_with_fields(name, fields):
 
 
 def visualize_ast(cursor):
+    """
+    Print the clang AST for better understanding of its structure
+    """
     q = [(cursor, 0)]
     # Outside the connection polling loop
     while q:
@@ -103,8 +113,16 @@ def visualize_ast(cursor):
 
 
 def report_on_cursor(c):
+    """
+    print some information about the cursor:
+        1. Name and its kind
+        2. List of its children
+        3. Line of code in the source file
+    """
     # What are we processing?
     print(c.spelling, c.kind)
+    children = list(c.get_children())
+    print([(x.spelling, x.kind) for x in children])
     # DEBUGING: Show every line of code
     if c.location.file:
         fname = c.location.file.name
@@ -113,3 +131,18 @@ def report_on_cursor(c):
             l = l.rstrip()
             print(l)
             print(' ' * (c.location.column -1) + '^')
+
+
+def show_insts(lst, depth=0):
+    """
+    Visualize the tree of instructions
+    """
+    for i in lst:
+        print('  '*depth + str(i))
+        # print(i.get_c_code())
+        if i.has_children():
+            show_insts(i.body, depth=depth+1)
+            # print('  '*depth + '<OTHERWISE>')
+            # __show_insts(i.other_body, depth=depth+1)
+            # print('  '*depth + '<END>')
+

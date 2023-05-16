@@ -2,15 +2,19 @@ import sys
 import clang.cindex as clang
 import queue
 
-from utility import parse_file, find_elem, get_code
-from understand_program_state import extract_state, get_state_for
+from utility import parse_file, find_elem, get_code, show_insts
+from understand_program_state import (extract_state, get_state_for,
+        Info)
 from understand_logic import (find_event_loop,
         get_variable_declaration_before_elem, get_all_read,
         gather_instructions_under, VarDecl)
 from bpf import SK_SKB_PROG
+from bpf_code_gen import gen_code
 
 
 def generate_offload(file_path, entry_func):
+    # Keep track of which variable name is what
+    info = Info()
     # This is the BPF program object we want to build
     prog = SK_SKB_PROG()
     # This is the AST generated with Clang
@@ -26,6 +30,8 @@ def generate_offload(file_path, entry_func):
     tcp_conn = find_elem(cursor, 'TCPConnection')
     states, decls = extract_state(tcp_conn)
     add_state_decl_to_bpf(prog, states, decls)
+    for s in states:
+        info.scope.add_global(s.name, s)
 
     # Find the event-loop
     ev_loop = find_event_loop(entry_func)
@@ -35,6 +41,8 @@ def generate_offload(file_path, entry_func):
     for d in all_declerations_before_loop:
         states, decls = get_state_for(d.cursor)
         add_state_decl_to_bpf(prog, states, decls)
+        for s in states:
+            info.scope.add_global(s.name, s)
 
     # TODO: all the initialization and operations done before the event loop is
     # probably part of the control program setting up the BPF program.
@@ -42,45 +50,42 @@ def generate_offload(file_path, entry_func):
     # TODO: make a framework agnostic interface, allow for porting to other
     # functions
     # Find the buffer representing the packet
-    buf = None
     reads = get_all_read(ev_loop)
     for r in reads:
         # the buffer is in the first arg
         first_arg = list(r.get_arguments())[0]
-        buf = first_arg.get_definition()
+        info.rd_buf = first_arg.get_definition()
         print('\nThe buffer for reading request:')
-        print(get_code(buf))
+        print(get_code(info.rd_buf))
         print('')
         # TODO: if there are reads from different sockets, bail out!
-    if buf is None:
+    if info.rd_buf is None:
         print('Failed to find the packet buffer', file=sys.stderr)
         return
+
+
+    print('The state until now is:')
+    print(info.scope.glbl)
+    print(info.scope.local)
+    print('-------------------------------------\n')
 
     # Go through the instructions, replace access to the buffer and read/write
     # instructions
     body_of_loop = list(ev_loop.get_children())[-1]
-    inst = gather_instructions_under(body_of_loop, buf, None)
+    insts = gather_instructions_under(body_of_loop, info)
 
-    # Show what are the instructions
+    # Going through the instructions and generating BPF code
+    gen_code(insts, info)
+
+    # Show what are the instructions (DEBUGING
     print('\n\n')
-    __show_insts(inst)
+    show_insts(insts)
 
     # # Get logic code
     # prog.parser_prog = logic_code
 
     # Print the code we have generated
     # print(prog.get_code())
-
-
-def __show_insts(lst, depth=0):
-    for i in lst:
-        print('  '*depth + str(i))
-        if i.has_children():
-            __show_insts(i.body, depth=depth+1)
-            print('  '*depth + '<OTHERWISE>')
-            __show_insts(i.other_body, depth=depth+1)
-            print('  '*depth + '<END>')
-
 
 
 def add_state_decl_to_bpf(prog, states, decls):

@@ -3,6 +3,53 @@ import clang.cindex as clang
 from utility import find_elem, get_code, generate_struct_with_fields, PRIMITIVE_TYPES
 
 
+class Info:
+    def __init__(self):
+        self.scope = VariableTracker()
+        self.rd_buf = None
+        self.wr_buf = None
+
+
+class VariableTracker:
+    def __init__(self):
+        self.local = {}
+        self.glbl = {}
+
+    def is_local(self, name):
+        if name in self.local:
+            return True, self.local[name]
+        return False, None
+
+    def is_global(self, name):
+        if name in self.glbl:
+            return True, self.glbl[name]
+        return False, None
+
+    def add_local(self, name, ref):
+        if name in self.local:
+            raise Exception(f'Shadowing local variables is not implemented yet ({name})')
+        self.local[name] = ref
+
+    def add_global(self, name, ref):
+        if name in self.glbl:
+            raise Exception('Global variables with the duplicate name is not allowed')
+        self.glbl[name] = ref
+
+    def get(self, name):
+        if name == 'conn':
+            # TODO: This is hack fix this
+            return self.glbl
+        # TODO: this implementation is ridiculous
+        res, obj = self.is_local(name)
+        if res:
+            return obj
+        res, obj = self.is_global(name)
+        if res:
+            return obj
+        return None
+
+
+
 class StateObject:
     def __init__(self, c):
         self.cursor = c
