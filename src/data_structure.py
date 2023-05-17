@@ -1,8 +1,7 @@
 import itertools
 import clang.cindex as clang
 
-from bpf import SK_SKB_PROG
-from utility import get_owner
+from utility import get_code, get_owner, generate_struct_with_fields
 
 
 class Info:
@@ -10,6 +9,7 @@ class Info:
     Represents the general understanding of the program
     """
     def __init__(self):
+        from bpf import SK_SKB_PROG
         self.scope = Scope()
         self.rd_buf = None
         self.wr_buf = None
@@ -139,7 +139,8 @@ class Function(TypeDefinition):
         Function.directory[self.name] = self
 
     def get_c_code(self):
-        raise Exception('Not implemented')
+        # raise Exception('Not implemented')
+        return f'// [[ definition of function {self.name} ]]'
 
 
 class Instruction:
@@ -219,9 +220,23 @@ class ControlFlowInst(Instruction):
         return f'<CtrlFlow {self.kind}: {self.cond}>'
 
 
+class UnaryOp(Instruction):
+    OPS = ('!', '-', '++', '--', '!', '&')
+
+    def __init__(self, cursor):
+        super().__init__()
+
+        self.cursor = cursor
+        self.kind = clang.CursorKind.UNARY_OPERATOR
+        self.child = []
+        self.op = self.__get_op()
+
+    def __get_op(self):
+        return next(self.cursor.get_tokens()).spelling
+
 class BinOp(Instruction):
     REL_OP = ('>', '>=', '<', '<=', '==')
-    ARITH_OP = ('+', '-', '*', '/', '++', '--')
+    ARITH_OP = ('+', '-', '*', '/')
     ASSIGN_OP = ('=', '+=', '-=', '*=', '/=', '<<=', '>>=', '&=', '|=')
     BIT_OP = ('&', '|', '<<', '>>')
     ALL_OP = tuple(itertools.chain(REL_OP, ARITH_OP, ASSIGN_OP, BIT_OP))
@@ -235,6 +250,8 @@ class BinOp(Instruction):
         # TODO: I do not know how to get information about binary
         # operations. My idea is to parse it my self.
         self.kind = clang.CursorKind.BINARY_OPERATOR
+        self.lhs = []
+        self.rhs = []
 
         text = self.__get_raw_c_code(cursor)
         tks = self.__parse(text)

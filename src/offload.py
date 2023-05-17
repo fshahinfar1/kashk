@@ -2,14 +2,13 @@ import sys
 import clang.cindex as clang
 import queue
 
-from utility import parse_file, find_elem, get_code, show_insts
+from utility import parse_file, find_elem, show_insts
 from understand_program_state import (extract_state, get_state_for,)
 from understand_logic import (find_event_loop,
         get_variable_declaration_before_elem, get_all_read,
         gather_instructions_under)
-from bpf import SK_SKB_PROG
-from bpf_code_gen import gen_program
-from data_structure import *
+from data_structure import Info, Record, StateObject, PacketBuffer
+from bpf_code_gen import generate_bpf_prog
 
 
 # TODO: make a framework agnostic interface, allow for porting to other
@@ -67,10 +66,9 @@ def generate_offload(file_path, entry_func):
     body_of_loop = list(ev_loop.get_children())[-1]
     insts = gather_instructions_under(body_of_loop, info)
 
+    info.prog.parser_code = insts
+
     # Going through the instructions and generating BPF code
-    print('\n\n')
-    text = gen_program(insts, info)
-    print(text)
 
     # Show what are the instructions (DEBUGING
     print('\n\n')
@@ -80,7 +78,7 @@ def generate_offload(file_path, entry_func):
     # prog.parser_prog = logic_code
 
     # Print the code we have generated
-    # print(prog.get_code())
+    print(generate_bpf_prog(info))
 
 
 def boot_starp_global_state(cursor, info):

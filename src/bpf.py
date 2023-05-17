@@ -25,7 +25,7 @@ class SK_SKB_PROG:
     def add_declaration(self, text):
         self.declarations.add(text)
 
-    def per_connection_state(self):
+    def _per_connection_state(self):
         return ([
                 '/* Put state of each socket in this struct (This will be used in sockops.h as',
                 ' * part of per socket metadata) */',
@@ -34,33 +34,37 @@ class SK_SKB_PROG:
                 ])
 
 
-    def parser_prog(self):
+    def _load_connection_state():
+        return '''
+if (skb->sk == NULL) {
+  bpf_printk("The socket reference is NULL");
+  return SK_DROP;
+}
+sock_ctx = bpf_sk_storage_get(&sock_ctx_map, skb->sk, NULL, 0);
+if (!sock_ctx) {
+  bpf_printk("Failed to get socket context!");
+  return SK_DROP;
+}
+'''
+
+
+    def _parser_prog(self, body):
         return ([
                 'SEC("sk_skb/stream_parser")',
                 'int parser(struct __sk_buff *skb)',
                 '{',
                 ]
-                + self.parser_code
+                + body
                 + ['}']
                 )
 
-    def verdict_prog(self):
+    def _verdict_prog(self, body):
         return ([
                 'SEC("sk_skb/stream_verdict")',
                 'int verdict(struct __sk_buff *skb)',
                 '{',
                 ]
-                + self.verdict_code
+                + body
                 + ['}']
                 )
 
-    def get_code(self):
-        code = ([]
-                + self.headers
-                + [d.get_c_code() for d in self.declarations]
-                + self.per_connection_state()
-                + self.parser_prog()
-                + self.verdict_prog()
-                + [f'char _license[] SEC("license") = "{self.license}";',]
-                )
-        return '\n'.join(code)

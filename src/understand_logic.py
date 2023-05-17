@@ -141,10 +141,11 @@ def gather_instructions_from(cursor, info):
             ops.append(inst)
             continue
         elif c.kind == clang.CursorKind.UNARY_OPERATOR:
-            inst = Instruction()
-            inst.kind = c.kind
+            inst = UnaryOp(c)
+            children = list(c.get_children())
+            assert(len(children) == 1)
+            inst.child = gather_instructions_from(children[0], info)
             ops.append(inst)
-            print("I need more data about unary operator")
         elif c.kind == clang.CursorKind.DECL_STMT:
             var_decl = None
             init = []

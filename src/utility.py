@@ -1,3 +1,4 @@
+import sys
 import clang.cindex as clang
 
 
@@ -31,12 +32,8 @@ def parse_file(file_path):
     compiler_args = '-std=c++20'.split()
     index = clang.Index.create()
     tu = index.parse(file_path, args=compiler_args)
-    print('---------------------------------------')
-    print('Diagnostics:')
-    print('---------------------------------------')
     for d in tu.diagnostics:
-        print(d.format())
-    print('---------------------------------------')
+        print(d.format(), file=sys.stderr)
     cursor = tu.cursor
     return index, tu, cursor
 
@@ -91,8 +88,9 @@ def generate_struct_with_fields(name, fields):
     Create a struct definition with the given name and fields.
     fields: an array of type StateObject
     """
-    struct = [f'struct {name} {{'] + [f.get_c_code() for f in fields] + ['};']
-    return '\n'.join(struct)
+    body = indent('\n'.join([f.get_c_code() for f in fields]), 1)
+    struct = f'struct {name} {{\n' + body + '\n};'
+    return struct
 
 
 def visualize_ast(cursor):
@@ -165,3 +163,15 @@ def get_owner(cursor):
         print('get_owner: unhandled cursor kind')
 
     return res
+
+
+INDENT = '  '
+def indent(text, count=1):
+    body = text.split('\n')
+    indented = []
+    for b in body:
+        if not b:
+            continue
+        indented.append(INDENT * count + b)
+    body = '\n'.join(indented)
+    return body
