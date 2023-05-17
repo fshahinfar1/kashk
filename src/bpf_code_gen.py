@@ -1,6 +1,6 @@
 import clang.cindex as clang
 
-from data_structure import Function
+from data_structure import Function, StateObject
 
 READ_PACKET = 'async_read_some'
 WRITE_PACKET = 'async_write'
@@ -54,6 +54,7 @@ def handle_call(inst, info, more):
     if func_name not in Function.directory:
         f = Function(func_name, inst.func_ptr)
         info.prog.add_declaration(f)
+        # TODO: generate the definition of the function
     else:
         f = Function.directory[func_name]
         info.prog.add_declaration(f)
@@ -77,10 +78,7 @@ def handle_ref_expr(inst, info, more):
     lvl = more[0]
     state_obj = info.scope.get(inst.name)
     if state_obj:
-        if state_obj.is_global:
-            text = '' + state_obj.name
-        else:
-            text = state_obj.name
+        text = __generate_code_ref_state_obj(state_obj)
     else:
         text = inst.name
     return text
@@ -172,6 +170,9 @@ def gen_code(list_instructions, info, context=BODY):
 
         if inst is None:
             text = '<missing something>'
+        elif isinstance(inst, StateObject):
+            # TODO: this is bad code design, remove this branch
+            text = __generate_code_ref_state_obj(inst)
         else:
             handler = jump_table.get(inst.kind, lambda x,y,z: '')
             text = handler(inst, info, [lvl])
@@ -188,3 +189,25 @@ def gen_code(list_instructions, info, context=BODY):
 
         code += text
     return code
+
+
+def __generate_code_ref_state_obj(state_obj):
+    # print(state_obj, state_obj.parent_object)
+    hierarchy, g = __build_hierarchy(state_obj)
+    hierarchy = '.'.join([h.name for h in reversed(hierarchy)])
+    if g:
+        text = 'sock_ctx->' + hierarchy
+    else:
+        text = hierarchy
+    return text
+
+def __build_hierarchy(state_obj):
+    g = False
+    hierarchy = [state_obj]
+    x = state_obj
+    while x.parent_object is not None:
+        hierarchy.append(x.parent_object)
+        x = x.parent_object
+    if hierarchy[-1].is_global:
+        g  = True
+    return hierarchy, g

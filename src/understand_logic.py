@@ -157,7 +157,7 @@ def gather_instructions_from(cursor, info):
             inst = VarDecl(var_decl)
             inst.init = init
             ops.append(inst)
-            info.scope.add_local(inst.name, inst)
+            info.scope.add_local(inst.name, inst.state_obj)
         elif c.kind == clang.CursorKind.MEMBER_REF_EXPR:
             inst = Instruction()
             inst.cursor = c

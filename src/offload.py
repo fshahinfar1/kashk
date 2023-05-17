@@ -12,6 +12,8 @@ from bpf_code_gen import gen_program
 from data_structure import *
 
 
+# TODO: make a framework agnostic interface, allow for porting to other
+# functions
 def generate_offload(file_path, entry_func):
     # Keep track of which variable name is what, what types has been defined
     # and other information learned about the program
@@ -36,24 +38,24 @@ def generate_offload(file_path, entry_func):
         add_state_decl_to_bpf(info.prog, states, decls)
         for s in states:
             s.is_global = True
+            s.parent_object = None
             info.scope.add_global(s.name, s)
 
     # TODO: all the initialization and operations done before the event loop is
     # probably part of the control program setting up the BPF program.
 
-    # TODO: make a framework agnostic interface, allow for porting to other
-    # functions
     # Find the buffer representing the packet
     reads = get_all_read(ev_loop)
+    if len(reads) > 1:
+        print('Multiple read function was found!', file=sys.stderr)
+        return
     for r in reads:
         # the buffer is in the first arg
         first_arg = list(r.get_arguments())[0]
         info.rd_buf = PacketBuffer(first_arg.get_definition())
-        # TODO: if there are reads from different sockets, bail out!
     if info.rd_buf is None:
         print('Failed to find the packet buffer', file=sys.stderr)
         return
-
 
     print('The state until now is:')
     print(info.scope.glbl)
@@ -99,9 +101,14 @@ def boot_starp_global_state(cursor, info):
     field.kind = clang.TypeKind.RECORD
     field.is_global = True
     field.type_ref = tcp_conn_struct
+    field.parent_object = None
+
+    for s in states:
+        s.parent_object = field
 
     add_state_decl_to_bpf(info.prog, [field], decls)
     info.scope.add_global(field.name, field)
+
 
 def add_state_decl_to_bpf(prog, states, decls):
     for s in states:

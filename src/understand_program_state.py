@@ -61,12 +61,7 @@ def extract_state(cursor):
         if c.type.kind in (clang.TypeKind.RECORD, clang.TypeKind.ELABORATED):
             d = generate_decleration_for(c)
             decl += d
-
-            if c.type.kind == clang.TypeKind.RECORD:
-                obj.type_ref = Record.directory.get(c.type.spelling)
-                if obj.type_ref:
-                    for f in obj.type_ref.fields:
-                        f.parent_object = obj
+            obj.type_ref = d[-1]
         states.append(obj)
     return states, decl
 
@@ -83,8 +78,11 @@ def get_state_for(cursor):
         states.append(StateObject(cursor))
         decl = generate_decleration_for(cursor) 
     elif k == clang.CursorKind.VAR_DECL:
-        states.append(StateObject(cursor))
+        obj = StateObject(cursor)
+        states.append(obj)
         decl = generate_decleration_for(cursor)
+        if cursor.type.kind in (clang.TypeKind.RECORD, clang.TypeKind.ELABORATED) and decl:
+            obj.type_ref = d[-1]
     else:
         raise Exception('Not implemented! ' + str(k))
     return states, decl

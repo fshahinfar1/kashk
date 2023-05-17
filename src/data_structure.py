@@ -15,6 +15,7 @@ class Info:
         self.wr_buf = None
         self.prog = SK_SKB_PROG()
 
+
 class PacketBuffer:
     """
     A buffer passed to the read/write functions
@@ -191,11 +192,12 @@ class VarDecl(Instruction):
         # implementing things
         self.cursor = c
 
+        self.state_obj = StateObject(c)
+
         self.type = c.type.spelling
         self.name = c.spelling
         self.kind = clang.CursorKind.VAR_DECL
         self.init = []
-        self.is_global = False
 
     def __str__(self):
         return f'<VarDecl {self.kind}: {self.type} {self.name} = {self.init}>'
