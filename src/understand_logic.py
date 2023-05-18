@@ -1,3 +1,4 @@
+import itertools
 import clang.cindex as clang
 
 from log import error
@@ -108,6 +109,253 @@ def __has_read(cursor):
     return False
 
 
+def __convert_curosr_to_inst(c, info):
+    if c.kind == clang.CursorKind.CALL_EXPR:
+        tmp_func_name = c.spelling
+        if tmp_func_name in COROUTINE_FUNC_NAME:
+            # Ignore these
+            return None
+        # A call to the function
+        inst = Call(c)
+
+        # Update name ------------------------------------
+        func_name = '__this_function_name_is_not_defined__'
+        if inst.is_method:
+            # find the object having this method
+            owner = list(reversed(inst.owner))
+            func_name = []
+            obj = info.scope
+            for x in owner:
+                obj = obj.get(x)
+                if obj is None:
+                    break
+                func_name.append(obj.type)
+                if not obj:
+                    raise Exception(f'Object not found: {obj}')
+            func_name.append(inst.name)
+            func_name = '_'.join(func_name)
+        else:
+            func_name = inst.name
+        inst.name = func_name
+        # ------------------------------------------------
+
+        args = []
+        for x in c.get_arguments():
+            arg = gather_instructions_from(x, info)
+            args.extend(arg)
+        inst.args = args
+
+        # check if function is defined
+        if inst.name not in Function.directory:
+            f = Function(inst.name, inst.func_ptr)
+            f.is_method = inst.is_method
+            if f.is_method:
+                ref_name = owner[0]
+                ref_state_obj = info.scope.get(ref_name)
+                if ref_state_obj is not None:
+                    ref_state = ref_state_obj
+                else:
+                    ref_state = f'T {ref_name}'
+                f.args = [ref_state] + f.args
+            if f.body_cursor:
+                # report_on_cursor(c)
+                # visualize_ast(f.body_cursor)
+                f.body = gather_instructions_under(f.body_cursor, info)
+            info.prog.add_declaration(f)
+        return inst
+    elif c.kind == clang.CursorKind.BINARY_OPERATOR:
+        # TODO: I do not know how to get information about binary
+        # operations. My idea is to parse it my self.
+        inst = BinOp(c)
+        children = list(c.get_children())
+        assert(len(children) == 2)
+        inst.lhs = gather_instructions_from(children[0], info)
+        inst.rhs = gather_instructions_from(children[1], info)
+        return inst
+    elif (c.kind == clang.CursorKind.UNARY_OPERATOR
+            or c.kind == clang.CursorKind.CXX_UNARY_EXPR):
+        inst = UnaryOp(c)
+        children = list(c.get_children())
+        assert(len(children) == 1)
+        inst.child = gather_instructions_from(children[0], info)
+        return inst
+    elif (c.kind == clang.CursorKind.CXX_REINTERPRET_CAST_EXPR
+            or c.kind == clang.CursorKind.CSTYLE_CAST_EXPR):
+        # print('cast')
+        # report_on_cursor(c)
+
+        children = list(c.get_children())
+        count_children = len(children)
+        inst = Instruction()
+        inst.kind = clang.CursorKind.CSTYLE_CAST_EXPR
+        if count_children == 1:
+            inst.castee = gather_instructions_from(children[0], info)
+            tokens = list(map(lambda x: x.spelling, c.get_tokens()))
+            assert tokens[0] == '('
+            index = tokens.index(')')
+            type_name = ' '.join(tokens[1:index])
+            inst.cast_type = type_name
+        elif count_children == 2:
+            inst.castee = gather_instructions_from(children[1], info)
+            inst.cast_type = children[0]
+        else:
+            raise Exception('Unexpected case!!')
+    elif c.kind == clang.CursorKind.DECL_STMT:
+        var_decl = None
+        init = []
+        children = list(c.get_children())
+        if children[0].kind == clang.CursorKind.VAR_DECL:
+            var_decl = children[0]
+            children = list(var_decl.get_children())
+            if children:
+                init = gather_instructions_from(children[-1], info)
+            inst = VarDecl(var_decl)
+            inst.init = init
+            info.scope.add_local(inst.name, inst.state_obj)
+            return inst
+        else:
+            error(f'Failed to add Instruction VarDecl for {c.spelling} {c.kind}')
+            return None
+    elif c.kind == clang.CursorKind.MEMBER_REF_EXPR:
+        inst = Instruction()
+        inst.cursor = c
+        inst.name = c.spelling
+        inst.kind = c.kind
+        inst.owner = get_owner(c)[1:]
+        return inst
+    elif (c.kind == clang.CursorKind.DECL_REF_EXPR
+            or c.kind == clang.CursorKind.TYPE_REF):
+        inst = Instruction()
+        inst.kind = clang.CursorKind.DECL_REF_EXPR
+        inst.name = c.spelling
+        return inst
+    elif c.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
+        # print('Array sub')
+        # report_on_cursor(c)
+
+        children = list(c.get_children())
+        count_children = len(children)
+        assert count_children == 2
+
+        inst = Instruction()
+        inst.kind = c.kind
+        inst.array_name = children[0].spelling
+        inst.index = gather_instructions_from(children[1], info)
+        return inst
+    elif c.kind in (clang.CursorKind.CXX_BOOL_LITERAL_EXPR,
+            clang.CursorKind.INTEGER_LITERAL,
+            clang.CursorKind.FLOATING_LITERAL,
+            clang.CursorKind.STRING_LITERAL,
+            clang.CursorKind.CHARACTER_LITERAL,):
+        inst = Instruction()
+        inst.kind = c.kind
+        report_on_cursor(c)
+        # print(list(map(lambda x: x.spelling, c.get_tokens())))
+        token_text = [t.spelling for t in c.get_tokens()]
+        if len(token_text) == 0:
+            inst.text = '<unknown>'
+            error('Some literal expration has unknown')
+        else:
+            inst.text = token_text[0]
+        return inst
+    elif c.kind == clang.CursorKind.CONTINUE_STMT:
+        inst = Instruction()
+        inst.kind = c.kind
+        return inst
+    elif c.kind == clang.CursorKind.IF_STMT:
+        children = list(c.get_children())
+        cond = gather_instructions_from(children[0], info)
+        body = []
+        other_body = []
+        if len(children) > 1:
+            body = gather_instructions_from(children[1], info)
+        if len(children) > 2:
+            other_body = gather_instructions_from(children[2], info)
+
+        inst = ControlFlowInst()
+        inst.kind = c.kind
+        inst.cond = cond
+        inst.body = body
+        inst.other_body = other_body 
+
+        return inst
+    elif c.kind == clang.CursorKind.DO_STMT:
+        children = list(c.get_children())
+        body = children[0]
+        cond = children[-1]
+
+        inst = ControlFlowInst()
+        inst.kind = c.kind
+        inst.cond = gather_instructions_from(cond, info)
+        inst.body = gather_instructions_under(body, info)
+        return inst
+    elif c.kind == clang.CursorKind.SWITCH_STMT:
+        children = list(c.get_children())
+        assert len(children) == 2
+        cond = gather_instructions_from(children[0], info)
+        body = gather_instructions_under(children[1], info)
+
+        inst = ControlFlowInst()
+        inst.kind = c.kind
+        inst.cond = cond
+        inst.body = body
+        return inst
+    elif c.kind == clang.CursorKind.CASE_STMT:
+        children = list(c.get_children())
+        assert len(children) == 2
+        inst = Instruction()
+        inst.kind = c.kind
+        inst.case = children[0]
+        inst.body = gather_instructions_from(children[1], info)
+        return inst
+    elif c.kind == clang.CursorKind.DEFAULT_STMT:
+        body = next(c.get_children())
+        inst = Instruction()
+        inst.kind = c.kind
+        inst.body = gather_instructions_from(body, info)
+        return inst
+    elif c.kind == clang.CursorKind.BREAK_STMT:
+        inst = Instruction()
+        inst.kind = c.kind
+        return inst
+    elif c.kind == clang.CursorKind.RETURN_STMT:
+        children = list(c.get_children())
+        count_children =  len(children)
+        inst = Instruction()
+        inst.kind = c.kind
+        if count_children == 0:
+            inst.body = []
+        elif count_children == 1:
+            inst.body = gather_instructions_from(children[0], info)
+        else:
+            raise Exception('Unexpected situation when encountering RETURN_STMT')
+    elif c.kind == clang.CursorKind.CXX_THROW_EXPR:
+        inst = Instruction()
+        inst.kind = c.kind
+        return inst
+    elif c.kind == clang.CursorKind.UNEXPOSED_STMT:
+        # Some hacks
+        text = get_code(c)
+        if text.startswith('co_return'):
+            inst = Instruction()
+            inst.kind = clang.CursorKind.RETURN_STMT
+            return inst
+        return None
+    else:
+        error('TODO:')
+        report_on_cursor(c)
+        return None
+
+
+def __should_process_this_file(path):
+    ignore_headers=['include/asio/','string', 'vecotr', 'map', 'iostream', 'stdio.h', 'stdlib.h']
+    for header in ignore_headers:
+        if header in path:
+            error(f'ignore {path}')
+            return False
+    return True
+
+
 def gather_instructions_from(cursor, info):
     """
     Convert the cursor to a instruction
@@ -118,153 +366,31 @@ def gather_instructions_from(cursor, info):
     while q:
         c = q.pop()
 
-        if c.kind == clang.CursorKind.CALL_EXPR:
-            tmp_func_name = c.spelling
-            if tmp_func_name in COROUTINE_FUNC_NAME:
-                # Ignore these
-                continue
-            # A call to the function
-            inst = Call(c)
+        # Check if this is a ASIO element
+        if not c.location.file or not __should_process_this_file(c.location.file.name):
+            continue 
 
-            # Update name ------------------------------------
-            func_name = '__this_function_name_is_not_defined__'
-            if inst.is_method:
-                # find the object having this method
-                owners = list(reversed(inst.owner))
-                func_name = []
-                obj = info.scope
-                for x in owners:
-                    obj = obj.get(x)
-                    if obj is None:
-                        break
-                    func_name.append(obj.type)
-                    if not obj:
-                        raise Exception(f'Object not found: {obj}')
-                func_name.append(inst.name)
-                func_name = '_'.join(func_name)
-            else:
-                func_name = inst.name
-            inst.name = func_name
-            # ------------------------------------------------
-
-            args = []
-            for x in c.get_arguments():
-                arg = gather_instructions_from(x, info)
-                args.extend(arg)
-            inst.args = args
-            ops.append(inst)
-
-            # check if function is defined
-            if inst.name not in Function.directory:
-                f = Function(inst.name, inst.func_ptr)
-                if f.body_cursor:
-                    f.body = gather_instructions_under(f.body_cursor, info)
-                info.prog.add_declaration(f)
-            continue
-        elif c.kind == clang.CursorKind.BINARY_OPERATOR:
-            # TODO: I do not know how to get information about binary
-            # operations. My idea is to parse it my self.
-            inst = BinOp(c)
-            children = list(c.get_children())
-            assert(len(children) == 2)
-            inst.lhs = gather_instructions_from(children[0], info)
-            inst.rhs = gather_instructions_from(children[1], info)
-            ops.append(inst)
-            continue
-        elif c.kind == clang.CursorKind.UNARY_OPERATOR:
-            inst = UnaryOp(c)
-            children = list(c.get_children())
-            assert(len(children) == 1)
-            inst.child = gather_instructions_from(children[0], info)
-            ops.append(inst)
-        elif c.kind == clang.CursorKind.DECL_STMT:
-            var_decl = None
-            init = []
-            children = list(c.get_children())
-            if children[0].kind == clang.CursorKind.VAR_DECL:
-                var_decl = children[0]
-                children = list(var_decl.get_children())
-                if children:
-                    init = gather_instructions_from(children[-1], info)
-                inst = VarDecl(var_decl)
-                inst.init = init
-                ops.append(inst)
-                info.scope.add_local(inst.name, inst.state_obj)
-            else:
-                error(f'Failed to add Instruction VarDecl for {c.spelling} {c.kind}')
-        elif c.kind == clang.CursorKind.MEMBER_REF_EXPR:
-            inst = Instruction()
-            inst.cursor = c
-            inst.name = c.spelling
-            inst.kind = c.kind
-            inst.owner = get_owner(c)[1:]
-            ops.append(inst)
-        elif c.kind == clang.CursorKind.DECL_REF_EXPR:
-            inst = Instruction()
-            inst.kind = c.kind
-            inst.name = c.spelling
-            ops.append(inst)
-        elif c.kind in (clang.CursorKind.CXX_BOOL_LITERAL_EXPR,
-                clang.CursorKind.INTEGER_LITERAL,
-                clang.CursorKind.FLOATING_LITERAL,
-                clang.CursorKind.STRING_LITERAL):
-            inst = Instruction()
-            inst.kind = c.kind
-            inst.text = [t.spelling for t in c.get_tokens()][0]
-            ops.append(inst)
-        elif c.kind == clang.CursorKind.CONTINUE_STMT:
-            inst = Instruction()
-            inst.kind = c.kind
-            ops.append(inst)
-        elif c.kind == clang.CursorKind.IF_STMT:
-            children = list(c.get_children())
-            cond = gather_instructions_from(children[0], info)
-            body = []
-            other_body = []
-            if len(children) > 1:
-                body = gather_instructions_from(children[1], info)
-            if len(children) > 2:
-                other_body = gather_instructions_from(children[2], info)
-
-            inst = ControlFlowInst()
-            inst.kind = c.kind
-            inst.cond = cond
-            inst.body = body
-            inst.other_body = other_body 
-
-            ops.append(inst)
-        elif c.kind == clang.CursorKind.DO_STMT:
-            children = list(c.get_children())
-            body = children[0]
-            cond = children[-1]
-
-            inst = ControlFlowInst()
-            inst.kind = c.kind
-            inst.cond = gather_instructions_from(cond, info)
-            inst.body = gather_instructions_under(body, info)
-            ops.append(inst)
-        elif c.kind == clang.CursorKind.CXX_THROW_EXPR:
-            inst = Instruction()
-            inst.kind = c.kind
-            ops.append(inst)
-        elif c.kind == clang.CursorKind.COMPOUND_STMT:
+        if (c.kind == clang.CursorKind.COMPOUND_STMT
+                or c.kind == clang.CursorKind.UNEXPOSED_EXPR):
             # Continue deeper
             for child in reversed(list(c.get_children())):
                 q.append(child)
-        elif c.kind == clang.CursorKind.UNEXPOSED_EXPR:
-            # Continue deeper
-            for child in reversed(list(c.get_children())):
-                q.append(child)
-        elif c.kind == clang.CursorKind.UNEXPOSED_STMT:
-            # Some hacks
-            text = get_code(c)
-            if text.startswith('co_return'):
-                inst = Instruction()
-                inst.kind = clang.CursorKind.RETURN_STMT
-                ops.append(inst)
-        else:
-            error('TODO:')
-            report_on_cursor(c)
+            continue
+        elif c.kind == clang.CursorKind.CXX_TRY_STMT:
+            # We do not have try statement in C or BPF.
+            # The idea is to do what is in the try part and hope for the best!
+            # TODO: Maybe do not offload try-except parts. Considering them as
+            # stopping condition.
+
+            children = list(c.get_children())
+            assert len(children) > 0
+            q.append(children[0])
+            continue
+
+        inst = __convert_curosr_to_inst(c, info)
+        if inst:
+            ops.append(inst)
+
     return ops
 
 

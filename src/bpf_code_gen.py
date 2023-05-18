@@ -71,6 +71,26 @@ def handle_ref_expr(inst, info, more):
     return text
 
 
+def handle_member_ref_expr(inst, info, more):
+    lvl = more[0]
+    # TODO: ...
+    assert len(inst.owner) == 0
+    print(inst.name)
+    assert info.context.kind == ContextInfo.KindFunction
+    # reference to the object will be in the first argument of the function
+    args = info.context.ref.args
+    if len(args) < 1:
+        return '<missing ref>->{inst.name}'
+    obj = args[0]
+    if isinstance(obj, str):
+        # TODO: this probably was a method call and the first arguement is the
+        # reference to the object.
+        text = f'{obj}->{inst.name}'
+    else:
+        text = f'{obj.name}->{inst.name}'
+    return text
+
+
 def handle_literal(inst, info, more):
     lvl = more[0]
     return INDENT * lvl + inst.text
@@ -122,10 +142,11 @@ CHANGE_BUFFER_DEF = 2
 def gen_code(list_instructions, info, context=BODY):
     jump_table = {
             clang.CursorKind.CALL_EXPR: handle_call,
-            clang.CursorKind.VAR_DECL: handle_var,
             clang.CursorKind.BINARY_OPERATOR: handle_bin_op,
             clang.CursorKind.UNARY_OPERATOR: handle_unary_op,
+            clang.CursorKind.VAR_DECL: handle_var,
             clang.CursorKind.DECL_REF_EXPR: handle_ref_expr,
+            clang.CursorKind.MEMBER_REF_EXPR: handle_member_ref_expr,
             clang.CursorKind.INTEGER_LITERAL: handle_literal,
             clang.CursorKind.FLOATING_LITERAL: handle_literal,
             clang.CursorKind.CXX_BOOL_LITERAL_EXPR: handle_literal,
@@ -150,6 +171,9 @@ def gen_code(list_instructions, info, context=BODY):
             text = __generate_code_ref_state_obj(inst)
         elif isinstance(inst, TypeDefinition):
             text = __generate_code_type_definition(inst, info)
+            if not text:
+                # We do not want this definition
+                continue
         else:
             # Some special rules
             if inst.kind == clang.CursorKind.VAR_DECL and inst.name == info.rd_buf.name:
@@ -200,11 +224,21 @@ def generate_bpf_prog(info):
 
 def __generate_code_type_definition(inst, info):
     if isinstance(inst, Function):
-        print(inst.return_type, inst.name, '(', inst.args, ')', '{')
-        body,_ = gen_code(inst.body, info)
-        print(body)
-        print('}')
-        return ''
+        if inst.cursor.spelling in (READ_PACKET, WRITE_PACKET):
+            return ''
+
+        # Change the context
+        old_ctx = info.context 
+        new_ctx = ContextInfo(ContextInfo.KindFunction, inst)
+        info.context = new_ctx
+        body, _ = gen_code(inst.body, info)
+        # Switch back the context
+        info.context = old_ctx
+
+        body = indent(body)
+
+        text = f'{inst.return_type} {inst.name} ({inst.args}) {{\n{body}\n}}'
+        return text
     else:
         return inst.get_c_code()
 

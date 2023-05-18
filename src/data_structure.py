@@ -1,7 +1,7 @@
 import itertools
 import clang.cindex as clang
 
-from utility import get_code, get_owner, generate_struct_with_fields
+from utility import get_code, get_owner, generate_struct_with_fields, report_on_cursor
 
 
 class Info:
@@ -11,6 +11,7 @@ class Info:
     def __init__(self):
         from bpf import SK_SKB_PROG
         self.scope = Scope()
+        self.context = None
         self.rd_buf = None
         self.wr_buf = None
         self.prog = SK_SKB_PROG()
@@ -144,6 +145,10 @@ class Function(TypeDefinition):
         if c.is_definition():
             children = list(c.get_children())
             body = children[-1]
+            while body.kind == clang.CursorKind.UNEXPOSED_STMT:
+                body = next(body.get_children())
+            # print(name)
+            # print([(x.spelling, x.kind) for x in children])
             assert (body.kind == clang.CursorKind.COMPOUND_STMT)
         else:
             body = None 
@@ -153,6 +158,8 @@ class Function(TypeDefinition):
         self.args = [StateObject(a) for a in c.get_arguments()]
 
         self.return_type = 'ret_type'
+
+        self.is_method = False
 
         if self.name in Function.directory:
             raise Exception(f'Function is already defined ({self.name})')
@@ -241,7 +248,7 @@ class ControlFlowInst(Instruction):
 
 
 class UnaryOp(Instruction):
-    OPS = ('!', '-', '++', '--', '!', '&')
+    OPS = ('!', '-', '++', '--', '!', '&', 'sizoef')
 
     def __init__(self, cursor):
         super().__init__()
@@ -272,6 +279,7 @@ class BinOp(Instruction):
         self.kind = clang.CursorKind.BINARY_OPERATOR
         self.lhs = []
         self.rhs = []
+        self.op = ''
 
         text = self.__get_raw_c_code(cursor)
         tks = self.__parse(text)
@@ -279,6 +287,10 @@ class BinOp(Instruction):
             if t in BinOp.ALL_OP:
                 self.op = t
                 break
+        if not self.op:
+            report_on_cursor(cursor)
+            print(tks)
+            self.op = '<operation is unknown>'
 
     def __parse(self, text):
         """
@@ -355,3 +367,11 @@ class BinOp(Instruction):
         return self.__str__()
 
 
+class ContextInfo:
+    KindFunction = 0
+    KindClass = 1
+
+    def __init__(self, kind, ref):
+        self.kind = kind
+        self.ref = ref
+        pass

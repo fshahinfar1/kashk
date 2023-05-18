@@ -2,12 +2,12 @@ import sys
 import clang.cindex as clang
 import queue
 
-from utility import parse_file, find_elem, show_insts
+from utility import parse_file, find_elem, show_insts, report_on_cursor
 from understand_program_state import (extract_state, get_state_for,)
 from understand_logic import (find_event_loop,
         get_variable_declaration_before_elem, get_all_read,
         gather_instructions_under)
-from data_structure import Info, Record, StateObject, PacketBuffer
+from data_structure import *
 from bpf_code_gen import generate_bpf_prog
 
 
@@ -24,6 +24,10 @@ def generate_offload(file_path, entry_func):
     if entry_func is None:
         print('Did not found the entry function', file=sys.stderr)
         return
+    # The initial context of the code is entry function
+    print(entry_func.is_definition())
+    report_on_cursor(entry_func)
+    info.context = ContextInfo(ContextInfo.KindFunction, Function('entry', entry_func))
     # The arguments to the entry function is part of the connection state
     # entry_func_params = [get_state_for(arg) for arg in entry_func.get_arguments()]
     boot_starp_global_state(cursor, info)
