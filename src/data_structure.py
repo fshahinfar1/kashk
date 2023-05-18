@@ -133,7 +133,27 @@ class Function(TypeDefinition):
     directory = {}
     def __init__(self, name, c):
         super().__init__(name)
+
+        # Make sure it is the function definition
+        if not c.is_definition():
+            tmp_cursor = c.get_definition()
+            if tmp_cursor:
+                c = tmp_cursor
         self.cursor = c
+
+        if c.is_definition():
+            children = list(c.get_children())
+            body = children[-1]
+            assert (body.kind == clang.CursorKind.COMPOUND_STMT)
+        else:
+            body = None 
+        self.body_cursor = body
+        self.body = []
+
+        self.args = [StateObject(a) for a in c.get_arguments()]
+
+        self.return_type = 'ret_type'
+
         if self.name in Function.directory:
             raise Exception(f'Function is already defined ({self.name})')
         Function.directory[self.name] = self

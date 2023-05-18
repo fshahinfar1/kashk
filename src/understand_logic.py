@@ -1,5 +1,6 @@
 import clang.cindex as clang
 
+from log import error
 from utility import get_code, report_on_cursor, visualize_ast, get_owner
 from data_structure import *
 
@@ -127,7 +128,6 @@ def gather_instructions_from(cursor, info):
 
             # Update name ------------------------------------
             func_name = '__this_function_name_is_not_defined__'
-            print(inst.name, inst.is_method, inst.owner)
             if inst.is_method:
                 # find the object having this method
                 owners = list(reversed(inst.owner))
@@ -157,6 +157,8 @@ def gather_instructions_from(cursor, info):
             # check if function is defined
             if inst.name not in Function.directory:
                 f = Function(inst.name, inst.func_ptr)
+                if f.body_cursor:
+                    f.body = gather_instructions_under(f.body_cursor, info)
                 info.prog.add_declaration(f)
             continue
         elif c.kind == clang.CursorKind.BINARY_OPERATOR:
@@ -184,10 +186,12 @@ def gather_instructions_from(cursor, info):
                 children = list(var_decl.get_children())
                 if children:
                     init = gather_instructions_from(children[-1], info)
-            inst = VarDecl(var_decl)
-            inst.init = init
-            ops.append(inst)
-            info.scope.add_local(inst.name, inst.state_obj)
+                inst = VarDecl(var_decl)
+                inst.init = init
+                ops.append(inst)
+                info.scope.add_local(inst.name, inst.state_obj)
+            else:
+                error(f'Failed to add Instruction VarDecl for {c.spelling} {c.kind}')
         elif c.kind == clang.CursorKind.MEMBER_REF_EXPR:
             inst = Instruction()
             inst.cursor = c
@@ -259,6 +263,7 @@ def gather_instructions_from(cursor, info):
                 inst.kind = clang.CursorKind.RETURN_STMT
                 ops.append(inst)
         else:
+            error('TODO:')
             report_on_cursor(c)
     return ops
 

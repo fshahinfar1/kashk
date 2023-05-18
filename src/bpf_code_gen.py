@@ -1,7 +1,7 @@
 import clang.cindex as clang
 
 from data_structure import *
-from utility import indent, INDENT
+from utility import indent, INDENT, report_on_cursor
 
 READ_PACKET = 'async_read_some'
 WRITE_PACKET = 'async_write'
@@ -149,7 +149,7 @@ def gen_code(list_instructions, info, context=BODY):
             # TODO: this is bad code design, remove this branch
             text = __generate_code_ref_state_obj(inst)
         elif isinstance(inst, TypeDefinition):
-            text = inst.get_c_code()
+            text = __generate_code_type_definition(inst, info)
         else:
             # Some special rules
             if inst.kind == clang.CursorKind.VAR_DECL and inst.name == info.rd_buf.name:
@@ -165,8 +165,8 @@ def gen_code(list_instructions, info, context=BODY):
                 handler = jump_table.get(inst.kind, lambda x,y,z: '')
                 text = handler(inst, info, [lvl])
         
-        if not text:
-            text = f'<empty code generated kind: {inst.kind}>'
+            if not text:
+                text = f'<empty code generated kind: {inst.kind}>'
 
         if context == BODY:
             if inst.kind in NEED_SEMI_COLON:
@@ -196,6 +196,17 @@ def generate_bpf_prog(info):
             + [f'char _license[] SEC("license") = "{info.prog.license}";',]
             )
     return '\n'.join(code)
+
+
+def __generate_code_type_definition(inst, info):
+    if isinstance(inst, Function):
+        print(inst.return_type, inst.name, '(', inst.args, ')', '{')
+        body,_ = gen_code(inst.body, info)
+        print(body)
+        print('}')
+        return ''
+    else:
+        return inst.get_c_code()
 
 
 def __generate_code_ref_state_obj(state_obj):

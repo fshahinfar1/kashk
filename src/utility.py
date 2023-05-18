@@ -1,5 +1,6 @@
-import sys
 import clang.cindex as clang
+
+from log import error, debug
 
 
 PRIMITIVE_TYPES = [
@@ -32,8 +33,10 @@ def parse_file(file_path):
     compiler_args = '-std=c++20'.split()
     index = clang.Index.create()
     tu = index.parse(file_path, args=compiler_args)
-    for d in tu.diagnostics:
-        print(d.format(), file=sys.stderr)
+    if tu.diagnostics:
+        error('Diagnostics:')
+        for d in tu.diagnostics:
+            error(d.format())
     cursor = tu.cursor
     return index, tu, cursor
 
@@ -102,7 +105,7 @@ def visualize_ast(cursor):
     while q:
         c, l = q.pop()
 
-        print('|  '*l + f'+- {c.spelling} {c.kind}')
+        debug('|  '*l + f'+- {c.spelling} {c.kind}')
 
         # Continue deeper
         children = list(reversed(list(c.get_children())))
@@ -118,17 +121,17 @@ def report_on_cursor(c):
         3. Line of code in the source file
     """
     # What are we processing?
-    print(c.spelling, c.kind)
+    debug(c.spelling, c.kind)
     children = list(c.get_children())
-    print([(x.spelling, x.kind) for x in children])
+    debug([(x.spelling, x.kind) for x in children])
     # DEBUGING: Show every line of code
     if c.location.file:
         fname = c.location.file.name
         with open(fname) as f:
             l = f.readlines()[c.location.line-1]
             l = l.rstrip()
-            print(l)
-            print(' ' * (c.location.column -1) + '^')
+            debug(l)
+            debug(' ' * (c.location.column -1) + '^')
 
 
 def show_insts(lst, depth=0):
@@ -136,7 +139,7 @@ def show_insts(lst, depth=0):
     Visualize the tree of instructions
     """
     for i in lst:
-        print('  '*depth + str(i))
+        debug('  '*depth + str(i))
         # print(i.get_c_code())
         if i.has_children():
             show_insts(i.body, depth=depth+1)
@@ -148,6 +151,8 @@ def show_insts(lst, depth=0):
 def get_owner(cursor):
     res = []
     children = list(cursor.get_children())
+    if len(children) == 0:
+        return ['this']
     assert len(children) > 0
     parent = children[0]
     if parent.kind == clang.CursorKind.DECL_REF_EXPR: 
@@ -160,7 +165,7 @@ def get_owner(cursor):
     elif parent.kind == clang.CursorKind.UNEXPOSED_EXPR:
         res += get_owner(parent)
     else:
-        print('get_owner: unhandled cursor kind')
+        error('get_owner: unhandled cursor kind')
 
     return res
 
