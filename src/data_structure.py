@@ -71,6 +71,20 @@ class StateObject:
         self.is_global = False
         self.type_ref = None
         self.parent_object = None
+        self.is_ref = False
+
+    def clone(self):
+        if not self.cursor:
+            print(self)
+        new = StateObject(self.cursor)
+        new.name = self.name
+        new.type = self.type
+        new.kind = self.kind
+        new.is_global = self.is_global
+        new.type_ref = self.type_ref
+        new.parent_object = None
+        new.is_ref = self.is_ref
+        return new
 
     def get(self, name):
         if self.type_ref:
@@ -201,7 +215,8 @@ class Call(Instruction):
         self.is_method = False
 
         children = list(cursor.get_children())
-        if len(children) > 0 and children[0].kind == clang.CursorKind.MEMBER_REF_EXPR:
+        # TODO: operator should have some sign after it. Fix this, a function name operator can confuse the code.
+        if len(children) > 0 and (children[0].kind == clang.CursorKind.MEMBER_REF_EXPR or self.name.startswith('operator')):
             mem = children[0]
             self.owner = get_owner(mem)
             if self.owner:
@@ -289,7 +304,6 @@ class BinOp(Instruction):
                 break
         if not self.op:
             report_on_cursor(cursor)
-            print(tks)
             self.op = '<operation is unknown>'
 
     def __parse(self, text):

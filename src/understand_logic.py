@@ -109,6 +109,21 @@ def __has_read(cursor):
     return False
 
 
+def __function_is_of_interest(inst):
+    if inst.is_method:
+        # TODO: filter based on methods of types we do not want to have
+        return True
+        # for o in inst.owner:
+        #     # TODO: i need more information from the owner not just its name
+        #     if o == 'string':
+        #         return False
+    if inst.name.startswith('operator'):
+        # TODO: I do not want operators for now. But It would be good to
+        # support it as another function decleration and invocation
+        return False
+    return True
+
+
 def __convert_curosr_to_inst(c, info):
     if c.kind == clang.CursorKind.CALL_EXPR:
         tmp_func_name = c.spelling
@@ -146,14 +161,16 @@ def __convert_curosr_to_inst(c, info):
         inst.args = args
 
         # check if function is defined
-        if inst.name not in Function.directory:
+        if __function_is_of_interest(inst) and inst.name not in Function.directory:
             f = Function(inst.name, inst.func_ptr)
             f.is_method = inst.is_method
             if f.is_method:
                 ref_name = owner[0]
                 ref_state_obj = info.scope.get(ref_name)
                 if ref_state_obj is not None:
-                    ref_state = ref_state_obj
+                    ref_state = ref_state_obj.clone()
+                    ref_state.is_ref = True
+                    # ref_state = f'{ref_state_obj.type} {ref_state_obj.name}'
                 else:
                     ref_state = f'T {ref_name}'
                 f.args = [ref_state] + f.args
@@ -163,7 +180,8 @@ def __convert_curosr_to_inst(c, info):
                 f.body = gather_instructions_under(f.body_cursor, info)
             info.prog.add_declaration(f)
         return inst
-    elif c.kind == clang.CursorKind.BINARY_OPERATOR:
+    elif (c.kind == clang.CursorKind.BINARY_OPERATOR
+            or c.kind == clang.CursorKind.COMPOUND_ASSIGNMENT_OPERATOR):
         # TODO: I do not know how to get information about binary
         # operations. My idea is to parse it my self.
         inst = BinOp(c)
@@ -178,6 +196,22 @@ def __convert_curosr_to_inst(c, info):
         children = list(c.get_children())
         assert(len(children) == 1)
         inst.child = gather_instructions_from(children[0], info)
+        return inst
+    elif c.kind == clang.CursorKind.CONDITIONAL_OPERATOR:
+        children = list(c.get_children())
+        assert len(children) == 3
+        inst = ControlFlowInst()
+        inst.kind = c.kind
+        inst.cond = gather_instructions_from(children[0], info)
+        inst.body = gather_instructions_from(children[1], info)
+        inst.other_body = gather_instructions_from(children[2], info)
+        return inst
+    elif c.kind == clang.CursorKind.PAREN_EXPR:
+        children = list(c.get_children())
+        assert len(children) == 1
+        inst = Instruction()
+        inst.kind = c.kind
+        inst.body = gather_instructions_from(children[0], info)
         return inst
     elif (c.kind == clang.CursorKind.CXX_REINTERPRET_CAST_EXPR
             or c.kind == clang.CursorKind.CSTYLE_CAST_EXPR):
@@ -249,7 +283,6 @@ def __convert_curosr_to_inst(c, info):
             clang.CursorKind.CHARACTER_LITERAL,):
         inst = Instruction()
         inst.kind = c.kind
-        report_on_cursor(c)
         # print(list(map(lambda x: x.spelling, c.get_tokens())))
         token_text = [t.spelling for t in c.get_tokens()]
         if len(token_text) == 0:
@@ -348,10 +381,10 @@ def __convert_curosr_to_inst(c, info):
 
 
 def __should_process_this_file(path):
-    ignore_headers=['include/asio/','string', 'vecotr', 'map', 'iostream', 'stdio.h', 'stdlib.h']
+    ignore_headers = ['include/asio/', 'lib/gcc',]
     for header in ignore_headers:
         if header in path:
-            error(f'ignore {path}')
+            # error(f'ignore {path}')
             return False
     return True
 

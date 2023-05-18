@@ -81,6 +81,11 @@ def generate_offload(file_path, entry_func):
     # # Get logic code
     # prog.parser_prog = logic_code
 
+    # print(info.prog.declarations)
+    # for d in info.prog.declarations:
+    #     if isinstance(d, Function) and d.name == 'TCPConnection_Parser_state':
+
+
     # Print the code we have generated
     text = generate_bpf_prog(info)
     print(text)
@@ -98,7 +103,6 @@ def boot_starp_global_state(cursor, info):
 
     # The global state has following field
     field = StateObject(tcp_conn)
-    field.cursor = None
     field.name = 'conn'
     field.type = 'TCPConnection'
     field.kind = clang.TypeKind.RECORD

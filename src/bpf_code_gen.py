@@ -75,7 +75,6 @@ def handle_member_ref_expr(inst, info, more):
     lvl = more[0]
     # TODO: ...
     assert len(inst.owner) == 0
-    print(inst.name)
     assert info.context.kind == ContextInfo.KindFunction
     # reference to the object will be in the first argument of the function
     args = info.context.ref.args
@@ -227,6 +226,20 @@ def __generate_code_type_definition(inst, info):
         if inst.cursor.spelling in (READ_PACKET, WRITE_PACKET):
             return ''
 
+        args = []
+        for a in inst.args:
+            if isinstance(a, str):
+                args.append(a)
+            else:
+                # text, _ = gen_code([a], info, context=ARG)
+                # TODO: what if the parameter is a pointer?
+                if a.is_ref:
+                    text = f'{a.type} *{a.name}'
+                else:
+                    text = f'{a.type} {a.name}'
+                args.append(text)
+        text_args = ', '.join(args)
+
         # Change the context
         old_ctx = info.context 
         new_ctx = ContextInfo(ContextInfo.KindFunction, inst)
@@ -234,10 +247,9 @@ def __generate_code_type_definition(inst, info):
         body, _ = gen_code(inst.body, info)
         # Switch back the context
         info.context = old_ctx
-
         body = indent(body)
 
-        text = f'{inst.return_type} {inst.name} ({inst.args}) {{\n{body}\n}}'
+        text = f'{inst.return_type} {inst.name} ({text_args}) {{\n{body}\n}}'
         return text
     else:
         return inst.get_c_code()
