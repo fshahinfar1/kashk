@@ -118,17 +118,46 @@ def gather_instructions_from(cursor, info):
         c = q.pop()
 
         if c.kind == clang.CursorKind.CALL_EXPR:
-            if c.spelling in COROUTINE_FUNC_NAME:
+            tmp_func_name = c.spelling
+            if tmp_func_name in COROUTINE_FUNC_NAME:
                 # Ignore these
                 continue
             # A call to the function
             inst = Call(c)
+
+            # Update name ------------------------------------
+            func_name = '__this_function_name_is_not_defined__'
+            print(inst.name, inst.is_method, inst.owner)
+            if inst.is_method:
+                # find the object having this method
+                owners = list(reversed(inst.owner))
+                func_name = []
+                obj = info.scope
+                for x in owners:
+                    obj = obj.get(x)
+                    if obj is None:
+                        break
+                    func_name.append(obj.type)
+                    if not obj:
+                        raise Exception(f'Object not found: {obj}')
+                func_name.append(inst.name)
+                func_name = '_'.join(func_name)
+            else:
+                func_name = inst.name
+            inst.name = func_name
+            # ------------------------------------------------
+
             args = []
             for x in c.get_arguments():
                 arg = gather_instructions_from(x, info)
                 args.extend(arg)
             inst.args = args
             ops.append(inst)
+
+            # check if function is defined
+            if inst.name not in Function.directory:
+                f = Function(inst.name, inst.func_ptr)
+                info.prog.add_declaration(f)
             continue
         elif c.kind == clang.CursorKind.BINARY_OPERATOR:
             # TODO: I do not know how to get information about binary
@@ -200,7 +229,6 @@ def gather_instructions_from(cursor, info):
             inst.other_body = other_body 
 
             ops.append(inst)
-            print("* I need to find the reference to branching condition\n")
         elif c.kind == clang.CursorKind.DO_STMT:
             children = list(c.get_children())
             body = children[0]
@@ -210,6 +238,10 @@ def gather_instructions_from(cursor, info):
             inst.kind = c.kind
             inst.cond = gather_instructions_from(cond, info)
             inst.body = gather_instructions_under(body, info)
+            ops.append(inst)
+        elif c.kind == clang.CursorKind.CXX_THROW_EXPR:
+            inst = Instruction()
+            inst.kind = c.kind
             ops.append(inst)
         elif c.kind == clang.CursorKind.COMPOUND_STMT:
             # Continue deeper

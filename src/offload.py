@@ -56,10 +56,10 @@ def generate_offload(file_path, entry_func):
         print('Failed to find the packet buffer', file=sys.stderr)
         return
 
-    print('The state until now is:')
-    print(info.scope.glbl)
-    print(info.scope.local)
-    print('-------------------------------------\n')
+    # print('The state until now is:')
+    # print(info.scope.glbl)
+    # print(info.scope.local)
+    # print('-------------------------------------\n')
 
     # Go through the instructions, replace access to the buffer and read/write
     # instructions
@@ -71,14 +71,15 @@ def generate_offload(file_path, entry_func):
     # Going through the instructions and generating BPF code
 
     # Show what are the instructions (DEBUGING
-    print('\n\n')
-    show_insts(insts)
+    # print('\n\n')
+    # show_insts(insts)
 
     # # Get logic code
     # prog.parser_prog = logic_code
 
     # Print the code we have generated
-    print(generate_bpf_prog(info))
+    text = generate_bpf_prog(info)
+    print(text)
 
 
 def boot_starp_global_state(cursor, info):

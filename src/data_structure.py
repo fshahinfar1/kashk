@@ -106,12 +106,12 @@ class Elaborate(TypeDefinition):
     def __init__(self, c):
         super().__init__(c.spelling)
         self.cursor = c
-        if self.name in Elaborate.directory:
-            raise Exception('Unexpected error')
-        Elaborate.directory[self.name] = self
+        if self.name not in Elaborate.directory:
+            # raise Exception('Unexpected error')
+            Elaborate.directory[self.name] = self
 
     def get_c_code(self):
-        d = get_code(self.cursor) + ';'
+        d = get_code(self.cursor)
         return d
 
 

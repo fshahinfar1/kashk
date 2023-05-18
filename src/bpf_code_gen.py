@@ -1,6 +1,6 @@
 import clang.cindex as clang
 
-from data_structure import Function, StateObject
+from data_structure import *
 from utility import indent, INDENT
 
 READ_PACKET = 'async_read_some'
@@ -28,35 +28,8 @@ def handle_var(inst, info, more):
 
 def handle_call(inst, info, more):
     lvl = more[0]
-    func_name = '__this_function_name_is_not_defined__'
+    func_name = inst.name
     args = list(inst.args) # a copy of the objects list of argument
-    if inst.is_method:
-        # find the object having this method
-        owners = list(reversed(inst.owner))
-        func_name = []
-        obj = info.scope
-        for x in owners:
-            obj = obj.get(x)
-            if obj is None:
-                break
-            func_name.append(obj.type)
-            if not obj:
-                raise Exception(f'Object not found: {obj}')
-        func_name.append(inst.name)
-        func_name = '_'.join(func_name)
-        args = [obj] + args
-    else:
-        func_name = inst.name
-
-    # check if function is defined
-    if func_name not in Function.directory:
-        f = Function(func_name, inst.func_ptr)
-        info.prog.add_declaration(f)
-        # TODO: generate the definition of the function
-    else:
-        f = Function.directory[func_name]
-        info.prog.add_declaration(f)
-
     code_args = []
     for x in args:
         tmp, _ = gen_code([x], info, context=ARG)
@@ -134,11 +107,12 @@ BODY = 0
 ARG = 1
 LHS = 2
 RHS = 3
+DEF = 4
 
 NEED_SEMI_COLON = set((clang.CursorKind.CALL_EXPR, clang.CursorKind.VAR_DECL,
     clang.CursorKind.BINARY_OPERATOR, clang.CursorKind.CONTINUE_STMT,
     clang.CursorKind.DO_STMT, clang.CursorKind.RETURN_STMT,
-    clang.CursorKind.CONTINUE_STMT))
+    clang.CursorKind.CONTINUE_STMT, clang.CursorKind.CXX_THROW_EXPR,))
 GOTO_NEXT_LINE = (clang.CursorKind.IF_STMT,)
 
 NO_MODIFICATION = 0
@@ -159,6 +133,7 @@ def gen_code(list_instructions, info, context=BODY):
             clang.CursorKind.DO_STMT: handle_do_stmt,
             clang.CursorKind.CONTINUE_STMT: lambda x,y,z: 'continue',
             clang.CursorKind.RETURN_STMT: lambda x,y,z: 'return SK_DROP',
+            clang.CursorKind.CXX_THROW_EXPR: lambda x,y,z: 'return SK_DROP',
             }
     count = len(list_instructions)
     q = reversed(list_instructions)
@@ -173,10 +148,15 @@ def gen_code(list_instructions, info, context=BODY):
         elif isinstance(inst, StateObject):
             # TODO: this is bad code design, remove this branch
             text = __generate_code_ref_state_obj(inst)
+        elif isinstance(inst, TypeDefinition):
+            text = inst.get_c_code()
         else:
             # Some special rules
             if inst.kind == clang.CursorKind.VAR_DECL and inst.name == info.rd_buf.name:
                 text = f'char *{info.rd_buf.name}'
+                modified = CHANGE_BUFFER_DEF
+            elif inst.kind == clang.CursorKind.CALL_EXPR and inst.name == 'operator<<':
+                text = f'// removing a call to "<<" operator'
                 modified = CHANGE_BUFFER_DEF
             elif inst.kind == clang.CursorKind.CALL_EXPR and inst.name == READ_PACKET:
                 text = call_read_packet(inst, info, [lvl])
@@ -193,6 +173,8 @@ def gen_code(list_instructions, info, context=BODY):
                 text += ';\n'
             elif inst.kind in GOTO_NEXT_LINE:
                 text += '\n'
+        elif context == DEF:
+            text += ';\n'
 
 
         code += text
@@ -200,11 +182,14 @@ def gen_code(list_instructions, info, context=BODY):
 
 
 def generate_bpf_prog(info):
+    decs = list(info.prog.declarations)
+    declarations, _ = gen_code(decs, info, context=DEF) 
     parser_code, _ = gen_code(info.prog.parser_code, info)
     parser_code = indent(parser_code, 1)
+
     code = ([]
             + info.prog.headers
-            + [d.get_c_code() for d in info.prog.declarations]
+            + [declarations]
             + info.prog._per_connection_state()
             + info.prog._parser_prog([parser_code])
             + info.prog._verdict_prog([])

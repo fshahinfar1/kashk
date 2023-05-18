@@ -1,7 +1,8 @@
 import sys
 import clang.cindex as clang
 
-from utility import find_elem, get_code, generate_struct_with_fields, PRIMITIVE_TYPES
+from utility import (find_elem, get_code, generate_struct_with_fields,
+        PRIMITIVE_TYPES, report_on_cursor)
 from bpf import SK_SKB_PROG
 from data_structure import *
 
@@ -33,12 +34,20 @@ def generate_decleration_for(cursor):
         # No further deps
         return []
     elif cursor.type.kind == clang.TypeKind.TYPEDEF:
-        if cursor.kind.is_declaration():
-            t = cursor.underlying_typedef_type
-            under_kind = t.kind
+        # print(cursor.spelling)
+        if not cursor.kind.is_declaration():
+            t = cursor.type.get_declaration()
+            # print(t)
+            # report_on_cursor(t)
         else:
-            print('Typedef if not declaration, I do not udnerstand this.')
-            under_kind = cursor.kind
+        # if cursor.kind.is_declaration():
+            t = cursor.underlying_typedef_type
+        under_kind = t.kind
+        # else:
+        #     c = cursor.type.get_declaration()
+        #     report_on_cursor(c)
+        #     print('Typedef if not declaration, I do not udnerstand this.', file=sys.stderr)
+        #     under_kind = cursor.kind
         if under_kind in PRIMITIVE_TYPES:
             # No further type decleration needed
             return []
