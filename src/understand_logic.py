@@ -144,9 +144,6 @@ def __convert_curosr_to_inst(c, info):
         return inst
     elif (c.kind == clang.CursorKind.CXX_REINTERPRET_CAST_EXPR
             or c.kind == clang.CursorKind.CSTYLE_CAST_EXPR):
-        # print('cast')
-        # report_on_cursor(c)
-
         children = list(c.get_children())
         count_children = len(children)
         inst = Instruction()
@@ -175,6 +172,13 @@ def __convert_curosr_to_inst(c, info):
             inst = VarDecl(var_decl)
             inst.init = init
             info.scope.add_local(inst.name, inst.state_obj)
+
+            # Variable Declaration
+            name = var_decl.spelling
+            T = var_decl.type.spelling
+            entry = SymbolTableEntry(name, T, 'variable', None)
+            info.sym_tbl.insert(entry)
+
             return inst
         else:
             error(f'Failed to add Instruction VarDecl for {c.spelling} {c.kind}')
@@ -310,6 +314,9 @@ def __convert_curosr_to_inst(c, info):
 
 
 def __should_process_this_file(path):
+    """
+    Try to prune the search space by ignoring some library files.
+    """
     ignore_headers = ['include/asio/', 'lib/gcc',]
     for header in ignore_headers:
         if header in path:

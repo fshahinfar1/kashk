@@ -68,7 +68,7 @@ class StateObject:
     def __init__(self, c):
         self.cursor = c
         self.name = c.spelling
-        self.type = c.type.spelling 
+        self.type = c.type.spelling
         self.kind = c.type.kind
         self.is_global = False
         self.type_ref = None
@@ -167,7 +167,7 @@ class Function(TypeDefinition):
             # print([(x.spelling, x.kind) for x in children])
             assert (body.kind == clang.CursorKind.COMPOUND_STMT)
         else:
-            body = None 
+            body = None
         self.body_cursor = body
         self.body = []
 
@@ -304,6 +304,7 @@ class BinOp(Instruction):
             if t in BinOp.ALL_OP:
                 self.op = t
                 break
+
         if not self.op:
             report_on_cursor(cursor)
             self.op = '<operation is unknown>'

@@ -165,6 +165,8 @@ def gen_code(list_instructions, info, context=BODY):
 
         if inst is None:
             text = '<missing something>'
+        elif isinstance(inst, str):
+            text = inst
         elif isinstance(inst, StateObject):
             # TODO: this is bad code design, remove this branch
             text = __generate_code_ref_state_obj(inst)

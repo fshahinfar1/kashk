@@ -9,6 +9,9 @@ COROUTINE_FUNC_NAME = ('await_resume', 'await_transform', 'await_ready', 'await_
 
 
 def __function_is_of_interest(inst):
+    """
+    Decide if the function should also be defined in BPF code
+    """
     if inst.is_method:
         # TODO: filter based on methods of types we do not want to have
         return True
@@ -49,6 +52,30 @@ def __get_func_args(inst, info):
     for x in inst.cursor.get_arguments():
         arg = gather_instructions_from(x, info)
         args.extend(arg)
+
+    # TODO: I am just sending the object as a string to be placed in the first
+    # argument. Maybe I need to share a symbol object
+    # If function is a method, we need to pass the reference to the object as
+    # the first argument
+    if inst.is_method:
+        hierarchy = []
+        obj = info.scope
+        for ref_name in reversed(inst.owner):
+            obj = obj.get(ref_name)
+            if obj is None:
+                print('Reference not found!', hierarchy, ref_name)
+                hierarchy.append(ref_name)
+                hierarchy.append('.')
+                break
+            hierarchy.append(obj.name)
+            if obj.is_ref:
+                hierarchy.append('->')
+            else:
+                hierarchy.append('.')
+        # remove the last token (. , ->)
+        hierarchy.pop()
+        ref_name = ''.join(hierarchy)
+        args = ['&'+ref_name] + args
     return args
 
 
@@ -107,5 +134,4 @@ def understand_call_expr(c, info):
         __add_func_definition(inst, info)
 
     return inst
-
 
