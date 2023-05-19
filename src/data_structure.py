@@ -2,6 +2,7 @@ import itertools
 import clang.cindex as clang
 
 from utility import get_code, get_owner, generate_struct_with_fields, report_on_cursor
+from sym_table import SymbolTable
 
 
 class Info:
@@ -15,6 +16,7 @@ class Info:
         self.rd_buf = None
         self.wr_buf = None
         self.prog = SK_SKB_PROG()
+        self.sym_tbl = SymbolTable()
 
 
 class PacketBuffer:
