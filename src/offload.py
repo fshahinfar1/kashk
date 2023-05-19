@@ -10,6 +10,9 @@ from understand_logic import (find_event_loop,
 from data_structure import *
 from bpf_code_gen import generate_bpf_prog
 
+from sym_table_gen import build_sym_table, scope_mapping
+from pprint import pprint
+
 
 # TODO: make a framework agnostic interface, allow for porting to other
 # functions
@@ -17,24 +20,34 @@ def generate_offload(file_path, entry_func):
     # Keep track of which variable name is what, what types has been defined
     # and other information learned about the program
     info = Info()
+
     # This is the AST generated with Clang
     index, tu, cursor = parse_file(file_path)
+
+    # Collect information about classes, functions, variables, ...
+    build_sym_table(cursor, info)
+    # pprint(scope_mapping)
+
+
     # Find the entry function
     entry_func = find_elem(cursor, 'Server::handle_connection')
     if entry_func is None:
-        print('Did not found the entry function', file=sys.stderr)
+        error('Did not found the entry function')
         return
-    # The initial context of the code is entry function
-    report_on_cursor(entry_func)
-    info.context = ContextInfo(ContextInfo.KindFunction, Function('entry', entry_func))
+
+    # # The initial context of the code is entry function
+    # info.context = ContextInfo(ContextInfo.KindFunction, Function('entry', entry_func))
+
     # The arguments to the entry function is part of the connection state
     # entry_func_params = [get_state_for(arg) for arg in entry_func.get_arguments()]
     boot_starp_global_state(cursor, info)
+
     # Find the event-loop
     ev_loop = find_event_loop(entry_func)
+
     # All declerations between event loop is shared among multiple packets of
     # one connection
-    all_declerations_before_loop = get_variable_declaration_before_elem(entry_func, ev_loop)
+    all_declerations_before_loop = get_variable_declaration_before_elem(entry_func, ev_loop, info)
     for d in all_declerations_before_loop:
         states, decls = get_state_for(d.cursor)
         add_state_decl_to_bpf(info.prog, states, decls)
@@ -91,17 +104,27 @@ def generate_offload(file_path, entry_func):
 
 
 def boot_starp_global_state(cursor, info):
-    # Per connection state class
-    tcp_conn = find_elem(cursor, 'TCPConnection')
+    """
+    This function prepares the initial scope for processing phase. In the
+    processing phase we go throught the instructions and understand the program
+    logic. The understanding is used for further transformation to BPF program.
+    """
+    # Set the scope to the Server::handle_connection
+    scope = scope_mapping['Server_handle_connection']
+    info.sym_tbl.current_scope = scope
+
+    tcp_conn_entry = info.sym_tbl.lookup('class_TCPConnection')
+    info.sym_tbl.insert_entry('conn', tcp_conn_entry.type, clang.CursorKind.PARM_DECL, None)
+
     # The fields and its dependencies
-    states, decls = extract_state(tcp_conn)
+    states, decls = extract_state(tcp_conn_entry.ref)
 
     # The input argument is of this type
     tcp_conn_struct = Record('TCPConnection', states)
     decls.append(tcp_conn_struct)
 
     # The global state has following field
-    field = StateObject(tcp_conn)
+    field = StateObject(tcp_conn_entry.ref)
     field.name = 'conn'
     field.type = 'TCPConnection'
     field.kind = clang.TypeKind.RECORD
@@ -113,7 +136,7 @@ def boot_starp_global_state(cursor, info):
         s.parent_object = field
 
     add_state_decl_to_bpf(info.prog, [field], decls)
-    info.scope.add_global(field.name, field)
+    # info.scope.add_global(field.name, field)
 
 
 def add_state_decl_to_bpf(prog, states, decls):

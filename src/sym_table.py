@@ -1,10 +1,21 @@
+from contextlib import contextmanager
+import pprint
+
+
 class SymbolTableEntry:
-    def __init__(self, name, type, scope, memory_location):
+    def __init__(self, name, type, kind, ref):
         self.name = name
         self.type = type
-        self.scope = scope
-        self.memory_location = memory_location
+        self.kind = kind
+        self.ref = ref
+
+        # Optional
         self.value = None
+        self.param_pos = 0
+
+    def __repr__(self):
+        return f'"<{self.kind}  {self.name}: {self.type.spelling}>"'
+
 
 class Scope:
     def __init__(self, parent=None):
@@ -23,24 +34,35 @@ class Scope:
         else:
             return None
 
+    def __repr__(self):
+        return pprint.pformat(self.symbols)
+
+
 class SymbolTable:
     def __init__(self):
         self.global_scope = Scope()
         self.current_scope = self.global_scope
 
+    def insert_entry(self, name, type, kind, ref):
+        e = SymbolTableEntry(name, type, kind, ref)
+        self.insert(e)
+        return e
+
     def insert(self, entry):
         self.current_scope.insert(entry)
 
     def lookup(self, name):
-        return self.global_scope.lookup(name)
+        return self.current_scope.lookup(name)
 
+    @contextmanager
     def new_scope(self):
         s = Scope(self.current_scope)
         self.current_scope = s
-        return s
+        try:
+            yield s
+        finally:
+            self.current_scope = self.current_scope.parent
 
-    def free_scope(self):
-        self.current_scope = self.current_scope.parent
 
 # def traverse_ast(node, symbol_table):
 #     if node.kind == clang.cindex.CursorKind.VAR_DECL:

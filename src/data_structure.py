@@ -2,6 +2,7 @@ import itertools
 import clang.cindex as clang
 
 from utility import get_code, get_owner, generate_struct_with_fields, report_on_cursor
+from log import error, debug
 from sym_table import SymbolTable
 
 
@@ -221,8 +222,15 @@ class Call(Instruction):
         if len(children) > 0 and (children[0].kind == clang.CursorKind.MEMBER_REF_EXPR or self.name.startswith('operator')):
             mem = children[0]
             self.owner = get_owner(mem)
-            if self.owner:
-                self.is_method = True
+            self.is_method = True
+
+        if cursor.spelling == 'finished':
+            debug('#', 'finished', self.is_method)
+            report_on_cursor(self.cursor)
+            error(self.cursor.get_usr())
+
+        # error(self.name, self.cursor, self.owner)
+        # report_on_cursor(self.cursor)
 
     def __str__(self):
         return f'<Call {self.name} ({self.args})>'
@@ -392,3 +400,10 @@ class ContextInfo:
         self.kind = kind
         self.ref = ref
         pass
+    
+    def __str__(self):
+        if self.kind == self.KindFunction:
+            return 'Function Context'
+        elif self.kind == self.KindClass:
+            return 'Class Context'
+        return 'Unknown Context'

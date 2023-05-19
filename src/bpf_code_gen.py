@@ -72,21 +72,23 @@ def handle_ref_expr(inst, info, more):
 
 
 def handle_member_ref_expr(inst, info, more):
-    lvl = more[0]
+    # lvl = more[0]
     # TODO: ...
-    assert len(inst.owner) == 0
-    assert info.context.kind == ContextInfo.KindFunction
+    # assert len(inst.owner) == 0
+    # assert info.context.kind == ContextInfo.KindFunction
     # reference to the object will be in the first argument of the function
-    args = info.context.ref.args
-    if len(args) < 1:
-        return '<missing ref>->{inst.name}'
-    obj = args[0]
-    if isinstance(obj, str):
-        # TODO: this probably was a method call and the first arguement is the
-        # reference to the object.
-        text = f'{obj}->{inst.name}'
-    else:
-        text = f'{obj.name}->{inst.name}'
+    # args = info.context.ref.args
+    # if len(args) < 1:
+    #     return '<missing ref>->{inst.name}'
+    # obj = args[0]
+    # if isinstance(obj, str):
+    #     # TODO: this probably was a method call and the first arguement is the
+    #     # reference to the object.
+    #     text = f'{obj}->{inst.name}'
+    # else:
+    #     text = f'{obj.name}->{inst.name}'
+
+    text = f'self->{inst.name}'
     return text
 
 
