@@ -183,7 +183,7 @@ def gen_code(list_instructions, info, context=BODY):
             elif inst.kind == clang.CursorKind.CALL_EXPR and inst.name == 'operator<<':
                 text = f'// removing a call to "<<" operator'
                 modified = CHANGE_BUFFER_DEF
-            elif inst.kind == clang.CursorKind.CALL_EXPR and inst.name == READ_PACKET:
+            elif inst.kind == clang.CursorKind.CALL_EXPR and inst.cursor.spelling == READ_PACKET:
                 text = call_read_packet(inst, info, [lvl])
                 modified = REPLACE_READ
             else:

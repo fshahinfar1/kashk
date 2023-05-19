@@ -25,7 +25,6 @@ def generate_offload(file_path, entry_func):
         print('Did not found the entry function', file=sys.stderr)
         return
     # The initial context of the code is entry function
-    print(entry_func.is_definition())
     report_on_cursor(entry_func)
     info.context = ContextInfo(ContextInfo.KindFunction, Function('entry', entry_func))
     # The arguments to the entry function is part of the connection state

@@ -42,7 +42,7 @@ def __get_func_name(inst, info):
             if not obj:
                 raise Exception(f'Object not found: {obj}')
         func_name.append(inst.name)
-        func_name = '_'.join(func_name)
+        func_name = '_'.join(func_name[-2:])
     else:
         func_name = inst.name
     return func_name
@@ -64,7 +64,7 @@ def __get_func_args(inst, info):
         for ref_name in reversed(inst.owner):
             obj = obj.get(ref_name)
             if obj is None:
-                print('Reference not found!', hierarchy, ref_name)
+                error('Reference not found!', hierarchy, ref_name)
                 hierarchy.append(ref_name)
                 hierarchy.append('.')
                 break
