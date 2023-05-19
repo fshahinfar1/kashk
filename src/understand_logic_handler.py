@@ -1,5 +1,6 @@
 import clang.cindex as clang
 from utility import get_code, report_on_cursor, visualize_ast, get_owner
+from log import error
 from data_structure import *
 from understand_logic import gather_instructions_from, gather_instructions_under
 from sym_table import *
@@ -83,8 +84,15 @@ def __add_func_definition(inst, info):
     f = Function(inst.name, inst.func_ptr)
     f.is_method = inst.is_method
     if f.is_method:
-        ref_name = inst.owner[0]
-        ref_state_obj = info.scope.get(ref_name)
+        obj = info.scope
+        for ref_name in reversed(inst.owner):
+            tmp_obj = obj.get(ref_name)
+            if tmp_obj is None:
+                error('Failed to find the reference!', inst.owner)
+                return
+            obj = tmp_obj
+        # ref_name = inst.owner[0]
+        ref_state_obj = obj
         if ref_state_obj is not None:
             ref_state = ref_state_obj.clone()
             ref_state.is_ref = True
