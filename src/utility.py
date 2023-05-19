@@ -153,7 +153,6 @@ def get_owner(cursor):
     children = list(cursor.get_children())
     if len(children) == 0:
         return []
-    assert len(children) > 0
     parent = children[0]
     if parent.kind == clang.CursorKind.DECL_REF_EXPR: 
         res.append(parent.spelling)

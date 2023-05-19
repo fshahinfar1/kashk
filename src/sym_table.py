@@ -64,6 +64,28 @@ class SymbolTable:
             self.current_scope = self.current_scope.parent
 
 
+class ScopeMapping:
+    def __init__(self):
+        self.scope_mapping = {}
+
+    def __getitem__(self, key):
+        return self.scope_mapping[key]
+
+    def __setitem__(self, key, val):
+        if key in self.scope_mapping:
+            raise Exception(f'a scope with the same name is created? (name: {key})')
+        self.scope_mapping[key] = val
+
+    def __repr__(self):
+        return pprint.pformat(self.scope_mapping)
+
+    def get(self, key, default=None):
+        return self.scope_mapping.get(key, default)
+
+
+scope_mapping = ScopeMapping()
+
+
 # def traverse_ast(node, symbol_table):
 #     if node.kind == clang.cindex.CursorKind.VAR_DECL:
 #         # Variable Declaration

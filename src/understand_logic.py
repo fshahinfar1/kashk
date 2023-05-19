@@ -135,29 +135,19 @@ def __convert_curosr_to_inst(c, info):
             inst.cast_type = children[0]
         else:
             raise Exception('Unexpected case!!')
-    elif c.kind == clang.CursorKind.DECL_STMT:
-        var_decl = None
+    elif c.kind == clang.CursorKind.VAR_DECL:
         init = []
         children = list(c.get_children())
-        if children[0].kind == clang.CursorKind.VAR_DECL:
-            var_decl = children[0]
-            children = list(var_decl.get_children())
-            if children:
-                init = gather_instructions_from(children[-1], info)
-            inst = VarDecl(var_decl)
-            inst.init = init
-            info.scope.add_local(inst.name, inst.state_obj)
+        if children:
+            init = gather_instructions_from(children[-1], info)
+        inst = VarDecl(c)
+        inst.init = init
+        info.scope.add_local(inst.name, inst.state_obj)
 
-            # Variable Declaration
-            name = var_decl.spelling
-            T = var_decl.type.spelling
-            entry = SymbolTableEntry(name, T, 'variable', None)
-            info.sym_tbl.insert(entry)
+        # Variable Declaration
+        info.sym_tbl.insert_entry(c.spelling, c.type, c.kind, c)
 
-            return inst
-        else:
-            error(f'Failed to add Instruction VarDecl for {c.spelling} {c.kind}')
-            return None
+        return inst
     elif c.kind == clang.CursorKind.MEMBER_REF_EXPR:
         inst = Instruction()
         inst.cursor = c
@@ -293,20 +283,17 @@ def gather_instructions_from(cursor, info):
     Convert the cursor to a instruction
     """
     ops = []
+    d = DFSPass(cursor)
     q = [cursor]
     # Outside the connection polling loop
-    while q:
-        c = q.pop()
-
-        # Check if this is a ASIO element
-        if not c.location.file or not should_process_this_file(c.location.file.name):
+    for c, _ in d:
+        if (not c.location.file
+                or not should_process_this_file(c.location.file.name)):
             continue 
 
         if (c.kind == clang.CursorKind.COMPOUND_STMT
                 or c.kind == clang.CursorKind.UNEXPOSED_EXPR):
-            # Continue deeper
-            for child in reversed(list(c.get_children())):
-                q.append(child)
+            d.go_deep()
             continue
         elif c.kind == clang.CursorKind.CXX_TRY_STMT:
             # We do not have try statement in C or BPF.
@@ -316,7 +303,7 @@ def gather_instructions_from(cursor, info):
 
             children = list(c.get_children())
             assert len(children) > 0
-            q.append(children[0])
+            d.enque(children[0])
             continue
 
         inst = __convert_curosr_to_inst(c, info)

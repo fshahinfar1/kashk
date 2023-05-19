@@ -37,8 +37,6 @@ def generate_decleration_for(cursor):
         # print(cursor.spelling)
         if not cursor.kind.is_declaration():
             t = cursor.type.get_declaration()
-            # print(t)
-            # report_on_cursor(t)
         else:
         # if cursor.kind.is_declaration():
             t = cursor.underlying_typedef_type

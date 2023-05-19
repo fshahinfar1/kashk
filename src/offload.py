@@ -10,7 +10,8 @@ from understand_logic import (find_event_loop,
 from data_structure import *
 from bpf_code_gen import generate_bpf_prog
 
-from sym_table_gen import build_sym_table, scope_mapping
+from sym_table import scope_mapping
+from sym_table_gen import build_sym_table
 from pprint import pprint
 
 
@@ -62,14 +63,14 @@ def generate_offload(file_path, entry_func):
     # Find the buffer representing the packet
     reads = get_all_read(ev_loop)
     if len(reads) > 1:
-        print('Multiple read function was found!', file=sys.stderr)
+        error('Multiple read function was found!')
         return
     for r in reads:
         # the buffer is in the first arg
         first_arg = list(r.get_arguments())[0]
         info.rd_buf = PacketBuffer(first_arg.get_definition())
     if info.rd_buf is None:
-        print('Failed to find the packet buffer', file=sys.stderr)
+        error('Failed to find the packet buffer')
         return
 
     # print('The state until now is:')
@@ -81,7 +82,6 @@ def generate_offload(file_path, entry_func):
     # instructions
     body_of_loop = list(ev_loop.get_children())[-1]
     insts = gather_instructions_under(body_of_loop, info)
-
     info.prog.parser_code = insts
 
     # Going through the instructions and generating BPF code

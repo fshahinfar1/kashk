@@ -8,26 +8,9 @@ import clang.cindex as clang
 import pprint
 
 
-class ScopeMapping:
-    def __init__(self):
-        self.scope_mapping = {}
-
-    def __getitem__(self, key):
-        return self.scope_mapping[key]
-
-    def __setitem__(self, key, val):
-        if key in self.scope_mapping:
-            raise Exception(f'a scope with the same name is created? (name: {key})')
-        self.scope_mapping[key] = val
-
-    def __repr__(self):
-        return pprint.pformat(self.scope_mapping)
-
-
-scope_mapping = ScopeMapping()
-
-
 def __collect_information_about_class(cursor, info):
+    info.sym_tbl.insert_entry('__class__', cursor.type, cursor.kind, cursor)
+
     d = DFSPass(cursor, inside=True)
     class_name = cursor.spelling
     for c, l in d:

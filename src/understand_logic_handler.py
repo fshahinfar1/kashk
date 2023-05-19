@@ -28,32 +28,34 @@ def __function_is_of_interest(inst):
 
 
 def __get_func_name(inst, info):
-    func_name = '__this_function_name_is_not_defined__'
+    func_name = inst.cursor.spelling
+    debug('++', func_name)
     if inst.is_method:
-        if inst.name == 'finished':
-            report_on_cursor(inst.func_ptr)
-        # find the object having this method
-        owner = list(reversed(inst.owner))
-        debug(inst.name, owner)
-        if len(owner) == 0:
-            # The method is for the current class
-            func_name = inst.name
+        cls = info.sym_tbl.lookup('__class__')
+        debug('is_method of', cls)
+        if len(inst.owner) == 0:
+            func_name = f'{cls.name}_{func_name}'
         else:
+            # find the object having this method
+            owner = list(reversed(inst.owner))
+            debug(owner)
             # Use the previouse objects to find the type of the class this
             # method belongs to
             func_name = []
-            obj = info.scope
+            scope = info.sym_tbl.current_scope
+            obj = None
             for x in owner:
-                obj = obj.get(x)
+                obj = scope.lookup(x)
                 if obj is None:
                     break
-                func_name.append(obj.type)
-                if not obj:
-                    raise Exception(f'Object not found: {obj}')
+                obj_cls = obj.type.spelling
+                func_name.append(obj_cls)
+                scope = scope_mapping.get(f'class_{obj_cls}')
+                if not scope:
+                    break
             func_name.append(inst.name)
             func_name = '_'.join(func_name[-2:])
-    else:
-        func_name = inst.name
+    debug('--', func_name)
     return func_name
 
 
@@ -97,7 +99,7 @@ def __get_func_args(inst, info):
             # remove the last token (. , ->)
             hierarchy.pop()
         else:
-            hierarchy = ['this', '->']
+            hierarchy = ['self', '->']
         ref_name = ''.join(hierarchy)
         args = ['&'+ref_name] + args
     return args
@@ -143,11 +145,9 @@ def understand_call_expr(c, info):
 
     # A call to the function
     inst = Call(c)
-    if inst.is_method and not inst.owner:
-        # TODO: I need to apply a hack here
-        debug('---', info.context)
     inst.name = __get_func_name(inst, info)
     inst.args = __get_func_args(inst, info)
+    print(f'call: {inst.name} is_method: {inst.is_method}')
 
     # check if function is defined
     if __function_is_of_interest(inst) and inst.name not in Function.directory:

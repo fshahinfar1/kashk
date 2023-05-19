@@ -224,11 +224,6 @@ class Call(Instruction):
             self.owner = get_owner(mem)
             self.is_method = True
 
-        if cursor.spelling == 'finished':
-            debug('#', 'finished', self.is_method)
-            report_on_cursor(self.cursor)
-            error(self.cursor.get_usr())
-
         # error(self.name, self.cursor, self.owner)
         # report_on_cursor(self.cursor)
 
