@@ -178,7 +178,7 @@ class Function(TypeDefinition):
 
         self.args = [StateObject(a) for a in c.get_arguments()]
 
-        self.return_type = 'ret_type'
+        self.return_type = self.cursor.result_type.spelling
 
         self.is_method = False
 

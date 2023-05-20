@@ -43,7 +43,7 @@ def handle_call(inst, info, more):
     args_text = ', '.join(code_args)
 
     # TODO: only generate ; if it is not as an argument
-    text = INDENT * lvl + func_name + '(' + args_text + ')'
+    text = indent(func_name + '(' + args_text + ')', lvl)
     return text
 
 
