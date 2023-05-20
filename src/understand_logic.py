@@ -146,7 +146,6 @@ def __convert_curosr_to_inst(c, info):
 
         # Variable Declaration
         info.sym_tbl.insert_entry(c.spelling, c.type, c.kind, c)
-
         return inst
     elif c.kind == clang.CursorKind.MEMBER_REF_EXPR:
         inst = Instruction()

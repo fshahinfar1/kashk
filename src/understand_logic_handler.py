@@ -27,6 +27,23 @@ def __function_is_of_interest(inst):
     return True
 
 
+def __owner_to_ref(owner, info):
+    owner = reversed(owner)
+    hierarchy = []
+    scope = info.sym_tbl.current_scope
+    obj = None
+    for x in owner:
+        obj = scope.lookup(x)
+        if obj is None:
+            break
+        hierarchy.append(obj)
+        obj_cls = obj.type.spelling
+        scope = scope_mapping.get(f'class_{obj_cls}')
+        if not scope:
+            break
+    return hierarchy
+
+
 def __get_func_name(inst, info):
     func_name = inst.cursor.spelling
     debug('++', func_name)
@@ -41,18 +58,8 @@ def __get_func_name(inst, info):
             debug(owner)
             # Use the previouse objects to find the type of the class this
             # method belongs to
-            func_name = []
-            scope = info.sym_tbl.current_scope
-            obj = None
-            for x in owner:
-                obj = scope.lookup(x)
-                if obj is None:
-                    break
-                obj_cls = obj.type.spelling
-                func_name.append(obj_cls)
-                scope = scope_mapping.get(f'class_{obj_cls}')
-                if not scope:
-                    break
+            owner_symb = __owner_to_ref(inst.owner, info)
+            func_name = list(map(lambda obj: obj.type.spelling, owner_symb))
             func_name.append(inst.name)
             func_name = '_'.join(func_name[-2:])
     debug('--', func_name)
@@ -82,25 +89,13 @@ def __get_func_args(inst, info):
     # the first argument
     if inst.is_method:
         if inst.owner:
-            hierarchy = []
-            obj = info.scope
-            for ref_name in reversed(inst.owner):
-                obj = obj.get(ref_name)
-                if obj is None:
-                    error('Reference not found!', hierarchy, ref_name)
-                    hierarchy.append(ref_name)
-                    hierarchy.append('.')
-                    break
-                hierarchy.append(obj.name)
-                if obj.is_ref:
-                    hierarchy.append('->')
-                else:
-                    hierarchy.append('.')
-            # remove the last token (. , ->)
-            hierarchy.pop()
+            hierarchy = list(map(lambda obj: obj.name,
+                __owner_to_ref(inst.owner, info)))
+            # TODO: maybe the objects are reference, handle this case
+            ref_name = '.'.join(hierarchy)
         else:
-            hierarchy = ['self', '->']
-        ref_name = ''.join(hierarchy)
+            ref_name = 'self->'
+
         args = ['&'+ref_name] + args
     return args
 
