@@ -46,35 +46,20 @@ def __owner_to_ref(owner, info):
 
 def __get_func_name(inst, info):
     func_name = inst.cursor.spelling
-    debug('++', func_name)
     if inst.is_method:
         cls = info.sym_tbl.lookup('__class__')
-        debug('is_method of', cls)
         if len(inst.owner) == 0:
             func_name = f'{cls.name}_{func_name}'
         else:
             # find the object having this method
             owner = list(reversed(inst.owner))
-            debug(owner)
             # Use the previouse objects to find the type of the class this
             # method belongs to
             owner_symb = __owner_to_ref(inst.owner, info)
             func_name = list(map(lambda obj: obj.type.spelling, owner_symb))
             func_name.append(inst.name)
             func_name = '_'.join(func_name[-2:])
-    debug('--', func_name)
     return func_name
-
-
-def __get_func_imm_owner(inst, info):
-    if not inst.is_method:
-        return None
-    obj = info.scope
-    for ref_name in reversed(inst.owner):
-        obj = obj.get(ref_name)
-        if obj is None:
-            return None
-    return obj
 
 
 def __get_func_args(inst, info):
@@ -89,11 +74,19 @@ def __get_func_args(inst, info):
     # the first argument
     if inst.is_method:
         if inst.owner:
-            hierarchy = list(map(lambda obj: obj.name,
-                __owner_to_ref(inst.owner, info)))
-            # TODO: maybe the objects are reference, handle this case
-            ref_name = '.'.join(hierarchy)
+            hierarchy = []
+            owner_symb = __owner_to_ref(inst.owner, info)
+            if owner_symb:
+                for obj in owner_symb:
+                    hierarchy.append(obj.name)
+                    link = '->' if obj.is_pointer else '.'
+                    hierarchy.append(link)
+                hierarchy.pop()
+            else:
+                error('owner list is not empty but we did not found the symbols')
+            ref_name = ''.join(hierarchy)
         else:
+            # The first argument of methods are self and it is a reference
             ref_name = 'self->'
 
         args = ['&'+ref_name] + args

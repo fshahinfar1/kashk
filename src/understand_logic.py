@@ -135,6 +135,10 @@ def __convert_curosr_to_inst(c, info):
             inst.cast_type = children[0]
         else:
             raise Exception('Unexpected case!!')
+    elif c.kind == clang.CursorKind.DECL_STMT:
+        children = list(c.get_children())
+        assert len(children) == 1
+        return gather_instructions_from(children[0], info)[0]
     elif c.kind == clang.CursorKind.VAR_DECL:
         init = []
         children = list(c.get_children())

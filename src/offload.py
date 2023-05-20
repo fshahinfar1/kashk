@@ -114,7 +114,11 @@ def boot_starp_global_state(cursor, info):
     info.sym_tbl.current_scope = scope
 
     tcp_conn_entry = info.sym_tbl.lookup('class_TCPConnection')
-    info.sym_tbl.insert_entry('conn', tcp_conn_entry.type, clang.CursorKind.PARM_DECL, None)
+    e = info.sym_tbl.insert_entry('conn', tcp_conn_entry.type, clang.CursorKind.PARM_DECL, None)
+    # Override what the clang thinks
+    e.is_pointer = True
+    e.name = 'sock_ctx'
+    # -----------------------------
 
     # The fields and its dependencies
     states, decls = extract_state(tcp_conn_entry.ref)

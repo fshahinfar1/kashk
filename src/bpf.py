@@ -34,8 +34,10 @@ class SK_SKB_PROG:
                 ])
 
 
-    def _load_connection_state():
+    def _load_connection_state(self):
         return '''
+struct sock_context *sock_ctx;
+
 if (skb->sk == NULL) {
   bpf_printk("The socket reference is NULL");
   return SK_DROP;

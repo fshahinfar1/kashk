@@ -1,3 +1,4 @@
+import clang.cindex as clang
 from contextlib import contextmanager
 import pprint
 
@@ -8,6 +9,8 @@ class SymbolTableEntry:
         self.type = type
         self.kind = kind
         self.ref = ref
+
+        self.is_pointer = type.kind == clang.TypeKind.POINTER
 
         # Optional
         self.value = None

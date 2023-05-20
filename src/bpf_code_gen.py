@@ -107,7 +107,7 @@ def handle_if_stmt(inst, info, more):
     if inst.other_body:
         body, _ = gen_code(inst.other_body, info, context=BODY)
         body = indent(body, 1)
-        text += 'else {\n' + body + '\n}'
+        text += ' else {\n' + body + '\n}'
     return text
 
 
@@ -211,7 +211,9 @@ def gen_code(list_instructions, info, context=BODY):
 def generate_bpf_prog(info):
     decs = list(info.prog.declarations)
     declarations, _ = gen_code(decs, info, context=DEF) 
+
     parser_code, _ = gen_code(info.prog.parser_code, info)
+    parser_code = info.prog._load_connection_state() + parser_code
     parser_code = indent(parser_code, 1)
 
     code = ([]
