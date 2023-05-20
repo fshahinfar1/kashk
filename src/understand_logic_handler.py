@@ -47,12 +47,11 @@ def __owner_to_ref(owner, info):
 def __get_func_name(inst, info):
     func_name = inst.cursor.spelling
     if inst.is_method:
-        cls = info.sym_tbl.lookup('__class__')
         if len(inst.owner) == 0:
+            cls = info.sym_tbl.lookup('__class__')
+            debug(cls)
             func_name = f'{cls.name}_{func_name}'
         else:
-            # find the object having this method
-            owner = list(reversed(inst.owner))
             # Use the previouse objects to find the type of the class this
             # method belongs to
             owner_symb = __owner_to_ref(inst.owner, info)
@@ -85,11 +84,10 @@ def __get_func_args(inst, info):
             else:
                 error('owner list is not empty but we did not found the symbols')
             ref_name = ''.join(hierarchy)
+            args = ['&'+ref_name] + args
         else:
             # The first argument of methods are self and it is a reference
-            ref_name = 'self->'
-
-        args = ['&'+ref_name] + args
+            args = ['self'] + args
     return args
 
 
@@ -117,8 +115,11 @@ def __add_func_definition(inst, info):
     if f.body_cursor:
         T = inst.cursor.result_type
 
+        old_scope = info.sym_tbl.current_scope
+        info.sym_tbl.current_scope = scope
         # Process function body recursively
         f.body = gather_instructions_under(f.body_cursor, info)
+        info.sym_tbl.current_scope = old_scope
 
         info.prog.add_declaration(f)
 

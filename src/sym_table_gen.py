@@ -9,7 +9,11 @@ import pprint
 
 
 def __collect_information_about_class(cursor, info):
-    info.sym_tbl.insert_entry('__class__', cursor.type, cursor.kind, cursor)
+    # map __class__ identifier to the class representing current scope -
+    e = info.sym_tbl.insert_entry('__class__', cursor.type, cursor.kind, cursor)
+    # override the name form __class__ to actual class name
+    e.name = cursor.spelling
+    # -------------------------------------------------------------------
 
     d = DFSPass(cursor, inside=True)
     class_name = cursor.spelling
