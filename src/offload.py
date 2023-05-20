@@ -29,7 +29,6 @@ def generate_offload(file_path, entry_func):
     build_sym_table(cursor, info)
     # pprint(scope_mapping)
 
-
     # Find the entry function
     entry_func = find_elem(cursor, 'Server::handle_connection')
     if entry_func is None:
@@ -84,19 +83,9 @@ def generate_offload(file_path, entry_func):
     insts = gather_instructions_under(body_of_loop, info)
     info.prog.parser_code = insts
 
-    # Going through the instructions and generating BPF code
-
     # Show what are the instructions (DEBUGING
     # print('\n\n')
     # show_insts(insts)
-
-    # # Get logic code
-    # prog.parser_prog = logic_code
-
-    # print(info.prog.declarations)
-    # for d in info.prog.declarations:
-    #     if isinstance(d, Function) and d.name == 'TCPConnection_Parser_state':
-
 
     # Print the code we have generated
     text = generate_bpf_prog(info)

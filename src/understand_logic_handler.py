@@ -94,26 +94,24 @@ def __get_func_args(inst, info):
 
 
 def __add_func_definition(inst, info):
+    scope = scope_mapping.get(inst.name)
+    if not scope:
+        error('The scope for the function', inst.name, 'was not found')
+        return
     f = Function(inst.name, inst.func_ptr)
     f.is_method = inst.is_method
     if f.is_method:
         if inst.owner:
-            obj = info.scope
-            for ref_name in reversed(inst.owner):
-                tmp_obj = obj.get(ref_name)
-                if tmp_obj is None:
-                    error('Failed to find the reference!', inst.owner)
-                    return
-                obj = tmp_obj
-            # ref_name = inst.owner[0]
-            ref_state_obj = obj
-            if ref_state_obj is not None:
-                ref_state = ref_state_obj.clone()
-                ref_state.is_ref = True
-                # ref_state = f'{ref_state_obj.type} {ref_state_obj.name}'
+            owner_symb = __owner_to_ref(inst.owner, info)
+            if owner_symb:
+                ref = f'{owner_symb[-1].type.spelling} *self'
+            else:
+                cls = scope.lookup('__class__')
+                cls_text = cls.type.spelling
+                ref = f'{cls_text} *self'
         else:
-            ref_state = 'T X'
-        f.args = [ref_state] + f.args
+            ref = 'T *self'
+        f.args = [ref] + f.args
 
     # Recursively analize the function body
     if f.body_cursor:
@@ -135,7 +133,6 @@ def understand_call_expr(c, info):
     inst = Call(c)
     inst.name = __get_func_name(inst, info)
     inst.args = __get_func_args(inst, info)
-    print(f'call: {inst.name} is_method: {inst.is_method}')
 
     # check if function is defined
     if __function_is_of_interest(inst) and inst.name not in Function.directory:

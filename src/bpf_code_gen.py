@@ -6,6 +6,7 @@ from utility import indent, INDENT, report_on_cursor
 READ_PACKET = 'async_read_some'
 WRITE_PACKET = 'async_write'
 
+
 is_first_time = True
 def call_read_packet(inst, info, more):
     # TODO: update the variable receiving the return value (read length)
@@ -140,6 +141,7 @@ NO_MODIFICATION = 0
 REPLACE_READ = 1
 CHANGE_BUFFER_DEF = 2
 
+
 def gen_code(list_instructions, info, context=BODY):
     jump_table = {
             clang.CursorKind.CALL_EXPR: handle_call,
@@ -270,6 +272,7 @@ def __generate_code_ref_state_obj(state_obj):
     else:
         text = hierarchy
     return text
+
 
 def __build_hierarchy(state_obj):
     g = False
