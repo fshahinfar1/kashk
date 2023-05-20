@@ -15,7 +15,7 @@ def call_read_packet(inst, info, more):
     if not is_first_time:
         return ''
     is_first_time = False
-    return INDENT * lvl + f'{info.rd_buf.name} = (void *)(__u64)skb->data'
+    return indent(f'{info.rd_buf.name} = (void *)(__u64)skb->data', lvl)
 
 
 def handle_var(inst, info, more):
@@ -97,6 +97,13 @@ def handle_member_ref_expr(inst, info, more):
     text = f'self->{inst.name}'
     return text
 
+def handle_array_sub(inst, info, more):
+    lvl = more[0]
+    index, _ = gen_code(inst.index, info, context=ARG)
+    text = f'{inst.array_name}[{index}]'
+    text = indent(text, lvl)
+    return text
+
 
 def handle_literal(inst, info, more):
     lvl = more[0]
@@ -114,19 +121,72 @@ def handle_if_stmt(inst, info, more):
         body, _ = gen_code(inst.other_body, info, context=BODY)
         body = indent(body, 1)
         text += ' else {\n' + body + '\n}'
+    text = indent(text, lvl)
     return text
 
 
 def handle_do_stmt(inst, info, more):
     lvl = more[0]
-    body, _ = gen_code(inst.body, info, context=BODY)
-    body = body.split('\n')
-    indented = []
-    for b in body:
-        indented.append(INDENT * (lvl + 1) + b)
-    body = '\n'.join(indented)
     cond, _ = gen_code(inst.cond, info, context=ARG)
+    body, _ = gen_code(inst.body, info, context=BODY)
+    body = indent(body, 1)
     text = 'do {\n' + body + f'\n}} while ({cond})'
+    text = indent(text, lvl)
+    return text
+
+
+def handle_switch_stmt(inst, info, more):
+    lvl = more[0]
+    cond, _ = gen_code(inst.cond, info, context=ARG)
+    body, _ = gen_code(inst.body, info, context=BODY)
+    body = indent(body)
+    text = f'switch ({cond}) {{\n{body}\n}}'
+    text = indent(text, lvl)
+    return text
+
+
+def handle_case_stmt(inst, info, more):
+    lvl = more[0]
+    case, _ = gen_code(inst.case, info, context=ARG)
+    body, _ = gen_code(inst.body, info, context=BODY)
+    body = indent(body)
+    text = f'case ({case}):\n{body}\n'
+    text = indent(text, lvl)
+    return text
+
+
+def handle_default_stmt(inst, info, more):
+    lvl = more[0]
+    body, _ = gen_code(inst.body, info, context=BODY)
+    body = indent(body)
+    text = f'default:\n{body}'
+    text = indent(text, lvl)
+    return text
+
+
+def handle_conditional_op(inst, info, more):
+    lvl = more[0]
+    cond, _ = gen_code(inst.cond, info, context=ARG)
+    body, _ = gen_code(inst.body, info, context=BODY)
+    other_body, _ = gen_code(inst.other_body, info, context=BODY)
+    text = f'({cond}) ? ({body}) : ({other_body})'
+    text = indent(text, lvl)
+    return text
+
+
+def handle_paren_expr(inst, info, more):
+    lvl = more[0]
+    body, _ = gen_code(inst.body, info, context=BODY)
+    text = f'({body})'
+    text = indent(text, lvl)
+    return text
+
+
+def handle_return_stmt(inst, info, more):
+    lvl = more[0]
+    body, _ = gen_code(inst.body, info, context=BODY)
+    text = f'return ({body})'
+    text = indent(text, lvl)
     return text
 
 
@@ -139,7 +199,7 @@ DEF = 4
 NEED_SEMI_COLON = set((clang.CursorKind.CALL_EXPR, clang.CursorKind.VAR_DECL,
     clang.CursorKind.BINARY_OPERATOR, clang.CursorKind.CONTINUE_STMT,
     clang.CursorKind.DO_STMT, clang.CursorKind.RETURN_STMT,
-    clang.CursorKind.CONTINUE_STMT, clang.CursorKind.CXX_THROW_EXPR,))
+    clang.CursorKind.CONTINUE_STMT, clang.CursorKind.BREAK_STMT, clang.CursorKind.CXX_THROW_EXPR,))
 GOTO_NEXT_LINE = (clang.CursorKind.IF_STMT,)
 
 NO_MODIFICATION = 0
@@ -152,16 +212,30 @@ def gen_code(list_instructions, info, context=BODY):
             clang.CursorKind.CALL_EXPR: handle_call,
             clang.CursorKind.BINARY_OPERATOR: handle_bin_op,
             clang.CursorKind.UNARY_OPERATOR: handle_unary_op,
+            # Vars
             clang.CursorKind.VAR_DECL: handle_var,
             clang.CursorKind.DECL_REF_EXPR: handle_ref_expr,
             clang.CursorKind.MEMBER_REF_EXPR: handle_member_ref_expr,
+            clang.CursorKind.ARRAY_SUBSCRIPT_EXPR: handle_array_sub,
+            # Literals
             clang.CursorKind.INTEGER_LITERAL: handle_literal,
             clang.CursorKind.FLOATING_LITERAL: handle_literal,
+            clang.CursorKind.CHARACTER_LITERAL: handle_literal,
+            clang.CursorKind.STRING_LITERAL: handle_literal,
             clang.CursorKind.CXX_BOOL_LITERAL_EXPR: handle_literal,
+            # Control FLow
             clang.CursorKind.IF_STMT: handle_if_stmt,
             clang.CursorKind.DO_STMT: handle_do_stmt,
+            clang.CursorKind.SWITCH_STMT: handle_switch_stmt,
+            clang.CursorKind.CASE_STMT: handle_case_stmt,
+            clang.CursorKind.DEFAULT_STMT: handle_default_stmt,
+            clang.CursorKind.CONDITIONAL_OPERATOR: handle_conditional_op,
+            #
+            clang.CursorKind.PAREN_EXPR: handle_paren_expr,
+            #
+            clang.CursorKind.BREAK_STMT: lambda x,y,z: 'break',
             clang.CursorKind.CONTINUE_STMT: lambda x,y,z: 'continue',
-            clang.CursorKind.RETURN_STMT: lambda x,y,z: 'return SK_DROP',
+            clang.CursorKind.RETURN_STMT: handle_return_stmt,
             clang.CursorKind.CXX_THROW_EXPR: lambda x,y,z: 'return SK_DROP',
             }
     count = len(list_instructions)

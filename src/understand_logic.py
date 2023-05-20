@@ -239,7 +239,7 @@ def __convert_curosr_to_inst(c, info):
         assert len(children) == 2
         inst = Instruction()
         inst.kind = c.kind
-        inst.case = children[0]
+        inst.case = [children[0]]
         inst.body = gather_instructions_from(children[1], info)
         return inst
     elif c.kind == clang.CursorKind.DEFAULT_STMT:
@@ -273,6 +273,7 @@ def __convert_curosr_to_inst(c, info):
         if text.startswith('co_return'):
             inst = Instruction()
             inst.kind = clang.CursorKind.RETURN_STMT
+            inst.body = []
             return inst
         return None
     else:
