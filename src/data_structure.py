@@ -96,6 +96,10 @@ class StateObject:
                     return f
 
     def get_c_code(self):
+        if self.cursor.type.kind == clang.TypeKind.CONSTANTARRAY:
+            el_type = self.cursor.type.element_type.spelling
+            el_count = self.cursor.type.element_count
+            return f'{el_type} {self.name}[{el_count}];'
         return f'{self.type} {self.name};'
 
     def __repr__(self):
@@ -246,6 +250,7 @@ class VarDecl(Instruction):
         self.name = c.spelling
         self.kind = clang.CursorKind.VAR_DECL
         self.init = []
+        self.is_array = c.type.kind == clang.TypeKind.CONSTANTARRAY
 
     def __str__(self):
         return f'<VarDecl {self.kind}: {self.type} {self.name} = {self.init}>'

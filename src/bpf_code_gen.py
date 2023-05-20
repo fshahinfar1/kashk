@@ -20,7 +20,12 @@ def call_read_packet(inst, info, more):
 
 def handle_var(inst, info, more):
     lvl = more[0]
-    text = INDENT * lvl + f'{inst.type} {inst.name}'
+    if inst.is_array:
+        el_type = inst.cursor.type.element_type.spelling
+        el_count = inst.cursor.type.element_count
+        text = indent(f'{el_type} {self.name}[{el_count}]', lvl)
+    else:
+        text = indent(f'{inst.type} {inst.name}', lvl)
     if inst.init:
         init_text, _ = gen_code(inst.init, info, context=RHS)
         text += ' = ' + init_text
