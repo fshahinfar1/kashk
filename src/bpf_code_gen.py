@@ -51,9 +51,9 @@ def handle_bin_op(inst, info, more):
     lvl = more[0]
     lhs, _ = gen_code(inst.lhs, info, context=LHS)
     rhs, m = gen_code(inst.rhs, info, context=RHS)
-    
+
     if m == REPLACE_READ:
-        text = ((INDENT * lvl) + rhs + ';\n' 
+        text = ((INDENT * lvl) + rhs + ';\n'
         + (INDENT * lvl) + lhs + ' ' + inst.op + ' ' + '((__u64)skb->data_end - (__u64)skb->data)')
     else:
         text = INDENT * lvl + lhs + ' ' +  inst.op + ' '+ rhs
@@ -198,7 +198,7 @@ def gen_code(list_instructions, info, context=BODY):
             else:
                 handler = jump_table.get(inst.kind, lambda x,y,z: '')
                 text = handler(inst, info, [lvl])
-        
+
             if not text:
                 text = f'<empty code generated kind: {inst.kind}>'
 
@@ -217,7 +217,11 @@ def gen_code(list_instructions, info, context=BODY):
 
 def generate_bpf_prog(info):
     decs = list(info.prog.declarations)
-    declarations, _ = gen_code(decs, info, context=DEF) 
+    non_func_decs = list(filter(lambda d: not isinstance(d, Function), decs))
+    func_decs = list(filter(lambda d: isinstance(d, Function), decs))
+    non_func_declarations, _ = gen_code(non_func_decs, info, context=DEF)
+    func_declarations, _ = gen_code(func_decs, info, context=DEF)
+    declarations = non_func_declarations + '\n' + func_declarations
 
     parser_code, _ = gen_code(info.prog.parser_code, info)
     parser_code = info.prog._load_connection_state() + parser_code
@@ -254,12 +258,12 @@ def __generate_code_type_definition(inst, info):
         text_args = ', '.join(args)
 
         # Change the context
-        old_ctx = info.context 
-        new_ctx = ContextInfo(ContextInfo.KindFunction, inst)
-        info.context = new_ctx
+        # old_ctx = info.context
+        # new_ctx = ContextInfo(ContextInfo.KindFunction, inst)
+        # info.context = new_ctx
         body, _ = gen_code(inst.body, info)
         # Switch back the context
-        info.context = old_ctx
+        # info.context = old_ctx
         body = indent(body)
 
         text = f'{inst.return_type} {inst.name} ({text_args}) {{\n{body}\n}}'
