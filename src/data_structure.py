@@ -134,7 +134,7 @@ class Elaborate(TypeDefinition):
 
     def get_c_code(self):
         d = get_code(self.cursor)
-        return d
+        return '\n'+d
 
 
 class Record(TypeDefinition):
@@ -148,7 +148,7 @@ class Record(TypeDefinition):
         Record.directory[self.name] = self
 
     def get_c_code(self):
-        return generate_struct_with_fields(self.name, self.fields)
+        return '\n'+generate_struct_with_fields(self.name, self.fields)
 
 
 class Function(TypeDefinition):
@@ -306,12 +306,17 @@ class BinOp(Instruction):
         self.rhs = []
         self.op = ''
 
-        text = self.__get_raw_c_code(cursor)
-        tks = self.__parse(text)
-        for index, t in enumerate(tks):
-            if t in BinOp.ALL_OP:
-                self.op = t
-                break
+        debug(dir(cursor))
+        lhs_tokens = len(list(next(cursor.get_children()).get_tokens()))
+        # First token after lhs
+        self.op = list(cursor.get_tokens())[lhs_tokens].spelling
+
+        # text = self.__get_raw_c_code(cursor)
+        # tks = self.__parse(text)
+        # for index, t in enumerate(tks):
+        #     if t in BinOp.ALL_OP:
+        #         self.op = t
+        #         break
 
         if not self.op:
             report_on_cursor(cursor)

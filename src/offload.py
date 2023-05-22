@@ -116,6 +116,8 @@ def boot_starp_global_state(cursor, info):
     tcp_conn_struct = Record('TCPConnection', states)
     decls.append(tcp_conn_struct)
 
+    debug([d.name for d in decls])
+
     # The global state has following field
     field = StateObject(tcp_conn_entry.ref)
     field.name = 'conn'

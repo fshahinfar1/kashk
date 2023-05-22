@@ -28,6 +28,9 @@ clang.TypeKind.LONGDOUBLE,
 ]
 
 
+def get_type_name(t):
+    pass
+
 def parse_file(file_path):
     # compiler_args = '-I /usr/include/ -I /opt/clang-16/include/c++/v1/'.split()
     compiler_args = '-std=c++20'.split()

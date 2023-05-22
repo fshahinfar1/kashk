@@ -53,10 +53,11 @@ def handle_bin_op(inst, info, more):
     rhs, m = gen_code(inst.rhs, info, context=RHS)
 
     if m == REPLACE_READ:
-        text = ((INDENT * lvl) + rhs + ';\n'
-        + (INDENT * lvl) + lhs + ' ' + inst.op + ' ' + '((__u64)skb->data_end - (__u64)skb->data)')
+        text = (rhs + ';\n' + lhs + ' ' + inst.op + ' ' +
+                '((__u64)skb->data_end - (__u64)skb->data)')
     else:
-        text = INDENT * lvl + lhs + ' ' +  inst.op + ' '+ rhs
+        text = f'{lhs} {inst.op} {rhs}'
+    text = indent(text, lvl)
     return text
 
 
@@ -291,6 +292,7 @@ def gen_code(list_instructions, info, context=BODY):
 
 def generate_bpf_prog(info):
     decs = list(info.prog.declarations)
+
     non_func_decs = list(filter(lambda d: not isinstance(d, Function), decs))
     func_decs = list(filter(lambda d: isinstance(d, Function), decs))
     non_func_declarations, _ = gen_code(non_func_decs, info, context=DEF)
@@ -303,6 +305,7 @@ def generate_bpf_prog(info):
 
     code = ([]
             + info.prog.headers
+            + ['typedef char bool;', ] 
             + [declarations]
             + info.prog._per_connection_state()
             + info.prog._parser_prog([parser_code])

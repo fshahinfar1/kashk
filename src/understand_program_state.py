@@ -12,7 +12,7 @@ def generate_decleration_for(cursor):
     cursor is a class, struct, enum, ...
     return a list of strings having codes for defining the types needed.
     """
-    type_name = cursor.spelling
+    type_name = cursor.type.spelling
 
     # List of type dependencies for this specific type
     decl = []

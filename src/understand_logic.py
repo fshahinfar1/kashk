@@ -88,6 +88,7 @@ def __convert_curosr_to_inst(c, info):
             or c.kind == clang.CursorKind.COMPOUND_ASSIGNMENT_OPERATOR):
         # TODO: I do not know how to get information about binary
         # operations. My idea is to parse it my self.
+        report_on_cursor(c)
         inst = BinOp(c)
         children = list(c.get_children())
         assert(len(children) == 2)
@@ -263,6 +264,7 @@ def __convert_curosr_to_inst(c, info):
             inst.body = gather_instructions_from(children[0], info)
         else:
             raise Exception('Unexpected situation when encountering RETURN_STMT')
+        return inst
     elif c.kind == clang.CursorKind.CXX_THROW_EXPR:
         inst = Instruction()
         inst.kind = c.kind
