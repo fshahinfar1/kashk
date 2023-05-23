@@ -6,16 +6,32 @@ from utility import (find_elem, get_code, generate_struct_with_fields,
 from bpf import SK_SKB_PROG
 from data_structure import *
 
+from prune import should_process_this_cursor
 
+
+# TODO: I have messed up finding the right type, I should refactor, rewrite
+# this function.
 def generate_decleration_for(cursor):
     """
     cursor is a class, struct, enum, ...
     return a list of strings having codes for defining the types needed.
     """
+
+    if not cursor.is_definition():
+        cursor = cursor.get_definition()
+        if not cursor:
+            return []
+
     type_name = cursor.type.spelling
 
     # List of type dependencies for this specific type
     decl = []
+
+    if cursor.type.kind in PRIMITIVE_TYPES: 
+        return decl
+
+    if not should_process_this_cursor(cursor):
+        return decl
 
     if cursor.type.kind == clang.TypeKind.RECORD:
         # Go through the fields, add any dependencies field might have, then
@@ -34,18 +50,11 @@ def generate_decleration_for(cursor):
         # No further deps
         return []
     elif cursor.type.kind == clang.TypeKind.TYPEDEF:
-        # print(cursor.spelling)
         if not cursor.kind.is_declaration():
             t = cursor.type.get_declaration()
         else:
-        # if cursor.kind.is_declaration():
             t = cursor.underlying_typedef_type
         under_kind = t.kind
-        # else:
-        #     c = cursor.type.get_declaration()
-        #     report_on_cursor(c)
-        #     print('Typedef if not declaration, I do not udnerstand this.', file=sys.stderr)
-        #     under_kind = cursor.kind
         if under_kind in PRIMITIVE_TYPES:
             # No further type decleration needed
             return []
@@ -62,8 +71,11 @@ def generate_decleration_for(cursor):
             error(f'Failed to find the definition for {T}')
             return []
         decl += generate_decleration_for(c)
+    elif cursor.type.kind == clang.TypeKind.CONSTANTARRAY:
+        report_on_cursor(cursor)
+        return []
     else:
-        print('Unexpected! ' + str(cursor.type.kind), file=sys.stderr)
+        error('Unexpected! ' + str(cursor.type.kind))
 
     return decl
 
@@ -79,7 +91,8 @@ def extract_state(cursor):
         if c.type.kind in (clang.TypeKind.RECORD, clang.TypeKind.ELABORATED):
             d = generate_decleration_for(c)
             decl += d
-            obj.type_ref = d[-1]
+            if d:
+                obj.type_ref = d[-1]
         states.append(obj)
     return states, decl
 
@@ -91,16 +104,24 @@ def get_state_for(cursor):
     """
     states = []
     decl = []
-    k = cursor.kind
-    if k == clang.CursorKind.PARM_DECL:
-        states.append(StateObject(cursor))
-        decl = generate_decleration_for(cursor) 
-    elif k == clang.CursorKind.VAR_DECL:
-        obj = StateObject(cursor)
-        states.append(obj)
-        decl = generate_decleration_for(cursor)
-        if cursor.type.kind in (clang.TypeKind.RECORD, clang.TypeKind.ELABORATED) and decl:
-            obj.type_ref = decl[-1]
-    else:
-        raise Exception('Not implemented! ' + str(k))
+
+    obj = StateObject(cursor)
+    states.append(obj)
+    decl = generate_decleration_for(cursor)
+    if cursor.type.kind in (clang.TypeKind.RECORD, clang.TypeKind.ELABORATED) and decl:
+        obj.type_ref = decl[-1]
+
+    # k = cursor.kind
+    # if k == clang.CursorKind.PARM_DECL:
+    #     obj = StateObject(cursor)
+    #     states.append(obj)
+    #     decl = generate_decleration_for(cursor) 
+    # elif k == clang.CursorKind.VAR_DECL:
+    #     obj = StateObject(cursor)
+    #     states.append(obj)
+    #     decl = generate_decleration_for(cursor)
+    #     if cursor.type.kind in (clang.TypeKind.RECORD, clang.TypeKind.ELABORATED) and decl:
+    #         obj.type_ref = decl[-1]
+    # else:
+    #     raise Exception('Not implemented! ' + str(k))
     return states, decl

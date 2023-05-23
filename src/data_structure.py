@@ -45,8 +45,8 @@ class Scope:
         return False, None
 
     def add_local(self, name, ref):
-        if name in self.local:
-            raise Exception(f'Shadowing local variables is not implemented yet ({name})')
+        # if name in self.local:
+        #     raise Exception(f'Shadowing local variables is not implemented yet ({name})')
         self.local[name] = ref
 
     def add_global(self, name, ref):
@@ -74,7 +74,12 @@ class StateObject:
         self.is_global = False
         self.type_ref = None
         self.parent_object = None
-        self.is_ref = False
+
+        self.is_pointer = c.type.kind == clang.TypeKind.POINTER
+        if self.is_pointer:
+            self.real_type = c.type.get_pointee()
+        else:
+            self.real_type = c.type
 
     def clone(self):
         if not self.cursor:
@@ -86,7 +91,6 @@ class StateObject:
         new.is_global = self.is_global
         new.type_ref = self.type_ref
         new.parent_object = None
-        new.is_ref = self.is_ref
         return new
 
     def get(self, name):
@@ -96,11 +100,11 @@ class StateObject:
                     return f
 
     def get_c_code(self):
-        if self.cursor.type.kind == clang.TypeKind.CONSTANTARRAY:
+        if self.real_type.kind == clang.TypeKind.CONSTANTARRAY:
             el_type = self.cursor.type.element_type.spelling
             el_count = self.cursor.type.element_count
             return f'{el_type} {self.name}[{el_count}];'
-        elif self.cursor.type.kind == clang.TypeKind.RECORD:
+        elif self.real_type.kind == clang.TypeKind.RECORD:
             return f'struct {self.type} {self.name};'
         return f'{self.type} {self.name};'
 
@@ -145,8 +149,8 @@ class Record(TypeDefinition):
     def __init__(self, name, fields):
         super().__init__(name)
         self.fields = fields
-        if self.name in Record.directory:
-            raise Exception('Unexpected error')
+        # if self.name in Record.directory:
+        #     raise Exception('Unexpected error')
         Record.directory[self.name] = self
 
     def get_c_code(self):
@@ -222,16 +226,17 @@ class Call(Instruction):
         # fields in the object.
         self.owner = []
         self.is_method = False
+        self.is_operator = False
 
         children = list(cursor.get_children())
         # TODO: operator should have some sign after it. Fix this, a function name operator can confuse the code.
-        if len(children) > 0 and (children[0].kind == clang.CursorKind.MEMBER_REF_EXPR or self.name.startswith('operator')):
+        if len(children) > 0 and (children[0].kind == clang.CursorKind.MEMBER_REF_EXPR):
             mem = children[0]
             self.owner = get_owner(mem)
             self.is_method = True
 
-        # error(self.name, self.cursor, self.owner)
-        # report_on_cursor(self.cursor)
+        if self.name.startswith('operator'):
+            self.is_operator = True
 
     def __str__(self):
         return f'<Call {self.name} ({self.args})>'

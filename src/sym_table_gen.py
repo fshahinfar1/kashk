@@ -67,7 +67,8 @@ def build_sym_table(cursor, info):
             if not c.is_definition():
                 continue
 
-            scope_key = f'func_{c.spelling}'
+            # scope_key = f'func_{c.spelling}'
+            scope_key = f'{c.spelling}'
             info.sym_tbl.insert_entry(scope_key, c.result_type, c.kind, c)
 
             with info.sym_tbl.new_scope() as scope:

@@ -24,7 +24,7 @@ def handle_var(inst, info, more):
     if inst.is_array:
         el_type = inst.cursor.type.element_type.spelling
         el_count = inst.cursor.type.element_count
-        text = f'{el_type} {self.name}[{el_count}]'
+        text = f'{el_type} {inst.name}[{el_count}]'
     elif inst.cursor.type.kind == clang.TypeKind.RECORD:
         text = f'struct {inst.type} {inst.name}'
     else:
@@ -317,7 +317,7 @@ def generate_bpf_prog(info):
     non_func_decs = list(filter(lambda d: not isinstance(d, Function), decs))
     func_decs = list(filter(lambda d: isinstance(d, Function), decs))
     non_func_declarations, _ = gen_code(non_func_decs, info, context=DEF)
-    func_declarations, _ = gen_code(func_decs, info, context=DEF)
+    func_declarations, _ = gen_code(func_decs, info, context=ARG)
     declarations = non_func_declarations + '\n' + func_declarations
 
     parser_code, _ = gen_code(info.prog.parser_code, info)
@@ -326,6 +326,7 @@ def generate_bpf_prog(info):
 
     code = ([]
             + ['typedef char bool;', 
+                'typedef unsigned long long int size_t;', 
                 'typedef unsigned char __u8;',
                 'typedef unsigned short __u16;',
                 'typedef unsigned int __u32;',
@@ -358,14 +359,8 @@ def __generate_code_type_definition(inst, info):
             if isinstance(a, str):
                 args.append(a)
             else:
-                # text, _ = gen_code([a], info, context=ARG)
-                if a.is_ref:
-                    text = f'{a.type} *{a.name}'
-                else:
-                    text = f'{a.type} {a.name}'
-
-                if a.cursor.type.kind == clang.TypeKind.RECORD:
-                    text = 'struct ' + text
+                # remove the semicolon
+                text = a.get_c_code()[:-1]
                 args.append(text)
         text_args = ', '.join(args)
 
@@ -382,7 +377,7 @@ def __generate_code_type_definition(inst, info):
         info.sym_tbl.current_scope = old_scope
 
         body = indent(body)
-        text = f'{inst.return_type} {inst.name} ({text_args}) {{\n{body}\n}}'
+        text = f'{inst.return_type} {inst.name} ({text_args}) {{\n{body}\n}}\n\n'
         return text
     else:
         return inst.get_c_code()
