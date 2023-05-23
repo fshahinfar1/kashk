@@ -100,6 +100,8 @@ class StateObject:
             el_type = self.cursor.type.element_type.spelling
             el_count = self.cursor.type.element_count
             return f'{el_type} {self.name}[{el_count}];'
+        elif self.cursor.type.kind == clang.TypeKind.RECORD:
+            return f'struct {self.type} {self.name};'
         return f'{self.type} {self.name};'
 
     def __repr__(self):

@@ -5,6 +5,7 @@ from log import error
 from utility import get_code, report_on_cursor, visualize_ast, get_owner
 from data_structure import *
 from prune import should_process_this_file
+from understand_program_state import get_state_for
 
 from dfs import DFSPass
 
@@ -149,8 +150,15 @@ def __convert_cursor_to_inst(c, info):
         inst.init = init
         info.scope.add_local(inst.name, inst.state_obj)
 
-        # Variable Declaration
+        # Add variable to the scope
         info.sym_tbl.insert_entry(c.spelling, c.type, c.kind, c)
+
+        # Check if there is a type dependencies which we need to define
+        _, decls = get_state_for(c)
+        # debug(inst.type, inst.name, decls)
+        for d in decls:
+            info.prog.add_declaration(d)
+
         return inst
     elif c.kind == clang.CursorKind.MEMBER_REF_EXPR:
         inst = Instruction()
@@ -208,7 +216,7 @@ def __convert_cursor_to_inst(c, info):
         inst.kind = c.kind
         inst.cond = cond
         inst.body = body
-        inst.other_body = other_body 
+        inst.other_body = other_body
 
         return inst
     elif c.kind == clang.CursorKind.DO_STMT:
@@ -292,7 +300,7 @@ def gather_instructions_from(cursor, info):
     for c, _ in d:
         if (not c.location.file
                 or not should_process_this_file(c.location.file.name)):
-            continue 
+            continue
 
         if (c.kind == clang.CursorKind.COMPOUND_STMT
                 or c.kind == clang.CursorKind.UNEXPOSED_EXPR):
@@ -319,7 +327,7 @@ def gather_instructions_from(cursor, info):
 def gather_instructions_under(cursor, info):
     """
     Get the list of instruction in side a block of code.
-    (Expecting the cursor to be a block of code) 
+    (Expecting the cursor to be a block of code)
     """
     # Gather instructions in this list
     ops = []

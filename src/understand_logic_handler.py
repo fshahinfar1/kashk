@@ -102,11 +102,11 @@ def __add_func_definition(inst, info):
         if inst.owner:
             owner_symb = __owner_to_ref(inst.owner, info)
             if owner_symb:
-                ref = f'{owner_symb[-1].type.spelling} *self'
+                ref = f'struct {owner_symb[-1].type.spelling} *self'
             else:
                 cls = scope.lookup('__class__')
                 cls_text = cls.type.spelling
-                ref = f'{cls_text} *self'
+                ref = f'struct {cls_text} *self'
         else:
             ref = 'T *self'
         f.args = [ref] + f.args

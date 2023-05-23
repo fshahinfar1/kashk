@@ -23,12 +23,15 @@ def handle_var(inst, info, more):
     if inst.is_array:
         el_type = inst.cursor.type.element_type.spelling
         el_count = inst.cursor.type.element_count
-        text = indent(f'{el_type} {self.name}[{el_count}]', lvl)
+        text = f'{el_type} {self.name}[{el_count}]'
+    elif inst.cursor.type.kind == clang.TypeKind.RECORD:
+        text = f'struct {inst.type} {inst.name}'
     else:
-        text = indent(f'{inst.type} {inst.name}', lvl)
+        text = f'{inst.type} {inst.name}'
     if inst.init:
         init_text, _ = gen_code(inst.init, info, context=RHS)
         text += ' = ' + init_text
+    indent(text, lvl)
     return text
 
 
@@ -109,7 +112,12 @@ def handle_array_sub(inst, info, more):
 def handle_cast_expr(inst, info, more):
     lvl = more[0]
     body, _ = gen_code(inst.castee, info, context=ARG)
-    ctype = inst.cast_type if isinstance(inst.cast_type, str) else inst.cast_type.spelling
+    if isinstance(inst.cast_type, str):
+        ctype = inst.cast_type
+    else:
+        ctype = inst.cast_type.spelling
+        if inst.cast_type.kind == clang.TypeKind.POINTER:
+            ctype += ' *'
     text = f'({ctype})({body})'
     text = indent(text, lvl)
     return text
@@ -337,11 +345,13 @@ def __generate_code_type_definition(inst, info):
                 args.append(a)
             else:
                 # text, _ = gen_code([a], info, context=ARG)
-                # TODO: what if the parameter is a pointer?
                 if a.is_ref:
                     text = f'{a.type} *{a.name}'
                 else:
                     text = f'{a.type} {a.name}'
+
+                if a.cursor.type.kind == clang.TypeKind.RECORD:
+                    text = 'struct ' + text
                 args.append(text)
         text_args = ', '.join(args)
 

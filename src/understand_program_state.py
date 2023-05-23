@@ -51,6 +51,17 @@ def generate_decleration_for(cursor):
             return []
         for c in cursor.get_children():
             decl += generate_decleration_for(c)
+    elif cursor.type.kind == clang.TypeKind.POINTER:
+        T = cursor.type.get_pointee()
+        c = T.get_declaration()
+        if c is None:
+            error(f'Failed to find the definition for {T}')
+            return []
+        c = c.get_definition()
+        if c is None:
+            error(f'Failed to find the definition for {T}')
+            return []
+        decl += generate_decleration_for(c)
     else:
         print('Unexpected! ' + str(cursor.type.kind), file=sys.stderr)
 
@@ -89,7 +100,7 @@ def get_state_for(cursor):
         states.append(obj)
         decl = generate_decleration_for(cursor)
         if cursor.type.kind in (clang.TypeKind.RECORD, clang.TypeKind.ELABORATED) and decl:
-            obj.type_ref = d[-1]
+            obj.type_ref = decl[-1]
     else:
         raise Exception('Not implemented! ' + str(k))
     return states, decl
