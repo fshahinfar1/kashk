@@ -103,7 +103,6 @@ def handle_member_ref_expr(inst, info, more):
         # Access to the members of this class
         text = f'self->{inst.name}'
     else:
-        debug('~~~ This memeber has owner')
         # This object is not for this class
         hierarchy = owner_to_ref(inst.owner, info)
         links = []
@@ -119,8 +118,9 @@ def handle_member_ref_expr(inst, info, more):
 
 def handle_array_sub(inst, info, more):
     lvl = more[0]
+    name, _ = gen_code(inst.array_ref, info, context=ARG)
     index, _ = gen_code(inst.index, info, context=ARG)
-    text = f'{inst.array_name}[{index}]'
+    text = f'{name}[{index}]'
     text = indent(text, lvl)
     return text
 
@@ -344,6 +344,13 @@ def generate_bpf_prog(info):
                 'typedef unsigned short __u16;',
                 'typedef unsigned int __u32;',
                 'typedef unsigned long long int __u64;',
+'''#ifndef memcpy
+#define memcpy(d, s, len) __builtin_memcpy(d, s, len)
+#endif
+
+#ifndef memmove
+#define memmove(d, s, len) __builtin_memmove(d, s, len)
+#endif''',
                 ] 
             + info.prog.headers
             + [declarations]
@@ -404,7 +411,6 @@ def __generate_code_ref_state_obj(state_obj, info):
 
     sym, scope = info.sym_tbl.current_scope.lookup2(state_obj.name)
     is_global = scope == info.sym_tbl.global_scope
-    # debug('----', sym, is_global)
 
     if is_global:
         text = 'sock_ctx->' + hierarchy

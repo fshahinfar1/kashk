@@ -6,6 +6,8 @@ from data_structure import *
 from understand_logic import gather_instructions_from, gather_instructions_under
 from sym_table import *
 
+from prune import should_process_this_file
+
 
 COROUTINE_FUNC_NAME = ('await_resume', 'await_transform', 'await_ready', 'await_suspend')
 
@@ -14,6 +16,13 @@ def __function_is_of_interest(inst):
     """
     Decide if the function should also be defined in BPF code
     """
+    if (not inst.cursor.location.file or
+            not should_process_this_file(inst.cursor.location.file.name)):
+        return False
+    if inst.name.startswith('operator'):
+        # TODO: I do not want operators for now. But It would be good to
+        # support it as another function decleration and invocation
+        return False
     if inst.is_method:
         # TODO: filter based on methods of types we do not want to have
         return True
@@ -21,10 +30,6 @@ def __function_is_of_interest(inst):
         #     # TODO: i need more information from the owner not just its name
         #     if o == 'string':
         #         return False
-    if inst.name.startswith('operator'):
-        # TODO: I do not want operators for now. But It would be good to
-        # support it as another function decleration and invocation
-        return False
     return True
 
 

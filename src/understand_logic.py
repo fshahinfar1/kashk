@@ -163,7 +163,6 @@ def __convert_cursor_to_inst(c, info):
 
         # Check if there is a type dependencies which we need to define
         _, decls = get_state_for(c)
-        # debug(inst.type, inst.name, decls)
         for d in decls:
             info.prog.add_declaration(d)
 
@@ -174,12 +173,6 @@ def __convert_cursor_to_inst(c, info):
         inst.name = c.spelling
         inst.kind = c.kind
         inst.owner = get_owner(c)
-        # if inst.name == 'type':
-        #     debug('----------')
-        #     debug(inst.name, inst.owner)
-        #     report_on_cursor(c)
-        #     report_on_cursor(c.get_children().__next__())
-        #     debug(get_owner(c))
         return inst
     elif (c.kind == clang.CursorKind.DECL_REF_EXPR
             or c.kind == clang.CursorKind.TYPE_REF):
@@ -194,8 +187,9 @@ def __convert_cursor_to_inst(c, info):
 
         inst = Instruction()
         inst.kind = c.kind
-        inst.array_name = children[0].spelling
+        inst.array_ref = gather_instructions_from(children[0], info)
         inst.index = gather_instructions_from(children[1], info)
+        inst.cursor = c
         return inst
     elif c.kind in (clang.CursorKind.CXX_BOOL_LITERAL_EXPR,
             clang.CursorKind.INTEGER_LITERAL,
