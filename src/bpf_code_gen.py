@@ -83,22 +83,8 @@ def handle_ref_expr(inst, info, more):
 
 
 def handle_member_ref_expr(inst, info, more):
-    lvl = more[0]
-    # TODO: ...
-    # assert len(inst.owner) == 0
-    # assert info.context.kind == ContextInfo.KindFunction
-    # reference to the object will be in the first argument of the function
-    # args = info.context.ref.args
-    # if len(args) < 1:
-    #     return '<missing ref>->{inst.name}'
-    # obj = args[0]
-    # if isinstance(obj, str):
-    #     # TODO: this probably was a method call and the first arguement is the
-    #     # reference to the object.
-    #     text = f'{obj}->{inst.name}'
-    # else:
-    #     text = f'{obj.name}->{inst.name}'
 
+    lvl = more[0]
     if len(inst.owner) == 0:
         # Access to the members of this class
         text = f'self->{inst.name}'
@@ -405,7 +391,6 @@ def __generate_code_type_definition(inst, info):
 # TODO: this helper is patched may times and has lost its purpose remove it and
 # fix the code
 def __generate_code_ref_state_obj(state_obj, info):
-    # print(state_obj, state_obj.parent_object)
     hierarchy, g = __build_hierarchy(state_obj)
     hierarchy = '.'.join([h.name for h in reversed(hierarchy)])
 

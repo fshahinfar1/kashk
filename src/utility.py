@@ -143,12 +143,8 @@ def show_insts(lst, depth=0):
     """
     for i in lst:
         debug('  '*depth + str(i))
-        # print(i.get_c_code())
         if i.has_children():
             show_insts(i.body, depth=depth+1)
-            # print('  '*depth + '<OTHERWISE>')
-            # __show_insts(i.other_body, depth=depth+1)
-            # print('  '*depth + '<END>')
 
 
 def get_owner(cursor):

@@ -198,7 +198,6 @@ def __convert_cursor_to_inst(c, info):
             clang.CursorKind.CHARACTER_LITERAL,):
         inst = Instruction()
         inst.kind = c.kind
-        # print(list(map(lambda x: x.spelling, c.get_tokens())))
         token_text = [t.spelling for t in c.get_tokens()]
         if len(token_text) == 0:
             inst.text = '<unknown>'

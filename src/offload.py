@@ -76,20 +76,11 @@ def generate_offload(file_path, entry_func):
         error('Failed to find the packet buffer')
         return
 
-    # print('The state until now is:')
-    # print(info.scope.glbl)
-    # print(info.scope.local)
-    # print('-------------------------------------\n')
-
     # Go through the instructions, replace access to the buffer and read/write
     # instructions
     body_of_loop = list(ev_loop.get_children())[-1]
     insts = gather_instructions_under(body_of_loop, info)
     info.prog.parser_code = insts
-
-    # Show what are the instructions (DEBUGING
-    # print('\n\n')
-    # show_insts(insts)
 
     # Print the code we have generated
     text = generate_bpf_prog(info)
