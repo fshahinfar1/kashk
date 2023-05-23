@@ -54,6 +54,8 @@ class SymbolTable:
     def __init__(self):
         self.global_scope = Scope()
         self.current_scope = self.global_scope
+        # Expose the global/static scope maping table as part of this class
+        self.scope_mapping = scope_mapping
 
     def insert_entry(self, name, type, kind, ref):
         e = SymbolTableEntry(name, type, kind, ref)

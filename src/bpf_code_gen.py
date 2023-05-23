@@ -1,7 +1,7 @@
 import clang.cindex as clang
 
 from data_structure import *
-from utility import indent, INDENT, report_on_cursor
+from utility import (indent, INDENT, report_on_cursor, owner_to_ref)
 from sym_table import scope_mapping
 
 READ_PACKET = 'async_read_some'
@@ -83,7 +83,7 @@ def handle_ref_expr(inst, info, more):
 
 
 def handle_member_ref_expr(inst, info, more):
-    # lvl = more[0]
+    lvl = more[0]
     # TODO: ...
     # assert len(inst.owner) == 0
     # assert info.context.kind == ContextInfo.KindFunction
@@ -99,7 +99,22 @@ def handle_member_ref_expr(inst, info, more):
     # else:
     #     text = f'{obj.name}->{inst.name}'
 
-    text = f'self->{inst.name}'
+    if len(inst.owner) == 0:
+        # Access to the members of this class
+        text = f'self->{inst.name}'
+    else:
+        debug('~~~ This memeber has owner')
+        # This object is not for this class
+        hierarchy = owner_to_ref(inst.owner, info)
+        links = []
+        for obj in hierarchy:
+            links.append(obj.name)
+            link = '->' if obj.is_pointer else '.'
+            links.append(link)
+        links.append(inst.name)
+        text = ''.join(links)
+
+    text = indent(text, lvl)
     return text
 
 def handle_array_sub(inst, info, more):
@@ -324,8 +339,13 @@ def generate_bpf_prog(info):
     parser_code = indent(parser_code, 1)
 
     code = ([]
+            + ['typedef char bool;', 
+                'typedef unsigned char __u8;',
+                'typedef unsigned short __u16;',
+                'typedef unsigned int __u32;',
+                'typedef unsigned long long int __u64;',
+                ] 
             + info.prog.headers
-            + ['typedef char bool;', ] 
             + [declarations]
             + info.prog._per_connection_state()
             + info.prog._parser_prog([parser_code])

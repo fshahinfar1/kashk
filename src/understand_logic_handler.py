@@ -1,5 +1,6 @@
 import clang.cindex as clang
-from utility import get_code, report_on_cursor, visualize_ast, get_owner
+from utility import (get_code, report_on_cursor, visualize_ast, get_owner,
+        owner_to_ref)
 from log import error, debug
 from data_structure import *
 from understand_logic import gather_instructions_from, gather_instructions_under
@@ -27,23 +28,6 @@ def __function_is_of_interest(inst):
     return True
 
 
-def __owner_to_ref(owner, info):
-    owner = reversed(owner)
-    hierarchy = []
-    scope = info.sym_tbl.current_scope
-    obj = None
-    for x in owner:
-        obj = scope.lookup(x)
-        if obj is None:
-            break
-        hierarchy.append(obj)
-        obj_cls = obj.type.spelling
-        scope = scope_mapping.get(f'class_{obj_cls}')
-        if not scope:
-            break
-    return hierarchy
-
-
 def __get_func_name(inst, info):
     func_name = inst.cursor.spelling
     if inst.is_method:
@@ -53,7 +37,7 @@ def __get_func_name(inst, info):
         else:
             # Use the previouse objects to find the type of the class this
             # method belongs to
-            owner_symb = __owner_to_ref(inst.owner, info)
+            owner_symb = owner_to_ref(inst.owner, info)
             func_name = list(map(lambda obj: obj.type.spelling, owner_symb))
             func_name.append(inst.name)
             func_name = '_'.join(func_name[-2:])
@@ -73,7 +57,7 @@ def __get_func_args(inst, info):
     if inst.is_method:
         if inst.owner:
             hierarchy = []
-            owner_symb = __owner_to_ref(inst.owner, info)
+            owner_symb = owner_to_ref(inst.owner, info)
             if owner_symb:
                 for obj in owner_symb:
                     hierarchy.append(obj.name)
@@ -99,9 +83,9 @@ def __add_func_definition(inst, info):
     f.is_method = inst.is_method
     if f.is_method:
         if inst.owner:
-            owner_symb = __owner_to_ref(inst.owner, info)
-            if owner_symb:
-                method_obj = owner_symb[-1]
+            hierarchy = owner_to_ref(inst.owner, info)
+            if hierarchy:
+                method_obj = hierarchy[-1]
                 ref = f'struct {method_obj.type.spelling} *self'
             else:
                 cls = scope.lookup('__class__')

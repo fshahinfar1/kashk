@@ -173,7 +173,13 @@ def __convert_cursor_to_inst(c, info):
         inst.cursor = c
         inst.name = c.spelling
         inst.kind = c.kind
-        inst.owner = get_owner(c)[1:]
+        inst.owner = get_owner(c)
+        # if inst.name == 'type':
+        #     debug('----------')
+        #     debug(inst.name, inst.owner)
+        #     report_on_cursor(c)
+        #     report_on_cursor(c.get_children().__next__())
+        #     debug(get_owner(c))
         return inst
     elif (c.kind == clang.CursorKind.DECL_REF_EXPR
             or c.kind == clang.CursorKind.TYPE_REF):

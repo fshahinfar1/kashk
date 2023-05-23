@@ -172,6 +172,23 @@ def get_owner(cursor):
     return res
 
 
+def owner_to_ref(owner, info):
+    owner = reversed(owner)
+    hierarchy = []
+    scope = info.sym_tbl.current_scope
+    obj = None
+    for x in owner:
+        obj = scope.lookup(x)
+        if obj is None:
+            break
+        hierarchy.append(obj)
+        obj_cls = obj.type.spelling
+        scope = info.sym_tbl.scope_mapping.get(f'class_{obj_cls}')
+        if not scope:
+            break
+    return hierarchy
+
+
 INDENT = '  '
 def indent(text, count=1):
     body = text.split('\n')
