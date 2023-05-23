@@ -106,6 +106,15 @@ def handle_array_sub(inst, info, more):
     return text
 
 
+def handle_cast_expr(inst, info, more):
+    lvl = more[0]
+    body, _ = gen_code(inst.castee, info, context=ARG)
+    ctype = inst.cast_type if isinstance(inst.cast_type, str) else inst.cast_type.spelling
+    text = f'({ctype})({body})'
+    text = indent(text, lvl)
+    return text
+
+
 def handle_literal(inst, info, more):
     lvl = more[0]
     return INDENT * lvl + inst.text
@@ -177,7 +186,7 @@ def handle_conditional_op(inst, info, more):
 
 def handle_paren_expr(inst, info, more):
     lvl = more[0]
-    body, _ = gen_code(inst.body, info, context=BODY)
+    body, _ = gen_code(inst.body, info, context=ARG)
     text = f'({body})'
     text = indent(text, lvl)
     return text
@@ -185,7 +194,7 @@ def handle_paren_expr(inst, info, more):
 
 def handle_return_stmt(inst, info, more):
     lvl = more[0]
-    body, _ = gen_code(inst.body, info, context=BODY)
+    body, _ = gen_code(inst.body, info, context=ARG)
     text = f'return ({body})'
     text = indent(text, lvl)
     return text
@@ -218,6 +227,7 @@ def gen_code(list_instructions, info, context=BODY):
             clang.CursorKind.DECL_REF_EXPR: handle_ref_expr,
             clang.CursorKind.MEMBER_REF_EXPR: handle_member_ref_expr,
             clang.CursorKind.ARRAY_SUBSCRIPT_EXPR: handle_array_sub,
+            clang.CursorKind.CSTYLE_CAST_EXPR: handle_cast_expr,
             # Literals
             clang.CursorKind.INTEGER_LITERAL: handle_literal,
             clang.CursorKind.FLOATING_LITERAL: handle_literal,
@@ -276,6 +286,7 @@ def gen_code(list_instructions, info, context=BODY):
 
             if not text:
                 text = f'<empty code generated kind: {inst.kind}>'
+                debug('<empty code>: ', inst, inst.kind)
 
         if context == BODY:
             if inst.kind in NEED_SEMI_COLON:

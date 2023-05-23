@@ -81,14 +81,13 @@ def __has_read(cursor):
     return False
 
 
-def __convert_curosr_to_inst(c, info):
+def __convert_cursor_to_inst(c, info):
     if c.kind == clang.CursorKind.CALL_EXPR:
         return understand_call_expr(c, info)
     elif (c.kind == clang.CursorKind.BINARY_OPERATOR
             or c.kind == clang.CursorKind.COMPOUND_ASSIGNMENT_OPERATOR):
         # TODO: I do not know how to get information about binary
         # operations. My idea is to parse it my self.
-        report_on_cursor(c)
         inst = BinOp(c)
         children = list(c.get_children())
         assert(len(children) == 2)
@@ -136,6 +135,7 @@ def __convert_curosr_to_inst(c, info):
             inst.cast_type = children[0]
         else:
             raise Exception('Unexpected case!!')
+        return inst
     elif c.kind == clang.CursorKind.DECL_STMT:
         children = list(c.get_children())
         assert len(children) == 1
@@ -166,9 +166,6 @@ def __convert_curosr_to_inst(c, info):
         inst.name = c.spelling
         return inst
     elif c.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
-        # print('Array sub')
-        # report_on_cursor(c)
-
         children = list(c.get_children())
         count_children = len(children)
         assert count_children == 2
@@ -240,7 +237,7 @@ def __convert_curosr_to_inst(c, info):
         assert len(children) == 2
         inst = Instruction()
         inst.kind = c.kind
-        inst.case = [children[0]]
+        inst.case = gather_instructions_from(children[0], info)
         inst.body = gather_instructions_from(children[1], info)
         return inst
     elif c.kind == clang.CursorKind.DEFAULT_STMT:
@@ -312,7 +309,7 @@ def gather_instructions_from(cursor, info):
             d.enque(children[0])
             continue
 
-        inst = __convert_curosr_to_inst(c, info)
+        inst = __convert_cursor_to_inst(c, info)
         if inst:
             ops.append(inst)
 

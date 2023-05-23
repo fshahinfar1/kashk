@@ -306,7 +306,6 @@ class BinOp(Instruction):
         self.rhs = []
         self.op = ''
 
-        debug(dir(cursor))
         lhs_tokens = len(list(next(cursor.get_children()).get_tokens()))
         # First token after lhs
         self.op = list(cursor.get_tokens())[lhs_tokens].spelling
@@ -319,7 +318,6 @@ class BinOp(Instruction):
         #         break
 
         if not self.op:
-            report_on_cursor(cursor)
             self.op = '<operation is unknown>'
 
     def __parse(self, text):

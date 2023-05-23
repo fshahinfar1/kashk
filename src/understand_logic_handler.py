@@ -49,7 +49,7 @@ def __get_func_name(inst, info):
     if inst.is_method:
         if len(inst.owner) == 0:
             cls = info.sym_tbl.lookup('__class__')
-            debug(cls)
+            # debug(cls)
             func_name = f'{cls.name}_{func_name}'
         else:
             # Use the previouse objects to find the type of the class this
