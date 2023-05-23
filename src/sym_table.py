@@ -37,6 +37,15 @@ class Scope:
         else:
             return None
 
+    def lookup2(self, name):
+        entry = self.symbols.get(name)
+        if entry:
+            return entry, self
+        elif self.parent:
+            return self.parent.lookup2(name)
+        else:
+            return None
+
     def __repr__(self):
         return pprint.pformat(self.symbols)
 

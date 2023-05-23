@@ -19,7 +19,6 @@ def get_variable_declaration_before_elem(cursor, target_cursor, info):
             break
 
         if c.kind == clang.CursorKind.VAR_DECL:
-            info.sym_tbl.insert_entry(c.spelling, c.type, c.kind, c)
             v = VarDecl(c)
             variables.append(v)
 

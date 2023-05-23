@@ -49,7 +49,6 @@ def __get_func_name(inst, info):
     if inst.is_method:
         if len(inst.owner) == 0:
             cls = info.sym_tbl.lookup('__class__')
-            # debug(cls)
             func_name = f'{cls.name}_{func_name}'
         else:
             # Use the previouse objects to find the type of the class this
@@ -102,21 +101,39 @@ def __add_func_definition(inst, info):
         if inst.owner:
             owner_symb = __owner_to_ref(inst.owner, info)
             if owner_symb:
-                ref = f'struct {owner_symb[-1].type.spelling} *self'
+                method_obj = owner_symb[-1]
+                ref = f'struct {method_obj.type.spelling} *self'
             else:
                 cls = scope.lookup('__class__')
                 cls_text = cls.type.spelling
+                method_obj = cls.ref
                 ref = f'struct {cls_text} *self'
         else:
+            method_obj = Object()
+            method_obj.type = None
+            method_obj.kind = None
             ref = 'T *self'
         f.args = [ref] + f.args
+        # Add the first argument to the scope
+        e = SymbolTableEntry('self', method_obj.type, method_obj.kind, method_obj)
+        scope.insert(e)
 
     # Recursively analize the function body
     if f.body_cursor:
         T = inst.cursor.result_type
 
+        # Switch scope
         old_scope = info.sym_tbl.current_scope
         info.sym_tbl.current_scope = scope
+
+        # Add parameters to the function scope
+        for a in f.args:
+            if isinstance(a, str):
+                error('Function argument is string not a Cursor, StateObj, ...')
+            else:
+                c = a.cursor
+                info.sym_tbl.insert_entry(c.spelling, c.type, c.kind, c)
+
         # Process function body recursively
         f.body = gather_instructions_under(f.body_cursor, info)
         info.sym_tbl.current_scope = old_scope

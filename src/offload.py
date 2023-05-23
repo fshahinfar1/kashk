@@ -10,7 +10,7 @@ from understand_logic import (find_event_loop,
 from data_structure import *
 from bpf_code_gen import generate_bpf_prog
 
-from sym_table import scope_mapping
+from sym_table import scope_mapping, SymbolTableEntry
 from sym_table_gen import build_sym_table
 from pprint import pprint
 
@@ -55,6 +55,10 @@ def generate_offload(file_path, entry_func):
             s.is_global = True
             s.parent_object = None
             info.scope.add_global(s.name, s)
+            # Add it to the global scope
+            c = s.cursor
+            entry = SymbolTableEntry(c.spelling, c.type, c.kind, c)
+            info.sym_tbl.global_scope.insert(entry)
 
     # TODO: all the initialization and operations done before the event loop is
     # probably part of the control program setting up the BPF program.
@@ -115,8 +119,6 @@ def boot_starp_global_state(cursor, info):
     # The input argument is of this type
     tcp_conn_struct = Record('TCPConnection', states)
     decls.append(tcp_conn_struct)
-
-    debug([d.name for d in decls])
 
     # The global state has following field
     field = StateObject(tcp_conn_entry.ref)

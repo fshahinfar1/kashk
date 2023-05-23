@@ -2,6 +2,7 @@ import clang.cindex as clang
 
 from data_structure import *
 from utility import indent, INDENT, report_on_cursor
+from sym_table import scope_mapping
 
 READ_PACKET = 'async_read_some'
 WRITE_PACKET = 'async_write'
@@ -75,7 +76,7 @@ def handle_ref_expr(inst, info, more):
     lvl = more[0]
     state_obj = info.scope.get(inst.name)
     if state_obj:
-        text = __generate_code_ref_state_obj(state_obj)
+        text = __generate_code_ref_state_obj(state_obj, info)
     else:
         text = inst.name
     return text
@@ -271,7 +272,7 @@ def gen_code(list_instructions, info, context=BODY):
             text = inst
         elif isinstance(inst, StateObject):
             # TODO: this is bad code design, remove this branch
-            text = __generate_code_ref_state_obj(inst)
+            text = __generate_code_ref_state_obj(inst, info)
         elif isinstance(inst, TypeDefinition):
             text = __generate_code_type_definition(inst, info)
             if not text:
@@ -356,25 +357,36 @@ def __generate_code_type_definition(inst, info):
         text_args = ', '.join(args)
 
         # Change the context
-        # old_ctx = info.context
-        # new_ctx = ContextInfo(ContextInfo.KindFunction, inst)
-        # info.context = new_ctx
+        scope = scope_mapping.get(inst.name)
+        if not scope:
+            raise Exception(f'could not find the scope for function {inst.name}')
+        # TODO: simiplify the scope switch process by using a stack in symbol
+        # table and exposing an API
+        old_scope = info.sym_tbl.current_scope
+        info.sym_tbl.current_scope = scope
         body, _ = gen_code(inst.body, info)
-        # Switch back the context
-        # info.context = old_ctx
-        body = indent(body)
+        # Change scope back
+        info.sym_tbl.current_scope = old_scope
 
+        body = indent(body)
         text = f'{inst.return_type} {inst.name} ({text_args}) {{\n{body}\n}}'
         return text
     else:
         return inst.get_c_code()
 
 
-def __generate_code_ref_state_obj(state_obj):
+# TODO: this helper is patched may times and has lost its purpose remove it and
+# fix the code
+def __generate_code_ref_state_obj(state_obj, info):
     # print(state_obj, state_obj.parent_object)
     hierarchy, g = __build_hierarchy(state_obj)
     hierarchy = '.'.join([h.name for h in reversed(hierarchy)])
-    if g:
+
+    sym, scope = info.sym_tbl.current_scope.lookup2(state_obj.name)
+    is_global = scope == info.sym_tbl.global_scope
+    # debug('----', sym, is_global)
+
+    if is_global:
         text = 'sock_ctx->' + hierarchy
     else:
         text = hierarchy
