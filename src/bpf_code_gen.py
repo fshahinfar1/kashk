@@ -93,7 +93,7 @@ def handle_ref_expr(inst, info, more):
     is_global = scope == info.sym_tbl.global_scope
     is_shared = scope == info.sym_tbl.shared_scope
     if is_global:
-        text = 'sock_ctx->' + inst.name
+        text = 'sock_ctx->state.' + inst.name
     elif is_shared:
         # TODO: WHERE SHOULD I PUT THESE CODE? IT SHOULD BE ON SOME PART OF THE
         # FUNCTION BODY BEFORE REACHING THIS STATEMENT.
@@ -364,6 +364,8 @@ def generate_bpf_prog(info):
     non_func_decs = list(filter(lambda d: not isinstance(d, Function), decs))
     func_decs = list(filter(lambda d: isinstance(d, Function), decs))
     non_func_declarations, _ = gen_code(non_func_decs, info, context=DEF)
+    non_func_declarations += ('\n/* The globaly shared state is in this structure */'
+            + shared_state.get_c_code() + ';\n')
     func_declarations, _ = gen_code(func_decs, info, context=ARG)
     declarations = non_func_declarations + '\n' + func_declarations
 
@@ -372,6 +374,7 @@ def generate_bpf_prog(info):
     parser_code = indent(parser_code, 1)
 
     code = ([]
+            + info.prog.headers
             + ['typedef char bool;',
                 'typedef unsigned long long int size_t;',
                 'typedef unsigned char __u8;',
@@ -386,10 +389,7 @@ def generate_bpf_prog(info):
 #define memmove(d, s, len) __builtin_memmove(d, s, len)
 #endif''',
                 ]
-            + info.prog.headers
             + [declarations]
-            + ['/* The globaly shared state is in this structure */',
-                shared_state.get_c_code(),]
             + info.prog._per_connection_state()
             + info.prog._parser_prog([parser_code])
             + info.prog._verdict_prog([])
