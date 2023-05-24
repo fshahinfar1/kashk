@@ -39,7 +39,6 @@ def generate_offload(file_path, entry_func):
 
     # The arguments to the entry function is part of the connection state
     # entry_func_params = [get_state_for(arg) for arg in entry_func.get_arguments()]
-    info.sym_tbl.current_scope = info.sym_tbl.global_scope
     boot_starp_global_state(cursor, info)
 
     # Find the event-loop

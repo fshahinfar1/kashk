@@ -2,7 +2,6 @@ from dfs import DFSPass
 from log import debug, error
 from prune import should_process_this_cursor
 from utility import report_on_cursor
-from sym_table import *
 
 import clang.cindex as clang
 import pprint
@@ -25,7 +24,7 @@ def __collect_information_about_class(cursor, info):
             info.sym_tbl.insert_entry(method_name, c.result_type, c.kind, c)
 
             with info.sym_tbl.new_scope() as scope:
-                scope_mapping[method_name] = scope
+                info.sym_tbl.scope_mapping[method_name] = scope
                 __collect_information_about_func(c, info)
 
 
@@ -42,8 +41,31 @@ def __collect_information_about_func(cursor, info):
     # body = children[-1]
 
 
+def pass_over_global_variables(cursor, info):
+    """
+    Go through the global variables and add them to the top level scope
+    """
+    d = DFSPass(cursor)
+    for c, l in d:
+        if c.kind == clang.CursorKind.VAR_DECL:
+            info.sym_tbl.insert_entry(c.spelling, c.type, c.kind, c)
+        if c.kind == clang.CursorKind.TRANSLATION_UNIT:
+            d.go_deep()
+
+
 def build_sym_table(cursor, info):
-    scope_mapping['__global__'] = info.sym_tbl.current_scope
+    """
+    Go through all the declaration of class, function, fields, and variables.
+    Create scope for class and functions and add the fields or variables to the
+    correct scope.
+
+    This function does not explore the body of functions. This is post-poned
+    for later.
+    """
+    pass_over_global_variables(cursor, info)
+    info.sym_tbl.current_scope = info.sym_tbl.global_scope
+
+    info.sym_tbl.scope_mapping['__global__'] = info.sym_tbl.current_scope
 
     d = DFSPass(cursor)
     for c, l in d:
@@ -57,10 +79,11 @@ def build_sym_table(cursor, info):
             info.sym_tbl.insert_entry(scope_key, c.type, c.kind, c)
 
             with info.sym_tbl.new_scope() as scope:
-                scope_mapping[scope_key] = scope
+                info.sym_tbl.scope_mapping[scope_key] = scope
                 __collect_information_about_class(c, info)
             continue
-        elif c.kind == clang.CursorKind.VAR_DECL:
+        elif c.kind == clang.CursorKind.VAR_DECL and l > 1:
+            # If it is a variable decleration and it is not a global variable
             info.sym_tbl.insert_entry(c.spelling, c.type, c.kind, c)
             continue
         elif c.kind == clang.CursorKind.FUNCTION_DECL:
@@ -72,7 +95,7 @@ def build_sym_table(cursor, info):
             info.sym_tbl.insert_entry(scope_key, c.result_type, c.kind, c)
 
             with info.sym_tbl.new_scope() as scope:
-                scope_mapping[scope_key] = scope
+                info.sym_tbl.scope_mapping[scope_key] = scope
                 __collect_information_about_func(c, info)
             continue
 

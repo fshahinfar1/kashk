@@ -74,20 +74,18 @@ def handle_unary_op(inst, info, more):
 
 def handle_ref_expr(inst, info, more):
     lvl = more[0]
-    state_obj = info.scope.get(inst.name)
-    if state_obj:
-        text = __generate_code_ref_state_obj(state_obj, info)
+    # Check if the variable is shared globally or per_connection.
+    sym, scope = info.sym_tbl.lookup2(inst.name)
+    is_global = scope == info.sym_tbl.global_scope
+    is_shared = scope == info.sym_tbl.shared_scope
+    if is_global:
+        text = 'sock_ctx->' + inst.name
+    elif is_shared:
+        text = 'shared->' + inst.name
     else:
-        # Check if the variable is shared globally or per_connection.
-        sym, scope = info.sym_tbl.lookup2(inst.name)
-        is_global = scope == info.sym_tbl.global_scope
-        is_shared = scope == info.sym_tbl.shared_scope
-        if is_global:
-            text = 'sock_ctx->' + inst.name
-        elif is_shared:
-            text = 'shared->' + inst.name
-        else:
-            text = inst.name
+        text = inst.name
+    text = indent(text, lvl)
+
     return text
 
 
@@ -295,7 +293,7 @@ def gen_code(list_instructions, info, context=BODY):
             text = inst
         elif isinstance(inst, StateObject):
             # TODO: this is bad code design, remove this branch
-            text = __generate_code_ref_state_obj(inst, info)
+            text = handle_ref_expr(inst, info, [lvl])
         elif isinstance(inst, TypeDefinition):
             text = __generate_code_type_definition(inst, info)
             if not text:
@@ -411,25 +409,6 @@ def __generate_code_type_definition(inst, info):
         return text
     else:
         return inst.get_c_code()
-
-
-# TODO: this helper is patched may times and has lost its purpose remove it and
-# fix the code
-def __generate_code_ref_state_obj(state_obj, info):
-    hierarchy, g = __build_hierarchy(state_obj)
-    hierarchy = '.'.join([h.name for h in reversed(hierarchy)])
-
-    sym, scope = info.sym_tbl.lookup2(state_obj.name)
-    is_global = scope == info.sym_tbl.global_scope
-    is_shared = scope == info.sym_tbl.shared_scope
-
-    if is_global:
-        text = 'sock_ctx->' + hierarchy
-    elif is_shared:
-        text = 'shared->' + hierarchy
-    else:
-        text = hierarchy
-    return text
 
 
 def __build_hierarchy(state_obj):
