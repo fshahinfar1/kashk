@@ -1,6 +1,6 @@
 from dfs import DFSPass
 from log import debug, error
-from prune import should_process_this_file
+from prune import should_process_this_cursor
 from utility import report_on_cursor
 from sym_table import *
 
@@ -77,6 +77,6 @@ def build_sym_table(cursor, info):
             continue
         
         # Should we go deeper and investigate the children of this object?
-        if ((c.location.file and should_process_this_file(c.location.file.name))
-            or c.kind == clang.CursorKind.TRANSLATION_UNIT):
+        if (should_process_this_cursor(c)
+                or c.kind == clang.CursorKind.TRANSLATION_UNIT):
             d.go_deep() 
