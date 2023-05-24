@@ -11,7 +11,7 @@ from data_structure import *
 from bpf_code_gen import generate_bpf_prog
 
 from sym_table import scope_mapping, SymbolTableEntry
-from sym_table_gen import build_sym_table
+from sym_table_gen import build_sym_table, pass_over_global_variables
 from pprint import pprint
 
 
@@ -26,6 +26,7 @@ def generate_offload(file_path, entry_func):
     index, tu, cursor = parse_file(file_path)
 
     # Collect information about classes, functions, variables, ...
+    pass_over_global_variables(cursor, info)
     build_sym_table(cursor, info)
     # pprint(scope_mapping)
 

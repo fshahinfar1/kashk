@@ -52,6 +52,9 @@ class Scope:
 
 class SymbolTable:
     def __init__(self):
+        # State that is shared between connection
+        self.shared_scope = Scope()
+        # State which is maintained between packets of the same connection
         self.global_scope = Scope()
         self.current_scope = self.global_scope
         # Expose the global/static scope maping table as part of this class

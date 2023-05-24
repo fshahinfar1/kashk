@@ -410,7 +410,7 @@ class ContextInfo:
         self.kind = kind
         self.ref = ref
         pass
-    
+
     def __str__(self):
         if self.kind == self.KindFunction:
             return 'Function Context'

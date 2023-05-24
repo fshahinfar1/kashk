@@ -27,7 +27,7 @@ def generate_decleration_for(cursor):
     # List of type dependencies for this specific type
     decl = []
 
-    if cursor.type.kind in PRIMITIVE_TYPES: 
+    if cursor.type.kind in PRIMITIVE_TYPES:
         return decl
 
     if not should_process_this_cursor(cursor):
@@ -64,11 +64,11 @@ def generate_decleration_for(cursor):
         T = cursor.type.get_pointee()
         c = T.get_declaration()
         if c is None:
-            error(f'Failed to find the definition for {T}')
+            error(f'Failed to find the definition for {T.spelling}')
             return []
         c = c.get_definition()
         if c is None:
-            error(f'Failed to find the definition for {T}')
+            error(f'Failed to find the definition for {T.spelling}')
             return []
         decl += generate_decleration_for(c)
     else:
@@ -112,7 +112,7 @@ def get_state_for(cursor):
     # if k == clang.CursorKind.PARM_DECL:
     #     obj = StateObject(cursor)
     #     states.append(obj)
-    #     decl = generate_decleration_for(cursor) 
+    #     decl = generate_decleration_for(cursor)
     # elif k == clang.CursorKind.VAR_DECL:
     #     obj = StateObject(cursor)
     #     states.append(obj)

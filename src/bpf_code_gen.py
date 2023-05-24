@@ -325,8 +325,16 @@ def gen_code(list_instructions, info, context=BODY):
 
 
 def generate_bpf_prog(info):
-    decs = list(info.prog.declarations)
+    fields = []
+    for x in info.sym_tbl.shared_scope.symbols.values():
+        o = StateObject(x.ref)
+        fields.append(o)
+        # text = o.get_c_code()
+        # debug(text)
+    shared_state = Record('shared_state', fields)
 
+
+    decs = list(info.prog.declarations)
     non_func_decs = list(filter(lambda d: not isinstance(d, Function), decs))
     func_decs = list(filter(lambda d: isinstance(d, Function), decs))
     non_func_declarations, _ = gen_code(non_func_decs, info, context=DEF)
@@ -338,8 +346,8 @@ def generate_bpf_prog(info):
     parser_code = indent(parser_code, 1)
 
     code = ([]
-            + ['typedef char bool;', 
-                'typedef unsigned long long int size_t;', 
+            + ['typedef char bool;',
+                'typedef unsigned long long int size_t;',
                 'typedef unsigned char __u8;',
                 'typedef unsigned short __u16;',
                 'typedef unsigned int __u32;',
@@ -351,9 +359,11 @@ def generate_bpf_prog(info):
 #ifndef memmove
 #define memmove(d, s, len) __builtin_memmove(d, s, len)
 #endif''',
-                ] 
+                ]
             + info.prog.headers
             + [declarations]
+            + ['/* The globaly shared state is in this structure */',
+                shared_state.get_c_code(),]
             + info.prog._per_connection_state()
             + info.prog._parser_prog([parser_code])
             + info.prog._verdict_prog([])
