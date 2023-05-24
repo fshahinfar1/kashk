@@ -7,6 +7,20 @@ from sym_table import scope_mapping
 READ_PACKET = 'async_read_some'
 WRITE_PACKET = 'async_write'
 
+def check_if_shared_obj_is_loaded(info):
+    shared_sym = info.sym_tbl.lookup('shared')
+    if shared_sym:
+        # This object is defined in this scope
+        return False, ''
+    text = '''
+struct shared_state *shared = NULL;
+{
+  int zero = 0;
+  shared = bpf_map_lookup_elem(&shared_map, &zero);
+}
+'''
+    return True, text
+
 
 is_first_time = True
 def call_read_packet(inst, info, more):
@@ -81,6 +95,12 @@ def handle_ref_expr(inst, info, more):
     if is_global:
         text = 'sock_ctx->' + inst.name
     elif is_shared:
+        # TODO: WHERE SHOULD I PUT THESE CODE? IT SHOULD BE ON SOME PART OF THE
+        # FUNCTION BODY BEFORE REACHING THIS STATEMENT.
+        # res, definition = check_if_shared_obj_is_loaded(info)
+        # if res:
+        #     text = definition + '\n' + text
+
         text = 'shared->' + inst.name
     else:
         text = inst.name
@@ -282,7 +302,7 @@ def gen_code(list_instructions, info, context=BODY):
     count = len(list_instructions)
     q = reversed(list_instructions)
     q = list(zip(q, [0] * count))
-    code = ''
+    code = []
     modified = NO_MODIFICATION
     while q:
         inst, lvl = q.pop()
@@ -327,8 +347,9 @@ def gen_code(list_instructions, info, context=BODY):
             text += ';\n'
 
 
-        code += text
-    return code, modified
+        code.append(text)
+    text = ''.join(code)
+    return text, modified
 
 
 def generate_bpf_prog(info):
