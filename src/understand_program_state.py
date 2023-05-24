@@ -71,9 +71,6 @@ def generate_decleration_for(cursor):
             error(f'Failed to find the definition for {T}')
             return []
         decl += generate_decleration_for(c)
-    elif cursor.type.kind == clang.TypeKind.CONSTANTARRAY:
-        report_on_cursor(cursor)
-        return []
     else:
         error('Unexpected! ' + str(cursor.type.kind))
 

@@ -141,20 +141,32 @@ def __convert_cursor_to_inst(c, info):
         assert len(children) == 1
         return gather_instructions_from(children[0], info)[0]
     elif c.kind == clang.CursorKind.VAR_DECL:
-        init = []
-        # The first child after TYPE_REF would be the initialization of the
-        # variable.
-        children = list(c.get_children())
-        tmp_index = 0
-        for i, tmp_c in enumerate(children):
-            if tmp_c.kind == clang.CursorKind.TYPE_REF:
-                tmp_index = i
-                break
-        tmp_index += 1
-        if len(children) > tmp_index:
-            # This declaration has initialization
-            init = gather_instructions_from(children[-1], info)
         inst = VarDecl(c)
+
+        # Find the variable initialization, if there is any.
+        init = []
+        if inst.is_array:
+            for child in c.get_children():
+                if child.kind == clang.CursorKind.INTEGER_LITERAL:
+                    continue
+                init = gather_instructions_from(child, info)
+                break
+        else:
+            # TODO: Keep the old code, it seems to work
+            init = []
+            # The first child after TYPE_REF would be the initialization of the
+            # variable.
+            children = list(c.get_children())
+            tmp_index = 0
+            for i, tmp_c in enumerate(children):
+                if tmp_c.kind == clang.CursorKind.TYPE_REF:
+                    tmp_index = i
+                    break
+            tmp_index += 1
+            if len(children) > tmp_index:
+                # This declaration has initialization
+                init = gather_instructions_from(children[-1], info)
+
         inst.init = init
         info.scope.add_local(inst.name, inst.state_obj)
 
