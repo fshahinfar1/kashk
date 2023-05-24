@@ -44,7 +44,7 @@ class Scope:
         elif self.parent:
             return self.parent.lookup2(name)
         else:
-            return None
+            return None, None
 
     def __repr__(self):
         return pprint.pformat(self.symbols)
@@ -55,8 +55,8 @@ class SymbolTable:
         # State that is shared between connection
         self.shared_scope = Scope()
         # State which is maintained between packets of the same connection
-        self.global_scope = Scope()
-        self.current_scope = self.global_scope
+        self.global_scope = Scope(self.shared_scope)
+        self.current_scope = self.shared_scope
         # Expose the global/static scope maping table as part of this class
         self.scope_mapping = scope_mapping
 
@@ -70,6 +70,10 @@ class SymbolTable:
 
     def lookup(self, name):
         return self.current_scope.lookup(name)
+
+    def lookup2(self, name):
+        sym, scope = self.current_scope.lookup2(name)
+        return sym, scope
 
     @contextmanager
     def new_scope(self):

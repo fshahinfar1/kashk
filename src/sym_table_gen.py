@@ -42,19 +42,6 @@ def __collect_information_about_func(cursor, info):
     # body = children[-1]
 
 
-def pass_over_global_variables(cursor, info):
-    scope = info.sym_tbl.shared_scope
-    d = DFSPass(cursor)
-    for c, l in d:
-        # debug('|  '*l + f'+- {c.spelling} {c.kind}')
-        if c.kind == clang.CursorKind.VAR_DECL:
-            debug('+', c.type.spelling, c.spelling, c.kind)
-            scope.insert(SymbolTableEntry(c.spelling, c.type, c.kind, c))
-
-        if c.kind == clang.CursorKind.TRANSLATION_UNIT:
-            d.go_deep()
-
-
 def build_sym_table(cursor, info):
     scope_mapping['__global__'] = info.sym_tbl.current_scope
 

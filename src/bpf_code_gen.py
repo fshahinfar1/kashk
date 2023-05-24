@@ -78,7 +78,16 @@ def handle_ref_expr(inst, info, more):
     if state_obj:
         text = __generate_code_ref_state_obj(state_obj, info)
     else:
-        text = inst.name
+        # Check if the variable is shared globally or per_connection.
+        sym, scope = info.sym_tbl.lookup2(inst.name)
+        is_global = scope == info.sym_tbl.global_scope
+        is_shared = scope == info.sym_tbl.shared_scope
+        if is_global:
+            text = 'sock_ctx->' + inst.name
+        elif is_shared:
+            text = 'shared->' + inst.name
+        else:
+            text = inst.name
     return text
 
 
@@ -329,8 +338,6 @@ def generate_bpf_prog(info):
     for x in info.sym_tbl.shared_scope.symbols.values():
         o = StateObject(x.ref)
         fields.append(o)
-        # text = o.get_c_code()
-        # debug(text)
     shared_state = Record('shared_state', fields)
 
 
@@ -412,11 +419,14 @@ def __generate_code_ref_state_obj(state_obj, info):
     hierarchy, g = __build_hierarchy(state_obj)
     hierarchy = '.'.join([h.name for h in reversed(hierarchy)])
 
-    sym, scope = info.sym_tbl.current_scope.lookup2(state_obj.name)
+    sym, scope = info.sym_tbl.lookup2(state_obj.name)
     is_global = scope == info.sym_tbl.global_scope
+    is_shared = scope == info.sym_tbl.shared_scope
 
     if is_global:
         text = 'sock_ctx->' + hierarchy
+    elif is_shared:
+        text = 'shared->' + hierarchy
     else:
         text = hierarchy
     return text
