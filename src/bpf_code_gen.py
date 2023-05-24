@@ -155,6 +155,18 @@ def handle_do_stmt(inst, info, more):
     return text
 
 
+def handle_for_stmt(inst, info,more):
+    lvl = more[0]
+    pre, _  =  gen_code(inst.pre, info, context=ARG)
+    cond, _ = gen_code(inst.cond, info, context=ARG)
+    post, _ = gen_code(inst.post, info, context=ARG)
+    body, _ = gen_code(inst.body, info, context=BODY)
+    body = indent(body)
+    text = f'for({pre}; {cond}; {post}) {{\n{body}\n}}'
+    text = indent(text, lvl)
+    return text
+
+
 def handle_switch_stmt(inst, info, more):
     lvl = more[0]
     cond, _ = gen_code(inst.cond, info, context=ARG)
@@ -247,6 +259,7 @@ def gen_code(list_instructions, info, context=BODY):
             # Control FLow
             clang.CursorKind.IF_STMT: handle_if_stmt,
             clang.CursorKind.DO_STMT: handle_do_stmt,
+            clang.CursorKind.FOR_STMT: handle_for_stmt,
             clang.CursorKind.SWITCH_STMT: handle_switch_stmt,
             clang.CursorKind.CASE_STMT: handle_case_stmt,
             clang.CursorKind.DEFAULT_STMT: handle_default_stmt,

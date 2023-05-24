@@ -230,11 +230,21 @@ def __convert_cursor_to_inst(c, info):
         children = list(c.get_children())
         body = children[0]
         cond = children[-1]
-
         inst = ControlFlowInst()
         inst.kind = c.kind
         inst.cond = gather_instructions_from(cond, info)
         inst.body = gather_instructions_under(body, info)
+        return inst
+    elif c.kind == clang.CursorKind.FOR_STMT:
+        children = list(c.get_children())
+        assert len(children) == 4
+        inst = Instruction()
+        inst.kind = c.kind
+        inst.cursor = c
+        inst.pre = gather_instructions_from(children[0], info)
+        inst.cond = gather_instructions_from(children[1], info)
+        inst.post = gather_instructions_from(children[2], info)
+        inst.body = gather_instructions_from(children[3], info)
         return inst
     elif c.kind == clang.CursorKind.SWITCH_STMT:
         children = list(c.get_children())
