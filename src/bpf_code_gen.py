@@ -392,6 +392,8 @@ def gen_code(list_instructions, info, context=BODY):
 def generate_bpf_prog(info):
     fields = []
     for x in info.sym_tbl.shared_scope.symbols.values():
+        if x.name not in info.global_accessed_variables:
+            continue
         o = StateObject(x.ref)
         fields.append(o)
     shared_state = Record('shared_state', fields)
@@ -413,11 +415,6 @@ def generate_bpf_prog(info):
     code = ([]
             + info.prog.headers
             + ['typedef char bool;',
-                'typedef unsigned long long int size_t;',
-                'typedef unsigned char __u8;',
-                'typedef unsigned short __u16;',
-                'typedef unsigned int __u32;',
-                'typedef unsigned long long int __u64;',
 '''#ifndef memcpy
 #define memcpy(d, s, len) __builtin_memcpy(d, s, len)
 #endif

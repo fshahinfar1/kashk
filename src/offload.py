@@ -53,7 +53,6 @@ def generate_offload(file_path, entry_func):
         for s in states:
             s.is_global = True
             s.parent_object = None
-            info.scope.add_global(s.name, s)
             # Add it to the global scope
             c = s.cursor
             entry = SymbolTableEntry(c.spelling, c.type, c.kind, c)
@@ -138,7 +137,6 @@ def boot_starp_global_state(cursor, info):
         s.parent_object = field
 
     add_state_decl_to_bpf(info.prog, [field], decls)
-    # info.scope.add_global(field.name, field)
 
 
 def add_state_decl_to_bpf(prog, states, decls):

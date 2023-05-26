@@ -190,7 +190,6 @@ def __convert_cursor_to_inst(c, info):
                 init = gather_instructions_from(children[-1], info)
 
         inst.init = init
-        info.scope.add_local(inst.name, inst.state_obj)
 
         # Add variable to the scope
         info.sym_tbl.insert_entry(c.spelling, c.type, c.kind, c)
@@ -213,6 +212,12 @@ def __convert_cursor_to_inst(c, info):
         inst = Instruction()
         inst.kind = clang.CursorKind.DECL_REF_EXPR
         inst.name = c.spelling
+
+        sym, scope = info.sym_tbl.lookup2(inst.name)
+        is_shared = scope == info.sym_tbl.shared_scope
+        if is_shared:
+            info.global_accessed_variables.add(inst.name)
+
         return inst
     elif c.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
         children = list(c.get_children())
@@ -333,6 +338,8 @@ def __convert_cursor_to_inst(c, info):
             inst.kind = clang.CursorKind.RETURN_STMT
             inst.body = []
             return inst
+        return None
+    elif c.kind == clang.CursorKind.NULL_STMT:
         return None
     else:
         error('TODO:')

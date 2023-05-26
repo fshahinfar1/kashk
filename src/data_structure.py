@@ -12,12 +12,12 @@ class Info:
     """
     def __init__(self):
         from bpf import SK_SKB_PROG
-        self.scope = Scope()
         self.context = None
         self.rd_buf = None
         self.wr_buf = None
         self.prog = SK_SKB_PROG()
         self.sym_tbl = SymbolTable()
+        self.global_accessed_variables = set()
 
 
 class PacketBuffer:
@@ -27,42 +27,6 @@ class PacketBuffer:
     def __init__(self, cursor):
         self.cursor = cursor
         self.name = cursor.spelling
-
-
-class Scope:
-    def __init__(self):
-        self.local = {}
-        self.glbl = {}
-
-    def is_local(self, name):
-        if name in self.local:
-            return True, self.local[name]
-        return False, None
-
-    def is_global(self, name):
-        if name in self.glbl:
-            return True, self.glbl[name]
-        return False, None
-
-    def add_local(self, name, ref):
-        # if name in self.local:
-        #     raise Exception(f'Shadowing local variables is not implemented yet ({name})')
-        self.local[name] = ref
-
-    def add_global(self, name, ref):
-        if name in self.glbl:
-            raise Exception('Global variables with the duplicate name is not allowed')
-        self.glbl[name] = ref
-
-    def get(self, name):
-        # TODO: this implementation is ridiculous
-        res, obj = self.is_local(name)
-        if res:
-            return obj
-        res, obj = self.is_global(name)
-        if res:
-            return obj
-        return None
 
 
 class StateObject:
