@@ -154,7 +154,7 @@ def __convert_cursor_to_inst(c, info):
             inst.cast_type = type_name
         elif count_children == 2:
             inst.castee = gather_instructions_from(children[1], info)
-            inst.cast_type = children[0]
+            inst.cast_type = c.type
         else:
             raise Exception('Unexpected case!!')
         return inst

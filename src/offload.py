@@ -114,7 +114,7 @@ def boot_starp_global_state(cursor, info):
     e = info.sym_tbl.insert_entry('conn', tcp_conn_entry.type, clang.CursorKind.PARM_DECL, None)
     # Override what the clang thinks
     e.is_pointer = True
-    e.name = 'sock_ctx'
+    e.name = 'sock_ctx->state.conn'
     # -----------------------------
 
     # The fields and its dependencies

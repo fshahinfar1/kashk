@@ -174,8 +174,6 @@ def handle_cast_expr(inst, info, more):
         ctype = inst.cast_type
     else:
         ctype = inst.cast_type.spelling
-        if inst.cast_type.kind == clang.TypeKind.POINTER:
-            ctype += ' *'
     text = f'({ctype})({body})'
     text = indent(text, lvl)
     return text
