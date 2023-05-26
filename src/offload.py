@@ -5,8 +5,8 @@ import queue
 from utility import parse_file, find_elem, show_insts, report_on_cursor
 from understand_program_state import (extract_state, get_state_for,)
 from understand_logic import (find_event_loop,
-        get_variable_declaration_before_elem, get_all_read,
-        gather_instructions_under)
+        get_variable_declaration_before_elem, get_all_read, get_all_send,
+        gather_instructions_under, gather_instructions_from)
 from data_structure import *
 from bpf_code_gen import generate_bpf_prog
 
@@ -74,6 +74,21 @@ def generate_offload(file_path, entry_func):
     if info.rd_buf is None:
         error('Failed to find the packet buffer')
         return
+
+    writes = get_all_send(ev_loop)
+    assert len(writes) == 1, 'I currently expect only one send system call'
+    for c in writes:
+        # TODO: this code is not going to work. it is so specific
+        # report_on_cursor(c)
+        args = list(c.get_arguments())
+        buf_def = args[1].get_definition()
+        # report_on_cursor(buf_def)
+        buf_def = next(buf_def.get_children())
+        args = list(buf_def.get_arguments())
+        buf_def = args[0].get_definition()
+        buf_sz = args[1]
+        info.wr_buf = PacketBuffer(buf_def)
+        info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
 
     # Go through the instructions, replace access to the buffer and read/write
     # instructions

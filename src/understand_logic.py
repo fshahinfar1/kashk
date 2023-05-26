@@ -4,7 +4,7 @@ import clang.cindex as clang
 from log import error
 from utility import get_code, report_on_cursor, visualize_ast, get_owner
 from data_structure import *
-from prune import should_process_this_file
+from prune import (should_process_this_file, READ_PACKET, WRITE_PACKET)
 from understand_program_state import get_state_for
 
 from dfs import DFSPass
@@ -55,13 +55,35 @@ def get_all_read(cursor):
                 # These functions are for coroutine and make things complex
                 continue
 
-            if c.spelling == 'async_read_some':
+            if c.spelling == READ_PACKET:
                 result.append(c)
                 continue
 
         # Continue deeper
         for child in reversed(list(c.get_children())):
             q.append(child)
+    return result
+
+
+def get_all_send(cursor):
+    """
+    Get all the send system calls under the cursor
+    """
+    result = []
+    d = DFSPass(cursor)
+    # Outside the connection polling loop
+    for c, _ in d:
+        if c.kind == clang.CursorKind.CALL_EXPR:
+            func_name = c.spelling
+            if func_name in COROUTINE_FUNC_NAME:
+                # These functions are for coroutine and make things complex
+                continue
+
+            if c.spelling == WRITE_PACKET:
+                result.append(c)
+                continue
+
+        d.go_deep()
     return result
 
 

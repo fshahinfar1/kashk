@@ -1,3 +1,7 @@
+READ_PACKET = 'async_read_some'
+WRITE_PACKET = 'async_write'
+
+
 def should_process_this_cursor(cursor):
     f = cursor.location.file
     return f and should_process_this_file(f.name)

@@ -3,9 +3,8 @@ import clang.cindex as clang
 from data_structure import *
 from utility import (indent, INDENT, report_on_cursor, owner_to_ref)
 from sym_table import scope_mapping
+from prune import READ_PACKET, WRITE_PACKET
 
-READ_PACKET = 'async_read_some'
-WRITE_PACKET = 'async_write'
 
 def check_if_shared_obj_is_loaded(info):
     shared_sym = info.sym_tbl.lookup('shared')
@@ -21,16 +20,46 @@ struct shared_state *shared = NULL;
 '''
     return True, text
 
+def only_once(f):
+    is_first_time = True
+    def x(*args, **kwargs):
+        if not is_first_time:
+            return ''
+        is_first_time = False
+        return f(*args, **kwargs)
+    return x
 
-is_first_time = True
+is_first_time_1 = True
 def call_read_packet(inst, info, more):
-    # TODO: update the variable receiving the return value (read length)
-    global is_first_time
+    global is_first_time_1
     lvl = more[0]
-    if not is_first_time:
+    if not is_first_time_1:
         return ''
-    is_first_time = False
+    is_first_time_1 = False
     return indent(f'{info.rd_buf.name} = (void *)(__u64)skb->data', lvl)
+
+
+is_first_time_2 = True
+def call_send_packet(inst, info, more):
+    global is_first_time_2
+    lvl = more[0]
+    if not is_first_time_2:
+        return ''
+    is_first_time_2 = False
+
+    buf = info.wr_buf.name
+    write_size, _ = gen_code(info.wr_buf.write_size_cursor, info, context=ARG)
+    code = [
+        f'__adjust_skb_size(skb, {write_size});',
+        f'if (((void *)(__u64)skb->data + {write_size})  > (void *)(__u64)skb->data_end) {{',
+        f'  return SK_DROP;',
+        '}',
+        f'memcpy((void *)(__u64)skb->data, {buf}, {write_size});',
+        'return bpf_sk_redirect_map(skb, &sock_map, sock_ctx->sock_map_index, 0);',
+        ]
+    text = '\n'.join(code)
+    text = indent(text, lvl)
+    return text
 
 
 def handle_var(inst, info, more):
@@ -321,14 +350,22 @@ def gen_code(list_instructions, info, context=BODY):
                 continue
         else:
             # Some special rules
-            if inst.kind == clang.CursorKind.VAR_DECL and inst.name == info.rd_buf.name:
-                text = f'char *{info.rd_buf.name}'
-                modified = CHANGE_BUFFER_DEF
+            if (inst.kind == clang.CursorKind.VAR_DECL
+                    and inst.name in (info.rd_buf.name,)): #  info.wr_buf.name
+                if inst.name == info.rd_buf.name:
+                    text = f'char *{info.rd_buf.name}'
+                    modified = CHANGE_BUFFER_DEF
+                # elif inst.name == info.wr_buf.name:
+                #     text = ''
+                #     modified = CHANGE_BUFFER_DEF
             elif inst.kind == clang.CursorKind.CALL_EXPR and inst.name == 'operator<<':
                 text = f'// removing a call to "<<" operator'
                 modified = CHANGE_BUFFER_DEF
             elif inst.kind == clang.CursorKind.CALL_EXPR and inst.cursor.spelling == READ_PACKET:
                 text = call_read_packet(inst, info, [lvl])
+                modified = REPLACE_READ
+            elif inst.kind == clang.CursorKind.CALL_EXPR and inst.cursor.spelling == WRITE_PACKET:
+                text = call_send_packet(inst, info, [lvl])
                 modified = REPLACE_READ
             else:
                 handler = jump_table.get(inst.kind, lambda x,y,z: '')
