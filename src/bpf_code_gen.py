@@ -281,6 +281,7 @@ ARG = 1
 LHS = 2
 RHS = 3
 DEF = 4
+FUNC = 5
 
 NEED_SEMI_COLON = set((clang.CursorKind.CALL_EXPR, clang.CursorKind.VAR_DECL,
     clang.CursorKind.BINARY_OPERATOR, clang.CursorKind.CONTINUE_STMT,
@@ -403,8 +404,11 @@ def generate_bpf_prog(info):
     non_func_declarations, _ = gen_code(non_func_decs, info, context=DEF)
     non_func_declarations += ('\n/* The globaly shared state is in this structure */'
             + shared_state.get_c_code() + ';\n')
+    bpf_map_declaration = info.prog._map_declaration()
     func_declarations, _ = gen_code(func_decs, info, context=ARG)
-    declarations = non_func_declarations + '\n' + func_declarations
+    declarations = (non_func_declarations + '\n'
+            + bpf_map_declaration + '\n'
+            + func_declarations + '\n')
 
     parser_code, _ = gen_code(info.prog.parser_code, info)
     parser_code = (info.prog._pull_packet_data()

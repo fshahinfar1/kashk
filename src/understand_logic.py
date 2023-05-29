@@ -1,4 +1,5 @@
 import itertools
+from contextlib import contextmanager
 import clang.cindex as clang
 
 from log import error
@@ -8,6 +9,41 @@ from prune import (should_process_this_file, READ_PACKET, WRITE_PACKET)
 from understand_program_state import get_state_for
 
 from dfs import DFSPass
+
+from bpf_code_gen import BODY, ARG, LHS, RHS, DEF, FUNC
+
+
+class CodeBlockRef:
+    """
+    This class can hold the reference to different code blocks.
+    For example current function, current class, current block, ...
+    """
+    def __init__(self):
+        self.code_block_reference = {}
+        self.stack = []
+
+    def push(self, name, code):
+        pair = (name, self.code_block_reference.get(name))
+        self.stack.append(pair)
+        self.code_block_reference[name] = code
+
+    def pop(self):
+        name, code = self.stack.pop()
+        self.code_block_reference[name] = code
+
+    def get(self, name, default=None):
+        return self.code_block_reference.get(name, default)
+
+    @contextmanager
+    def new_ref(self, name, code):
+        self.push(name, code)
+        try:
+            yield self
+        finally:
+            self.pop()
+
+
+cb_ref = CodeBlockRef()
 
 
 def get_variable_declaration_before_elem(cursor, target_cursor, info):
@@ -113,31 +149,31 @@ def __convert_cursor_to_inst(c, info):
         inst = BinOp(c)
         children = list(c.get_children())
         assert(len(children) == 2)
-        inst.lhs = gather_instructions_from(children[0], info)
-        inst.rhs = gather_instructions_from(children[1], info)
+        inst.lhs = gather_instructions_from(children[0], info, context=LHS)
+        inst.rhs = gather_instructions_from(children[1], info, context=RHS)
         return inst
     elif (c.kind == clang.CursorKind.UNARY_OPERATOR
             or c.kind == clang.CursorKind.CXX_UNARY_EXPR):
         inst = UnaryOp(c)
         children = list(c.get_children())
         assert(len(children) == 1)
-        inst.child = gather_instructions_from(children[0], info)
+        inst.child = gather_instructions_from(children[0], info, context=ARG)
         return inst
     elif c.kind == clang.CursorKind.CONDITIONAL_OPERATOR:
         children = list(c.get_children())
         assert len(children) == 3
         inst = ControlFlowInst()
         inst.kind = c.kind
-        inst.cond = gather_instructions_from(children[0], info)
-        inst.body = gather_instructions_from(children[1], info)
-        inst.other_body = gather_instructions_from(children[2], info)
+        inst.cond = gather_instructions_from(children[0], info, context=ARG)
+        inst.body = gather_instructions_from(children[1], info, context=ARG)
+        inst.other_body = gather_instructions_from(children[2], info, context=ARG)
         return inst
     elif c.kind == clang.CursorKind.PAREN_EXPR:
         children = list(c.get_children())
         assert len(children) == 1
         inst = Instruction()
         inst.kind = c.kind
-        inst.body = gather_instructions_from(children[0], info)
+        inst.body = gather_instructions_from(children[0], info, context=ARG)
         return inst
     elif (c.kind == clang.CursorKind.CXX_REINTERPRET_CAST_EXPR
             or c.kind == clang.CursorKind.CSTYLE_CAST_EXPR):
@@ -146,14 +182,14 @@ def __convert_cursor_to_inst(c, info):
         inst = Instruction()
         inst.kind = clang.CursorKind.CSTYLE_CAST_EXPR
         if count_children == 1:
-            inst.castee = gather_instructions_from(children[0], info)
+            inst.castee = gather_instructions_from(children[0], info, context=ARG)
             tokens = list(map(lambda x: x.spelling, c.get_tokens()))
             assert tokens[0] == '('
             index = tokens.index(')')
             type_name = ' '.join(tokens[1:index])
             inst.cast_type = type_name
         elif count_children == 2:
-            inst.castee = gather_instructions_from(children[1], info)
+            inst.castee = gather_instructions_from(children[1], info, context=ARG)
             inst.cast_type = c.type
         else:
             raise Exception('Unexpected case!!')
@@ -161,7 +197,7 @@ def __convert_cursor_to_inst(c, info):
     elif c.kind == clang.CursorKind.DECL_STMT:
         children = list(c.get_children())
         assert len(children) == 1
-        return gather_instructions_from(children[0], info)[0]
+        return gather_instructions_from(children[0], info, context=ARG)[0]
     elif c.kind == clang.CursorKind.VAR_DECL:
         inst = VarDecl(c)
 
@@ -171,10 +207,10 @@ def __convert_cursor_to_inst(c, info):
             for child in c.get_children():
                 if child.kind == clang.CursorKind.INTEGER_LITERAL:
                     continue
-                init = gather_instructions_from(child, info)
+                init = gather_instructions_from(child, info, context=ARG)
                 break
         else:
-            # TODO: Keep the old code, it seems to work
+            # NOTE: Keeping the old code, it seems to work
             init = []
             # The first child after TYPE_REF would be the initialization of the
             # variable.
@@ -187,7 +223,7 @@ def __convert_cursor_to_inst(c, info):
             tmp_index += 1
             if len(children) > tmp_index:
                 # This declaration has initialization
-                init = gather_instructions_from(children[-1], info)
+                init = gather_instructions_from(children[-1], info, context=ARG)
 
         inst.init = init
 
@@ -216,8 +252,27 @@ def __convert_cursor_to_inst(c, info):
         sym, scope = info.sym_tbl.lookup2(inst.name)
         is_shared = scope == info.sym_tbl.shared_scope
         if is_shared:
+            # Keep track of used global variables
             info.global_accessed_variables.add(inst.name)
+            sym = scope.lookup('shared')
+            debug('shared symbol is defined:', sym is not None)
+            if sym is None:
+                # Perform a lookup on the map for globally shared values
+                code = cb_ref.get(FUNC)
+                new_inst = Instruction()
+                new_inst.kind = clang.CursorKind.STRING_LITERAL
+                new_inst.text = '''
+struct shared_state *shared = NULL;
+{
+  int zero = 0;
+  shared = bpf_map_lookup_elem(&shared_map, &zero);
+}
+if (!shared) {
+  return SK_DROP;
+}
 
+'''
+                code.append(new_inst)
         return inst
     elif c.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
         children = list(c.get_children())
@@ -226,8 +281,8 @@ def __convert_cursor_to_inst(c, info):
 
         inst = Instruction()
         inst.kind = c.kind
-        inst.array_ref = gather_instructions_from(children[0], info)
-        inst.index = gather_instructions_from(children[1], info)
+        inst.array_ref = gather_instructions_from(children[0], info, context=ARG)
+        inst.index = gather_instructions_from(children[1], info, context=ARG)
         inst.cursor = c
         return inst
     elif c.kind in (clang.CursorKind.CXX_BOOL_LITERAL_EXPR,
@@ -250,13 +305,13 @@ def __convert_cursor_to_inst(c, info):
         return inst
     elif c.kind == clang.CursorKind.IF_STMT:
         children = list(c.get_children())
-        cond = gather_instructions_from(children[0], info)
+        cond = gather_instructions_from(children[0], info, context=ARG)
         body = []
         other_body = []
         if len(children) > 1:
-            body = gather_instructions_from(children[1], info)
+            body = gather_instructions_from(children[1], info, context=BODY)
         if len(children) > 2:
-            other_body = gather_instructions_from(children[2], info)
+            other_body = gather_instructions_from(children[2], info, context=BODY)
 
         inst = ControlFlowInst()
         inst.kind = c.kind
@@ -271,8 +326,8 @@ def __convert_cursor_to_inst(c, info):
         cond = children[-1]
         inst = ControlFlowInst()
         inst.kind = c.kind
-        inst.cond = gather_instructions_from(cond, info)
-        inst.body = gather_instructions_under(body, info)
+        inst.cond = gather_instructions_from(cond, info, context=ARG)
+        inst.body = gather_instructions_under(body, info, BODY)
         return inst
     elif c.kind == clang.CursorKind.FOR_STMT:
         children = list(c.get_children())
@@ -280,16 +335,16 @@ def __convert_cursor_to_inst(c, info):
         inst = Instruction()
         inst.kind = c.kind
         inst.cursor = c
-        inst.pre = gather_instructions_from(children[0], info)
-        inst.cond = gather_instructions_from(children[1], info)
-        inst.post = gather_instructions_from(children[2], info)
-        inst.body = gather_instructions_from(children[3], info)
+        inst.pre =  gather_instructions_from(children[0], info, context=ARG)
+        inst.cond = gather_instructions_from(children[1], info, context=ARG)
+        inst.post = gather_instructions_from(children[2], info, context=ARG)
+        inst.body = gather_instructions_from(children[3], info, context=BODY)
         return inst
     elif c.kind == clang.CursorKind.SWITCH_STMT:
         children = list(c.get_children())
         assert len(children) == 2
-        cond = gather_instructions_from(children[0], info)
-        body = gather_instructions_under(children[1], info)
+        cond = gather_instructions_from(children[0], info, context=ARG)
+        body = gather_instructions_under(children[1], info, BODY)
 
         inst = ControlFlowInst()
         inst.kind = c.kind
@@ -301,14 +356,14 @@ def __convert_cursor_to_inst(c, info):
         assert len(children) == 2
         inst = Instruction()
         inst.kind = c.kind
-        inst.case = gather_instructions_from(children[0], info)
-        inst.body = gather_instructions_from(children[1], info)
+        inst.case = gather_instructions_from(children[0], info, context=ARG)
+        inst.body = gather_instructions_from(children[1], info, context=BODY)
         return inst
     elif c.kind == clang.CursorKind.DEFAULT_STMT:
         body = next(c.get_children())
         inst = Instruction()
         inst.kind = c.kind
-        inst.body = gather_instructions_from(body, info)
+        inst.body = gather_instructions_from(body, info, context=BODY)
         return inst
     elif c.kind == clang.CursorKind.BREAK_STMT:
         inst = Instruction()
@@ -322,7 +377,7 @@ def __convert_cursor_to_inst(c, info):
         if count_children == 0:
             inst.body = []
         elif count_children == 1:
-            inst.body = gather_instructions_from(children[0], info)
+            inst.body = gather_instructions_from(children[0], info, context=ARG)
         else:
             raise Exception('Unexpected situation when encountering RETURN_STMT')
         return inst
@@ -347,14 +402,13 @@ def __convert_cursor_to_inst(c, info):
         return None
 
 
-def gather_instructions_from(cursor, info):
+def gather_instructions_from(cursor, info, context=BODY):
     """
     Convert the cursor to a instruction
     """
     ops = []
+    cb_ref.push(context, ops)
     d = DFSPass(cursor)
-    q = [cursor]
-    # Outside the connection polling loop
     for c, _ in d:
         if (not c.location.file
                 or not should_process_this_file(c.location.file.name)):
@@ -378,11 +432,11 @@ def gather_instructions_from(cursor, info):
         inst = __convert_cursor_to_inst(c, info)
         if inst:
             ops.append(inst)
-
+    cb_ref.pop()
     return ops
 
 
-def gather_instructions_under(cursor, info):
+def gather_instructions_under(cursor, info, context):
     """
     Get the list of instruction in side a block of code.
     (Expecting the cursor to be a block of code)
@@ -390,7 +444,7 @@ def gather_instructions_under(cursor, info):
     # Gather instructions in this list
     ops = []
     for c in cursor.get_children():
-        insts = gather_instructions_from(c, info)
+        insts = gather_instructions_from(c, info, context)
         ops.extend(insts)
 
     return ops

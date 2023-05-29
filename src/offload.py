@@ -8,7 +8,7 @@ from understand_logic import (find_event_loop,
         get_variable_declaration_before_elem, get_all_read, get_all_send,
         gather_instructions_under, gather_instructions_from)
 from data_structure import *
-from bpf_code_gen import generate_bpf_prog
+from bpf_code_gen import generate_bpf_prog, FUNC
 
 from sym_table import scope_mapping, SymbolTableEntry
 from sym_table_gen import build_sym_table
@@ -92,7 +92,7 @@ def generate_offload(file_path, entry_func):
     # Go through the instructions, replace access to the buffer and read/write
     # instructions
     body_of_loop = list(ev_loop.get_children())[-1]
-    insts = gather_instructions_under(body_of_loop, info)
+    insts = gather_instructions_under(body_of_loop, info, FUNC)
     info.prog.parser_code = insts
 
     # Print the code we have generated
