@@ -18,6 +18,7 @@ class Info:
         self.prog = SK_SKB_PROG()
         self.sym_tbl = SymbolTable()
         self.global_accessed_variables = set()
+        self.remove_cursor = set()
 
 
 class PacketBuffer:

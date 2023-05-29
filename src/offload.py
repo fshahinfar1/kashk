@@ -69,7 +69,19 @@ def generate_offload(file_path, entry_func):
     for r in reads:
         # the buffer is in the first arg
         first_arg = list(r.get_arguments())[0]
-        info.rd_buf = PacketBuffer(first_arg.get_definition())
+        # TODO: Only if the buffer is assigned before and is not a function call
+        buf_def = first_arg.get_definition()
+        remove_def = buf_def
+        buf_def = next(buf_def.get_children())
+        args = list(buf_def.get_arguments())
+        debug(args)
+        report_on_cursor(args[0])
+        buf_def = args[0].get_definition()
+        debug(buf_def)
+        buf_sz = args[1]
+        info.rd_buf = PacketBuffer(buf_def)
+        info.rd_buf.size_cursor = gather_instructions_from(buf_def, info)
+        info.remove_cursor.add(remove_def.get_usr())
     if info.rd_buf is None:
         error('Failed to find the packet buffer')
         return
@@ -81,6 +93,7 @@ def generate_offload(file_path, entry_func):
         # report_on_cursor(c)
         args = list(c.get_arguments())
         buf_def = args[1].get_definition()
+        remove_def = buf_def
         # report_on_cursor(buf_def)
         buf_def = next(buf_def.get_children())
         args = list(buf_def.get_arguments())
@@ -88,6 +101,7 @@ def generate_offload(file_path, entry_func):
         buf_sz = args[1]
         info.wr_buf = PacketBuffer(buf_def)
         info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
+        info.remove_cursor.add(remove_def.get_usr())
 
     # Go through the instructions, replace access to the buffer and read/write
     # instructions

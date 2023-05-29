@@ -197,7 +197,10 @@ def __convert_cursor_to_inst(c, info):
     elif c.kind == clang.CursorKind.DECL_STMT:
         children = list(c.get_children())
         assert len(children) == 1
-        return gather_instructions_from(children[0], info, context=ARG)[0]
+        res = gather_instructions_from(children[0], info, context=ARG)
+        if res:
+            return res[0]
+        return None
     elif c.kind == clang.CursorKind.VAR_DECL:
         inst = VarDecl(c)
 
@@ -412,6 +415,9 @@ def gather_instructions_from(cursor, info, context=BODY):
     for c, _ in d:
         if (not c.location.file
                 or not should_process_this_file(c.location.file.name)):
+            continue
+
+        if c.get_usr() in info.remove_cursor:
             continue
 
         if (c.kind == clang.CursorKind.COMPOUND_STMT
