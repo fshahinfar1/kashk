@@ -5,6 +5,8 @@ from utility import get_code, get_owner, generate_struct_with_fields, report_on_
 from log import error, debug
 from sym_table import SymbolTable
 
+CODE_LITERAL = '__code_literal__'
+
 
 class Info:
     """
@@ -75,6 +77,11 @@ class StateObject:
 
     def __repr__(self):
         return f'<StateObject: {self.type} {self.name}>'
+
+
+class MyType:
+    def __init__(self):
+        pass
 
 
 class TypeDefinition:
@@ -167,8 +174,18 @@ class Instruction:
         pass
 
     def has_children(self):
+        if hasattr(self, 'body'):
+            b = getattr(self, 'body')
+            if b:
+                return True
         return False
 
+    def get_children(self):
+        if hasattr(self, 'body'):
+            b = getattr(self, 'body')
+            if b:
+                return b
+        return []
 
     def __str__(self):
         return f'<Inst {self.kind}>'
@@ -243,9 +260,15 @@ class ControlFlowInst(Instruction):
     def __str__(self):
         return f'<CtrlFlow {self.kind}: {self.cond}>'
 
+    def get_children(self):
+        res = []
+        for x in [self.cond, self.body, self.other_body]:
+            res.extend(x)
+        return res
+
 
 class UnaryOp(Instruction):
-    OPS = ('!', '-', '++', '--', '!', '&', 'sizoef')
+    OPS = ('!', '-', '++', '--', '&', 'sizoef')
 
     def __init__(self, cursor):
         super().__init__()
@@ -257,6 +280,13 @@ class UnaryOp(Instruction):
 
     def __get_op(self):
         return next(self.cursor.get_tokens()).spelling
+
+    def has_children(self):
+        return True
+
+    def get_children(self):
+        return self.child
+
 
 class BinOp(Instruction):
     REL_OP = ('>', '>=', '<', '<=', '==')
@@ -278,107 +308,54 @@ class BinOp(Instruction):
         self.rhs = []
         self.op = ''
 
-        lhs_tokens = len(list(next(cursor.get_children()).get_tokens()))
-        # First token after lhs
-        self.op = list(cursor.get_tokens())[lhs_tokens].spelling
-
-        # text = self.__get_raw_c_code(cursor)
-        # tks = self.__parse(text)
-        # for index, t in enumerate(tks):
-        #     if t in BinOp.ALL_OP:
-        #         self.op = t
-        #         break
+        if cursor is not None:
+            self.__find_op_str(cursor)
 
         if not self.op:
             self.op = '<operation is unknown>'
 
-    def __parse(self, text):
-        """
-        For some reason I was not confortable with Binary Operations using
-        libclang + python bindings. This function will reconstruct the line on
-        which the binary operation is and parse the line to extract the operation.
-        """
-        # TODO: what if the binary operation expands to multiple lines
-        # TODO: the right hand side can be also another binary operations, it
-        # should be recursive.
-        tokens = []
-        parsing_op = False
-        groups = []
-        tk = ''
-        for c in text:
-            if c in BinOp.OPEN_GROUP:
-                groups.append(c)
-                tk += c
-            elif c in BinOp.CLOSE_GROUP:
-                if groups:
-                    i = BinOp.CLOSE_GROUP.index(c)
-                    if groups[-1] != BinOp.OPEN_GROUP[i]:
-                        raise Exception('Parser error')
-                    tk += c
-                    groups.pop()
-                else:
-                    # End of token
-                    if tk:
-                        tokens.append(tk)
-                        tk = ''
-                        parsing_op = False
-            elif groups:
-                tk += c
-            elif c in ' \t\r\n' or c ==  ';':
-                if tk:
-                    tokens.append(tk)
-                    tk = ''
-                    parsing_op = False
-            elif c in BinOp.ALL_OP:
-                if not parsing_op and tk:
-                    tokens.append(tk)
-                    tk = ''
-                    parsing_op = False
-                tk += c
-                parsing_op = True
-                if tk not in BinOp.ALL_OP:
-                    # It is not a operation but only some signs
-                    parsing_op = False
-                    # Connect it to the prev token
-                    tk = tokens.pop() + tk
-            elif parsing_op:
-                # End of operator
-                tokens.append(tk)
-                tk = ''
-                parsing_op = False
-            else:
-                tk += c
-        return tokens
+    def __find_op_str(self, cursor):
+        lhs_tokens = len(list(next(cursor.get_children()).get_tokens()))
+        # First token after lhs
+        self.op = list(cursor.get_tokens())[lhs_tokens].spelling
 
-    def __get_raw_c_code(self, c):
-        if c.location.file:
-            fname = c.location.file.name
-            with open(fname) as f:
-                l = f.readlines()[c.location.line-1]
-                text = l[c.location.column-1:]
-                return text
-        else:
-            raise Exception('Can not find the file for Binary operation source code')
+    def has_children(self):
+        return True
 
-    def __str__(self):
-        return f'<BinOp {self.lhs} {self.op} {self.rhs}>'
-
-    def __repr__(self):
-        return self.__str__()
+    def get_children(self):
+        res = []
+        for x in [self.lhs, self.rhs]:
+            res.extend(x)
+        return res
 
 
-class ContextInfo:
-    KindFunction = 0
-    KindClass = 1
+class CaseSTMT(Instruction):
+    def __init__(self, cursor):
+        self.kind = cursor.kind
+        self.cursor = cursor
+        self.case = []
+        self.body = []
 
-    def __init__(self, kind, ref):
-        self.kind = kind
-        self.ref = ref
-        pass
+    def has_children(self):
+        return True
 
-    def __str__(self):
-        if self.kind == self.KindFunction:
-            return 'Function Context'
-        elif self.kind == self.KindClass:
-            return 'Class Context'
-        return 'Unknown Context'
+    def get_children(self):
+        res = []
+        for x in [self.case, self.body]:
+            res.extend(x)
+        return res
+
+class ArrayAccess(Instruction):
+    def __init__(self, cursor):
+        self.kind = clang.CursorKind.ARRAY_SUBSCRIPT_EXPR
+        self.array_ref = []
+        self.index = []
+
+    def has_children(self):
+        return True
+
+    def get_children(self):
+        res = []
+        for x in [self.array_ref, self.index]:
+            res.extend(x)
+        return res

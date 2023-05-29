@@ -3,10 +3,13 @@ from utility import (get_code, report_on_cursor, visualize_ast, get_owner,
         owner_to_ref)
 from log import error, debug
 from data_structure import *
-from understand_logic import (gather_instructions_from, gather_instructions_under, FUNC)
+from understand_logic import (gather_instructions_from,
+        gather_instructions_under, ARG, FUNC)
 from sym_table import *
 
-from prune import should_process_this_file
+from prune import should_process_this_file, READ_PACKET, WRITE_PACKET
+
+from bpf_code_gen import gen_code
 
 
 COROUTINE_FUNC_NAME = ('await_resume', 'await_transform', 'await_ready', 'await_suspend')
@@ -132,9 +135,31 @@ def __add_func_definition(inst, info):
 
 def understand_call_expr(c, info):
     tmp_func_name = c.spelling
+    # TODO: generate instruction instead of text
     if tmp_func_name in COROUTINE_FUNC_NAME:
         # Ignore these
         return None
+    elif tmp_func_name == READ_PACKET:
+        inst = Instruction()
+        inst.text = f'{info.rd_buf.name} = (void *)(__u64)skb->data;\n'
+        inst.kind = CODE_LITERAL
+        return inst
+    elif tmp_func_name == WRITE_PACKET:
+        buf = info.wr_buf.name
+        write_size, _ = gen_code(info.wr_buf.write_size_cursor, info, context=ARG)
+        code = [
+            f'__adjust_skb_size(skb, {write_size});',
+            f'if (((void *)(__u64)skb->data + {write_size})  > (void *)(__u64)skb->data_end) {{',
+            f'  return SK_DROP;',
+            '}',
+            f'memcpy((void *)(__u64)skb->data, {buf}, {write_size});',
+            'return bpf_sk_redirect_map(skb, &sock_map, sock_ctx->sock_map_index, 0);',
+            ]
+        text = '\n'.join(code)
+        inst = Instruction()
+        inst.text = text
+        inst.kind = CODE_LITERAL
+        return inst
 
     # A call to the function
     inst = Call(c)

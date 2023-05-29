@@ -181,7 +181,7 @@ def handle_cast_expr(inst, info, more):
 
 def handle_literal(inst, info, more):
     lvl = more[0]
-    return INDENT * lvl + inst.text
+    return indent(inst.text, lvl)
 
 
 def handle_if_stmt(inst, info, more):
@@ -287,7 +287,7 @@ NEED_SEMI_COLON = set((clang.CursorKind.CALL_EXPR, clang.CursorKind.VAR_DECL,
     clang.CursorKind.BINARY_OPERATOR, clang.CursorKind.CONTINUE_STMT,
     clang.CursorKind.DO_STMT, clang.CursorKind.RETURN_STMT,
     clang.CursorKind.CONTINUE_STMT, clang.CursorKind.BREAK_STMT, clang.CursorKind.CXX_THROW_EXPR,))
-GOTO_NEXT_LINE = (clang.CursorKind.IF_STMT,)
+GOTO_NEXT_LINE = (clang.CursorKind.IF_STMT,CODE_LITERAL)
 
 NO_MODIFICATION = 0
 REPLACE_READ = 1
@@ -311,6 +311,7 @@ def gen_code(list_instructions, info, context=BODY):
             clang.CursorKind.CHARACTER_LITERAL: handle_literal,
             clang.CursorKind.STRING_LITERAL: handle_literal,
             clang.CursorKind.CXX_BOOL_LITERAL_EXPR: handle_literal,
+            CODE_LITERAL: handle_literal,
             # Control FLow
             clang.CursorKind.IF_STMT: handle_if_stmt,
             clang.CursorKind.DO_STMT: handle_do_stmt,
@@ -349,23 +350,9 @@ def gen_code(list_instructions, info, context=BODY):
                 continue
         else:
             # Some special rules
-            if (inst.kind == clang.CursorKind.VAR_DECL
-                    and inst.name in (info.rd_buf.name,)): #  info.wr_buf.name
-                if inst.name == info.rd_buf.name:
-                    text = f'char *{info.rd_buf.name}'
-                    modified = CHANGE_BUFFER_DEF
-                # elif inst.name == info.wr_buf.name:
-                #     text = ''
-                #     modified = CHANGE_BUFFER_DEF
-            elif inst.kind == clang.CursorKind.CALL_EXPR and inst.name == 'operator<<':
+            if inst.kind == clang.CursorKind.CALL_EXPR and inst.name == 'operator<<':
                 text = f'// removing a call to "<<" operator'
                 modified = CHANGE_BUFFER_DEF
-            elif inst.kind == clang.CursorKind.CALL_EXPR and inst.cursor.spelling == READ_PACKET:
-                text = call_read_packet(inst, info, [lvl])
-                modified = REPLACE_READ
-            elif inst.kind == clang.CursorKind.CALL_EXPR and inst.cursor.spelling == WRITE_PACKET:
-                text = call_send_packet(inst, info, [lvl])
-                modified = REPLACE_READ
             else:
                 handler = jump_table.get(inst.kind, lambda x,y,z: '')
                 text = handler(inst, info, [lvl])

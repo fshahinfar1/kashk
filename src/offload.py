@@ -12,7 +12,7 @@ from bpf_code_gen import generate_bpf_prog, FUNC
 
 from sym_table import scope_mapping, SymbolTableEntry
 from sym_table_gen import build_sym_table
-from pprint import pprint
+from verifier import add_verifier_checks
 
 
 # TODO: make a framework agnostic interface, allow for porting to other
@@ -33,9 +33,6 @@ def generate_offload(file_path, entry_func):
     if entry_func is None:
         error('Did not found the entry function')
         return
-
-    # # The initial context of the code is entry function
-    # info.context = ContextInfo(ContextInfo.KindFunction, Function('entry', entry_func))
 
     # The arguments to the entry function is part of the connection state
     # entry_func_params = [get_state_for(arg) for arg in entry_func.get_arguments()]
@@ -62,52 +59,20 @@ def generate_offload(file_path, entry_func):
     # probably part of the control program setting up the BPF program.
 
     # Find the buffer representing the packet
-    reads = get_all_read(ev_loop)
-    if len(reads) > 1:
-        error('Multiple read function was found!')
-        return
-    for r in reads:
-        # the buffer is in the first arg
-        first_arg = list(r.get_arguments())[0]
-        # TODO: Only if the buffer is assigned before and is not a function call
-        buf_def = first_arg.get_definition()
-        remove_def = buf_def
-        buf_def = next(buf_def.get_children())
-        args = list(buf_def.get_arguments())
-        debug(args)
-        report_on_cursor(args[0])
-        buf_def = args[0].get_definition()
-        debug(buf_def)
-        buf_sz = args[1]
-        info.rd_buf = PacketBuffer(buf_def)
-        info.rd_buf.size_cursor = gather_instructions_from(buf_def, info)
-        info.remove_cursor.add(remove_def.get_usr())
-    if info.rd_buf is None:
-        error('Failed to find the packet buffer')
-        return
+    find_read_write_bufs(ev_loop, info)
 
-    writes = get_all_send(ev_loop)
-    assert len(writes) == 1, 'I currently expect only one send system call'
-    for c in writes:
-        # TODO: this code is not going to work. it is so specific
-        # report_on_cursor(c)
-        args = list(c.get_arguments())
-        buf_def = args[1].get_definition()
-        remove_def = buf_def
-        # report_on_cursor(buf_def)
-        buf_def = next(buf_def.get_children())
-        args = list(buf_def.get_arguments())
-        buf_def = args[0].get_definition()
-        buf_sz = args[1]
-        info.wr_buf = PacketBuffer(buf_def)
-        info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
-        info.remove_cursor.add(remove_def.get_usr())
-
-    # Go through the instructions, replace access to the buffer and read/write
-    # instructions
+    # Go through the AST, generate instructions, transform access to variables
+    # and read/write buffers.
     body_of_loop = list(ev_loop.get_children())[-1]
     insts = gather_instructions_under(body_of_loop, info, FUNC)
     info.prog.parser_code = insts
+
+    # Go throught the instructions and add bound checking
+    scope = scope_mapping['Server_handle_connection']
+    info.sym_tbl.current_scope = scope
+    modifed_insts = add_verifier_checks(insts, info) 
+
+    # info.prog.parser_code = modifed_insts
 
     # Print the code we have generated
     text = generate_bpf_prog(info)
@@ -151,6 +116,46 @@ def boot_starp_global_state(cursor, info):
         s.parent_object = field
 
     add_state_decl_to_bpf(info.prog, [field], decls)
+
+
+def find_read_write_bufs(ev_loop, info):
+    reads = get_all_read(ev_loop)
+    if len(reads) > 1:
+        error('Multiple read function was found!')
+        return
+    for r in reads:
+        # the buffer is in the first arg
+        first_arg = list(r.get_arguments())[0]
+        # TODO: Only if the buffer is assigned before and is not a function call
+        buf_def = first_arg.get_definition()
+        remove_def = buf_def
+        buf_def = next(buf_def.get_children())
+        args = list(buf_def.get_arguments())
+        buf_def = args[0].get_definition()
+        buf_sz = args[1]
+        info.rd_buf = PacketBuffer(buf_def)
+        info.rd_buf.size_cursor = gather_instructions_from(buf_def, info)
+        info.remove_cursor.add(remove_def.get_usr())
+    if info.rd_buf is None:
+        error('Failed to find the packet buffer')
+        return
+
+    writes = get_all_send(ev_loop)
+    assert len(writes) == 1, 'I currently expect only one send system call'
+    for c in writes:
+        # TODO: this code is not going to work. it is so specific
+        # report_on_cursor(c)
+        args = list(c.get_arguments())
+        buf_def = args[1].get_definition()
+        remove_def = buf_def
+        # report_on_cursor(buf_def)
+        buf_def = next(buf_def.get_children())
+        args = list(buf_def.get_arguments())
+        buf_def = args[0].get_definition()
+        buf_sz = args[1]
+        info.wr_buf = PacketBuffer(buf_def)
+        info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
+        info.remove_cursor.add(remove_def.get_usr())
 
 
 def add_state_decl_to_bpf(prog, states, decls):

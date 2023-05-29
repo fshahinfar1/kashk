@@ -15,6 +15,8 @@ class SymbolTableEntry:
         # Optional
         self.value = None
         self.param_pos = 0
+        self.is_bpf_ctx = False
+        self.bpf_ctx_off = 0
 
     def __repr__(self):
         return f'"<{self.kind}  {self.name}: {self.type.spelling}>"'

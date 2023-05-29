@@ -204,39 +204,51 @@ def __convert_cursor_to_inst(c, info):
     elif c.kind == clang.CursorKind.VAR_DECL:
         inst = VarDecl(c)
 
-        # Find the variable initialization, if there is any.
-        init = []
-        if inst.is_array:
-            for child in c.get_children():
-                if child.kind == clang.CursorKind.INTEGER_LITERAL:
-                    continue
-                init = gather_instructions_from(child, info, context=ARG)
-                break
+        # Handle read buffer transformation
+        if inst.name == info.rd_buf.name:
+            # TODO: the generated code has so many null references!
+            inst.type = 'char *'
+            inst.is_array = False
+            T = MyType()
+            T.spelling = 'char *'
+            T.kind = clang.TypeKind.POINTER
+            e = info.sym_tbl.insert_entry(inst.name, T, c.kind, None)
+            e.is_bpf_ctx = True
+            e.bpf_ctx_off = 0
         else:
-            # NOTE: Keeping the old code, it seems to work
+            # Find the variable initialization, if there is any.
             init = []
-            # The first child after TYPE_REF would be the initialization of the
-            # variable.
-            children = list(c.get_children())
-            tmp_index = 0
-            for i, tmp_c in enumerate(children):
-                if tmp_c.kind == clang.CursorKind.TYPE_REF:
-                    tmp_index = i
+            if inst.is_array:
+                for child in c.get_children():
+                    if child.kind == clang.CursorKind.INTEGER_LITERAL:
+                        continue
+                    init = gather_instructions_from(child, info, context=ARG)
                     break
-            tmp_index += 1
-            if len(children) > tmp_index:
-                # This declaration has initialization
-                init = gather_instructions_from(children[-1], info, context=ARG)
+            else:
+                # NOTE: Keeping the old code, it seems to work
+                init = []
+                # The first child after TYPE_REF would be the initialization of the
+                # variable.
+                children = list(c.get_children())
+                tmp_index = 0
+                for i, tmp_c in enumerate(children):
+                    if tmp_c.kind == clang.CursorKind.TYPE_REF:
+                        tmp_index = i
+                        break
+                tmp_index += 1
+                if len(children) > tmp_index:
+                    # This declaration has initialization
+                    init = gather_instructions_from(children[-1], info, context=ARG)
 
-        inst.init = init
+            inst.init = init
 
-        # Add variable to the scope
-        info.sym_tbl.insert_entry(c.spelling, c.type, c.kind, c)
+            # Add variable to the scope
+            info.sym_tbl.insert_entry(c.spelling, c.type, c.kind, c)
 
-        # Check if there is a type dependencies which we need to define
-        _, decls = get_state_for(c)
-        for d in decls:
-            info.prog.add_declaration(d)
+            # Check if there is a type dependencies which we need to define
+            _, decls = get_state_for(c)
+            for d in decls:
+                info.prog.add_declaration(d)
 
         return inst
     elif c.kind == clang.CursorKind.MEMBER_REF_EXPR:
@@ -263,7 +275,7 @@ def __convert_cursor_to_inst(c, info):
                 # Perform a lookup on the map for globally shared values
                 code = cb_ref.get(FUNC)
                 new_inst = Instruction()
-                new_inst.kind = clang.CursorKind.STRING_LITERAL
+                new_inst.kind = CODE_LITERAL
                 new_inst.text = '''
 struct shared_state *shared = NULL;
 {
@@ -282,11 +294,9 @@ if (!shared) {
         count_children = len(children)
         assert count_children == 2
 
-        inst = Instruction()
-        inst.kind = c.kind
+        inst = ArrayAccess(c)
         inst.array_ref = gather_instructions_from(children[0], info, context=ARG)
         inst.index = gather_instructions_from(children[1], info, context=ARG)
-        inst.cursor = c
         return inst
     elif c.kind in (clang.CursorKind.CXX_BOOL_LITERAL_EXPR,
             clang.CursorKind.INTEGER_LITERAL,
@@ -357,15 +367,13 @@ if (!shared) {
     elif c.kind == clang.CursorKind.CASE_STMT:
         children = list(c.get_children())
         assert len(children) == 2
-        inst = Instruction()
-        inst.kind = c.kind
+        inst = CaseSTMT(c)
         inst.case = gather_instructions_from(children[0], info, context=ARG)
         inst.body = gather_instructions_from(children[1], info, context=BODY)
         return inst
     elif c.kind == clang.CursorKind.DEFAULT_STMT:
         body = next(c.get_children())
-        inst = Instruction()
-        inst.kind = c.kind
+        inst = CaseSTMT(c)
         inst.body = gather_instructions_from(body, info, context=BODY)
         return inst
     elif c.kind == clang.CursorKind.BREAK_STMT:
