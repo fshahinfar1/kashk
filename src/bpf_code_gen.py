@@ -407,7 +407,8 @@ def generate_bpf_prog(info):
     declarations = non_func_declarations + '\n' + func_declarations
 
     parser_code, _ = gen_code(info.prog.parser_code, info)
-    parser_code = info.prog._load_connection_state() + parser_code
+    parser_code = (info.prog._pull_packet_data()
+            + info.prog._load_connection_state() + parser_code)
     parser_code = indent(parser_code, 1)
 
     code = ([]

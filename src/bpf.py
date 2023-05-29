@@ -52,6 +52,14 @@ if (!sock_ctx) {
 }
 '''
 
+    def _pull_packet_data(self):
+        return '''
+if (bpf_skb_pull_data(skb, skb->len) != 0) {
+	bpf_printk("Parser: Failed to load message data");
+	return SK_DROP;
+}
+'''
+
 
     def _parser_prog(self, body):
         return ([
