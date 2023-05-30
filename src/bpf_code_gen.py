@@ -1,6 +1,7 @@
 import clang.cindex as clang
 
 from data_structure import *
+from instruction import *
 from utility import (indent, INDENT, report_on_cursor, owner_to_ref)
 from sym_table import scope_mapping
 from prune import READ_PACKET, WRITE_PACKET
@@ -72,7 +73,7 @@ def handle_var(inst, info, more):
         text = f'struct {inst.type} {inst.name}'
     else:
         text = f'{inst.type} {inst.name}'
-    if inst.init:
+    if inst.init.has_children():
         init_text, _ = gen_code(inst.init, info, context=RHS)
         text += ' = ' + init_text
     indent(text, lvl)
@@ -191,7 +192,7 @@ def handle_if_stmt(inst, info, more):
     body = indent(body, 1)
     cond, _ = gen_code(inst.cond, info, context=ARG)
     text = f'if ({cond}) {{\n' + body + '\n}'
-    if inst.other_body:
+    if inst.other_body.has_children():
         body, _ = gen_code(inst.other_body, info, context=BODY)
         body = indent(body, 1)
         text += ' else {\n' + body + '\n}'
@@ -276,18 +277,11 @@ def handle_return_stmt(inst, info, more):
     return text
 
 
-BODY = 0
-ARG = 1
-LHS = 2
-RHS = 3
-DEF = 4
-FUNC = 5
-
 NEED_SEMI_COLON = set((clang.CursorKind.CALL_EXPR, clang.CursorKind.VAR_DECL,
     clang.CursorKind.BINARY_OPERATOR, clang.CursorKind.CONTINUE_STMT,
     clang.CursorKind.DO_STMT, clang.CursorKind.RETURN_STMT,
     clang.CursorKind.CONTINUE_STMT, clang.CursorKind.BREAK_STMT, clang.CursorKind.CXX_THROW_EXPR,))
-GOTO_NEXT_LINE = (clang.CursorKind.IF_STMT,CODE_LITERAL)
+GOTO_NEXT_LINE = (clang.CursorKind.IF_STMT, clang.CursorKind.FOR_STMT, clang.CursorKind.SWITCH_STMT, CODE_LITERAL)
 
 NO_MODIFICATION = 0
 REPLACE_READ = 1
@@ -328,6 +322,8 @@ def gen_code(list_instructions, info, context=BODY):
             clang.CursorKind.RETURN_STMT: handle_return_stmt,
             clang.CursorKind.CXX_THROW_EXPR: lambda x,y,z: 'return SK_DROP',
             }
+    if isinstance(list_instructions, Block):
+        list_instructions = list_instructions.get_children()
     count = len(list_instructions)
     q = reversed(list_instructions)
     q = list(zip(q, [0] * count))

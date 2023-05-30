@@ -3,8 +3,9 @@ from utility import (get_code, report_on_cursor, visualize_ast, get_owner,
         owner_to_ref)
 from log import error, debug
 from data_structure import *
+from instruction import *
 from understand_logic import (gather_instructions_from,
-        gather_instructions_under, ARG, FUNC)
+        gather_instructions_under, cb_ref)
 from sym_table import *
 
 from prune import should_process_this_file, READ_PACKET, WRITE_PACKET
@@ -130,7 +131,8 @@ def __add_func_definition(inst, info):
                 info.sym_tbl.insert_entry(c.spelling, c.type, c.kind, c)
 
         # Process function body recursively
-        f.body = gather_instructions_under(f.body_cursor, info, FUNC)
+        body = gather_instructions_under(f.body_cursor, info, BODY)
+        f.body.extend_inst(body) 
         info.sym_tbl.current_scope = old_scope
 
         info.prog.add_declaration(f)
@@ -143,9 +145,16 @@ def understand_call_expr(c, info):
         # Ignore these
         return None
     elif tmp_func_name == READ_PACKET:
-        inst = Instruction()
-        inst.text = f'{info.rd_buf.name} = (void *)(__u64)skb->data;\n'
-        inst.kind = CODE_LITERAL
+        # assign packet pointer on a previouse line
+        text = f'{info.rd_buf.name} = (void *)(__u64)skb->data;\n'
+        assign_inst = Literal(text, CODE_LITERAL)
+        blk = cb_ref.get(BODY)
+        blk.append(assign_inst)
+
+        # TODO: what if `skb` is not defined in this scope?
+        # set the return value
+        text = f'skb->len'
+        inst = Literal(text, CODE_LITERAL)
         return inst
     elif tmp_func_name == WRITE_PACKET:
         buf = info.wr_buf.name
@@ -159,9 +168,7 @@ def understand_call_expr(c, info):
             'return bpf_sk_redirect_map(skb, &sock_map, sock_ctx->sock_map_index, 0);',
             ]
         text = '\n'.join(code)
-        inst = Instruction()
-        inst.text = text
-        inst.kind = CODE_LITERAL
+        inst = Literal(text, CODE_LITERAL)
         return inst
 
     # A call to the function
