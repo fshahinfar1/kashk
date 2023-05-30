@@ -13,7 +13,7 @@ from bpf_code_gen import generate_bpf_prog
 
 from sym_table import scope_mapping, SymbolTableEntry
 from sym_table_gen import build_sym_table
-from verifier import add_verifier_checks, do_pass
+from verifier import add_verifier_checks, verifier_pass
 
 
 # TODO: make a framework agnostic interface, allow for porting to other
@@ -66,16 +66,10 @@ def generate_offload(file_path, entry_func):
     # and read/write buffers.
     body_of_loop = list(ev_loop.get_children())[-1]
     insts = gather_instructions_under(body_of_loop, info, BODY)
-    # info.prog.parser_code = insts
-
-    # # Go throught the instructions and add bound checking
-    # scope = scope_mapping['Server_handle_connection']
-    # info.sym_tbl.current_scope = scope
-    # modifed_insts = add_verifier_checks(insts, info) 
 
     inst = Block(BODY)
     inst.extend_inst(insts)
-    m = do_pass(inst, info, (0, inst.tag, None))
+    m = verifier_pass(inst, info, (0, inst.tag, None))
 
     info.prog.parser_code = m
 

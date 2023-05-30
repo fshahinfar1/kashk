@@ -4,7 +4,6 @@ import clang.cindex as clang
 from log import error, debug
 from data_structure import *
 from instruction import *
-from dfs import DFSPass
 
 from bpf_code_gen import gen_code
 from template import bpf_ctx_bound_check
@@ -26,6 +25,9 @@ def is_value_from_bpf_ctx(inst, info, R=None):
     if inst.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
         if is_bpf_ctx_ptr(inst.array_ref.children[0], info):
             if R is not None:
+                # TODO: I am converting instructions to code early because I am
+                # using a string template and not an Instruction template.
+                # It would be better to use the latter.
                 ref, _ = gen_code(inst.array_ref, info)
                 index, _  = gen_code(inst.index, info)
                 size = f'sizoef({inst.type.spelling})'
@@ -231,78 +233,98 @@ def _handle_binop(inst, info, more):
         if val_is_from_ctx:
             ref, index, T = R.pop()
             check = bpf_ctx_bound_check(ref, index, '(__u64)skb->data_end')
-            inst = Literal(check, CODE_LITERAL)
+            check_inst = Literal(check, CODE_LITERAL)
 
             blk = cb_ref.get(BODY)
             # Add the check a line before this access
-            blk.append(inst)
+            blk.append(check_inst)
+
+    # Keep the instruction unchanged
+    return inst
+
+
+def _handle_call(inst, info, more):
+    # Are we passing BPF context pointer to the function?
+    # If yest, find the position of the argument.
+    pos_of_ctx_ptrs = []
+    for pos, a in enumerate(inst.args):
+        if is_bpf_ctx_ptr(a, info):
+            pos_of_ctx_ptrs.append(pos)
+
+    if not pos_of_ctx_ptrs:
+        # We are not passing any special pointers. We do not need to
+        # investigate inside of the function.
+        return inst
+
+    # Find the definition of the function and step into it
+    func = inst.get_function_def()
+    if func:
+        # Switch the context, then update the context flag in this
+        # context
+        scope = info.sym_tbl.scope_mapping.get(inst.name)
+        assert scope is not None
+        cur = info.sym_tbl.current_scope
+        info.sym_tbl.current_scope = scope
+        # debug('function call:', inst.name, 'args:', inst.args)
+
+        for pos in pos_of_ctx_ptrs:
+            param = func.args[pos]
+            sym = info.sym_tbl.lookup(param.name)
+            sym.is_bpf_ctx = True
+            debug('function:', inst.name, 'param:', param.name, 'is bpf ctx')
+            # TODO: do I need to turn the flag off when removing
+            # the scope of the function (may in another run the
+            # parameter is not a pointer to the context)
+
+        modified = verifier_pass(func.body, info, (0, BODY, None))
+        assert modified is not None
+        info.sym_tbl.current_scope = cur
+
+        # Update the instructions of the function
+        func.body = modified
+    else:
+        # We can not modify this function
+        error(MODULE_TAG, 'function:', inst.name,
+                'receives BPF context but is not accessible for modification')
+    return inst
 
 
 def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.BINARY_OPERATOR:
-        return _handle_binop(inst,info,more)
+        return _handle_binop(inst, info, more)
     elif inst.kind == clang.CursorKind.CALL_EXPR:
-
-        # Are we passing BPF context pointer to the function?
-        # If yest, find the position of the argument.
-        pos_of_ctx_ptrs = []
-        for pos, a in enumerate(inst.args):
-            if is_bpf_ctx_ptr(a, info):
-                pos_of_ctx_ptrs.append(pos)
-
-        # Find the definition of the function and step into it
-        func = inst.get_function_def()
-        if func:
-            # Switch the context, then update the context flag in this
-            # context
-            scope = info.sym_tbl.scope_mapping.get(inst.name)
-            assert scope is not None
-            cur = info.sym_tbl.current_scope
-            info.sym_tbl.current_scope = scope
-            # debug('function call:', inst.name, 'args:', inst.args)
-
-            for pos in pos_of_ctx_ptrs:
-                param = func.args[pos]
-                sym = info.sym_tbl.lookup(param.name)
-                sym.is_bpf_ctx = True
-                debug('function:', inst.name, 'param:', param.name, 'is bpf ctx')
-                # TODO: do I need to turn the flag off when removing
-                # the scope of the function (may in another run the
-                # parameter is not a pointer to the context)
-
-            modified = do_pass(func.body, info, (0, BODY, None))
-            info.sym_tbl.current_scope = cur
-
-            func.body = modified
-        else:
-            # We can not modify this function
-            if pos_of_ctx_ptrs:
-                error(MODULE_TAG, 'function:', inst.name,
-                        'receives BPF context but is not accessible for modification')
+        return _handle_call(inst, info, more)
+    # Ignore other instructions
+    return inst
 
 
 
+# TODO:The CodeBlockRef thing is not correct and works really bad. Find a way
+# to fix it.
 cb_ref = CodeBlockRef()
-def do_pass(inst, info, more):
+def verifier_pass(inst, info, more):
     lvl, ctx, parent_list = more
     new_children = []
 
     with cb_ref.new_ref(ctx, parent_list):
         # Process current instruction
-        _process_current_inst(inst, info, more)
+        inst = _process_current_inst(inst, info, more)
 
+        if inst is None:
+            # This instruction should be removed
+            return None
 
-        # Continue deeper 
+        # Continue deeper
         for child, tag in inst.get_children_context_marked():
             if isinstance(child, list):
                 new_child = []
                 for i in child:
-                    new_inst = do_pass(i, info, (lvl+1, tag, new_child))
-                    new_child.append(new_inst)
+                    new_inst = verifier_pass(i, info, (lvl+1, tag, new_child))
+                    if new_inst is not None:
+                        new_child.append(new_inst)
             else:
-                new_child = do_pass(child, info, (lvl+1, tag, parent_list))
+                new_child = verifier_pass(child, info, (lvl+1, tag, parent_list))
             new_children.append(new_child)
 
-    # new_children.reverse()
     new_inst = inst.clone(new_children)
     return new_inst
