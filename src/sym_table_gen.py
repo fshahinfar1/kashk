@@ -59,7 +59,7 @@ def build_sym_table(cursor, info):
     Create scope for class and functions and add the fields or variables to the
     correct scope.
 
-    This function does not explore the body of functions. This is post-poned
+    This function does not explore the body of functions. This is postponed
     for later.
     """
     pass_over_global_variables(cursor, info)

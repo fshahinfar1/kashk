@@ -19,8 +19,11 @@ def __function_is_of_interest(inst):
     """
     Decide if the function should also be defined in BPF code
     """
-    if (not inst.cursor.location.file or
-            not should_process_this_file(inst.cursor.location.file.name)):
+    cursor = inst.cursor
+    definition = cursor.get_definition()
+    if (not definition
+            or not definition.location.file
+            or not should_process_this_file(definition.location.file.name)):
         return False
     if inst.name.startswith('operator'):
         # TODO: I do not want operators for now. But It would be good to

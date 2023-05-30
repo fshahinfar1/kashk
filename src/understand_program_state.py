@@ -62,6 +62,8 @@ def generate_decleration_for(cursor):
             decl += generate_decleration_for(c)
     elif cursor.type.kind == clang.TypeKind.POINTER:
         T = cursor.type.get_pointee()
+        if T.kind in PRIMITIVE_TYPES:
+            return []
         c = T.get_declaration()
         if c is None:
             error(f'Failed to find the definition for {T.spelling}')

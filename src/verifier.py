@@ -93,12 +93,13 @@ def add_verifier_checks(insts, info):
                 # debug('function call:', inst.name, 'args:', inst.args)
 
                 for pos in pos_of_ctx_ptrs:
-                        param = func.args[pos]
-                        sym = info.sym_tbl.lookup(param.name)
-                        sym.is_bpf_ctx = True
-                        # TODO: do I need to turn the flag off when removing
-                        # the scope of the function (may in another run the
-                        # parameter is not a pointer to the context)
+                    param = func.args[pos]
+                    sym = info.sym_tbl.lookup(param.name)
+                    sym.is_bpf_ctx = True
+                    debug('function:', inst.name, 'param:', param.name, 'is bpf ctx')
+                    # TODO: do I need to turn the flag off when removing
+                    # the scope of the function (may in another run the
+                    # parameter is not a pointer to the context)
 
                 modified = add_verifier_checks(func.body, info)
                 info.sym_tbl.current_scope = cur
