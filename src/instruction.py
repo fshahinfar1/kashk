@@ -5,8 +5,8 @@ from data_structure import StateObject, Function
 from log import error, debug
 
 
-CODE_LITERAL = '__code_literal__'
-BLOCK_OF_CODE = ''
+CODE_LITERAL = 8081
+BLOCK_OF_CODE = 8082
 
 BODY = 0
 ARG = 1

@@ -277,11 +277,16 @@ def handle_return_stmt(inst, info, more):
     return text
 
 
+# Put semi-colon and go to next line after these nodes
 NEED_SEMI_COLON = set((clang.CursorKind.CALL_EXPR, clang.CursorKind.VAR_DECL,
     clang.CursorKind.BINARY_OPERATOR, clang.CursorKind.CONTINUE_STMT,
     clang.CursorKind.DO_STMT, clang.CursorKind.RETURN_STMT,
     clang.CursorKind.CONTINUE_STMT, clang.CursorKind.BREAK_STMT, clang.CursorKind.CXX_THROW_EXPR,))
-GOTO_NEXT_LINE = (clang.CursorKind.IF_STMT, clang.CursorKind.FOR_STMT, clang.CursorKind.SWITCH_STMT, CODE_LITERAL)
+
+# Go to next line after these nodes
+GOTO_NEXT_LINE = (clang.CursorKind.IF_STMT, clang.CursorKind.FOR_STMT,
+        clang.CursorKind.SWITCH_STMT, clang.CursorKind.CASE_STMT,
+        clang.CursorKind.DEFAULT_STMT, CODE_LITERAL)
 
 NO_MODIFICATION = 0
 REPLACE_READ = 1

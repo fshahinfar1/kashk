@@ -7,8 +7,9 @@ from instruction import *
 from dfs import DFSPass
 
 from bpf_code_gen import gen_code
+from template import bpf_ctx_bound_check
 
-MODULE_TAG = 'Verfier Pass'
+MODULE_TAG = '[Verfier Pass]'
 
 
 def is_value_from_bpf_ctx(inst, info, R=None):
@@ -229,33 +230,29 @@ def _handle_binop(inst, info, more):
         val_is_from_ctx = is_value_from_bpf_ctx(x, info, R)
         if val_is_from_ctx:
             ref, index, T = R.pop()
-            check = f'''
-if ((void *)({ref} + {index} + 1) > (void *)(__u64)skb->data_end ) {{
-  return 0;
-}}
-'''
+            check = bpf_ctx_bound_check(ref, index, '(__u64)skb->data_end')
             inst = Literal(check, CODE_LITERAL)
 
             blk = cb_ref.get(BODY)
             # Add the check a line before this access
             blk.append(inst)
-            debug('add check\n', check)
 
 
 def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.BINARY_OPERATOR:
         return _handle_binop(inst,info,more)
     elif inst.kind == clang.CursorKind.CALL_EXPR:
-        # Step into the function
+
+        # Are we passing BPF context pointer to the function?
+        # If yest, find the position of the argument.
+        pos_of_ctx_ptrs = []
+        for pos, a in enumerate(inst.args):
+            if is_bpf_ctx_ptr(a, info):
+                pos_of_ctx_ptrs.append(pos)
+
+        # Find the definition of the function and step into it
         func = inst.get_function_def()
         if func:
-            # Find which arguments are context pointer before switching the
-            # scope
-            pos_of_ctx_ptrs = []
-            for pos, a in enumerate(inst.args):
-                if is_bpf_ctx_ptr(a, info):
-                    pos_of_ctx_ptrs.append(pos)
-
             # Switch the context, then update the context flag in this
             # context
             scope = info.sym_tbl.scope_mapping.get(inst.name)
@@ -277,6 +274,12 @@ def _process_current_inst(inst, info, more):
             info.sym_tbl.current_scope = cur
 
             func.body = modified
+        else:
+            # We can not modify this function
+            if pos_of_ctx_ptrs:
+                error(MODULE_TAG, 'function:', inst.name,
+                        'receives BPF context but is not accessible for modification')
+
 
 
 cb_ref = CodeBlockRef()
