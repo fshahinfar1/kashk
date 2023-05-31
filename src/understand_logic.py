@@ -250,7 +250,11 @@ def __convert_cursor_to_inst(c, info):
             clang.CursorKind.FLOATING_LITERAL,
             clang.CursorKind.STRING_LITERAL,
             clang.CursorKind.CHARACTER_LITERAL,):
-        token_text = next(c.get_tokens()).spelling
+        try:
+            token_text = next(c.get_tokens()).spelling
+        except StopIteration:
+            # Weirdly there are no token!
+            token_text = '<token not found>'
         inst = Literal(token_text, c.kind)
         return inst
     elif c.kind == clang.CursorKind.CONTINUE_STMT:
