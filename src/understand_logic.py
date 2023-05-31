@@ -168,19 +168,10 @@ def __convert_cursor_to_inst(c, info):
             or c.kind == clang.CursorKind.CSTYLE_CAST_EXPR):
         children = list(c.get_children())
         count_children = len(children)
+        assert count_children < 3
         inst = Cast()
-        if count_children == 1:
-            inst.castee.extend_inst(gather_instructions_from(children[0], info, context=ARG))
-            tokens = list(map(lambda x: x.spelling, c.get_tokens()))
-            assert tokens[0] == '('
-            index = tokens.index(')')
-            type_name = ' '.join(tokens[1:index])
-            inst.cast_type = type_name
-        elif count_children == 2:
-            inst.castee.extend_inst(gather_instructions_from(children[1], info, context=ARG))
-            inst.cast_type = c.type
-        else:
-            raise Exception('Unexpected case!!')
+        inst.castee.extend_inst(gather_instructions_from(children[-1], info, context=ARG))
+        inst.cast_type = c.type
         return inst
     elif c.kind == clang.CursorKind.DECL_STMT:
         children = c.get_children()

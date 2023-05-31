@@ -27,7 +27,7 @@ def is_function_call_possible(inst, info):
 def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.CALL_EXPR:
         res = is_function_call_possible(inst, info)
-        debug(inst.name, 'is possible:', res)
+        # debug(inst.name, 'is possible:', res)
         if not res:
             return None
     return inst

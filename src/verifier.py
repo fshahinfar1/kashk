@@ -63,6 +63,12 @@ def is_bpf_ctx_ptr(inst, info):
     elif inst.kind == clang.CursorKind.UNARY_OPERATOR and inst.op == '&':
         if is_value_from_bpf_ctx(inst.child.children[0], info):
             return True
+    elif inst.kind == clang.CursorKind.CSTYLE_CAST_EXPR:
+        if inst.cast_type.kind == clang.TypeKind.POINTER:
+            res = is_bpf_ctx_ptr(inst.castee.children[0], info)
+            return res
+    elif inst.kind == clang.CursorKind.PAREN_EXPR:
+        return is_bpf_ctx_ptr(inst.body.children[0], info)
     return False
 
 
@@ -215,6 +221,7 @@ def _handle_binop(inst, info, more):
     if inst.op == '=':
         lhs_is_ptr = is_bpf_ctx_ptr(lhs, info)
         rhs_is_ptr = is_bpf_ctx_ptr(rhs, info)
+
         # TODO: it can also be a MEMBER_REF
         if lhs.kind == clang.CursorKind.DECL_REF_EXPR:
             if rhs_is_ptr:
