@@ -268,6 +268,24 @@ def _handle_call(inst, info, more):
     func = inst.get_function_def()
     if func:
         with info.sym_tbl.with_func_scope(inst.name):
+            # Add skb as the last parameter of this function
+            skb_obj = StateObject(None)
+            skb_obj.name = 'skb'
+            skb_obj.type = 'struct __sk_buff *'
+            skb_obj.is_pointer = True
+            func.args.append(skb_obj)
+            T = MyType()
+            T.spelling = skb_obj.type
+            T.kind = clang.TypeKind.POINTER
+            info.sym_tbl.insert_entry(skb_obj.name, T, clang.CursorKind.PARM_DECL, None)
+            skb_obj.real_type = T
+
+            # TODO: update every invocation of this function with the skb parameter
+            # TODO: what if the caller function does not have access to skb?
+            skb_ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
+            skb_ref.name = skb_obj.name
+            inst.args.append(skb_ref)
+
             for pos in pos_of_ctx_ptrs:
                 param = func.args[pos]
                 sym = info.sym_tbl.lookup(param.name)

@@ -62,19 +62,27 @@ class CodeBlockRef:
 
 class StateObject:
     def __init__(self, c):
-        self.cursor = c
-        self.name = c.spelling
-        self.type = c.type.spelling
-        self.kind = c.type.kind
+        if c:
+            self.cursor = c
+            self.name = c.spelling
+            self.type = c.type.spelling
+            self.kind = c.type.kind
+            self.is_pointer = c.type.kind == clang.TypeKind.POINTER
+            if self.is_pointer:
+                self.real_type = c.type.get_pointee()
+            else:
+                self.real_type = c.type
+        else:
+            self.cursor = None
+            self.name = None
+            self.type = None
+            self.kind = None
+            self.is_pointer = False
+
         self.is_global = False
         self.type_ref = None
         self.parent_object = None
 
-        self.is_pointer = c.type.kind == clang.TypeKind.POINTER
-        if self.is_pointer:
-            self.real_type = c.type.get_pointee()
-        else:
-            self.real_type = c.type
 
     def clone(self):
         if not self.cursor:

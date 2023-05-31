@@ -360,8 +360,12 @@ class Cast(Instruction):
 class Ref(Instruction):
     def __init__(self, cursor, kind=None):
         self.cursor = cursor
-        self.name = cursor.spelling
-        self.kind = cursor.kind if kind is None else kind
+        if cursor is None:
+            self.name = '<unnamed>'
+            self.kind = kind
+        else:
+            self.name = cursor.spelling
+            self.kind = cursor.kind if kind is None else kind
         self.owner = []
 
     def clone(self, _):
