@@ -6,7 +6,7 @@ from data_structure import *
 from instruction import *
 
 from bpf_code_gen import gen_code
-from template import bpf_ctx_bound_check
+from template import bpf_ctx_bound_check, bpf_ctx_bound_check_bytes
 
 MODULE_TAG = '[Verfier Pass]'
 
@@ -242,7 +242,6 @@ def _handle_binop(inst, info, more):
             ref, index, T = R.pop()
             check = bpf_ctx_bound_check(ref, index, '(__u64)skb->data_end')
             check_inst = Literal(check, CODE_LITERAL)
-
             blk = cb_ref.get(BODY)
             # Add the check a line before this access
             blk.append(check_inst)
@@ -301,9 +300,20 @@ def _handle_call(inst, info, more):
         # Update the instructions of the function
         func.body = modified
     else:
-        # We can not modify this function
-        error(MODULE_TAG, 'function:', inst.name,
+        if inst.name not in ('memcpy',):
+            # We can not modify this function
+            error(MODULE_TAG, 'function:', inst.name,
                 'receives BPF context but is not accessible for modification')
+        else:
+            ref = inst.args[0]
+            size = inst.args[2]
+            # Add the check a line before this access
+            ref_str, _ = gen_code([ref], info)
+            size_str, _ = gen_code([size], info)
+            check = bpf_ctx_bound_check_bytes(ref_str, size_str, '(__u64)skb->data_end')
+            check_inst = Literal(check, CODE_LITERAL)
+            blk = cb_ref.get(BODY)
+            blk.append(check_inst)
     return inst
 
 

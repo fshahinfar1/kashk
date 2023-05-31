@@ -14,6 +14,9 @@ MODULE_TAG = '[Possible Path Pass]'
 def is_function_call_possible(inst, info):
     func = inst.get_function_def()
     if not func:
+        if inst.name in ('memcpy', ):
+            # It is fine
+            return True
         return False
 
     with info.sym_tbl.with_func_scope(inst.name):
