@@ -46,7 +46,9 @@ class Instruction:
         return []
 
     def clone(self, children):
-        error('clone Instruction:', self.kind)
+        if self.kind not in (clang.CursorKind.BREAK_STMT,
+                clang.CursorKind.RETURN_STMT):
+            error('clone Instruction:', self.kind)
         new = Instruction()
         # new.kind = self.kind
         for name, val in vars(self).items():

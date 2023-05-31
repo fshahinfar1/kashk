@@ -208,6 +208,7 @@ def add_verifier_checks(insts, info):
 
 
 def _handle_binop(inst, info, more):
+    # debug(inst.lhs.children, inst.op, inst.rhs.children)
     lhs = inst.lhs.children[0]
     rhs = inst.rhs.children[0]
     # Track which variables are pointer to the BPF context
@@ -259,26 +260,18 @@ def _handle_call(inst, info, more):
     # Find the definition of the function and step into it
     func = inst.get_function_def()
     if func:
-        # Switch the context, then update the context flag in this
-        # context
-        scope = info.sym_tbl.scope_mapping.get(inst.name)
-        assert scope is not None
-        cur = info.sym_tbl.current_scope
-        info.sym_tbl.current_scope = scope
-        # debug('function call:', inst.name, 'args:', inst.args)
+        with info.sym_tbl.with_func_scope(inst.name):
+            for pos in pos_of_ctx_ptrs:
+                param = func.args[pos]
+                sym = info.sym_tbl.lookup(param.name)
+                sym.is_bpf_ctx = True
+                debug('function:', inst.name, 'param:', param.name, 'is bpf ctx')
+                # TODO: do I need to turn the flag off when removing
+                # the scope of the function? (maybe in another run the
+                # parameter is not a pointer to the context)
 
-        for pos in pos_of_ctx_ptrs:
-            param = func.args[pos]
-            sym = info.sym_tbl.lookup(param.name)
-            sym.is_bpf_ctx = True
-            debug('function:', inst.name, 'param:', param.name, 'is bpf ctx')
-            # TODO: do I need to turn the flag off when removing
-            # the scope of the function (may in another run the
-            # parameter is not a pointer to the context)
-
-        modified = verifier_pass(func.body, info, (0, BODY, None))
-        assert modified is not None
-        info.sym_tbl.current_scope = cur
+            modified = verifier_pass(func.body, info, (0, BODY, None))
+            assert modified is not None
 
         # Update the instructions of the function
         func.body = modified
@@ -296,7 +289,6 @@ def _process_current_inst(inst, info, more):
         return _handle_call(inst, info, more)
     # Ignore other instructions
     return inst
-
 
 
 # TODO:The CodeBlockRef thing is not correct and works really bad. Find a way

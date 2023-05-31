@@ -86,6 +86,17 @@ class SymbolTable:
         finally:
             self.current_scope = self.current_scope.parent
 
+    @contextmanager
+    def with_func_scope(self, func_name):
+        scope = self.scope_mapping.get(func_name)
+        assert scope is not None
+        cur = self.current_scope
+        self.current_scope = scope
+        try:
+            yield None
+        finally:
+            self.current_scope = cur
+
 
 class ScopeMapping:
     def __init__(self):

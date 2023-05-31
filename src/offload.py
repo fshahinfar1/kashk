@@ -13,7 +13,8 @@ from bpf_code_gen import generate_bpf_prog
 
 from sym_table import scope_mapping, SymbolTableEntry
 from sym_table_gen import build_sym_table
-from verifier import add_verifier_checks, verifier_pass
+from verifier import verifier_pass
+from possible_path_analysis import possible_path_analysis_pass
 
 
 # TODO: make a framework agnostic interface, allow for porting to other
@@ -68,8 +69,12 @@ def generate_offload(file_path, entry_func):
     insts = gather_instructions_under(body_of_loop, info, BODY)
 
     inst = Block(BODY)
-    inst.extend_inst(insts)
-    m = verifier_pass(inst, info, (0, inst.tag, None))
+    inst.children = insts
+    # Cut inpossible paths
+    m = possible_path_analysis_pass(inst, info, (0, BODY, None))
+
+    # Verifier
+    m = verifier_pass(m, info, (0, inst.tag, None))
 
     info.prog.parser_code = m
 
