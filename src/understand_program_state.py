@@ -17,62 +17,73 @@ def generate_decleration_for(cursor):
     return a list of strings having codes for defining the types needed.
     """
 
-    if not cursor.is_definition():
-        cursor = cursor.get_definition()
-        if not cursor:
-            return []
+    if not should_process_this_cursor(cursor):
+        return []
 
-    type_name = cursor.type.spelling
+    orig = cursor
+
+    T = cursor.type
+    if T.kind == clang.TypeKind.POINTER:
+        T = T.get_pointee()
+    if T.kind in PRIMITIVE_TYPES:
+        return []
+    c = T.get_declaration()
+    if c is None:
+        error(f'Failed to find the definition for {T.spelling}')
+        return []
+    c = c.get_definition()
+    if c is None:
+        error(f'Failed to find the definition for {T.spelling}')
+        return []
+    cursor = c
+    T = cursor.type
+
+
+    type_name = T.spelling
 
     # List of type dependencies for this specific type
     decl = []
 
-    if cursor.type.kind in PRIMITIVE_TYPES:
+    if T.kind in PRIMITIVE_TYPES:
         return decl
 
-    if not should_process_this_cursor(cursor):
-        return decl
-
-    if cursor.type.kind == clang.TypeKind.RECORD:
+    if T.kind == clang.TypeKind.RECORD:
         # Go through the fields, add any dependencies field might have, then
         # define a struct for it.
+        # debug('============')
+        # report_on_cursor(orig)
+        # report_on_cursor(cursor)
+        # debug('============')
         fields, new_decl = extract_state(cursor)
         decl += new_decl
         r = Record(type_name, fields)
         decl.append(r)
-    elif cursor.type.kind == clang.TypeKind.ELABORATED:
+    elif T.kind == clang.TypeKind.ELABORATED:
         # For enum, union, typedef
-        c = cursor.type.get_declaration()
-        d = generate_decleration_for(c)
-        decl.extend(d)
+        # debug('============')
+        # report_on_cursor(orig)
+        # report_on_cursor(cursor)
+        # debug('============')
+        # c = cursor.type.get_declaration()
+        # d = generate_decleration_for(c)
+        # decl.extend(d)
         decl.append(Elaborate(c))
-    elif cursor.type.kind == clang.TypeKind.ENUM:
-        # No further deps
+    elif T.kind == clang.TypeKind.ENUM:
+        # TODO: No further deps?
         return []
-    elif cursor.type.kind == clang.TypeKind.TYPEDEF:
-        if not cursor.kind.is_declaration():
-            t = cursor.type.get_declaration()
-        else:
-            t = cursor.underlying_typedef_type
-        under_kind = t.kind
-        if under_kind in PRIMITIVE_TYPES:
-            # No further type decleration needed
-            return []
-        for c in cursor.get_children():
-            decl += generate_decleration_for(c)
-    elif cursor.type.kind == clang.TypeKind.POINTER:
-        T = cursor.type.get_pointee()
-        if T.kind in PRIMITIVE_TYPES:
-            return []
-        c = T.get_declaration()
-        if c is None:
-            error(f'Failed to find the definition for {T.spelling}')
-            return []
-        c = c.get_definition()
-        if c is None:
-            error(f'Failed to find the definition for {T.spelling}')
-            return []
-        decl += generate_decleration_for(c)
+    elif T.kind == clang.TypeKind.TYPEDEF:
+        # if not cursor.kind.is_declaration():
+        #     t = T.get_declaration()
+        # else:
+        #     t = T.underlying_typedef_type
+        # under_kind = cursor.underlying_typedef_type.kind
+        # report_on_cursor(cursor)
+        # if under_kind in PRIMITIVE_TYPES:
+        #     # No further type decleration needed
+        #     return []
+        # for c in cursor.get_children():
+        #     decl += generate_decleration_for(c)
+        pass
     else:
         error('Unexpected! ' + str(cursor.type.kind))
 

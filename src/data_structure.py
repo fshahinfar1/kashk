@@ -142,6 +142,9 @@ class Elaborate(TypeDefinition):
         d = get_code(self.cursor)
         return '\n'+d
 
+    def __repr__(self):
+        return f'<Elaborate {self.name} >'
+
 
 class Record(TypeDefinition):
     directory = {}
@@ -155,6 +158,9 @@ class Record(TypeDefinition):
 
     def get_c_code(self):
         return '\n'+generate_struct_with_fields(self.name, self.fields)
+
+    def __repr__(self):
+        return f'<Record {self.name} >'
 
 
 class Function(TypeDefinition):

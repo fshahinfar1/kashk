@@ -38,8 +38,7 @@ class SK_SKB_PROG:
 
 
     def _load_connection_state(self):
-        return '''
-struct sock_context *sock_ctx;
+        return '''struct sock_context *sock_ctx;
 
 if (skb->sk == NULL) {
   bpf_printk("The socket reference is NULL");
@@ -53,20 +52,18 @@ if (!sock_ctx) {
 '''
 
     def _pull_packet_data(self):
-        return '''
-if (bpf_skb_pull_data(skb, skb->len) != 0) {
-	bpf_printk("Parser: Failed to load message data");
-	return SK_DROP;
+        return '''if (bpf_skb_pull_data(skb, skb->len) != 0) {
+  bpf_printk("Parser: Failed to load message data");
+  return SK_DROP;
 }
 '''
 
     def _map_declaration(self):
-        return '''
-struct {
-	__uint(type,  BPF_MAP_TYPE_ARRAY);
-	__type(key,   __u32);
-	__type(value, struct shared_state);
-	__uint(max_entries, 1);
+        return '''struct {
+  __uint(type,  BPF_MAP_TYPE_ARRAY);
+  __type(key,   __u32);
+  __type(value, struct shared_state);
+  __uint(max_entries, 1);
 } shared_map SEC(".maps");
 '''
 

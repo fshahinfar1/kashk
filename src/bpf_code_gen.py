@@ -6,20 +6,15 @@ from utility import (indent, INDENT, report_on_cursor, owner_to_ref)
 from sym_table import scope_mapping
 from prune import READ_PACKET, WRITE_PACKET
 
+from template import memcpy_internal_defs, license_text, load_shared_object_code
+
 
 def check_if_shared_obj_is_loaded(info):
     shared_sym = info.sym_tbl.lookup('shared')
     if shared_sym:
         # This object is defined in this scope
         return False, ''
-    text = '''
-struct shared_state *shared = NULL;
-{
-  int zero = 0;
-  shared = bpf_map_lookup_elem(&shared_map, &zero);
-}
-'''
-    return True, text
+    return True, load_shared_object_code()
 
 def only_once(f):
     is_first_time = True
@@ -405,20 +400,12 @@ def generate_bpf_prog(info):
 
     code = ([]
             + info.prog.headers
-            + ['typedef char bool;',
-'''#ifndef memcpy
-#define memcpy(d, s, len) __builtin_memcpy(d, s, len)
-#endif
-
-#ifndef memmove
-#define memmove(d, s, len) __builtin_memmove(d, s, len)
-#endif''',
-                ]
+            + ['typedef char bool;', memcpy_internal_defs()]
             + [declarations]
             + info.prog._per_connection_state()
             + info.prog._parser_prog([parser_code])
             + info.prog._verdict_prog([])
-            + [f'char _license[] SEC("license") = "{info.prog.license}";',]
+            + [license_text(info.prog.license),]
             )
     return '\n'.join(code)
 
