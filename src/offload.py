@@ -73,6 +73,12 @@ def generate_offload(file_path, entry_func):
     # Cut inpossible paths
     m = possible_path_analysis_pass(inst, info, (0, BODY, None))
 
+    debug('~~~~~~~~~~~~~~~~~~~~~')
+    for func in Function.directory.values():
+        debug(func.name, 'may_fail:', func.may_fail, 'may_succeed:',
+                func.may_succeed)
+    debug('~~~~~~~~~~~~~~~~~~~~~')
+
     # Verifier
     m = verifier_pass(m, info, (0, inst.tag, None))
 

@@ -11,6 +11,7 @@ from sym_table import *
 from prune import should_process_this_file, READ_PACKET, WRITE_PACKET
 
 from bpf_code_gen import gen_code
+from template import bpf_get_data, send_response_template
 
 
 COROUTINE_FUNC_NAME = ('await_resume', 'await_transform', 'await_ready', 'await_suspend')
@@ -116,8 +117,6 @@ def __add_func_definition(inst, info):
 
     # Recursively analize the function body
     if f.body_cursor:
-        T = inst.cursor.result_type
-
         # Switch scope
         old_scope = info.sym_tbl.current_scope
         info.sym_tbl.current_scope = scope
@@ -137,37 +136,31 @@ def __add_func_definition(inst, info):
 
         info.prog.add_declaration(f)
 
+    f.invocations.append(inst)
+
 
 def understand_call_expr(c, info):
     tmp_func_name = c.spelling
-    # TODO: generate instruction instead of text
+
+    # Check if this a special type of function
     if tmp_func_name in COROUTINE_FUNC_NAME:
         # Ignore these
         return None
     elif tmp_func_name == READ_PACKET:
-        # assign packet pointer on a previouse line
-        text = f'{info.rd_buf.name} = (void *)(__u64)skb->data;\n'
+        # Assign packet pointer on a previouse line
+        text = bpf_get_data(info.rd_buf.name)
         assign_inst = Literal(text, CODE_LITERAL)
         blk = cb_ref.get(BODY)
         blk.append(assign_inst)
-
         # TODO: what if `skb` is not defined in this scope?
-        # set the return value
+        # Set the return value
         text = f'skb->len'
         inst = Literal(text, CODE_LITERAL)
         return inst
     elif tmp_func_name == WRITE_PACKET:
         buf = info.wr_buf.name
         write_size, _ = gen_code(info.wr_buf.write_size_cursor, info, context=ARG)
-        code = [
-            f'__adjust_skb_size(skb, {write_size});',
-            f'if (((void *)(__u64)skb->data + {write_size})  > (void *)(__u64)skb->data_end) {{',
-            f'  return SK_DROP;',
-            '}',
-            f'memcpy((void *)(__u64)skb->data, {buf}, {write_size});',
-            'return bpf_sk_redirect_map(skb, &sock_map, sock_ctx->sock_map_index, 0);',
-            ]
-        text = '\n'.join(code)
+        text = send_response_template(buf, write_size)
         inst = Literal(text, CODE_LITERAL)
         return inst
 
@@ -181,4 +174,3 @@ def understand_call_expr(c, info):
         __add_func_definition(inst, info)
 
     return inst
-

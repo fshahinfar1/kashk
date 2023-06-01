@@ -20,6 +20,23 @@ class Info:
         self.global_accessed_variables = set()
         self.remove_cursor = set()
 
+        self.processed = ProcessedBook()
+
+
+class ProcessedBook:
+    def __init__(self):
+        self.book = {}
+
+    def remember(self, key, name):
+        if key not in self.book:
+            self.book[key] = set()
+        self.book[key].add(name)
+
+    def check(self, key, name):
+        if key in self.book:
+            return name in self.book[key]
+        return False
+
 
 class PacketBuffer:
     """
@@ -172,37 +189,33 @@ class Record(TypeDefinition):
 
 
 class Function(TypeDefinition):
+
     directory = {}
     def __init__(self, name, c):
         # TODO: what to do about this dependency??
         from instruction import Block, BODY
         super().__init__(name)
 
-        # Make sure it is the function definition
-        if not c.is_definition():
-            tmp_cursor = c.get_definition()
-            if tmp_cursor:
-                c = tmp_cursor
         self.cursor = c
-
         if c.is_definition():
             children = list(c.get_children())
             body = children[-1]
             while body.kind == clang.CursorKind.UNEXPOSED_STMT:
                 body = next(body.get_children())
-            # print(name)
-            # print([(x.spelling, x.kind) for x in children])
             assert (body.kind == clang.CursorKind.COMPOUND_STMT)
         else:
             body = None
+
         self.body_cursor = body
         self.body = Block(BODY)
-
         self.args = [StateObject(a) for a in c.get_arguments()]
-
-        self.return_type = self.cursor.result_type.spelling
-
+        self.return_type = c.result_type.spelling
         self.is_method = False
+
+        self.may_have_context_ptr = False
+        self.may_fail = False
+        self.may_succeed = False
+        self.invocations = []
 
         if self.name in Function.directory:
             raise Exception(f'Function is already defined ({self.name})')
