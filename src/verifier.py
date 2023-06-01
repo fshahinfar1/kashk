@@ -38,6 +38,19 @@ def is_value_from_bpf_ctx(inst, info, R=None):
             if R is not None:
                 R.append(('x', 0, 0))
             return True
+    elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
+        # Debug:
+        # report_on_cursor(inst.cursor)
+        # debug(inst.name, inst.owner)
+
+        # TODO: what if there are multiple member access?
+        owner = inst.owner[-1]
+        sym = info.sym_tbl.lookup(owner)
+        if sym.is_bpf_ctx:
+            # We are accessing BPF context
+            size = f'sizeof({inst.cursor.type.spelling})'
+            R.append((sym.name, 0, size))
+            return True
     return False
 
 
