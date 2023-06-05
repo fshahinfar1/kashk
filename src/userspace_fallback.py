@@ -18,6 +18,11 @@ cb_ref = CodeBlockRef()
 FLAG_PARAM_NAME = '__fail_flag'
 
 
+# class After:
+#     def __init__(self, box):
+#         self.box = box
+
+
 @contextmanager
 def remember_func(func):
     global current_function
@@ -29,7 +34,9 @@ def remember_func(func):
         current_function = tmp
 
 
-def _handle_function_may_fail(inst, func, info):
+def _handle_function_may_fail(inst, func, info, more):
+    _, ctx, _ = more
+
     flag_ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
     flag_ref.name = FLAG_PARAM_NAME
 
@@ -55,6 +62,7 @@ def _handle_function_may_fail(inst, func, info):
         # First check if we need to allocate the flag on the stack memory
         sym = info.sym_tbl.lookup(FLAG_PARAM_NAME)
         if not sym:
+            # TODO: initialize to zero
             # declare a local variable
             flag_decl = VarDecl(None)
             flag_decl.name = flag_obj.name
@@ -95,6 +103,7 @@ def _handle_function_may_fail(inst, func, info):
             # TODO: it adds the code before the function invocation! Fix it.
             blk = cb_ref.get(BODY)
             blk.append(bin_op)
+            # blk.append(After(bin_op))
         else:
             # The caller knows we are going to fail (this function never
             # succeed)
@@ -102,6 +111,34 @@ def _handle_function_may_fail(inst, func, info):
             if current_function:
                 assert (current_function.may_fail and not
                         current_function.may_succeed)
+
+    if ctx != BODY:
+        blk = cb_ref.get(BODY)
+
+        # Let's move the function outside of argument section
+        if func.return_type != 'void':
+            tmp_var_name = 'tmp'
+            # Declare tmp
+            tmp_decl = VarDecl(None)
+            tmp_decl.name = tmp_var_name
+            tmp_decl.type = func.return_type
+            tmp_decl.state_obj = None
+            blk.append(tmp_decl)
+            # Assign function return value to tmp 
+            tmp_ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
+            tmp_ref.name = tmp_var_name
+            bin_op = BinOp(None)
+            bin_op.op = '='
+            bin_op.lhs.add_inst(tmp_ref)
+            bin_op.rhs.add_inst(inst)
+            blk.append(bin_op)
+            # Use tmp variable instead of the function
+            return tmp_ref.clone([])
+        else:
+            raise Exception('Not implemented yet!')
+
+
+
     return inst
 
 
@@ -110,7 +147,7 @@ def _process_current_inst(inst, info, more):
         func = inst.get_function_def()
         # we only need to investigate functions that may fail
         if func and func.may_fail:
-            return _handle_function_may_fail(inst, func, info)
+            return _handle_function_may_fail(inst, func, info, more)
     return inst
 
 
@@ -132,7 +169,15 @@ def _do_pass(inst, info, more):
                 for i in child:
                     new_inst = _do_pass(i, info, (lvl+1, tag, new_child))
                     assert new_inst is not None
+
+                    # check if there is something to move after this instruction
+                    # has_after = False
+                    # if new_child and isinstance(new_child[-1], After):
+                    #     tmp = new_child.pop()
+                    #     has_after = True
                     new_child.append(new_inst)
+                    # if has_after:
+                    #     new_child.append(tmp.box)
             else:
                 new_child = _do_pass(child, info, (lvl+1, tag, None))
                 assert new_child is not None
