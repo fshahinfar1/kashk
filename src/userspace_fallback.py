@@ -108,6 +108,15 @@ def _handle_function_may_fail(inst, func, info, more):
         # check if function fail
         tmp = Literal('/* check if function fail */\n', CODE_LITERAL)
         after_func_call.append(tmp)
+        if current_function == None:
+            # we are in the bpf function
+            return_stmt = '/*Go to userspace */\n  return SK_PASS;\n'
+        else:
+            return_stmt = 'return ({func.return_type})0;'
+        check_flag = f'if({FLAG_PARAM_NAME} == 1) {{\n  {return_stmt}\n}}\n'
+        tmp = Literal(check_flag, CODE_LITERAL)
+        after_func_call.append(tmp)
+
 
         # Analyse the called function.
         with remember_func(func):
@@ -130,9 +139,14 @@ def _handle_function_may_fail(inst, func, info, more):
             bin_op.lhs.add_inst(val_op)
             bin_op.rhs.add_inst(true)
 
-            # TODO: it adds the code before the function invocation! Fix it.
             after_func_call.append(bin_op)
-            tmp = Literal('/* Return from this point to the caller */\n', CODE_LITERAL)
+            if func.return_type == 'void':
+                tmp_stmt = 'return'
+            else:
+                tmp_stmt = f'return ({func.return_type}){0}'
+            return_stmt = ('/* Return from this point to the caller */\n'
+                    + f'{tmp_stmt};')
+            tmp = Literal(return_stmt, CODE_LITERAL)
             after_func_call.append(tmp)
         else:
             # The caller knows we are going to fail (this function never
