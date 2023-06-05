@@ -15,6 +15,7 @@ from sym_table import scope_mapping, SymbolTableEntry
 from sym_table_gen import build_sym_table
 from verifier import verifier_pass
 from possible_path_analysis import possible_path_analysis_pass
+from userspace_fallback import userspace_fallback_pass
 
 
 # TODO: make a framework agnostic interface, allow for porting to other
@@ -68,22 +69,28 @@ def generate_offload(file_path, entry_func):
     body_of_loop = list(ev_loop.get_children())[-1]
     insts = gather_instructions_under(body_of_loop, info, BODY)
 
-    inst = Block(BODY)
-    inst.children = insts
-    # Cut inpossible paths
-    m = possible_path_analysis_pass(inst, info, (0, BODY, None))
+    # TODO: Think more about the API of each pass
+    third_arg = (0, BODY, None)
 
+    m = Block(BODY)
+    m.children = insts
+    # Cut inpossible paths
+    m = possible_path_analysis_pass(m, info, third_arg)
     debug('~~~~~~~~~~~~~~~~~~~~~')
-    for func in Function.directory.values():
-        debug(func.name, 'may_fail:', func.may_fail, 'may_succeed:',
-                func.may_succeed)
+
+    # Handle moving to userspace
+    # for func in Function.directory.values():
+    #     debug(func.name, 'may_fail:', func.may_fail, 'may_succeed:',
+    #             func.may_succeed)
+    m = userspace_fallback_pass(m, info, third_arg)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Verifier
-    m = verifier_pass(m, info, (0, inst.tag, None))
+    m = verifier_pass(m, info, third_arg)
+    debug('~~~~~~~~~~~~~~~~~~~~~')
 
+    # TODO: split the code between parser and verdict
     info.prog.parser_code = m
-
     # Print the code we have generated
     text = generate_bpf_prog(info)
     print(text)

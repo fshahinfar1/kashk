@@ -45,7 +45,7 @@ def send_response_template(buf, write_size, skb='skb'):
         f'  return SK_DROP;',
         '}',
         f'memcpy((void *)(__u64){skb}->data, {buf}, {write_size});',
-        'return bpf_sk_redirect_map({skb}, &sock_map, sock_ctx->sock_map_index, 0);',
+        f'return bpf_sk_redirect_map({skb}, &sock_map, sock_ctx->sock_map_index, 0);',
         ]
     text = '\n'.join(code)
     return text

@@ -1,4 +1,3 @@
-import itertools
 from contextlib import contextmanager
 import clang.cindex as clang
 

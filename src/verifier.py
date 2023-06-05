@@ -289,6 +289,8 @@ def _handle_call(inst, info, more):
             T = MyType()
             T.spelling = skb_obj.type
             T.kind = clang.TypeKind.POINTER
+            # TODO: probably the next line is adding the symbol information to
+            # a wrong scope.
             info.sym_tbl.insert_entry(skb_obj.name, T, clang.CursorKind.PARM_DECL, None)
             skb_obj.real_type = T
 

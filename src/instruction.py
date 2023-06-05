@@ -17,7 +17,7 @@ FUNC = 5
 
 
 def _generate_marked_children(groups, context):
-    return tuple(zip(groups, context))
+    return tuple(map(lambda x: (x, x.tag), groups))
 
 
 class Instruction:
@@ -108,19 +108,26 @@ class Call(Instruction):
 class VarDecl(Instruction):
     def __init__(self, c):
         super().__init__()
+        if c is not None:
+            # TODO: get rid of cursor pointer.
+            # TODO: this is because I am not following a solid design in
+            # implementing things
+            self.cursor = c
+            self.state_obj = StateObject(c)
 
-        # TODO: get rid of cursor pointer.
-        # TODO: this is because I am not following a solid design in
-        # implementing things
-        self.cursor = c
-
-        self.state_obj = StateObject(c)
-
-        self.type = c.type.spelling
-        self.name = c.spelling
+            self.type = c.type.spelling
+            self.name = c.spelling
+            self.is_array = c.type.kind == clang.TypeKind.CONSTANTARRAY
+            self.is_record = self.cursor.type.kind == clang.TypeKind.RECORD
+        else:
+            self.cursor = None
+            self.state_obj = None
+            self.type = ''
+            self.name = ''
+            self.is_array = False
+            self.is_record = False
         self.kind = clang.CursorKind.VAR_DECL
         self.init = Block(ARG)
-        self.is_array = c.type.kind == clang.TypeKind.CONSTANTARRAY
 
     def __str__(self):
         return f'<VarDecl {self.kind}: {self.type} {self.name} = {self.init}>'
@@ -184,10 +191,14 @@ class UnaryOp(Instruction):
     def __init__(self, cursor):
         super().__init__()
 
-        self.cursor = cursor
         self.kind = clang.CursorKind.UNARY_OPERATOR
         self.child = Block(ARG)
-        self.op = self.__get_op()
+        if cursor is not None:
+            self.cursor = cursor
+            self.op = self.__get_op()
+        else:
+            self.cursor = None
+            self.op = '<not set>'
 
     def __get_op(self):
         return next(self.cursor.get_tokens()).spelling
@@ -370,6 +381,7 @@ class Ref(Instruction):
 
     def clone(self, _):
         new = Ref(self.cursor, self.kind)
+        new.name = self.name
         clone_owner = list(self.owner)
         new.owner = clone_owner
         return new
@@ -422,7 +434,7 @@ class Block(Instruction):
         self.children = []
 
     def add_inst(self, inst):
-        self.children.appen(inst)
+        self.children.append(inst)
 
     def extend_inst(self, inst):
         self.children.extend(inst)
@@ -436,7 +448,7 @@ class Block(Instruction):
         return list(self.children)
 
     def get_children_context_marked(self):
-        return ((self.children, BODY),)
+        return ((self.children, self.tag),)
 
     def clone(self, children):
         new = Block(self.tag)

@@ -64,7 +64,7 @@ def handle_var(inst, info, more):
         el_type = inst.cursor.type.element_type.spelling
         el_count = inst.cursor.type.element_count
         text = f'{el_type} {inst.name}[{el_count}]'
-    elif inst.cursor.type.kind == clang.TypeKind.RECORD:
+    elif inst.is_record:
         text = f'struct {inst.type} {inst.name}'
     else:
         text = f'{inst.type} {inst.name}'
