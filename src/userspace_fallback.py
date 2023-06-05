@@ -18,11 +18,6 @@ cb_ref = CodeBlockRef()
 FLAG_PARAM_NAME = '__fail_flag'
 
 
-# class After:
-#     def __init__(self, box):
-#         self.box = box
-
-
 @contextmanager
 def remember_func(func):
     global current_function
@@ -37,11 +32,42 @@ def remember_func(func):
 def _handle_function_may_fail(inst, func, info, more):
     _, ctx, _ = more
 
+    blk = cb_ref.get(BODY)
+    ret_val = None
+
     flag_ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
     flag_ref.name = FLAG_PARAM_NAME
 
+    before_func_call = []
+    func_call = inst
+    after_func_call = []
+
+    if ctx != BODY:
+        # Let's move the function outside of argument section
+        if func.return_type != 'void':
+            tmp_var_name = 'tmp'
+            # Declare tmp
+            tmp_decl = VarDecl(None)
+            tmp_decl.name = tmp_var_name
+            tmp_decl.type = func.return_type
+            tmp_decl.state_obj = None
+            before_func_call.append(tmp_decl)
+            # Assign function return value to tmp
+            tmp_ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
+            tmp_ref.name = tmp_var_name
+            bin_op = BinOp(None)
+            bin_op.op = '='
+            bin_op.lhs.add_inst(tmp_ref)
+            bin_op.rhs.add_inst(inst)
+            func_call = bin_op
+            # replace the function call with the variable
+            ret_val = tmp_ref.clone([])
+        else:
+            raise Exception('Not implemented yet!')
+
     if func.may_succeed:
         ## we need to pass a flag
+        # TODO: check that we only update the signature once
         # Update the signature of the function
         flag_obj = StateObject(None)
         flag_obj.name = FLAG_PARAM_NAME
@@ -52,7 +78,7 @@ def _handle_function_may_fail(inst, func, info, more):
         T.kind = clang.TypeKind.POINTER
         flag_obj.real_type = T
         func.args.append(flag_obj)
-        # Update the flag to the symbol table for the function scope 
+        # Update the flag to the symbol table for the function scope
         scope = info.sym_tbl.scope_mapping.get(inst.name)
         assert scope is not None
         entry = SymbolTableEntry(flag_obj.name, T, clang.CursorKind.PARM_DECL, None)
@@ -62,15 +88,15 @@ def _handle_function_may_fail(inst, func, info, more):
         # First check if we need to allocate the flag on the stack memory
         sym = info.sym_tbl.lookup(FLAG_PARAM_NAME)
         if not sym:
-            # TODO: initialize to zero
             # declare a local variable
             flag_decl = VarDecl(None)
             flag_decl.name = flag_obj.name
             flag_decl.type = flag_obj.type
             flag_decl.state_obj = flag_obj
-            # Declare it just before calling the function
-            blk = cb_ref.get(BODY)
-            blk.append(flag_decl)
+            zero = Literal('0', clang.CursorKind.INTEGER_LITERAL)
+            flag_decl.init.add_inst(zero)
+            before_func_call.append(flag_decl)
+
         # Now add the argument to the invocation instruction
         # TODO: update every invocation of this function with the flag parameter
         addr_op = UnaryOp(None)
@@ -78,8 +104,12 @@ def _handle_function_may_fail(inst, func, info, more):
         addr_op.child.add_inst(flag_ref)
         inst.args.append(addr_op)
 
-        # Analyse the called function. We do not need to analyse this function
-        # in other cases.
+        # TODO: it adds the code before the function invocation! Fix it.
+        # check if function fail
+        tmp = Literal('/* check if function fail */\n', CODE_LITERAL)
+        after_func_call.append(tmp)
+
+        # Analyse the called function.
         with remember_func(func):
             with info.sym_tbl.with_func_scope(inst.name):
                 modified = _do_pass(func.body, info, (0, BODY, None))
@@ -101,9 +131,9 @@ def _handle_function_may_fail(inst, func, info, more):
             bin_op.rhs.add_inst(true)
 
             # TODO: it adds the code before the function invocation! Fix it.
-            blk = cb_ref.get(BODY)
-            blk.append(bin_op)
-            # blk.append(After(bin_op))
+            after_func_call.append(bin_op)
+            tmp = Literal('/* Return from this point to the caller */\n', CODE_LITERAL)
+            after_func_call.append(tmp)
         else:
             # The caller knows we are going to fail (this function never
             # succeed)
@@ -112,34 +142,10 @@ def _handle_function_may_fail(inst, func, info, more):
                 assert (current_function.may_fail and not
                         current_function.may_succeed)
 
-    if ctx != BODY:
-        blk = cb_ref.get(BODY)
-
-        # Let's move the function outside of argument section
-        if func.return_type != 'void':
-            tmp_var_name = 'tmp'
-            # Declare tmp
-            tmp_decl = VarDecl(None)
-            tmp_decl.name = tmp_var_name
-            tmp_decl.type = func.return_type
-            tmp_decl.state_obj = None
-            blk.append(tmp_decl)
-            # Assign function return value to tmp 
-            tmp_ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
-            tmp_ref.name = tmp_var_name
-            bin_op = BinOp(None)
-            bin_op.op = '='
-            bin_op.lhs.add_inst(tmp_ref)
-            bin_op.rhs.add_inst(inst)
-            blk.append(bin_op)
-            # Use tmp variable instead of the function
-            return tmp_ref.clone([])
-        else:
-            raise Exception('Not implemented yet!')
-
-
-
-    return inst
+    blk.extend(before_func_call)
+    blk.append(func_call)
+    blk.extend(after_func_call)
+    return ret_val
 
 
 def _process_current_inst(inst, info, more):
@@ -160,7 +166,8 @@ def _do_pass(inst, info, more):
     with cb_ref.new_ref(ctx, parent_list):
         # Process current instruction
         inst = _process_current_inst(inst, info, more)
-        assert inst is not None
+        if inst is None:
+            return None
 
         # Continue deeper
         for child, tag in inst.get_children_context_marked():
@@ -168,16 +175,9 @@ def _do_pass(inst, info, more):
                 new_child = []
                 for i in child:
                     new_inst = _do_pass(i, info, (lvl+1, tag, new_child))
-                    assert new_inst is not None
-
-                    # check if there is something to move after this instruction
-                    # has_after = False
-                    # if new_child and isinstance(new_child[-1], After):
-                    #     tmp = new_child.pop()
-                    #     has_after = True
+                    if new_inst is None:
+                        continue
                     new_child.append(new_inst)
-                    # if has_after:
-                    #     new_child.append(tmp.box)
             else:
                 new_child = _do_pass(child, info, (lvl+1, tag, None))
                 assert new_child is not None
