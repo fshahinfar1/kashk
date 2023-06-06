@@ -90,7 +90,10 @@ def generate_offload(file_path, entry_func):
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # TODO: split the code between parser and verdict
-    info.prog.parser_code = m
+    p = Block(BODY)
+    p.add_inst(Literal('return skb->len;', CODE_LITERAL))
+    info.prog.parser_code = p
+    info.prog.verdict_code = m
     # Print the code we have generated
     text = generate_bpf_prog(info)
     print(text)
@@ -109,7 +112,7 @@ def boot_starp_global_state(cursor, info):
     tcp_conn_entry = info.sym_tbl.lookup('class_TCPConnection')
     e = info.sym_tbl.insert_entry('conn', tcp_conn_entry.type, clang.CursorKind.PARM_DECL, None)
     # Override what the clang thinks
-    e.is_pointer = True
+    e.is_pointer = False
     e.name = 'sock_ctx->state.conn'
     # -----------------------------
 

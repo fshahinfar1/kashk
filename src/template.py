@@ -49,3 +49,13 @@ def send_response_template(buf, write_size, skb='skb'):
         ]
     text = '\n'.join(code)
     return text
+
+
+def shared_map_decl():
+    return '''struct {
+  __uint(type,  BPF_MAP_TYPE_ARRAY);
+  __type(key,   __u32);
+  __type(value, struct shared_state);
+  __uint(max_entries, 1);
+} shared_map SEC(".maps");
+'''

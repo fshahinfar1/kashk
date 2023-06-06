@@ -91,7 +91,7 @@ def _handle_function_may_fail(inst, func, info, more):
             # declare a local variable
             flag_decl = VarDecl(None)
             flag_decl.name = flag_obj.name
-            flag_decl.type = flag_obj.type
+            flag_decl.type = 'char'
             flag_decl.state_obj = flag_obj
             zero = Literal('0', clang.CursorKind.INTEGER_LITERAL)
             flag_decl.init.add_inst(zero)
@@ -141,11 +141,11 @@ def _handle_function_may_fail(inst, func, info, more):
 
             after_func_call.append(bin_op)
             if func.return_type == 'void':
-                tmp_stmt = 'return'
+                tmp_stmt = 'return;'
             else:
-                tmp_stmt = f'return ({func.return_type}){0}'
+                tmp_stmt = f'return ({func.return_type}){0};'
             return_stmt = ('/* Return from this point to the caller */\n'
-                    + f'{tmp_stmt};')
+                    + f'{tmp_stmt}')
             tmp = Literal(return_stmt, CODE_LITERAL)
             after_func_call.append(tmp)
         else:

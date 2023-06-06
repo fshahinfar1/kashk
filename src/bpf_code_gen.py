@@ -6,7 +6,8 @@ from utility import (indent, INDENT, report_on_cursor, owner_to_ref)
 from sym_table import scope_mapping
 from prune import READ_PACKET, WRITE_PACKET
 
-from template import memcpy_internal_defs, license_text, load_shared_object_code
+from template import (memcpy_internal_defs, license_text,
+        load_shared_object_code, shared_map_decl)
 
 
 def check_if_shared_obj_is_loaded(info):
@@ -378,33 +379,43 @@ def generate_bpf_prog(info):
             continue
         o = StateObject(x.ref)
         fields.append(o)
-    shared_state = Record('shared_state', fields)
+    # If there are any global state, declare the shared_map
+    if fields:
+        shared_state = Record('shared_state', fields)
+        shared_state_struct_decl = (
+                '\n/* The globaly shared state is in this structure */'
+                + shared_state.get_c_code() + ';\n'
+                + shared_map_decl() + '\n'
+                )
+    else:
+        shared_state_struct_decl = ''
 
 
     decs = list(info.prog.declarations)
     non_func_decs = list(filter(lambda d: not isinstance(d, Function), decs))
     func_decs = list(filter(lambda d: isinstance(d, Function), decs))
     non_func_declarations, _ = gen_code(non_func_decs, info, context=DEF)
-    non_func_declarations += ('\n/* The globaly shared state is in this structure */'
-            + shared_state.get_c_code() + ';\n')
-    bpf_map_declaration = info.prog._map_declaration()
+    non_func_declarations += shared_state_struct_decl
     func_declarations, _ = gen_code(func_decs, info, context=ARG)
-    declarations = (non_func_declarations + '\n'
-            + bpf_map_declaration + '\n'
-            + func_declarations + '\n')
+    declarations = (non_func_declarations + '\n' + func_declarations)
 
     parser_code, _ = gen_code(info.prog.parser_code, info)
-    parser_code = (info.prog._pull_packet_data()
-            + info.prog._load_connection_state() + parser_code)
     parser_code = indent(parser_code, 1)
+    verdict_code, _ = gen_code(info.prog.verdict_code, info)
+    verdict_code = (info.prog._pull_packet_data()
+            + info.prog._load_connection_state() + verdict_code)
+    verdict_code = indent(verdict_code, 1)
 
     code = ([]
             + info.prog.headers
             + ['typedef char bool;', memcpy_internal_defs()]
             + [declarations]
             + info.prog._per_connection_state()
+            + ['']
             + info.prog._parser_prog([parser_code])
-            + info.prog._verdict_prog([])
+            + ['']
+            + info.prog._verdict_prog([verdict_code])
+            + ['']
             + [license_text(info.prog.license),]
             )
     return '\n'.join(code)

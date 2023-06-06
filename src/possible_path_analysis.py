@@ -81,6 +81,17 @@ def _do_pass(inst, info, more):
                         comment = f'/* can not use "{tmp}". Continue in userspace!*/'
                         tmp_inst = Literal(comment, CODE_LITERAL)
                         new_child.append(tmp_inst)
+                        if current_function is None:
+                            tmp_stmt = 'return SK_PASS;'
+                        elif current_function.return_type == 'void':
+                            tmp_stmt = 'return;'
+                        else:
+                            tmp_stmt = f'return ({current_function.return_type}){0};'
+                        return_stmt = ('/* Return from this point to the caller */\n'
+                                + f'{tmp_stmt}')
+
+                        tmp = Literal(return_stmt, CODE_LITERAL)
+                        new_child.append(tmp)
                         current_function.may_fail = True
                         break
                     else:

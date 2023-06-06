@@ -58,16 +58,6 @@ if (!sock_ctx) {
 }
 '''
 
-    def _map_declaration(self):
-        return '''struct {
-  __uint(type,  BPF_MAP_TYPE_ARRAY);
-  __type(key,   __u32);
-  __type(value, struct shared_state);
-  __uint(max_entries, 1);
-} shared_map SEC(".maps");
-'''
-
-
     def _parser_prog(self, body):
         return ([
                 'SEC("sk_skb/stream_parser")',
