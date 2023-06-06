@@ -92,7 +92,8 @@ def _do_pass(inst, info, more):
 
                         tmp = Literal(return_stmt, CODE_LITERAL)
                         new_child.append(tmp)
-                        current_function.may_fail = True
+                        if current_function:
+                            current_function.may_fail = True
                         break
                     else:
                         # The argument of something similar is removed

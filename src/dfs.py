@@ -14,11 +14,11 @@ class DFSPass:
             self.q = [(cursor, 0)]
         self._if_deep = []
 
-    def enque(self, cursor):
+    def enque(self, cursor, depth):
         """
         The cursor would be processed immediatly the next time user calls next.
         """
-        self.q.append(cursor)
+        self.q.append((cursor, depth))
 
     def go_deep(self):
         self.q.extend(self._if_deep)

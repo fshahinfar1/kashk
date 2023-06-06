@@ -363,7 +363,7 @@ def gather_instructions_from(cursor, info, context=BODY):
     ops = []
     cb_ref.push(context, ops)
     d = DFSPass(cursor)
-    for c, _ in d:
+    for c, lvl in d:
         if (not c.location.file
                 or not should_process_this_file(c.location.file.name)):
             continue
@@ -376,14 +376,14 @@ def gather_instructions_from(cursor, info, context=BODY):
             d.go_deep()
             continue
         elif c.kind == clang.CursorKind.CXX_TRY_STMT:
-            # We do not have try statement in C or BPF.
+            # We do not have `try' statement in C or BPF.
             # The idea is to do what is in the try part and hope for the best!
             # TODO: Maybe do not offload try-except parts. Considering them as
             # stopping condition.
 
             children = list(c.get_children())
             assert len(children) > 0
-            d.enque(children[0])
+            d.enque(children[0], lvl+1)
             continue
 
         inst = __convert_cursor_to_inst(c, info)
