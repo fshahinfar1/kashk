@@ -71,8 +71,12 @@ def _handle_function_may_fail(inst, func, info, more):
         flag_obj.name = FLAG_PARAM_NAME
         flag_obj.type = 'char *'
         flag_obj.is_pointer = True
+        T2 = MyType()
+        T2.spelling = 'char'
+        T2.kind = clang.TypeKind.SCHAR
         T = MyType()
         T.spelling = flag_obj.type
+        T.under_type = T2
         T.kind = clang.TypeKind.POINTER
         flag_obj.real_type = T
         func.args.append(flag_obj)

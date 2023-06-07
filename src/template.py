@@ -1,19 +1,102 @@
+from instruction import *
+
+VOID_PTR = 'void *'
+
+
 def bpf_get_data(buf, skb='skb'):
     return f'{buf} = (void *)(__u64){skb}->data;\n'
 
 
 def bpf_ctx_bound_check(ref, index, data_end):
-    return '\n'.join([
-        f'if ((void *)({ref} + {index} + 1) > (void *){data_end}) {{',
-        '  return 0;',
-        '}\n'])
+    _if = ControlFlowInst()
+    _if.kind = clang.CursorKind.IF_STMT
+
+    # index + 1
+    size_plus_one = BinOp(None)
+    size_plus_one.op = '+'
+    size_plus_one.lhs.add_inst(index)
+    size_plus_one.rhs.add_inst(Literal('1', clang.CursorKind.INTEGER_LITERAL))
+
+    # (ref + index + 1)
+    pkt_off = BinOp(None)
+    pkt_off.op = '+'
+    pkt_off.lhs.add_inst(ref)
+    pkt_off.rhs.add_inst(size_plus_one)
+
+    # (void *)(ref + size + 1)
+    lhs_cast = Cast()
+    lhs_cast.castee.add_inst(pkt_off)
+    lhs_cast.cast_type = VOID_PTR
+
+    # (void *)(data_end)
+    rhs_cast = Cast()
+    rhs_cast.castee.add_inst(data_end)
+    rhs_cast.cast_type = VOID_PTR
+
+
+    # (void *)(ref + size + 1) > (void *)(data_end)
+    cond = BinOp(None)
+    cond.op = '>'
+    cond.lhs.add_inst(lhs_cast)
+    cond.rhs.add_inst(rhs_cast)
+
+    # return 0
+    ret = Instruction()
+    ret.kind = clang.CursorKind.RETURN_STMT
+    ret.body = [Literal('0', kind=clang.CursorKind.INTEGER_LITERAL),]
+
+    _if.cond.add_inst(cond)
+    _if.body.add_inst(ret)
+
+    return _if
 
 
 def bpf_ctx_bound_check_bytes(ref, size, data_end):
-    return '\n'.join([
-        f'if ((void *){ref} + {size} + 1 > (void *){data_end}) {{',
-        '  return 0;',
-        '}\n'])
+    _if = ControlFlowInst()
+    _if.kind = clang.CursorKind.IF_STMT
+
+    # size + 1
+    size_plus_one = BinOp(None)
+    size_plus_one.op = '+'
+    size_plus_one.lhs.add_inst(size)
+    size_plus_one.rhs.add_inst(Literal('1', clang.CursorKind.INTEGER_LITERAL))
+
+    # (void *)(ref)
+    lhs_cast = Cast()
+    lhs_cast.castee.add_inst(ref)
+    lhs_cast.cast_type = VOID_PTR
+
+    # (void *)(ref) + size + 1
+    pkt_off = BinOp(None)
+    pkt_off.op = '+'
+    pkt_off.lhs.add_inst(lhs_cast)
+    pkt_off.rhs.add_inst(size_plus_one)
+
+    # (void *)(data_end)
+    rhs_cast = Cast()
+    rhs_cast.castee.add_inst(data_end)
+    rhs_cast.cast_type = VOID_PTR
+
+    # (void *)(ref + size + 1) > (void *)(data_end)
+    cond = BinOp(None)
+    cond.op = '>'
+    cond.lhs.add_inst(pkt_off)
+    cond.rhs.add_inst(rhs_cast)
+
+    # return 0
+    ret = Instruction()
+    ret.kind = clang.CursorKind.RETURN_STMT
+    ret.body = [Literal('0', kind=clang.CursorKind.INTEGER_LITERAL),]
+
+    _if.cond.add_inst(cond)
+    _if.body.add_inst(ret)
+
+    return _if
+
+    # return '\n'.join([
+    #     f'if ((void *){ref} + {size} + 1 > (void *){data_end}) {{',
+    #     '  return 0;',
+    #     '}\n'])
 
 
 def memcpy_internal_defs():

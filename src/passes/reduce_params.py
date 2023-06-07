@@ -73,8 +73,12 @@ def _function_check_param_reduc(inst, func, info, more):
         ex_obj.name = EXTRA_PARAM_NAME
         ex_obj.type = f'struct {change.struct_name} *'
         ex_obj.is_pointer = True
+        T2 = MyType()
+        T2.spelling = f'struct {change.struct_name}'
+        T2.kind = clang.TypeKind.RECORD
         T = MyType()
         T.spelling = ex_obj.type
+        T.under_type = T2
         T.kind = clang.TypeKind.POINTER
         ex_obj.real_type = T
         func.args.append(ex_obj)
@@ -83,6 +87,7 @@ def _function_check_param_reduc(inst, func, info, more):
 
         # Add this new struct to the definition list
         rec = Record(change.struct_name, change.list_of_params)
+        rec.update_symbol_table(info.sym_tbl)
         text = rec.get_c_code()
         info.prog.add_declaration(text)
     
@@ -159,6 +164,7 @@ def _handle_ref(inst, info, more):
         before, _ = gen_code([inst], info)
         after, _ = gen_code([new_inst], info)
         debug(f'Should update {before} -> {after}')
+        debug(type(inst), inst.name, inst.kind, inst.owner)
         return new_inst
     return inst
 

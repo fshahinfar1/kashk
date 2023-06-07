@@ -134,7 +134,14 @@ class StateObject:
 
 class MyType:
     def __init__(self):
-        pass
+        self.spelling = None
+        self.under_type = None
+        self.kind = None
+
+    def get_pointee(self):
+        if self.kind == clang.TypeKind.POINTER:
+            return self.under_type
+        raise Exception('Not a pointer')
 
 
 class TypeDefinition:
@@ -183,6 +190,25 @@ class Record(TypeDefinition):
 
     def get_c_code(self):
         return '\n'+generate_struct_with_fields(self.name, self.fields)
+
+    def update_symbol_table(self, sym_tbl):
+        struct_name = self.name
+        T = MyType()
+        T.spelling = f'struct {struct_name}'
+        T.kind = clang.TypeKind.RECORD
+        scope_key = f'class_{T.spelling}'
+        sym_tbl.insert_entry(scope_key, T, clang.CursorKind.CLASS_DECL, None)
+        with sym_tbl.new_scope() as scope:
+            sym_tbl.scope_mapping[scope_key] = scope
+            for f in self.fields:
+                T = MyType()
+                T.spelling = f.type
+                if f.is_pointer:
+                    T.kind = clang.TypeKind.POINTER
+                    T.under_type = None
+                else:
+                    T.kind = f.kind
+                sym_tbl.insert_entry(f.name, T, clang.CursorKind.FIELD_DECL, None)
 
     def __repr__(self):
         return f'<Record {self.name} >'

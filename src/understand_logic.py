@@ -189,8 +189,12 @@ def __convert_cursor_to_inst(c, info):
             # TODO: the generated code has so many null references!
             inst.type = 'char *'
             inst.is_array = False
+            T2 = MyType()
+            T2.spelling = 'char'
+            T2.kind = clang.TypeKind.SCHAR
             T = MyType()
             T.spelling = 'char *'
+            T.under_type = T2
             T.kind = clang.TypeKind.POINTER
             e = info.sym_tbl.insert_entry(inst.name, T, c.kind, None)
             e.is_bpf_ctx = True

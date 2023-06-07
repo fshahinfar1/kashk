@@ -1,3 +1,4 @@
+import os
 import clang.cindex as clang
 
 from log import error, debug
@@ -130,11 +131,12 @@ def report_on_cursor(c):
     # DEBUGING: Show every line of code
     if c.location.file:
         fname = c.location.file.name
-        with open(fname) as f:
-            l = f.readlines()[c.location.line-1]
-            l = l.rstrip()
-            debug(l)
-            debug(' ' * (c.location.column -1) + '^')
+        if os.path.isfile(fname):
+            with open(fname) as f:
+                l = f.readlines()[c.location.line-1]
+                l = l.rstrip()
+                debug(l)
+                debug(' ' * (c.location.column -1) + '^')
 
 
 def show_insts(lst, depth=0):
@@ -176,11 +178,17 @@ def owner_to_ref(owner, info):
     for x in owner:
         obj = scope.lookup(x)
         if obj is None:
+            debug('did not found obj:', x)
             break
         hierarchy.append(obj)
-        obj_cls = obj.type.spelling
-        scope = info.sym_tbl.scope_mapping.get(f'class_{obj_cls}')
+        if obj.type.kind == clang.TypeKind.POINTER and obj.type.get_pointee():
+            obj_cls = obj.type.get_pointee().spelling
+        else:
+            obj_cls = obj.type.spelling
+        key = f'class_{obj_cls}'
+        scope = info.sym_tbl.scope_mapping.get(key)
         if not scope:
+            debug(f'scope not found for: |{key}|') 
             break
     return hierarchy
 

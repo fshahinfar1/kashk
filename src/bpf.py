@@ -1,4 +1,7 @@
+import clang.cindex as clang
 from utility import generate_struct_with_fields
+from data_structure import MyType
+from log import debug
 
 
 class SK_SKB_PROG:
@@ -19,6 +22,25 @@ class SK_SKB_PROG:
                 ]
         self.license = 'GPL'
 
+    def set_bpf_context_struct_sym_tbl(self, sym_tbl):
+        struct_name = '__sk_buff'
+        T = MyType()
+        T.spelling = f'struct {struct_name}'
+        T.kind = clang.TypeKind.RECORD
+        scope_key = f'class_{T.spelling}'
+        sym_tbl.insert_entry(scope_key, T, clang.CursorKind.CLASS_DECL, None)
+        with sym_tbl.new_scope() as scope:
+            sym_tbl.scope_mapping[scope_key] = scope
+            # # map __class__ identifier to the class representing current scope -
+            # e = info.sym_tbl.insert_entry('__class__', None, clang.CursorKind.CLASS_DECL, None)
+            # # override the name form __class__ to actual class name
+            # e.name = struct_name 
+            # # -------------------------------------------------------------------
+            T = MyType()
+            T.spelling = '__u32'
+            T.kind = clang.TypeKind.UINT
+            sym_tbl.insert_entry('data', T, clang.CursorKind.FIELD_DECL, None)
+            sym_tbl.insert_entry('data_end', T, clang.CursorKind.FIELD_DECL, None)
 
     def add_connection_state(self, state):
         self.connection_state.append(state)

@@ -62,6 +62,8 @@ def build_sym_table(cursor, info):
     This function does not explore the body of functions. This is postponed
     for later.
     """
+    # Define the field of BPF context
+    info.prog.set_bpf_context_struct_sym_tbl(info.sym_tbl)
     pass_over_global_variables(cursor, info)
     info.sym_tbl.current_scope = info.sym_tbl.global_scope
 

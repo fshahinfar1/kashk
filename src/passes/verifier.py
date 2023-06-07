@@ -28,9 +28,14 @@ def is_value_from_bpf_ctx(inst, info, R=None):
                 # TODO: I am converting instructions to code early because I am
                 # using a string template and not an Instruction template.
                 # It would be better to use the latter.
-                ref, _ = gen_code(inst.array_ref, info)
-                index, _  = gen_code(inst.index, info)
-                size = f'sizoef({inst.type.spelling})'
+                # ref, _ = gen_code(inst.array_ref, info)
+                # index, _  = gen_code(inst.index, info)
+                # size = f'sizoef({inst.type.spelling})'
+                # R.append((ref, index, size))
+
+                ref = inst.array_ref.children[0]
+                index =inst.index.children[0]
+                size = Literal(f'sizoef({inst.type.spelling})', kind=CODE_LITERAL)
                 R.append((ref, index, size))
             return True
     elif inst.kind == clang.CursorKind.UNARY_OPERATOR:
@@ -48,8 +53,12 @@ def is_value_from_bpf_ctx(inst, info, R=None):
         sym = info.sym_tbl.lookup(owner)
         if sym.is_bpf_ctx:
             # We are accessing BPF context
-            size = f'sizeof({inst.cursor.type.spelling})'
-            R.append((sym.name, 0, size))
+            ref = Ref(None)
+            ref.name = sym.name
+            ref.kind = clang.CursorKind.DECL_REF_EXPR
+            index = Literal('0', clang.CursorKind.INTEGER_LITERAL)
+            size = Literal(f'sizeof({inst.cursor.type.spelling})', CODE_LITERAL)
+            R.append((ref, index, size))
             return True
     return False
 
@@ -253,8 +262,18 @@ def _handle_binop(inst, info, more):
         val_is_from_ctx = is_value_from_bpf_ctx(x, info, R)
         if val_is_from_ctx:
             ref, index, T = R.pop()
-            check = bpf_ctx_bound_check(ref, index, '(__u64)skb->data_end')
-            check_inst = Literal(check, CODE_LITERAL)
+            # check = bpf_ctx_bound_check(ref, index, '(__u64)skb->data_end')
+            # check_inst = Literal(check, CODE_LITERAL)
+
+            # (__u64)skb->data_end
+            end_ref = Ref(None, kind=clang.CursorKind.MEMBER_REF_EXPR)
+            end_ref.name = 'data_end'
+            end_ref.owner.append('skb')
+            data_end = Cast()
+            data_end.cast_type = '__u64'
+            data_end.castee.add_inst(end_ref)
+            check_inst = bpf_ctx_bound_check(ref, index, data_end)
+
             blk = cb_ref.get(BODY)
             # Add the check a line before this access
             blk.append(check_inst)
@@ -286,11 +305,14 @@ def _handle_call(inst, info, more):
             skb_obj.type = 'struct __sk_buff *'
             skb_obj.is_pointer = True
             func.args.append(skb_obj)
+            T2 = MyType()
+            T2.spelling = 'struct __sk_buff'
+            T2.kind = clang.TypeKind.RECORD
             T = MyType()
             T.spelling = skb_obj.type
+            T.under_type = T2
             T.kind = clang.TypeKind.POINTER
-            # TODO: probably the next line is adding the symbol information to
-            # a wrong scope.
+            # This is added to the scope of function being called
             info.sym_tbl.insert_entry(skb_obj.name, T, clang.CursorKind.PARM_DECL, None)
             skb_obj.real_type = T
 
@@ -322,11 +344,24 @@ def _handle_call(inst, info, more):
         else:
             ref = inst.args[0]
             size = inst.args[2]
+
             # Add the check a line before this access
-            ref_str, _ = gen_code([ref], info)
-            size_str, _ = gen_code([size], info)
-            check = bpf_ctx_bound_check_bytes(ref_str, size_str, '(__u64)skb->data_end')
-            check_inst = Literal(check, CODE_LITERAL)
+            # ref_str, _ = gen_code([ref], info)
+            # size_str, _ = gen_code([size], info)
+            # check = bpf_ctx_bound_check_bytes(ref_str, size_str, '(__u64)skb->data_end')
+            # check_inst = Literal(check, CODE_LITERAL)
+
+            end_ref = Ref(None, kind=clang.CursorKind.MEMBER_REF_EXPR)
+            end_ref.name = 'data_end'
+            end_ref.owner.append('skb')
+            data_end = Cast()
+            data_end.cast_type = '__u64'
+            data_end.castee.add_inst(end_ref)
+            check_inst = bpf_ctx_bound_check_bytes(ref, size, data_end)
+
+            tmp, _ = gen_code([check_inst], info)
+            debug('check: ', tmp)
+
             blk = cb_ref.get(BODY)
             blk.append(check_inst)
     return inst
