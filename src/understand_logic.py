@@ -10,6 +10,8 @@ from understand_program_state import get_state_for
 
 from dfs import DFSPass
 
+MODULE_TAG = '[Understand Pass]'
+
 
 cb_ref = CodeBlockRef()
 
@@ -221,6 +223,8 @@ def __convert_cursor_to_inst(c, info):
             inst.init.extend_inst(init)
 
             # Add variable to the scope
+            if info.sym_tbl.lookup(c.spelling) is not None:
+                error('{MODULE_TAG} Shadowing variables are not supported and can cause issues! ({c.spelling})')
             info.sym_tbl.insert_entry(c.spelling, c.type, c.kind, c)
 
             # Check if there is a type dependencies which we need to define

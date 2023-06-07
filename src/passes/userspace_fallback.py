@@ -5,8 +5,6 @@ from log import error, debug
 from data_structure import *
 from instruction import *
 
-from bpf_code_gen import gen_code
-
 from sym_table import SymbolTableEntry
 
 

@@ -27,6 +27,9 @@ class Scope:
         self.symbols = {}
         self.parent = parent
 
+    def delete(self, name):
+        return self.symbols.pop(name)
+
     def insert(self, entry):
         self.symbols[entry.name] = entry
 
