@@ -240,11 +240,11 @@ def _handle_binop(inst, info, more):
             if rhs_is_ptr:
                 sym = info.sym_tbl.lookup(lhs.name)
                 sym.is_bpf_ctx = True
-                debug(sym.name, 'is ctx ptr')
+                # debug(sym.name, 'is ctx ptr')
             elif not rhs_is_ptr and lhs_is_ptr:
                 sym = info.sym_tbl.lookup(lhs.name)
                 sym.is_bpf_ctx = False
-                debug(sym.name, 'is something else')
+                # debug(sym.name, 'is something else')
 
     # Check if the BPF context is accessed and add bound checking
     for x in [lhs, rhs]:
@@ -304,7 +304,7 @@ def _handle_call(inst, info, more):
                 param = func.args[pos]
                 sym = info.sym_tbl.lookup(param.name)
                 sym.is_bpf_ctx = True
-                debug('function:', inst.name, 'param:', param.name, 'is bpf ctx')
+                # debug('function:', inst.name, 'param:', param.name, 'is bpf ctx')
                 # TODO: do I need to turn the flag off when removing
                 # the scope of the function? (maybe in another run the
                 # parameter is not a pointer to the context)

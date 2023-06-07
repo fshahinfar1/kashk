@@ -13,9 +13,10 @@ from bpf_code_gen import generate_bpf_prog
 
 from sym_table import scope_mapping, SymbolTableEntry
 from sym_table_gen import build_sym_table
-from verifier import verifier_pass
-from possible_path_analysis import possible_path_analysis_pass
-from userspace_fallback import userspace_fallback_pass
+from passes.verifier import verifier_pass
+from passes.possible_path_analysis import possible_path_analysis_pass
+from passes.userspace_fallback import userspace_fallback_pass
+from passes.reduce_params import reduce_params_pass
 
 
 # TODO: make a framework agnostic interface, allow for porting to other
@@ -88,6 +89,11 @@ def generate_offload(file_path, entry_func):
     # Verifier
     m = verifier_pass(m, info, third_arg)
     debug('~~~~~~~~~~~~~~~~~~~~~')
+
+    # Reduce number of parameters
+    m = reduce_params_pass(m, info, third_arg)
+    debug('~~~~~~~~~~~~~~~~~~~~~')
+
 
     # TODO: split the code between parser and verdict
     p = Block(BODY)

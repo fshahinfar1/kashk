@@ -131,12 +131,10 @@ def __add_func_definition(inst, info):
 
         # Process function body recursively
         body = gather_instructions_under(f.body_cursor, info, BODY)
-        f.body.extend_inst(body) 
+        f.body.extend_inst(body)
         info.sym_tbl.current_scope = old_scope
 
         info.prog.add_declaration(f)
-
-    f.invocations.append(inst)
 
 
 def understand_call_expr(c, info):

@@ -215,7 +215,6 @@ class Function(TypeDefinition):
         self.may_have_context_ptr = False
         self.may_fail = False
         self.may_succeed = False
-        self.invocations = []
 
         if self.name in Function.directory:
             raise Exception(f'Function is already defined ({self.name})')
