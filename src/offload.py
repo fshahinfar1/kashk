@@ -80,9 +80,6 @@ def generate_offload(file_path, entry_func):
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Handle moving to userspace
-    # for func in Function.directory.values():
-    #     debug(func.name, 'may_fail:', func.may_fail, 'may_succeed:',
-    #             func.may_succeed)
     m = userspace_fallback_pass(m, info, third_arg)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
@@ -142,15 +139,6 @@ def boot_starp_global_state(cursor, info):
         s.parent_object = field
 
     add_state_decl_to_bpf(info.prog, [field], decls)
-
-    # TODO: put this code in a place that every new Record is automatically
-    # given a scope
-    for d in decls:
-        if isinstance(d, Record):
-            tmp = info.sym_tbl.current_scope
-            info.sym_tbl.current_scope = info.sym_tbl.global_scope
-            d.update_symbol_table(info.sym_tbl)
-            info.sym_tbl.current_scope = tmp
 
 
 def find_read_write_bufs(ev_loop, info):

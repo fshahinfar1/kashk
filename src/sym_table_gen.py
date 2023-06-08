@@ -72,8 +72,11 @@ def build_sym_table(cursor, info):
     d = DFSPass(cursor)
     for c, l in d:
         # debug('|  '*l + f'+- {c.spelling} {c.kind}')
+        if not (should_process_this_cursor(c)
+                or c.kind == clang.CursorKind.TRANSLATION_UNIT):
+            continue
 
-        if c.kind == clang.CursorKind.CLASS_DECL:
+        if (c.kind == clang.CursorKind.CLASS_DECL):
             if not c.is_definition():
                 continue
 
@@ -100,8 +103,15 @@ def build_sym_table(cursor, info):
                 info.sym_tbl.scope_mapping[scope_key] = scope
                 __collect_information_about_func(c, info)
             continue
+        elif c.kind == clang.CursorKind.STRUCT_DECL:
+            if not c.is_definition():
+                continue
+            scope_key = f'class_struct {c.spelling}'
+            debug(scope_key)
+            info.sym_tbl.insert_entry(scope_key, c.type, c.kind, c)
+            with info.sym_tbl.new_scope() as scope:
+                info.sym_tbl.scope_mapping[scope_key] = scope
+                __collect_information_about_class(c, info)
+            continue
 
-        # Should we go deeper and investigate the children of this object?
-        if (should_process_this_cursor(c)
-                or c.kind == clang.CursorKind.TRANSLATION_UNIT):
-            d.go_deep()
+        d.go_deep()
