@@ -47,6 +47,12 @@ class _Change:
 
 
 def _function_check_param_reduc(inst, func, info, more):
+    """
+    Check if number of parameters of function exceed.
+    1. Define a struct and put some of the parameters in that
+    2. Change the signature of the function
+    3. Recursively analyse the body of the called function
+    """
     # Remember during this pass that I am going to change this function
     change = _Change(inst.name)
 

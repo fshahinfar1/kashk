@@ -95,10 +95,20 @@ class Call(Instruction):
         func = Function.directory.get(self.name)
         return func
 
+    def has_children(self):
+        return True
+
+    def get_chlidren(self):
+        return self.args
+
+    def get_children_context_marked(self):
+        return list(zip(self.args, [ARG] * len(self.args)))
+
     def clone(self, children):
         new = Call(self.cursor)
         new.name  = self.name
-        new.args   = list(self.args)
+        # new.args  = list(self.args)
+        new.args  = children
         new.owner = list(self.owner)
         new.is_method = self.is_method
         new.is_operator = self.is_operator
