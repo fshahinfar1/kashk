@@ -50,39 +50,16 @@ def generate_decleration_for(cursor):
     if T.kind == clang.TypeKind.RECORD:
         # Go through the fields, add any dependencies field might have, then
         # define a struct for it.
-        # debug('============')
-        # report_on_cursor(orig)
-        # report_on_cursor(cursor)
-        # debug('============')
         fields, new_decl = extract_state(cursor)
         decl += new_decl
         r = Record(type_name, fields)
         decl.append(r)
     elif T.kind == clang.TypeKind.ELABORATED:
-        # For enum, union, typedef
-        # debug('============')
-        # report_on_cursor(orig)
-        # report_on_cursor(cursor)
-        # debug('============')
-        # c = cursor.type.get_declaration()
-        # d = generate_decleration_for(c)
-        # decl.extend(d)
         decl.append(Elaborate(c))
     elif T.kind == clang.TypeKind.ENUM:
         # TODO: No further deps?
         return []
     elif T.kind == clang.TypeKind.TYPEDEF:
-        # if not cursor.kind.is_declaration():
-        #     t = T.get_declaration()
-        # else:
-        #     t = T.underlying_typedef_type
-        # under_kind = cursor.underlying_typedef_type.kind
-        # report_on_cursor(cursor)
-        # if under_kind in PRIMITIVE_TYPES:
-        #     # No further type decleration needed
-        #     return []
-        # for c in cursor.get_children():
-        #     decl += generate_decleration_for(c)
         pass
     else:
         error('Unexpected! ' + str(cursor.type.kind))

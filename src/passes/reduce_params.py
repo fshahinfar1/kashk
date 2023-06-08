@@ -58,8 +58,8 @@ def _function_check_param_reduc(inst, func, info, more):
 
     count_args = len(func.args)
     if count_args > PARAMETER_LIMIT:
-        debug(MODULE_TAG, 'function', inst.name,
-                'violates parameter limit! (it has:', count_args,')')
+        # debug(MODULE_TAG, 'function', inst.name,
+        #         'violates parameter limit! (it has:', count_args,')')
 
         func_scope = info.sym_tbl.scope_mapping.get(inst.name)
         assert func_scope is not None
@@ -167,10 +167,6 @@ def _handle_ref(inst, info, more):
         new_inst = inst.clone([])
         new_inst.owner.append(EXTRA_PARAM_NAME)
         new_inst.kind = clang.CursorKind.MEMBER_REF_EXPR
-        before, _ = gen_code([inst], info)
-        after, _ = gen_code([new_inst], info)
-        debug(f'Should update {before} -> {after}')
-        debug(type(inst), inst.name, inst.kind, inst.owner)
         return new_inst
     return inst
 

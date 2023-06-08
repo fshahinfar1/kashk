@@ -143,6 +143,15 @@ def boot_starp_global_state(cursor, info):
 
     add_state_decl_to_bpf(info.prog, [field], decls)
 
+    # TODO: put this code in a place that every new Record is automatically
+    # given a scope
+    for d in decls:
+        if isinstance(d, Record):
+            tmp = info.sym_tbl.current_scope
+            info.sym_tbl.current_scope = info.sym_tbl.global_scope
+            d.update_symbol_table(info.sym_tbl)
+            info.sym_tbl.current_scope = tmp
+
 
 def find_read_write_bufs(ev_loop, info):
     reads = get_all_read(ev_loop)

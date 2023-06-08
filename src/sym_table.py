@@ -33,6 +33,11 @@ class Scope:
     def insert(self, entry):
         self.symbols[entry.name] = entry
 
+    def insert_entry(self, name, type, kind, ref):
+        e = SymbolTableEntry(name, type, kind, ref)
+        self.insert(e)
+        return e
+
     def lookup(self, name):
         entry = self.symbols.get(name)
         if entry:
