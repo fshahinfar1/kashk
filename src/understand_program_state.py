@@ -98,17 +98,4 @@ def get_state_for(cursor):
     if cursor.type.kind in (clang.TypeKind.RECORD, clang.TypeKind.ELABORATED) and decl:
         obj.type_ref = decl[-1]
 
-    # k = cursor.kind
-    # if k == clang.CursorKind.PARM_DECL:
-    #     obj = StateObject(cursor)
-    #     states.append(obj)
-    #     decl = generate_decleration_for(cursor)
-    # elif k == clang.CursorKind.VAR_DECL:
-    #     obj = StateObject(cursor)
-    #     states.append(obj)
-    #     decl = generate_decleration_for(cursor)
-    #     if cursor.type.kind in (clang.TypeKind.RECORD, clang.TypeKind.ELABORATED) and decl:
-    #         obj.type_ref = decl[-1]
-    # else:
-    #     raise Exception('Not implemented! ' + str(k))
     return states, decl

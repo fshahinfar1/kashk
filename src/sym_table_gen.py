@@ -4,7 +4,6 @@ from prune import should_process_this_cursor
 from utility import report_on_cursor
 
 import clang.cindex as clang
-import pprint
 
 
 def __collect_information_about_class(cursor, info):
@@ -55,12 +54,12 @@ def pass_over_global_variables(cursor, info):
 
 def build_sym_table(cursor, info):
     """
-    Go through all the declaration of class, function, fields, and variables.
-    Create scope for class and functions and add the fields or variables to the
-    correct scope.
+    Go through all the declarations of class, struct, function, fields, and
+    variables.  Create scope for class and functions and add the fields or
+    variables to the correct scope.
 
-    This function does not explore the body of functions. This is postponed
-    for later.
+    This function does not explore the body of functions. This is postponed for
+    later.
     """
     # Define the field of BPF context
     info.prog.set_bpf_context_struct_sym_tbl(info.sym_tbl)
@@ -95,7 +94,6 @@ def build_sym_table(cursor, info):
             if not c.is_definition():
                 continue
 
-            # scope_key = f'func_{c.spelling}'
             scope_key = f'{c.spelling}'
             info.sym_tbl.insert_entry(scope_key, c.result_type, c.kind, c)
 
