@@ -284,7 +284,6 @@ def handle_to_userspace(inst, info, more):
     text = ('/* Return from this point to the caller */\n'
             + f'{tmp_stmt}')
     text = indent(text, lvl)
-    debug('go to userspace:', text)
     return text
 
 

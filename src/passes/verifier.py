@@ -25,14 +25,6 @@ def is_value_from_bpf_ctx(inst, info, R=None):
     if inst.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
         if is_bpf_ctx_ptr(inst.array_ref.children[0], info):
             if R is not None:
-                # TODO: I am converting instructions to code early because I am
-                # using a string template and not an Instruction template.
-                # It would be better to use the latter.
-                # ref, _ = gen_code(inst.array_ref, info)
-                # index, _  = gen_code(inst.index, info)
-                # size = f'sizoef({inst.type.spelling})'
-                # R.append((ref, index, size))
-
                 ref = inst.array_ref.children[0]
                 index =inst.index.children[0]
                 size = Literal(f'sizoef({inst.type.spelling})', kind=CODE_LITERAL)
@@ -44,10 +36,6 @@ def is_value_from_bpf_ctx(inst, info, R=None):
                 R.append(('x', 0, 0))
             return True
     elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
-        # Debug:
-        # report_on_cursor(inst.cursor)
-        # debug(inst.name, inst.owner)
-
         # TODO: what if there are multiple member access?
         owner = inst.owner[-1]
         sym = info.sym_tbl.lookup(owner)
@@ -126,8 +114,6 @@ def _handle_binop(inst, info, more):
         val_is_from_ctx = is_value_from_bpf_ctx(x, info, R)
         if val_is_from_ctx:
             ref, index, T = R.pop()
-            # check = bpf_ctx_bound_check(ref, index, '(__u64)skb->data_end')
-            # check_inst = Literal(check, CODE_LITERAL)
 
             # (__u64)skb->data_end
             end_ref = Ref(None, kind=clang.CursorKind.MEMBER_REF_EXPR)
@@ -195,7 +181,7 @@ def _handle_call(inst, info, more):
                 # the scope of the function? (maybe in another run the
                 # parameter is not a pointer to the context)
 
-            modified = verifier_pass(func.body, info, (0, BODY, None))
+            modified = _do_pass(func.body, info, (0, BODY, None))
             assert modified is not None
 
         # Update the instructions of the function
@@ -210,11 +196,6 @@ def _handle_call(inst, info, more):
             size = inst.args[2]
 
             # Add the check a line before this access
-            # ref_str, _ = gen_code([ref], info)
-            # size_str, _ = gen_code([size], info)
-            # check = bpf_ctx_bound_check_bytes(ref_str, size_str, '(__u64)skb->data_end')
-            # check_inst = Literal(check, CODE_LITERAL)
-
             end_ref = Ref(None, kind=clang.CursorKind.MEMBER_REF_EXPR)
             end_ref.name = 'data_end'
             end_ref.owner.append('skb')
@@ -239,10 +220,12 @@ def _process_current_inst(inst, info, more):
     return inst
 
 
+# TODO: I need to ignore instructions after the ToUserspace
+
 # TODO:The CodeBlockRef thing is not correct and works really bad. Find a way
 # to fix it.
 cb_ref = CodeBlockRef()
-def verifier_pass(inst, info, more):
+def _do_pass(inst, info, more):
     lvl, ctx, parent_list = more
     new_children = []
 
@@ -259,12 +242,16 @@ def verifier_pass(inst, info, more):
             if isinstance(child, list):
                 new_child = []
                 for i in child:
-                    new_inst = verifier_pass(i, info, (lvl+1, tag, new_child))
+                    new_inst = _do_pass(i, info, (lvl+1, tag, new_child))
                     if new_inst is not None:
                         new_child.append(new_inst)
             else:
-                new_child = verifier_pass(child, info, (lvl+1, tag, parent_list))
+                new_child = _do_pass(child, info, (lvl+1, tag, parent_list))
             new_children.append(new_child)
 
     new_inst = inst.clone(new_children)
     return new_inst
+
+
+def verifier_pass(inst, info, more):
+    return _do_pass(inst, info, more)
