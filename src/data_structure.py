@@ -12,14 +12,23 @@ class Info:
     """
     def __init__(self):
         from bpf import SK_SKB_PROG
-        self.context = None
+        from user import UserProg
         self.rd_buf = None
         self.wr_buf = None
         self.prog = SK_SKB_PROG()
         self.sym_tbl = SymbolTable()
+        # Keep track of global variables that where actually accessed. This
+        # helps with generating the BPF map shared across connections.
         self.global_accessed_variables = set()
+
+        # Keep track of information about the userspace program
+        self.user_prog = UserProg()
+
+        # TODO: the use of this set is very limited maybe I could do something
+        # better
         self.remove_cursor = set()
 
+        # TODO: this has not been used yet! what I was thinking and why I added this?
         self.processed = ProcessedBook()
 
 

@@ -403,6 +403,9 @@ class Literal(Instruction):
         self.kind = kind
         self.text = text
 
+    def __str__(self):
+        return f'<Literal {self.text}>'
+
     def clone(self, _):
         new = Literal(self.text, self.kind)
         return new

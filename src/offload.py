@@ -18,6 +18,8 @@ from passes.possible_path_analysis import possible_path_analysis_pass
 from passes.userspace_fallback import userspace_fallback_pass
 from passes.reduce_params import reduce_params_pass
 
+from bpf_code_gen import gen_code
+
 
 # TODO: make a framework agnostic interface, allow for porting to other
 # functions
@@ -76,9 +78,17 @@ def generate_offload(file_path, entry_func):
     bpf = Block(BODY)
     bpf.children = insts
 
-    # Cut inpossible paths
+    # Cut inpossible paths: It returns the AST for the BPF and also It updates
+    # UserProg data structure for generating the user program.
     bpf = possible_path_analysis_pass(bpf, info, third_arg)
     debug('~~~~~~~~~~~~~~~~~~~~~')
+
+
+    debug('Userspace paths')
+    for path in info.user_prog.paths:
+        text, _ = gen_code(path.body, info)
+        debug('Path', path.number, ':\n', text, '\n')
+
 
     # Handle moving to userspace
     bpf = userspace_fallback_pass(bpf, info, third_arg)

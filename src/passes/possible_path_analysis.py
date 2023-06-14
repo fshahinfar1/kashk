@@ -12,7 +12,24 @@ MODULE_TAG = '[Possible Path Pass]'
 
 current_function = None
 has_failed = False
+top_failing_block = False
+list_user_inst = []
 cb_ref = CodeBlockRef()
+
+
+def end_userspaec_path(info):
+    """
+    This function is invoked when reaching end of a path which should be
+    processed in userspace.
+    """
+    global list_user_inst
+    # debug('list of instruction for a userspace path:\n', list_user_inst)
+    inst = Block(BODY)
+    inst.children = list_user_inst
+    info.user_prog.add_path(inst)
+    # Get ready for another path
+    list_user_inst = []
+
 
 @contextmanager
 def remember_func(func):
@@ -25,27 +42,33 @@ def remember_func(func):
         current_function = tmp
 
 
+# TODO: This function is important, complex, and I am not sure that I remember
+# how exactly it is working. Find a way to reduce the complexity.
 @contextmanager
-def remember_boundry(ctx, value):
+def remember_boundry(ctx, value, info, prev_ctx, inst):
     global has_failed
-    if ctx == BODY:
-        tmp = has_failed
-        has_failed = value
-        try:
-            yield None
-        finally:
-            name = 'empty'
-            if current_function:
-                name = current_function.name
-            # debug('put it back', has_failed, tmp, 'at', name)
+    global top_failing_block
+
+    try:
+        tmp_failing_block = top_failing_block
+        if ctx == BODY:
+            tmp = has_failed
+            has_failed = value
+        yield None
+    finally:
+        top_failing_block = tmp_failing_block
+        if prev_ctx == BODY and has_failed and not top_failing_block:
+            # The inst is the first instruction that fails (in the top block)
+            list_user_inst.append(inst)
+            top_failing_block = True
+        if ctx == BODY:
+            had_failed = has_failed
             has_failed = tmp
-    else:
-        # Do nothing
-        try:
-            yield None
-        finally:
-            # debug('do nothing', has_failed)
-            pass
+            if had_failed and not has_failed:
+                # The program has not failed in this context but just before
+                # switching to this context it had failed!
+                # It shows a path which needs to be moved to userspace!
+                end_userspaec_path(info)
 
 
 def is_function_call_possible(inst, info):
@@ -85,7 +108,8 @@ def _process_current_inst(inst, info, more):
 def _failed_to_generate_inst(i, info, body):
     # TODO: this function is probably is not needed anymore
     tmp, _ = gen_code([i], info)
-    comment = f'/* can not use "{tmp}". Removing it!*/'
+    # comment = f'/* can not use "{tmp}". Removing it!*/'
+    comment = f'/* {tmp} */'
     tmp_inst = Literal(comment, CODE_LITERAL)
     body.append(tmp_inst)
 
@@ -98,12 +122,14 @@ def _process_child(child, inst, info, lvl, tag, parent_list):
         new_child = []
         for i in child:
             new_inst = _process_child(i, inst, info, lvl, tag, new_child)
-            if new_child is None:
+            if new_inst is None:
                 if inst.kind == BLOCK_OF_CODE and inst.tag == BODY:
                     # It is a block of code, we do not want to remove the whole
                     # block just stop here.
-                    _failed_to_generate_inst(child, info, parent_list)
-                    break
+                    _failed_to_generate_inst(i, info, new_child)
+                    # Continue and add others instructions to the user
+                    # program's list
+                    continue
                 else:
                     # The argument, condition or ... of this instruction was
                     # not possible. Also remove the whole instruction.
@@ -116,17 +142,28 @@ def _process_child(child, inst, info, lvl, tag, parent_list):
 
 def _do_pass(inst, info, more):
     global has_failed
+
     lvl, ctx, parent_list = more
     new_children = []
 
-    # debug('T' if has_failed else 'F', '|' * lvl, '\'-->' , inst, '  context:', ctx)
+    # debug('T' if top_failing_block else 'F', '|' * lvl, '\'-->' , inst, '  context:', ctx)
 
     with cb_ref.new_ref(ctx, parent_list):
         if not has_failed:
             # Process current instruction
             inst, fails = _process_current_inst(inst, info, more)
         else:
-            inst, fails = inst, False
+            # Does not need processing
+
+            # Check if we should add it to the list of operation that should be
+            # done in userspace
+            if top_failing_block:
+                # debug('add instructions:', inst)
+                list_user_inst.append(inst)
+
+            # Remove this instruction from BPF program and do not investigate
+            # its children.
+            inst, fails = None, False
 
         if inst is None:
             # This instruction should be removed
@@ -142,10 +179,12 @@ def _do_pass(inst, info, more):
             # Mark the function as failed
             if current_function:
                 current_function.may_fail = True
+            # Remove this instruction.
+            return None
 
         # Continue deeper
         for child, tag in inst.get_children_context_marked():
-            with remember_boundry(tag, has_failed):
+            with remember_boundry(tag, has_failed, info, ctx, inst):
                 new_child = _process_child(child, inst, info, lvl, tag, parent_list)
             if new_child is None:
                 return None
