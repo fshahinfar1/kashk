@@ -7,6 +7,7 @@ from log import error, debug
 
 CODE_LITERAL = 8081
 BLOCK_OF_CODE = 8082
+TO_USERSPACE_INST = 8083
 
 BODY = 0
 ARG = 1
@@ -464,3 +465,25 @@ class Block(Instruction):
         new = Block(self.tag)
         new.children = children[0]
         return new
+
+
+class ToUserspace(Instruction):
+    def __init__(self):
+        super().__init__()
+        self.kind = TO_USERSPACE_INST
+        self.is_bpf_main = False
+        self.return_type = None
+
+    def clone(self, _):
+        new = ToUserspace()
+        new.is_bpf_main = self.is_bpf_main
+        new.return_type = self.return_type
+        return new
+
+    @classmethod
+    def from_func_obj(cls, func):
+        obj = ToUserspace()
+        obj.is_bpf_main = func is None
+        if func is not None:
+            obj.return_type = func.return_type
+        return obj

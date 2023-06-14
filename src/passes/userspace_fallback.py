@@ -113,8 +113,10 @@ def _handle_function_may_fail(inst, func, info, more):
         if current_function == None:
             # we are in the bpf function
             return_stmt = '/*Go to userspace */\n  return SK_PASS;\n'
+        elif func.return_type == 'void':
+            return_stmt = 'return;'
         else:
-            return_stmt = 'return ({func.return_type})0;'
+            return_stmt = f'return ({func.return_type})0;'
         check_flag = f'if({FLAG_PARAM_NAME} == 1) {{\n  {return_stmt}\n}}\n'
         tmp = Literal(check_flag, CODE_LITERAL)
         after_func_call.append(tmp)

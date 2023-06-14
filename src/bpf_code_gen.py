@@ -273,6 +273,21 @@ def handle_return_stmt(inst, info, more):
     return text
 
 
+def handle_to_userspace(inst, info, more):
+    lvl = more[0]
+    if inst.is_bpf_main:
+        tmp_stmt = 'return SK_PASS;'
+    elif inst.return_type == 'void':
+        tmp_stmt = 'return;'
+    else:
+        tmp_stmt = f'return ({inst.return_type})0;'
+    text = ('/* Return from this point to the caller */\n'
+            + f'{tmp_stmt}')
+    text = indent(text, lvl)
+    debug('go to userspace:', text)
+    return text
+
+
 # Put semi-colon and go to next line after these nodes
 NEED_SEMI_COLON = set((clang.CursorKind.CALL_EXPR, clang.CursorKind.VAR_DECL,
     clang.CursorKind.BINARY_OPERATOR, clang.CursorKind.CONTINUE_STMT,
@@ -282,47 +297,51 @@ NEED_SEMI_COLON = set((clang.CursorKind.CALL_EXPR, clang.CursorKind.VAR_DECL,
 # Go to next line after these nodes
 GOTO_NEXT_LINE = (clang.CursorKind.IF_STMT, clang.CursorKind.FOR_STMT,
         clang.CursorKind.SWITCH_STMT, clang.CursorKind.CASE_STMT,
-        clang.CursorKind.DEFAULT_STMT, CODE_LITERAL)
+        clang.CursorKind.DEFAULT_STMT, CODE_LITERAL, TO_USERSPACE_INST)
 
 NO_MODIFICATION = 0
 REPLACE_READ = 1
 CHANGE_BUFFER_DEF = 2
 
+# A jump table for generating code based on instruction kind
+jump_table = {
+        clang.CursorKind.CALL_EXPR: handle_call,
+        clang.CursorKind.BINARY_OPERATOR: handle_bin_op,
+        clang.CursorKind.UNARY_OPERATOR: handle_unary_op,
+        # Vars
+        clang.CursorKind.VAR_DECL: handle_var,
+        clang.CursorKind.DECL_REF_EXPR: handle_ref_expr,
+        clang.CursorKind.MEMBER_REF_EXPR: handle_member_ref_expr,
+        clang.CursorKind.ARRAY_SUBSCRIPT_EXPR: handle_array_sub,
+        clang.CursorKind.CSTYLE_CAST_EXPR: handle_cast_expr,
+        # Literals
+        clang.CursorKind.INTEGER_LITERAL: handle_literal,
+        clang.CursorKind.FLOATING_LITERAL: handle_literal,
+        clang.CursorKind.CHARACTER_LITERAL: handle_literal,
+        clang.CursorKind.STRING_LITERAL: handle_literal,
+        clang.CursorKind.CXX_BOOL_LITERAL_EXPR: handle_literal,
+        CODE_LITERAL: handle_literal,
+        # Control FLow
+        clang.CursorKind.IF_STMT: handle_if_stmt,
+        clang.CursorKind.DO_STMT: handle_do_stmt,
+        clang.CursorKind.FOR_STMT: handle_for_stmt,
+        clang.CursorKind.SWITCH_STMT: handle_switch_stmt,
+        clang.CursorKind.CASE_STMT: handle_case_stmt,
+        clang.CursorKind.DEFAULT_STMT: handle_default_stmt,
+        clang.CursorKind.CONDITIONAL_OPERATOR: handle_conditional_op,
+        #
+        clang.CursorKind.PAREN_EXPR: handle_paren_expr,
+        #
+        clang.CursorKind.BREAK_STMT: lambda x,y,z: 'break',
+        clang.CursorKind.CONTINUE_STMT: lambda x,y,z: 'continue',
+        clang.CursorKind.RETURN_STMT: handle_return_stmt,
+        clang.CursorKind.CXX_THROW_EXPR: lambda x,y,z: 'return SK_DROP',
+        #
+        TO_USERSPACE_INST: handle_to_userspace,
+        }
+
 
 def gen_code(list_instructions, info, context=BODY):
-    jump_table = {
-            clang.CursorKind.CALL_EXPR: handle_call,
-            clang.CursorKind.BINARY_OPERATOR: handle_bin_op,
-            clang.CursorKind.UNARY_OPERATOR: handle_unary_op,
-            # Vars
-            clang.CursorKind.VAR_DECL: handle_var,
-            clang.CursorKind.DECL_REF_EXPR: handle_ref_expr,
-            clang.CursorKind.MEMBER_REF_EXPR: handle_member_ref_expr,
-            clang.CursorKind.ARRAY_SUBSCRIPT_EXPR: handle_array_sub,
-            clang.CursorKind.CSTYLE_CAST_EXPR: handle_cast_expr,
-            # Literals
-            clang.CursorKind.INTEGER_LITERAL: handle_literal,
-            clang.CursorKind.FLOATING_LITERAL: handle_literal,
-            clang.CursorKind.CHARACTER_LITERAL: handle_literal,
-            clang.CursorKind.STRING_LITERAL: handle_literal,
-            clang.CursorKind.CXX_BOOL_LITERAL_EXPR: handle_literal,
-            CODE_LITERAL: handle_literal,
-            # Control FLow
-            clang.CursorKind.IF_STMT: handle_if_stmt,
-            clang.CursorKind.DO_STMT: handle_do_stmt,
-            clang.CursorKind.FOR_STMT: handle_for_stmt,
-            clang.CursorKind.SWITCH_STMT: handle_switch_stmt,
-            clang.CursorKind.CASE_STMT: handle_case_stmt,
-            clang.CursorKind.DEFAULT_STMT: handle_default_stmt,
-            clang.CursorKind.CONDITIONAL_OPERATOR: handle_conditional_op,
-            #
-            clang.CursorKind.PAREN_EXPR: handle_paren_expr,
-            #
-            clang.CursorKind.BREAK_STMT: lambda x,y,z: 'break',
-            clang.CursorKind.CONTINUE_STMT: lambda x,y,z: 'continue',
-            clang.CursorKind.RETURN_STMT: handle_return_stmt,
-            clang.CursorKind.CXX_THROW_EXPR: lambda x,y,z: 'return SK_DROP',
-            }
     if isinstance(list_instructions, Block):
         list_instructions = list_instructions.get_children()
     count = len(list_instructions)
@@ -372,55 +391,6 @@ def gen_code(list_instructions, info, context=BODY):
     return text, modified
 
 
-def generate_bpf_prog(info):
-    fields = []
-    for x in info.sym_tbl.shared_scope.symbols.values():
-        if x.name not in info.global_accessed_variables:
-            continue
-        o = StateObject(x.ref)
-        fields.append(o)
-    # If there are any global state, declare the shared_map
-    if fields:
-        shared_state = Record('shared_state', fields)
-        shared_state_struct_decl = (
-                '\n/* The globaly shared state is in this structure */'
-                + shared_state.get_c_code() + ';\n'
-                + shared_map_decl() + '\n'
-                )
-    else:
-        shared_state_struct_decl = ''
-
-
-    decs = list(info.prog.declarations)
-    non_func_decs = list(filter(lambda d: not isinstance(d, Function), decs))
-    func_decs = list(filter(lambda d: isinstance(d, Function), decs))
-    non_func_declarations, _ = gen_code(non_func_decs, info, context=DEF)
-    non_func_declarations += shared_state_struct_decl
-    func_declarations, _ = gen_code(func_decs, info, context=ARG)
-    declarations = (non_func_declarations + '\n' + func_declarations)
-
-    parser_code, _ = gen_code(info.prog.parser_code, info)
-    parser_code = indent(parser_code, 1)
-    verdict_code, _ = gen_code(info.prog.verdict_code, info)
-    verdict_code = (info.prog._pull_packet_data()
-            + info.prog._load_connection_state() + verdict_code)
-    verdict_code = indent(verdict_code, 1)
-
-    code = ([]
-            + info.prog.headers
-            + ['typedef char bool;', memcpy_internal_defs()]
-            + [declarations]
-            + info.prog._per_connection_state()
-            + ['']
-            + info.prog._parser_prog([parser_code])
-            + ['']
-            + info.prog._verdict_prog([verdict_code])
-            + ['']
-            + [license_text(info.prog.license),]
-            )
-    return '\n'.join(code)
-
-
 def __generate_code_type_definition(inst, info):
     if isinstance(inst, Function):
         if inst.cursor.spelling in (READ_PACKET, WRITE_PACKET):
@@ -465,3 +435,56 @@ def __build_hierarchy(state_obj):
     if hierarchy[-1].is_global:
         g  = True
     return hierarchy, g
+
+
+def __generate_global_shared_state(info):
+    fields = []
+    for x in info.sym_tbl.shared_scope.symbols.values():
+        if x.name not in info.global_accessed_variables:
+            continue
+        o = StateObject(x.ref)
+        fields.append(o)
+    # If there are any global state, declare the shared_map
+    if fields:
+        shared_state = Record('shared_state', fields)
+        shared_state_struct_decl = (
+                '\n/* The globaly shared state is in this structure */'
+                + shared_state.get_c_code() + ';\n'
+                + shared_map_decl() + '\n'
+                )
+    else:
+        shared_state_struct_decl = ''
+    return shared_state_struct_decl
+
+
+def generate_bpf_prog(info):
+    shared_state_struct_decl = __generate_global_shared_state(info)
+
+    decs = list(info.prog.declarations)
+    non_func_decs = list(filter(lambda d: not isinstance(d, Function), decs))
+    func_decs = list(filter(lambda d: isinstance(d, Function), decs))
+    non_func_declarations, _ = gen_code(non_func_decs, info, context=DEF)
+    non_func_declarations += shared_state_struct_decl
+    func_declarations, _ = gen_code(func_decs, info, context=ARG)
+    declarations = (non_func_declarations + '\n' + func_declarations)
+
+    parser_code, _ = gen_code(info.prog.parser_code, info)
+    parser_code = indent(parser_code, 1)
+    verdict_code, _ = gen_code(info.prog.verdict_code, info)
+    verdict_code = (info.prog._pull_packet_data()
+            + info.prog._load_connection_state() + verdict_code)
+    verdict_code = indent(verdict_code, 1)
+
+    code = ([]
+            + info.prog.headers
+            + ['typedef char bool;', memcpy_internal_defs()]
+            + [declarations]
+            + info.prog._per_connection_state()
+            + ['']
+            + info.prog._parser_prog([parser_code])
+            + ['']
+            + info.prog._verdict_prog([verdict_code])
+            + ['']
+            + [license_text(info.prog.license),]
+            )
+    return '\n'.join(code)
