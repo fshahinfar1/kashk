@@ -139,6 +139,10 @@ def _do_pass(inst, info, more):
             blk = cb_ref.get(BODY)
             blk.append(to_user_inst)
 
+            # Mark the function as failed
+            if current_function:
+                current_function.may_fail = True
+
         # Continue deeper
         for child, tag in inst.get_children_context_marked():
             with remember_boundry(tag, has_failed):

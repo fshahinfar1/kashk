@@ -73,30 +73,31 @@ def generate_offload(file_path, entry_func):
     # TODO: Think more about the API of each pass
     third_arg = (0, BODY, None)
 
-    m = Block(BODY)
-    m.children = insts
+    bpf = Block(BODY)
+    bpf.children = insts
+
     # Cut inpossible paths
-    m = possible_path_analysis_pass(m, info, third_arg)
+    bpf = possible_path_analysis_pass(bpf, info, third_arg)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Handle moving to userspace
-    m = userspace_fallback_pass(m, info, third_arg)
+    bpf = userspace_fallback_pass(bpf, info, third_arg)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Verifier
-    m = verifier_pass(m, info, third_arg)
+    bpf = verifier_pass(bpf, info, third_arg)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Reduce number of parameters
-    m = reduce_params_pass(m, info, third_arg)
+    bpf = reduce_params_pass(bpf, info, third_arg)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
-
     # TODO: split the code between parser and verdict
-    p = Block(BODY)
-    p.add_inst(Literal('return skb->len;', CODE_LITERAL))
-    info.prog.parser_code = p
-    info.prog.verdict_code = m
+    bpf_parser = Block(BODY)
+    bpf_parser.add_inst(Literal('return skb->len;', CODE_LITERAL))
+    info.prog.parser_code = bpf_parser
+    info.prog.verdict_code = bpf
+
     # Print the code we have generated
     text = generate_bpf_prog(info)
     print(text)
