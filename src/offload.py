@@ -13,12 +13,14 @@ from bpf_code_gen import generate_bpf_prog
 
 from sym_table import scope_mapping, SymbolTableEntry
 from sym_table_gen import build_sym_table
+
+from passes.pass_obj import PassObject
 from passes.verifier import verifier_pass
 from passes.possible_path_analysis import possible_path_analysis_pass
 from passes.userspace_fallback import userspace_fallback_pass
 from passes.reduce_params import reduce_params_pass
 from passes.clone import clone_pass
-from passes.pass_obj import PassObject
+from passes.select_user import select_user_pass
 
 from bpf_code_gen import gen_code
 
@@ -86,10 +88,13 @@ def generate_offload(file_path, entry_func):
     # Create a clone of unmodified but marked AST, later used for creating the
     # userspace program
     user = clone_pass(bpf, info, third_arg)
+    select_user_pass(user, info, third_arg)
 
-    # Handle moving to userspace
+    # Handle moving to userspace and removing the instruction not possible in
+    # BPF
     bpf = userspace_fallback_pass(bpf, info, third_arg)
     debug('~~~~~~~~~~~~~~~~~~~~~')
+
 
     # Verifier
     bpf = verifier_pass(bpf, info, third_arg)
