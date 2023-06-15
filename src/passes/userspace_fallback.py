@@ -6,6 +6,7 @@ from data_structure import *
 from instruction import *
 
 from sym_table import SymbolTableEntry
+from passes.pass_obj import PassObject
 
 
 MODULE_TAG = '[Fallback Pass]'
@@ -28,7 +29,7 @@ def remember_func(func):
 
 
 def _handle_function_may_fail(inst, func, info, more):
-    _, ctx, _ = more
+    ctx = more.ctx
 
     blk = cb_ref.get(BODY)
     ret_val = None
@@ -89,7 +90,8 @@ def _handle_function_may_fail(inst, func, info, more):
         # Pass the flag when invoking the function
         # First check if we need to allocate the flag on the stack memory
         sym = info.sym_tbl.lookup(FLAG_PARAM_NAME)
-        if not sym:
+        is_on_the_stack = not sym
+        if is_on_the_stack:
             # declare a local variable
             flag_decl = VarDecl(None)
             flag_decl.name = flag_obj.name
@@ -101,12 +103,15 @@ def _handle_function_may_fail(inst, func, info, more):
 
         # Now add the argument to the invocation instruction
         # TODO: update every invocation of this function with the flag parameter
-        addr_op = UnaryOp(None)
-        addr_op.op = '&'
-        addr_op.child.add_inst(flag_ref)
-        inst.args.append(addr_op)
+        if is_on_the_stack:
+            # pass a reference
+            addr_op = UnaryOp(None)
+            addr_op.op = '&'
+            addr_op.child.add_inst(flag_ref)
+            inst.args.append(addr_op)
+        else:
+            inst.args.append(flag_ref)
 
-        # TODO: it adds the code before the function invocation! Fix it.
         # check if function fail
         tmp = Literal('/* check if function fail */\n', CODE_LITERAL)
         after_func_call.append(tmp)
@@ -125,7 +130,7 @@ def _handle_function_may_fail(inst, func, info, more):
         # Analyse the called function.
         with remember_func(func):
             with info.sym_tbl.with_func_scope(inst.name):
-                modified = _do_pass(func.body, info, (0, BODY, None))
+                modified = _do_pass(func.body, info, PassObject())
         assert modified is not None
         func.body = modified
     else:
@@ -144,14 +149,15 @@ def _handle_function_may_fail(inst, func, info, more):
             bin_op.rhs.add_inst(true)
 
             after_func_call.append(bin_op)
-            if func.return_type == 'void':
-                tmp_stmt = 'return;'
-            else:
-                tmp_stmt = f'return ({func.return_type}){0};'
-            return_stmt = ('/* Return from this point to the caller */\n'
-                    + f'{tmp_stmt}')
-            tmp = Literal(return_stmt, CODE_LITERAL)
-            after_func_call.append(tmp)
+
+            # if func.return_type == 'void':
+            #     tmp_stmt = 'return;'
+            # else:
+            #     tmp_stmt = f'return ({func.return_type}){0};'
+            # return_stmt = ('/* Return from this point to the caller */\n'
+            #         + f'{tmp_stmt}')
+            # tmp = Literal(return_stmt, CODE_LITERAL)
+            after_func_call.append(ToUserspace.from_func_obj(func))
         else:
             # The caller knows we are going to fail (this function never
             # succeed)
@@ -176,7 +182,7 @@ def _process_current_inst(inst, info, more):
 
 
 def _do_pass(inst, info, more):
-    lvl, ctx, parent_list = more
+    lvl, ctx, parent_list = more.unpack()
     new_children = []
 
     # TODO: remember body seems to be redundant, one assignment could solve the
@@ -192,12 +198,14 @@ def _do_pass(inst, info, more):
             if isinstance(child, list):
                 new_child = []
                 for i in child:
-                    new_inst = _do_pass(i, info, (lvl+1, tag, new_child))
+                    obj = PassObject.pack(lvl+1, tag, new_child)
+                    new_inst = _do_pass(i, info, obj)
                     if new_inst is None:
-                        continue
+                        break
                     new_child.append(new_inst)
             else:
-                new_child = _do_pass(child, info, (lvl+1, tag, None))
+                obj = PassObject.pack(lvl+1, tag, None)
+                new_child = _do_pass(child, info, obj)
                 assert new_child is not None
             new_children.append(new_child)
 
@@ -206,4 +214,4 @@ def _do_pass(inst, info, more):
 
 
 def userspace_fallback_pass(inst, info, more):
-    return _do_pass(inst, info,more)
+    return _do_pass(inst, info, more)

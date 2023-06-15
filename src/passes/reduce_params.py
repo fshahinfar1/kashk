@@ -5,6 +5,7 @@ from instruction import *
 from sym_table import SymbolTableEntry
 from utility import indent 
 from bpf_code_gen import gen_code
+from passes.pass_obj import PassObject
 
 
 PARAMETER_LIMIT = 5
@@ -101,7 +102,7 @@ def _function_check_param_reduc(inst, func, info, more):
     # for other function invocations.
     with info.sym_tbl.with_func_scope(inst.name):
         with remember_change_ctx(change):
-            m = _do_pass(func.body, info, (0, BODY, None))
+            m = _do_pass(func.body, info, PassObject())
     func.body = m
 
 
@@ -181,7 +182,7 @@ def _process_current_inst(inst, info, more):
 
 
 def _do_pass(inst, info, more):
-    lvl, ctx, parent_list = more
+    lvl, ctx, parent_list = more.unpack()
     new_children = []
 
     with cb_ref.new_ref(ctx, parent_list):
@@ -195,12 +196,14 @@ def _do_pass(inst, info, more):
             if isinstance(child, list):
                 new_child = []
                 for i in child:
-                    new_inst = _do_pass(i, info, (lvl+1, tag, new_child))
+                    obj = PassObject.pack(lvl+1, tag, new_child)
+                    new_inst = _do_pass(i, info, obj)
                     if new_inst is None:
                         continue
                     new_child.append(new_inst)
             else:
-                new_child = _do_pass(child, info, (lvl+1, tag, None))
+                obj = PassObject.pack(lvl+1, tag, None)
+                new_child = _do_pass(child, info, obj)
                 assert new_child is not None
             new_children.append(new_child)
 

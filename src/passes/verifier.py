@@ -6,6 +6,7 @@ from data_structure import *
 from instruction import *
 
 from bpf_code_gen import gen_code
+from passes.pass_obj import PassObject
 from template import bpf_ctx_bound_check, bpf_ctx_bound_check_bytes
 
 MODULE_TAG = '[Verfier Pass]'
@@ -181,7 +182,7 @@ def _handle_call(inst, info, more):
                 # the scope of the function? (maybe in another run the
                 # parameter is not a pointer to the context)
 
-            modified = _do_pass(func.body, info, (0, BODY, None))
+            modified = _do_pass(func.body, info, PassObject())
             assert modified is not None
 
         # Update the instructions of the function
@@ -226,7 +227,7 @@ def _process_current_inst(inst, info, more):
 # to fix it.
 cb_ref = CodeBlockRef()
 def _do_pass(inst, info, more):
-    lvl, ctx, parent_list = more
+    lvl, ctx, parent_list = more.unpack()
     new_children = []
 
     with cb_ref.new_ref(ctx, parent_list):
@@ -242,11 +243,13 @@ def _do_pass(inst, info, more):
             if isinstance(child, list):
                 new_child = []
                 for i in child:
-                    new_inst = _do_pass(i, info, (lvl+1, tag, new_child))
+                    obj = PassObject.pack(lvl+1, tag, new_child)
+                    new_inst = _do_pass(i, info, obj)
                     if new_inst is not None:
                         new_child.append(new_inst)
             else:
-                new_child = _do_pass(child, info, (lvl+1, tag, parent_list))
+                obj = PassObject.pack(lvl+1, tag, parent_list)
+                new_child = _do_pass(child, info, obj)
             new_children.append(new_child)
 
     new_inst = inst.clone(new_children)

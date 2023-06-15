@@ -17,6 +17,8 @@ from passes.verifier import verifier_pass
 from passes.possible_path_analysis import possible_path_analysis_pass
 from passes.userspace_fallback import userspace_fallback_pass
 from passes.reduce_params import reduce_params_pass
+from passes.clone import clone_pass
+from passes.pass_obj import PassObject
 
 from bpf_code_gen import gen_code
 
@@ -73,22 +75,17 @@ def generate_offload(file_path, entry_func):
     insts = gather_instructions_under(body_of_loop, info, BODY)
 
     # TODO: Think more about the API of each pass
-    third_arg = (0, BODY, None)
+    third_arg = PassObject()
 
     bpf = Block(BODY)
-    bpf.children = insts
+    bpf.extend_inst(insts)
 
-    # Cut inpossible paths: It returns the AST for the BPF and also It updates
-    # UserProg data structure for generating the user program.
+    # Mark inpossible paths and annotate which functions may fail or suceed
     bpf = possible_path_analysis_pass(bpf, info, third_arg)
-    debug('~~~~~~~~~~~~~~~~~~~~~')
 
-
-    debug('Userspace paths')
-    for path in info.user_prog.paths:
-        text, _ = gen_code(path.body, info)
-        debug('Path', path.number, ':\n', text, '\n')
-
+    # Create a clone of unmodified but marked AST, later used for creating the
+    # userspace program
+    user = clone_pass(bpf, info, third_arg)
 
     # Handle moving to userspace
     bpf = userspace_fallback_pass(bpf, info, third_arg)

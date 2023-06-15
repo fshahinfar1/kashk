@@ -6,29 +6,13 @@ from data_structure import *
 from instruction import *
 
 from bpf_code_gen import gen_code
+from passes.pass_obj import PassObject
 
 
 MODULE_TAG = '[Possible Path Pass]'
 
 current_function = None
-has_failed = False
-top_failing_block = False
-list_user_inst = []
 cb_ref = CodeBlockRef()
-
-
-def end_userspaec_path(info):
-    """
-    This function is invoked when reaching end of a path which should be
-    processed in userspace.
-    """
-    global list_user_inst
-    # debug('list of instruction for a userspace path:\n', list_user_inst)
-    inst = Block(BODY)
-    inst.children = list_user_inst
-    info.user_prog.add_path(inst)
-    # Get ready for another path
-    list_user_inst = []
 
 
 @contextmanager
@@ -42,35 +26,6 @@ def remember_func(func):
         current_function = tmp
 
 
-# TODO: This function is important, complex, and I am not sure that I remember
-# how exactly it is working. Find a way to reduce the complexity.
-@contextmanager
-def remember_boundry(ctx, value, info, prev_ctx, inst):
-    global has_failed
-    global top_failing_block
-
-    try:
-        tmp_failing_block = top_failing_block
-        if ctx == BODY:
-            tmp = has_failed
-            has_failed = value
-        yield None
-    finally:
-        top_failing_block = tmp_failing_block
-        if prev_ctx == BODY and has_failed and not top_failing_block:
-            # The inst is the first instruction that fails (in the top block)
-            list_user_inst.append(inst)
-            top_failing_block = True
-        if ctx == BODY:
-            had_failed = has_failed
-            has_failed = tmp
-            if had_failed and not has_failed:
-                # The program has not failed in this context but just before
-                # switching to this context it had failed!
-                # It shows a path which needs to be moved to userspace!
-                end_userspaec_path(info)
-
-
 def is_function_call_possible(inst, info):
     func = inst.get_function_def()
     if not func:
@@ -82,7 +37,7 @@ def is_function_call_possible(inst, info):
 
     with remember_func(func):
         with info.sym_tbl.with_func_scope(inst.name):
-            modified = _do_pass(func.body, info, (0, BODY, None))
+            modified = _do_pass(func.body, info, PassObject())
 
     func.body = modified
     if modified is None:
@@ -101,93 +56,87 @@ def _process_current_inst(inst, info, more):
         # Check if the function may fail
         func = inst.get_function_def()
         if func and current_function and func.may_fail:
+            # The called function may fail
             current_function.may_fail = True
     return inst, False
 
 
 def _failed_to_generate_inst(i, info, body):
     # TODO: this function is probably is not needed anymore
-    tmp, _ = gen_code([i], info)
-    # comment = f'/* can not use "{tmp}". Removing it!*/'
-    comment = f'/* {tmp} */'
-    tmp_inst = Literal(comment, CODE_LITERAL)
-    body.append(tmp_inst)
+    # tmp, _ = gen_code([i], info)
+    # # comment = f'/* can not use "{tmp}". Removing it!*/'
+    # comment = f'/* {tmp} */'
+    # tmp_inst = Literal(comment, CODE_LITERAL)
+    # body.append(tmp_inst)
+
+    to_user_inst = ToUserspace.from_func_obj(current_function)
+    body.append(to_user_inst)
 
     if current_function:
         current_function.may_fail = True
 
-def _process_child(child, inst, info, lvl, tag, parent_list):
+def _process_child(child, inst, info, more):
+    lvl, tag, parent_list = more.unpack()
     new_child = None
     if isinstance(child, list):
         new_child = []
+        obj = more.repack(lvl + 1, tag, new_child)
         for i in child:
-            new_inst = _process_child(i, inst, info, lvl, tag, new_child)
+            new_inst = _process_child(i, inst, info, obj)
             if new_inst is None:
                 if inst.kind == BLOCK_OF_CODE and inst.tag == BODY:
                     # It is a block of code, we do not want to remove the whole
                     # block just stop here.
-                    _failed_to_generate_inst(i, info, new_child)
-                    # Continue and add others instructions to the user
-                    # program's list
-                    continue
+                    break
                 else:
                     # The argument, condition or ... of this instruction was
                     # not possible. Also remove the whole instruction.
                     return None
             new_child.append(new_inst)
     else:
-        new_child = _do_pass(child, info, (lvl+1, tag, parent_list))
+        obj = more.repack(lvl + 1, tag, parent_list)
+        new_child = _do_pass(child, info, obj)
+
+    more.failed = obj.failed
+
     return new_child
 
 
 def _do_pass(inst, info, more):
-    global has_failed
-
-    lvl, ctx, parent_list = more
+    # TODO: fix this ugly if-else
+    lvl, ctx, parent_list = more.unpack()
     new_children = []
-
-    # debug('T' if top_failing_block else 'F', '|' * lvl, '\'-->' , inst, '  context:', ctx)
+    failed = more.get('failed', False)
 
     with cb_ref.new_ref(ctx, parent_list):
-        if not has_failed:
-            # Process current instruction
-            inst, fails = _process_current_inst(inst, info, more)
+        if failed:
+            inst, failed = inst, failed
         else:
-            # Does not need processing
-
-            # Check if we should add it to the list of operation that should be
-            # done in userspace
-            if top_failing_block:
-                # debug('add instructions:', inst)
-                list_user_inst.append(inst)
-
-            # Remove this instruction from BPF program and do not investigate
-            # its children.
-            inst, fails = None, False
+            inst, failed = _process_current_inst(inst, info, more)
+            if failed:
+                blk = cb_ref.get(BODY)
+                _failed_to_generate_inst(inst, info, blk)
+                more.failed = failed
 
         if inst is None:
             # This instruction should be removed
             return None
 
-        if fails and not has_failed:
-            # debug('>>>> It fails here <<<<')
-            has_failed = True
-            to_user_inst = ToUserspace.from_func_obj(current_function)
-            blk = cb_ref.get(BODY)
-            blk.append(to_user_inst)
-
-            # Mark the function as failed
-            if current_function:
-                current_function.may_fail = True
-            # Remove this instruction.
-            return None
-
         # Continue deeper
         for child, tag in inst.get_children_context_marked():
-            with remember_boundry(tag, has_failed, info, ctx, inst):
-                new_child = _process_child(child, inst, info, lvl, tag, parent_list)
+            obj = PassObject.pack(lvl, tag, parent_list)
+            obj.failed = failed
+            new_child = _process_child(child, inst, info, obj)
             if new_child is None:
                 return None
+
+
+            failed = obj.failed
+            # TODO: when should I propagate the failure to the upper level
+            # context?
+            if inst.kind != clang.CursorKind.IF_STMT:
+                more.failed = failed
+
             new_children.append(new_child)
 
             if inst.kind == clang.CursorKind.RETURN_STMT:
@@ -198,4 +147,4 @@ def _do_pass(inst, info, more):
 
 
 def possible_path_analysis_pass(inst, info, more):
-    return _do_pass(inst, info,more)
+    return _do_pass(inst, info, more)

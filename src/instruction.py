@@ -381,6 +381,7 @@ class Cast(Instruction):
 
 class Ref(Instruction):
     def __init__(self, cursor, kind=None):
+        super().__init__()
         self.cursor = cursor
         if cursor is None:
             self.name = '<unnamed>'
@@ -400,6 +401,7 @@ class Ref(Instruction):
 
 class Literal(Instruction):
     def __init__(self, text, kind):
+        super().__init__()
         self.kind = kind
         self.text = text
 
@@ -412,6 +414,7 @@ class Literal(Instruction):
 
 class ForLoop(Instruction):
     def __init__(self):
+        super().__init__()
         self.cursor = None
         self.kind = clang.CursorKind.FOR_STMT
         self.pre = Block(ARG)
@@ -450,8 +453,8 @@ class Block(Instruction):
     def add_inst(self, inst):
         self.children.append(inst)
 
-    def extend_inst(self, inst):
-        self.children.extend(inst)
+    def extend_inst(self, insts):
+        self.children.extend(insts)
 
     def has_children(self):
         if self.children:
