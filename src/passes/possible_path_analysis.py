@@ -139,7 +139,7 @@ def _do_pass(inst, info, more):
 
             new_children.append(new_child)
 
-            if inst.kind == clang.CursorKind.RETURN_STMT:
+            if not failed and inst.kind == clang.CursorKind.RETURN_STMT:
                 current_function.may_succeed = True
 
     new_inst = inst.clone(new_children)
