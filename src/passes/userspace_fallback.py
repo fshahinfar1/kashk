@@ -126,7 +126,6 @@ def _handle_function_may_fail(inst, func, info, more):
         tmp = Literal(check_flag, CODE_LITERAL)
         after_func_call.append(tmp)
 
-
         # Analyse the called function.
         with remember_func(func):
             with info.sym_tbl.with_func_scope(inst.name):
@@ -165,6 +164,19 @@ def _handle_function_may_fail(inst, func, info, more):
             if current_function:
                 assert (current_function.may_fail and not
                         current_function.may_succeed)
+        # We want to remove everything after this function call and go to userspace
+        # If the function call is in a body of code the ret_val was already
+        # None. Otherwise it is the tmp value assigned to its return value.
+        # Since it is definetly failing. We do not need the tmp value.
+        ret_val = None
+
+        # Also take a look at the body of the called function. We may want to
+        # remove everything after failure point.
+        with remember_func(func):
+            with info.sym_tbl.with_func_scope(inst.name):
+                modified = _do_pass(func.body, info, PassObject())
+        assert modified is not None
+        func.body = modified
 
     blk.extend(before_func_call)
     blk.append(func_call)
@@ -201,12 +213,19 @@ def _do_pass(inst, info, more):
                     obj = PassObject.pack(lvl+1, tag, new_child)
                     new_inst = _do_pass(i, info, obj)
                     if new_inst is None:
-                        break
+                        if inst.tag == BODY:
+                            break
+                        else:
+                            return None
                     new_child.append(new_inst)
+
+                    if isinstance(i, ToUserspace):
+                        break
             else:
                 obj = PassObject.pack(lvl+1, tag, None)
                 new_child = _do_pass(child, info, obj)
-                assert new_child is not None
+                if new_child is None:
+                    return None
             new_children.append(new_child)
 
     new_inst = inst.clone(new_children)
