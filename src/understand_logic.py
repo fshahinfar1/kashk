@@ -214,14 +214,16 @@ def __convert_cursor_to_inst(c, info):
                 # The first child after TYPE_REF would be the initialization of the
                 # variable.
                 children = list(c.get_children())
-                tmp_index = 0
-                for i, tmp_c in enumerate(children):
-                    if tmp_c.kind == clang.CursorKind.TYPE_REF:
-                        tmp_index = i
-                        break
-                tmp_index += 1
-                if len(children) > tmp_index:
-                    # This declaration has initialization
+                # tmp_index = 0
+                # for i, tmp_c in enumerate(children):
+                #     if tmp_c.kind == clang.CursorKind.TYPE_REF:
+                #         tmp_index = i
+                #         break
+                # tmp_index += 1
+                # if len(children) > tmp_index:
+                #     # This declaration has initialization
+                #     init = gather_instructions_from(children[-1], info, context=ARG)
+                if children:
                     init = gather_instructions_from(children[-1], info, context=ARG)
 
             inst.init.extend_inst(init)
