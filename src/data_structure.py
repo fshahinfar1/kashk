@@ -13,8 +13,9 @@ class Info:
     def __init__(self):
         from bpf import SK_SKB_PROG
         from user import UserProg
-        self.rd_buf = None
-        self.wr_buf = None
+        self.entry_func_name = None
+        self.rd_buf = PacketBuffer(None)
+        self.wr_buf = PacketBuffer(None)
         self.prog = SK_SKB_PROG()
         self.sym_tbl = SymbolTable()
         # Keep track of global variables that where actually accessed. This
@@ -52,8 +53,12 @@ class PacketBuffer:
     A buffer passed to the read/write functions
     """
     def __init__(self, cursor):
-        self.cursor = cursor
-        self.name = cursor.spelling
+        if cursor is None:
+            self.cursor = None
+            self.name = '__not_set_to_a_name__'
+        else:
+            self.cursor = cursor
+            self.name = cursor.spelling
 
 
 class CodeBlockRef:

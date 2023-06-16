@@ -21,16 +21,19 @@ from passes.userspace_fallback import userspace_fallback_pass
 from passes.reduce_params import reduce_params_pass
 from passes.clone import clone_pass
 from passes.select_user import select_user_pass
+# from passes.cfg_gen import cfg_gen_pass
+from passes.linear_code import linear_code_pass
 
 from bpf_code_gen import gen_code
 
 
 # TODO: make a framework agnostic interface, allow for porting to other
 # functions
-def generate_offload(file_path, entry_func):
+def generate_offload(file_path, entry_func_name):
     # Keep track of which variable name is what, what types has been defined
     # and other information learned about the program
     info = Info()
+    info.entry_func_name = entry_func_name
 
     # This is the AST generated with Clang
     index, tu, cursor = parse_file(file_path)
@@ -39,7 +42,7 @@ def generate_offload(file_path, entry_func):
     build_sym_table(cursor, info)
 
     # Find the entry function
-    entry_func = find_elem(cursor, 'Server::handle_connection')
+    entry_func = find_elem(cursor, entry_func_name)
     if entry_func is None:
         error('Did not found the entry function')
         return
@@ -50,31 +53,37 @@ def generate_offload(file_path, entry_func):
 
     # Find the event-loop
     ev_loop = find_event_loop(entry_func)
+    if ev_loop is None:
+        error('Did not found event loop')
+        debug('Assuming it is a test case!')
+        body_of_loop = list(entry_func.get_children())[-1]
+        insts = gather_instructions_under(body_of_loop, info, BODY)
+    else:
+        # All declerations between event loop is shared among multiple packets of
+        # one connection
+        all_declerations_before_loop = get_variable_declaration_before_elem(entry_func, ev_loop, info)
+        for d in all_declerations_before_loop:
+            states, decls = get_state_for(d.cursor)
+            add_state_decl_to_bpf(info.prog, states, decls)
+            for s in states:
+                s.is_global = True
+                s.parent_object = None
+                # Add it to the global scope
+                c = s.cursor
+                entry = SymbolTableEntry(c.spelling, c.type, c.kind, c)
+                info.sym_tbl.global_scope.insert(entry)
 
-    # All declerations between event loop is shared among multiple packets of
-    # one connection
-    all_declerations_before_loop = get_variable_declaration_before_elem(entry_func, ev_loop, info)
-    for d in all_declerations_before_loop:
-        states, decls = get_state_for(d.cursor)
-        add_state_decl_to_bpf(info.prog, states, decls)
-        for s in states:
-            s.is_global = True
-            s.parent_object = None
-            # Add it to the global scope
-            c = s.cursor
-            entry = SymbolTableEntry(c.spelling, c.type, c.kind, c)
-            info.sym_tbl.global_scope.insert(entry)
+        # TODO: all the initialization and operations done before the event loop is
+        # probably part of the control program setting up the BPF program.
 
-    # TODO: all the initialization and operations done before the event loop is
-    # probably part of the control program setting up the BPF program.
+        # Find the buffer representing the packet
+        find_read_write_bufs(ev_loop, info)
 
-    # Find the buffer representing the packet
-    find_read_write_bufs(ev_loop, info)
+        # Go through the AST, generate instructions, transform access to variables
+        # and read/write buffers.
+        body_of_loop = list(ev_loop.get_children())[-1]
+        insts = gather_instructions_under(body_of_loop, info, BODY)
 
-    # Go through the AST, generate instructions, transform access to variables
-    # and read/write buffers.
-    body_of_loop = list(ev_loop.get_children())[-1]
-    insts = gather_instructions_under(body_of_loop, info, BODY)
 
     # TODO: Think more about the API of each pass
     third_arg = PassObject()
@@ -82,14 +91,22 @@ def generate_offload(file_path, entry_func):
     bpf = Block(BODY)
     bpf.extend_inst(insts)
 
+    # Move function calls out of the ARG context!
+    bpf = linear_code_pass(bpf, info, third_arg)
+    text, _ = gen_code(bpf, info)
+    debug(text)
+    return
+
     # Mark inpossible paths and annotate which functions may fail or suceed
     bpf = possible_path_analysis_pass(bpf, info, third_arg)
 
     # Create a clone of unmodified but marked AST, later used for creating the
     # userspace program
     user = clone_pass(bpf, info, third_arg)
-    select_user_pass(user, info, third_arg)
-    info.user_prog.show(info)
+    user_cfg = cfg_gen_pass(user, info, third_arg)
+
+    # select_user_pass(user, info, third_arg)
+    # info.user_prog.show(info)
 
     # Handle moving to userspace and removing the instruction not possible in
     # BPF
@@ -123,36 +140,39 @@ def boot_starp_global_state(cursor, info):
     logic. The understanding is used for further transformation to BPF program.
     """
     # Set the scope to the Server::handle_connection
-    scope = scope_mapping['Server_handle_connection']
+    entry_name = info.entry_func_name
+    entry_name = entry_name.replace('::', '_')
+    scope = scope_mapping[entry_name]
     info.sym_tbl.current_scope = scope
 
     tcp_conn_entry = info.sym_tbl.lookup('class_TCPConnection')
-    e = info.sym_tbl.insert_entry('conn', tcp_conn_entry.type, clang.CursorKind.PARM_DECL, None)
-    # Override what the clang thinks
-    e.is_pointer = False
-    e.name = 'sock_ctx->state.conn'
-    # -----------------------------
+    if tcp_conn_entry:
+        e = info.sym_tbl.insert_entry('conn', tcp_conn_entry.type, clang.CursorKind.PARM_DECL, None)
+        # Override what the clang thinks
+        e.is_pointer = False
+        e.name = 'sock_ctx->state.conn'
+        # -----------------------------
 
-    # The fields and its dependencies
-    states, decls = extract_state(tcp_conn_entry.ref)
+        # The fields and its dependencies
+        states, decls = extract_state(tcp_conn_entry.ref)
 
-    # The input argument is of this type
-    tcp_conn_struct = Record('TCPConnection', states)
-    decls.append(tcp_conn_struct)
+        # The input argument is of this type
+        tcp_conn_struct = Record('TCPConnection', states)
+        decls.append(tcp_conn_struct)
 
-    # The global state has following field
-    field = StateObject(tcp_conn_entry.ref)
-    field.name = 'conn'
-    field.type = 'TCPConnection'
-    field.kind = clang.TypeKind.RECORD
-    field.is_global = True
-    field.type_ref = tcp_conn_struct
-    field.parent_object = None
+        # The global state has following field
+        field = StateObject(tcp_conn_entry.ref)
+        field.name = 'conn'
+        field.type = 'TCPConnection'
+        field.kind = clang.TypeKind.RECORD
+        field.is_global = True
+        field.type_ref = tcp_conn_struct
+        field.parent_object = None
 
-    for s in states:
-        s.parent_object = field
+        for s in states:
+            s.parent_object = field
 
-    add_state_decl_to_bpf(info.prog, [field], decls)
+        add_state_decl_to_bpf(info.prog, [field], decls)
 
 
 def find_read_write_bufs(ev_loop, info):
