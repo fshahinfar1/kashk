@@ -1,22 +1,80 @@
-class UserProg:
+from bpf_code_gen import gen_code
+from log import debug
+
+
+class Graph:
     def __init__(self):
-        self._path_number_gen = 0
+        self.parent = None
+        # Other nodes of control graph
+        self.children = [] # TODO: maybe use a set?
+        # Codes associated with this node
         self.paths = []
 
-    def add_path(self, inst):
-        """
-        @param inst: expect it to be a `Block' of code.
-        """
-        path = UserPath(inst)
-        self.paths.append(path)
+    def append(self, child):
+        self.paths.append(child)
+
+    def add_child(self, node):
+        self.children.append(node)
+
+    def new_child(self):
+        cur = self
+        node = Graph()
+        cur.add_child(node)
+        node.parent = cur
+        return node
+
+
+class UserProg:
+    def __init__(self):
+        self.graph = Graph()
+
+    # def add_path(self, inst):
+    #     """
+    #     @param inst: expect it to be a `Block' of code.
+    #     """
+    #     path = UserPath(inst)
+    #     self.graph.append(path)
+    #     return path
+
+    def insert_super_node(self):
+        cur = self.graph
+        node = Graph()
+        node.add_child(cur)
+        cur.parent = node
+        self.graph = node
+        return node
+
+    def insert_sub_node(self):
+        cur = self.graph
+        node = Graph()
+        cur.add_child(node)
+        node.parent = cur
+        return node
+
+    def show(self, info):
+        q = [(self.graph, 0)]
+        while q:
+            g, lvl = q.pop()
+            
+            debug('level:', lvl)
+            for p in g.paths:
+                text, _ = gen_code(p, info)
+                debug(text)
+                debug('----')
+
+            next_lvl = lvl + 1
+            for c in reversed(g.children):
+                q.append((c, next_lvl))
 
 
 class UserPath:
     _path_number_gen = 0
 
     def __init__(self, inst):
-        self.body = inst
         self.number = UserPath._path_number_gen
         UserPath._path_number_gen += 1
+
+        self.body = inst
+
         # TODO: how am I going to implement this?
         self.states_it_need = []

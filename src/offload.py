@@ -89,6 +89,7 @@ def generate_offload(file_path, entry_func):
     # userspace program
     user = clone_pass(bpf, info, third_arg)
     select_user_pass(user, info, third_arg)
+    info.user_prog.show(info)
 
     # Handle moving to userspace and removing the instruction not possible in
     # BPF
