@@ -55,6 +55,7 @@ def run_test():
         has_var_declare = False
         has_var_assignment = False
         has_function_move = False
+        # TODO: Check the inner function movement
         function_assigned_to_var = '__not_set__' 
         for i in bpf.get_children():
             if i.kind == clang.CursorKind.VAR_DECL:
