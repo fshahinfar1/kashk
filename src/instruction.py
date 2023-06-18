@@ -138,7 +138,7 @@ class VarDecl(Instruction):
             self.is_array = False
             self.is_record = False
         self.kind = clang.CursorKind.VAR_DECL
-        self.init = Block(ARG)
+        self.init = Block(RHS)
 
     def __str__(self):
         return f'<VarDecl {self.kind}: {self.type} {self.name} = {self.init}>'
@@ -247,8 +247,8 @@ class BinOp(Instruction):
         super().__init__()
 
         self.kind = clang.CursorKind.BINARY_OPERATOR
-        self.lhs = Block(ARG)
-        self.rhs = Block(ARG)
+        self.lhs = Block(LHS)
+        self.rhs = Block(RHS)
         self.op = ''
 
         if cursor is not None:

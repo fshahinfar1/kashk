@@ -93,9 +93,6 @@ def generate_offload(file_path, entry_func_name):
 
     # Move function calls out of the ARG context!
     bpf = linear_code_pass(bpf, info, third_arg)
-    text, _ = gen_code(bpf, info)
-    debug(text)
-    return
 
     # Mark inpossible paths and annotate which functions may fail or suceed
     bpf = possible_path_analysis_pass(bpf, info, third_arg)
@@ -103,7 +100,7 @@ def generate_offload(file_path, entry_func_name):
     # Create a clone of unmodified but marked AST, later used for creating the
     # userspace program
     user = clone_pass(bpf, info, third_arg)
-    user_cfg = cfg_gen_pass(user, info, third_arg)
+    # user_cfg = cfg_gen_pass(user, info, third_arg)
 
     # select_user_pass(user, info, third_arg)
     # info.user_prog.show(info)
@@ -112,7 +109,6 @@ def generate_offload(file_path, entry_func_name):
     # BPF
     bpf = userspace_fallback_pass(bpf, info, third_arg)
     debug('~~~~~~~~~~~~~~~~~~~~~')
-
 
     # Verifier
     bpf = verifier_pass(bpf, info, third_arg)

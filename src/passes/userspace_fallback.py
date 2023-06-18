@@ -17,6 +17,11 @@ cb_ref = CodeBlockRef()
 FLAG_PARAM_NAME = '__fail_flag'
 
 
+class After:
+    def __init__(self, box):
+        self.box = box
+
+
 @contextmanager
 def remember_func(func):
     global current_function
@@ -32,37 +37,12 @@ def _handle_function_may_fail(inst, func, info, more):
     ctx = more.ctx
 
     blk = cb_ref.get(BODY)
-    ret_val = None
 
     flag_ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
     flag_ref.name = FLAG_PARAM_NAME
 
     before_func_call = []
-    func_call = inst
     after_func_call = []
-
-    if ctx != BODY:
-        # Let's move the function outside of argument section
-        if func.return_type != 'void':
-            tmp_var_name = 'tmp'
-            # Declare tmp
-            tmp_decl = VarDecl(None)
-            tmp_decl.name = tmp_var_name
-            tmp_decl.type = func.return_type
-            tmp_decl.state_obj = None
-            before_func_call.append(tmp_decl)
-            # Assign function return value to tmp
-            tmp_ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
-            tmp_ref.name = tmp_var_name
-            bin_op = BinOp(None)
-            bin_op.op = '='
-            bin_op.lhs.add_inst(tmp_ref)
-            bin_op.rhs.add_inst(inst)
-            func_call = bin_op
-            # replace the function call with the variable
-            ret_val = tmp_ref.clone([])
-        else:
-            raise Exception('Not implemented yet!')
 
     if func.may_succeed:
         ## we need to pass a flag
@@ -148,14 +128,6 @@ def _handle_function_may_fail(inst, func, info, more):
             bin_op.rhs.add_inst(true)
 
             after_func_call.append(bin_op)
-
-            # if func.return_type == 'void':
-            #     tmp_stmt = 'return;'
-            # else:
-            #     tmp_stmt = f'return ({func.return_type}){0};'
-            # return_stmt = ('/* Return from this point to the caller */\n'
-            #         + f'{tmp_stmt}')
-            # tmp = Literal(return_stmt, CODE_LITERAL)
             after_func_call.append(ToUserspace.from_func_obj(func))
         else:
             # The caller knows we are going to fail (this function never
@@ -164,11 +136,6 @@ def _handle_function_may_fail(inst, func, info, more):
             if current_function:
                 assert (current_function.may_fail and not
                         current_function.may_succeed)
-        # We want to remove everything after this function call and go to userspace
-        # If the function call is in a body of code the ret_val was already
-        # None. Otherwise it is the tmp value assigned to its return value.
-        # Since it is definetly failing. We do not need the tmp value.
-        ret_val = None
 
         # Also take a look at the body of the called function. We may want to
         # remove everything after failure point.
@@ -179,9 +146,8 @@ def _handle_function_may_fail(inst, func, info, more):
         func.body = modified
 
     blk.extend(before_func_call)
-    blk.append(func_call)
-    blk.extend(after_func_call)
-    return ret_val
+    blk.append(After(after_func_call))
+    return inst
 
 
 def _process_current_inst(inst, info, more):
@@ -214,15 +180,21 @@ def _do_pass(inst, info, more):
                     new_inst = _do_pass(i, info, obj)
                     if new_inst is None:
                         if inst.tag == BODY:
-                            break
+                            continue
                         else:
                             return None
-                    new_child.append(new_inst)
 
-                    if isinstance(i, ToUserspace):
+                    after = []
+                    while new_child and isinstance(new_child[-1], After):
+                        after.append(new_child.pop())
+                    new_child.append(new_inst)
+                    for a in after:
+                        new_child.extend(a.box)
+
+                    if i.kind == TO_USERSPACE_INST:
                         break
             else:
-                obj = PassObject.pack(lvl+1, tag, None)
+                obj = PassObject.pack(lvl+1, tag, parent_list)
                 new_child = _do_pass(child, info, obj)
                 if new_child is None:
                     return None

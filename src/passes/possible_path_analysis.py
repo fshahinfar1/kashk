@@ -49,7 +49,6 @@ def is_function_call_possible(inst, info):
 def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.CALL_EXPR:
         res = is_function_call_possible(inst, info)
-        # debug(inst.name, 'is possible:', res)
         if not res:
             return inst, True
 
@@ -62,13 +61,6 @@ def _process_current_inst(inst, info, more):
 
 
 def _failed_to_generate_inst(i, info, body):
-    # TODO: this function is probably is not needed anymore
-    # tmp, _ = gen_code([i], info)
-    # # comment = f'/* can not use "{tmp}". Removing it!*/'
-    # comment = f'/* {tmp} */'
-    # tmp_inst = Literal(comment, CODE_LITERAL)
-    # body.append(tmp_inst)
-
     to_user_inst = ToUserspace.from_func_obj(current_function)
     body.append(to_user_inst)
 
