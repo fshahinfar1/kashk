@@ -68,7 +68,7 @@ class SymbolTable:
         self.global_scope = Scope(self.shared_scope)
         self.current_scope = self.shared_scope
         # Expose the global/static scope maping table as part of this class
-        self.scope_mapping = scope_mapping
+        self.scope_mapping = ScopeMapping()
 
     def insert_entry(self, name, type, kind, ref):
         e = SymbolTableEntry(name, type, kind, ref)
@@ -105,6 +105,14 @@ class SymbolTable:
         finally:
             self.current_scope = cur
 
+    def clone(self):
+        return None
+        # new_tbl = SymbolTable()
+        # new_tbl.shared_scope = self.shared_scope.clone()
+        # new_tbl.global_scope = self.global_scope.clone()
+        # new_tbl.current_scope = None
+        
+
 
 class ScopeMapping:
     def __init__(self):
@@ -123,7 +131,3 @@ class ScopeMapping:
 
     def get(self, key, default=None):
         return self.scope_mapping.get(key, default)
-
-
-scope_mapping = ScopeMapping()
-

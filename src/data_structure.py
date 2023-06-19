@@ -112,7 +112,6 @@ class StateObject:
 
         self.is_global = False
         self.type_ref = None
-        self.parent_object = None
 
 
     def clone(self):
@@ -124,7 +123,6 @@ class StateObject:
         new.kind = self.kind
         new.is_global = self.is_global
         new.type_ref = self.type_ref
-        new.parent_object = None
         return new
 
     def get(self, name):

@@ -3,7 +3,6 @@ import clang.cindex as clang
 from data_structure import *
 from instruction import *
 from utility import (indent, INDENT, report_on_cursor, owner_to_ref)
-from sym_table import scope_mapping
 from prune import READ_PACKET, WRITE_PACKET
 
 from template import (memcpy_internal_defs, license_text,
@@ -406,7 +405,7 @@ def __generate_code_type_definition(inst, info):
         text_args = ', '.join(args)
 
         # Change the context
-        scope = scope_mapping.get(inst.name)
+        scope = info.sym_tbl.scope_mapping.get(inst.name)
         if not scope:
             raise Exception(f'could not find the scope for function {inst.name}')
         # TODO: simiplify the scope switch process by using a stack in symbol
@@ -422,18 +421,6 @@ def __generate_code_type_definition(inst, info):
         return text
     else:
         return inst.get_c_code()
-
-
-def __build_hierarchy(state_obj):
-    g = False
-    hierarchy = [state_obj]
-    x = state_obj
-    while x.parent_object is not None:
-        hierarchy.append(x.parent_object)
-        x = x.parent_object
-    if hierarchy[-1].is_global:
-        g  = True
-    return hierarchy, g
 
 
 def __generate_global_shared_state(info):

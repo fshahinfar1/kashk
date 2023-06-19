@@ -65,7 +65,6 @@ def generate_offload(file_path, entry_func_name):
             add_state_decl_to_bpf(info.prog, states, decls)
             for s in states:
                 s.is_global = True
-                s.parent_object = None
                 # Add it to the global scope
                 c = s.cursor
                 entry = SymbolTableEntry(c.spelling, c.type, c.kind, c)
@@ -173,10 +172,6 @@ def boot_starp_global_state(cursor, info):
         field.kind = clang.TypeKind.RECORD
         field.is_global = True
         field.type_ref = tcp_conn_struct
-        field.parent_object = None
-
-        for s in states:
-            s.parent_object = field
 
         add_state_decl_to_bpf(info.prog, [field], decls)
 

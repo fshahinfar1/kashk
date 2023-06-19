@@ -88,7 +88,7 @@ def __get_func_args(inst, info):
 
 
 def __add_func_definition(inst, info):
-    scope = scope_mapping.get(inst.name)
+    scope = info.sym_tbl.scope_mapping.get(inst.name)
     if not scope:
         error('The scope for the function', inst.name, 'was not found')
         return
