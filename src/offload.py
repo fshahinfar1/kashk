@@ -86,36 +86,36 @@ def generate_offload(file_path, entry_func_name):
 
 
     # TODO: Think more about the API of each pass
-    third_arg = PassObject()
-
     bpf = Block(BODY)
     bpf.extend_inst(insts)
 
     # Move function calls out of the ARG context!
-    bpf = linear_code_pass(bpf, info, third_arg)
+    bpf = linear_code_pass(bpf, info, PassObject())
+    for f in Function.directory.values():
+        f.body = linear_code_pass(f.body, info, PassObject())
 
     # Mark inpossible paths and annotate which functions may fail or suceed
-    bpf = possible_path_analysis_pass(bpf, info, third_arg)
+    bpf = possible_path_analysis_pass(bpf, info, PassObject())
 
     # Create a clone of unmodified but marked AST, later used for creating the
     # userspace program
-    user = clone_pass(bpf, info, third_arg)
-    # user_cfg = cfg_gen_pass(user, info, third_arg)
+    user = clone_pass(bpf, info, PassObject())
+    # user_cfg = cfg_gen_pass(user, info, PassObject())
 
-    # select_user_pass(user, info, third_arg)
-    # info.user_prog.show(info)
+    select_user_pass(user, info, PassObject())
+    info.user_prog.show(info)
 
     # Handle moving to userspace and removing the instruction not possible in
     # BPF
-    bpf = userspace_fallback_pass(bpf, info, third_arg)
+    bpf = userspace_fallback_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Verifier
-    bpf = verifier_pass(bpf, info, third_arg)
+    bpf = verifier_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Reduce number of parameters
-    bpf = reduce_params_pass(bpf, info, third_arg)
+    bpf = reduce_params_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # TODO: split the code between parser and verdict

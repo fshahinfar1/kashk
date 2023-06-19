@@ -44,6 +44,8 @@ def _do_pass(inst, info, more):
     if not hasattr(more, 'in_user_land'):
         _init_userland_signal(more)
 
+    assert more.in_user_land is False
+
     # if inst.kind != BLOCK_OF_CODE:
     #     debug(f'{lvl:3d}', ("|" * lvl) + '+->', inst, f'(signal:{more.in_user_land})')
 
@@ -60,6 +62,8 @@ def _do_pass(inst, info, more):
             with graph_node(node):
                 with info.sym_tbl.with_func_scope(inst.name):
                     ret = _do_pass(func.body, info, obj)
+                if node.is_empty():
+                    node.remove()
             # debug (f'step out of function: {inst.name} and userland state in function is: {obj.in_user_land}')
 
             # Propagate the signal to caller context
@@ -101,6 +105,8 @@ def _do_pass(inst, info, more):
             # debug('## number of user inst:', len(more.remember))
             # debug(more.remember)
             # debug('---------------------------------')
+
+            # TODO: I might want to postpone this to the upper block
 
             user_inst = Block(BODY)
             user_inst.extend_inst(more.remember)

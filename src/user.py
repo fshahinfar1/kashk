@@ -16,6 +16,22 @@ class Graph:
     def add_child(self, node):
         self.children.append(node)
 
+    def is_empty(self):
+        return len(self.children) == 0 and len(self.paths) == 0
+
+    def remove(self):
+        if self.parent:
+            self.parent.remove_child(self)
+            self.parent = None
+
+        # TODO: what happens to the children?
+        assert len(self.children) == 0
+
+        self.paths.clear()
+
+    def remove_child(self, child):
+        self.children.remove(child)
+
     def new_child(self):
         cur = self
         node = Graph()
@@ -67,14 +83,14 @@ class UserProg:
                 q.append((c, next_lvl))
 
 
-class UserPath:
-    _path_number_gen = 0
+# class UserPath:
+#     _path_number_gen = 0
 
-    def __init__(self, inst):
-        self.number = UserPath._path_number_gen
-        UserPath._path_number_gen += 1
+#     def __init__(self, inst):
+#         self.number = UserPath._path_number_gen
+#         UserPath._path_number_gen += 1
 
-        self.body = inst
+#         self.body = inst
 
-        # TODO: how am I going to implement this?
-        self.states_it_need = []
+#         # TODO: how am I going to implement this?
+#         self.states_it_need = []
