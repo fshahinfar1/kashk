@@ -1,6 +1,7 @@
 import clang.cindex as clang
 from contextlib import contextmanager
 import pprint
+from log import error, debug
 
 
 class SymbolTableEntry:
@@ -18,14 +19,43 @@ class SymbolTableEntry:
         self.is_bpf_ctx = False
         self.bpf_ctx_off = 0
 
+    def clone(self):
+        e = SymbolTableEntry(self.name, self.type, self.kind, self.ref)
+        for k, v in vars(self).items():
+            setattr(e, k, v)
+        return e
+
     def __repr__(self):
         return f'"<{self.kind}  {self.name}: {self.type.spelling}>"'
 
 
 class Scope:
     def __init__(self, parent=None):
+        self.number = 0 if parent is None else parent.number + len(parent.children) + 1
         self.symbols = {}
         self.parent = parent
+        self.children = []
+        if parent is not None:
+            parent.add_child_scope(self)
+
+    def clone(self, parent):
+        # TODO: I do not know how to clone from the midle of the tree
+        assert parent is not None or self.parent is None
+        clone_scope = Scope(parent)
+
+        # Clone this scope's symbol table
+        for key, entry in self.symbols.items():
+            clone_entry = entry.clone()
+            clone_scope.symbols[key] = clone_entry
+
+        # Clone its children
+        for child in self.children:
+            scope = child.clone(clone_scope)
+
+        return clone_scope
+
+    def add_child_scope(self, child):
+        self.children.append(child)
 
     def delete(self, name):
         return self.symbols.pop(name)
@@ -106,12 +136,41 @@ class SymbolTable:
             self.current_scope = cur
 
     def clone(self):
-        return None
-        # new_tbl = SymbolTable()
-        # new_tbl.shared_scope = self.shared_scope.clone()
-        # new_tbl.global_scope = self.global_scope.clone()
-        # new_tbl.current_scope = None
-        
+        # Creat a new object
+        new_tbl = SymbolTable()
+
+        # Clone the top most scope
+        new_tbl.shared_scope = self.shared_scope.clone(None)
+
+        # Cloning the top most scope will clone every other scope connected to
+        # it. I just need to find the coresponding references and set the
+        # pointesr.
+
+        glb_scp_num = self.global_scope.number
+        cur_scp_num = self.current_scope.number
+
+        # if I found:  glb  | cur
+        found =       [False, False]
+        q = [new_tbl.shared_scope]
+        while q:
+            scp = q.pop()
+            if scp.number == glb_scp_num:
+                found[0] = True
+                new_tbl.global_scope = scp
+            if scp.number == cur_scp_num:
+                found[1] = True
+                new_tbl.current_scope = scp
+            if all(found):
+                break
+            q.extend(reversed(scp.children))
+
+        if not all(found):
+            error('Failed to clone the scope')
+            debug(found)
+            debug(glb_scp_num, cur_scp_num)
+            raise Exception('Failed to clone the scope')
+
+        return new_tbl
 
 
 class ScopeMapping:
