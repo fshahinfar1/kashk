@@ -48,8 +48,8 @@ def run_test():
         bpf = linear_code_pass(bpf, info, third_arg)
 
         # Generate the code and show it for debuging
-        # text, _ = gen_code(bpf, info)
-        # print(text)
+        text, _ = gen_code(bpf, info)
+        print(text)
 
         # Check the pass is correct
         has_var_declare = False
