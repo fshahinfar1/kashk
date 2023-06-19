@@ -83,8 +83,6 @@ def extract_state(cursor):
         if c.type.kind in (clang.TypeKind.RECORD, clang.TypeKind.ELABORATED):
             d = generate_decleration_for(c)
             decl += d
-            # if d:
-            #     obj.type_ref = d[-1]
         states.append(obj)
     return states, decl
 
@@ -100,7 +98,5 @@ def get_state_for(cursor):
     obj = StateObject(cursor)
     states.append(obj)
     decl = generate_decleration_for(cursor)
-    # if cursor.type.kind in (clang.TypeKind.RECORD, clang.TypeKind.ELABORATED) and decl:
-    #     obj.type_ref = decl[-1]
 
     return states, decl

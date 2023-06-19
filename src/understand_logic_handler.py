@@ -2,6 +2,7 @@ import clang.cindex as clang
 from utility import (get_code, report_on_cursor, visualize_ast, get_owner,
         owner_to_ref)
 from log import error, debug
+from prune import READ_PACKET, WRITE_PACKET
 from data_structure import *
 from instruction import *
 from understand_logic import (gather_instructions_from,
@@ -44,6 +45,9 @@ def __function_is_of_interest(inst):
 
 def __get_func_name(inst, info):
     func_name = inst.cursor.spelling
+    if func_name in (READ_PACKET, WRITE_PACKET):
+        # do not rewrite the read/send functions
+        return func_name
     if inst.is_method:
         if len(inst.owner) == 0:
             cls = info.sym_tbl.lookup('__class__')

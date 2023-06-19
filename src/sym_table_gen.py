@@ -105,7 +105,6 @@ def build_sym_table(cursor, info):
             if not c.is_definition():
                 continue
             scope_key = f'class_struct {c.spelling}'
-            debug(scope_key)
             info.sym_tbl.insert_entry(scope_key, c.type, c.kind, c)
             with info.sym_tbl.new_scope() as scope:
                 info.sym_tbl.scope_mapping[scope_key] = scope

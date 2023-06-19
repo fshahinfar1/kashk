@@ -107,7 +107,7 @@ def do_passes(bpf,info):
 
     ## Possible Path Analysis
     # Mark inpossible paths and annotate which functions may fail or suceed
-    # bpf = possible_path_analysis_pass(bpf, info, PassObject())
+    bpf = possible_path_analysis_pass(bpf, info, PassObject())
 
     # Create a clone of unmodified but marked AST, later used for creating the
     # userspace program
