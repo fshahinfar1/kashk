@@ -142,3 +142,18 @@ def shared_map_decl():
   __uint(max_entries, 1);
 } shared_map SEC(".maps");
 '''
+
+
+def prepare_shared_state_var():
+    text = '''struct shared_state *shared = NULL;
+{
+  int zero = 0;
+  shared = bpf_map_lookup_elem(&shared_map, &zero);
+}
+if (!shared) {
+  return SK_DROP;
+}
+
+'''
+    new_inst = Literal(text, CODE_LITERAL)
+    return new_inst

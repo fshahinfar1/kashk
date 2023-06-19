@@ -109,34 +109,6 @@ def __has_read(cursor):
     return False
 
 
-def _check_if_ref_is_global_state(inst, info):
-    sym, scope = info.sym_tbl.lookup2(inst.name)
-    is_shared = scope == info.sym_tbl.shared_scope
-    if is_shared:
-        # Keep track of used global variables
-        info.global_accessed_variables.add(inst.name)
-        # TODO: what if a variable named shared is already defined but it is
-        # not our variable?
-        sym = scope.lookup('shared')
-        debug('shared symbol is defined:', sym is not None)
-        if sym is None:
-            # Perform a lookup on the map for globally shared values
-            text = '''
-struct shared_state *shared = NULL;
-{
-  int zero = 0;
-  shared = bpf_map_lookup_elem(&shared_map, &zero);
-}
-if (!shared) {
-  return SK_DROP;
-}
-
-'''
-            new_inst = Literal(text, CODE_LITERAL)
-            code = cb_ref.get(BODY)
-            code.append(new_inst)
-
-
 def __convert_cursor_to_inst(c, info):
     if c.kind == clang.CursorKind.CALL_EXPR:
         return understand_call_expr(c, info)
@@ -183,60 +155,31 @@ def __convert_cursor_to_inst(c, info):
         return None
     elif c.kind == clang.CursorKind.VAR_DECL:
         inst = VarDecl(c)
-
-        # Handle read buffer transformation
-        if inst.name == info.rd_buf.name:
-            # TODO: the generated code has so many null references!
-            inst.type = 'char *'
-            inst.is_array = False
-            T2 = MyType()
-            T2.spelling = 'char'
-            T2.kind = clang.TypeKind.SCHAR
-            T = MyType()
-            T.spelling = 'char *'
-            T.under_type = T2
-            T.kind = clang.TypeKind.POINTER
-            e = info.sym_tbl.insert_entry(inst.name, T, c.kind, None)
-            e.is_bpf_ctx = True
-            e.bpf_ctx_off = 0
+        # Find the variable initialization, if there is any.
+        init = []
+        if inst.is_array:
+            for child in c.get_children():
+                if child.kind == clang.CursorKind.INTEGER_LITERAL:
+                    continue
+                init = gather_instructions_from(child, info, context=ARG)
+                break
         else:
-            # Find the variable initialization, if there is any.
             init = []
-            if inst.is_array:
-                for child in c.get_children():
-                    if child.kind == clang.CursorKind.INTEGER_LITERAL:
-                        continue
-                    init = gather_instructions_from(child, info, context=ARG)
-                    break
-            else:
-                # NOTE: Keeping the old code, it seems to work
-                init = []
-                # The first child after TYPE_REF would be the initialization of the
-                # variable.
-                children = list(c.get_children())
-                # tmp_index = 0
-                # for i, tmp_c in enumerate(children):
-                #     if tmp_c.kind == clang.CursorKind.TYPE_REF:
-                #         tmp_index = i
-                #         break
-                # tmp_index += 1
-                # if len(children) > tmp_index:
-                #     # This declaration has initialization
-                #     init = gather_instructions_from(children[-1], info, context=ARG)
-                if children:
-                    init = gather_instructions_from(children[-1], info, context=ARG)
+            children = list(c.get_children())
+            if children:
+                init = gather_instructions_from(children[-1], info, context=ARG)
 
-            inst.init.extend_inst(init)
+        inst.init.extend_inst(init)
 
-            # Add variable to the scope
-            if info.sym_tbl.lookup(c.spelling) is not None:
-                error('{MODULE_TAG} Shadowing variables are not supported and can cause issues! ({c.spelling})')
-            info.sym_tbl.insert_entry(c.spelling, c.type, c.kind, c)
+        # Add variable to the scope
+        if info.sym_tbl.lookup(c.spelling) is not None:
+            error(f'{MODULE_TAG} Shadowing variables are not supported and can cause issues! ({c.spelling})')
+        info.sym_tbl.insert_entry(c.spelling, c.type, c.kind, c)
 
-            # Check if there is a type dependencies which we need to define
-            _, decls = get_state_for(c)
-            for d in decls:
-                info.prog.add_declaration(d)
+        # Check if there is a type dependencies which we need to define
+        _, decls = get_state_for(c)
+        for d in decls:
+            info.prog.add_declaration(d)
 
         return inst
     elif c.kind == clang.CursorKind.MEMBER_REF_EXPR:
@@ -246,7 +189,6 @@ def __convert_cursor_to_inst(c, info):
     elif (c.kind == clang.CursorKind.DECL_REF_EXPR
             or c.kind == clang.CursorKind.TYPE_REF):
         inst = Ref(c, clang.CursorKind.DECL_REF_EXPR)
-        _check_if_ref_is_global_state(inst, info)
         return inst
     elif c.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
         children = c.get_children()

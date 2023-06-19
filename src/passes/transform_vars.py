@@ -1,0 +1,94 @@
+import clang.cindex as clang
+from log import error, debug
+from bpf_code_gen import gen_code
+from template import prepare_shared_state_var
+
+from data_structure import *
+from instruction import *
+from passes.pass_obj import PassObject
+
+
+MODULE_TAG = '[Transform Vars Pass]'
+cb_ref = CodeBlockRef()
+
+
+def _check_if_ref_is_global_state(inst, info):
+    sym, scope = info.sym_tbl.lookup2(inst.name)
+    is_shared = scope == info.sym_tbl.shared_scope
+    if is_shared:
+        # Keep track of used global variables
+        info.global_accessed_variables.add(inst.name)
+        # TODO: what if a variable named shared is already defined but it is
+        # not our variable?
+        sym = scope.lookup('shared')
+        debug('shared symbol is defined:', sym is not None)
+        if sym is None:
+            # Perform a lookup on the map for globally shared values
+            new_inst = prepare_shared_state_var()
+            code = cb_ref.get(BODY)
+            code.append(new_inst)
+    return inst
+
+
+def _process_current_inst(inst, info, more):
+    if inst.kind == clang.CursorKind.DECL_REF_EXPR:
+        return _check_if_ref_is_global_state(inst, info)
+    elif inst.kind == clang.CursorKind.VAR_DECL:
+        # Handle read buffer transformation
+        if inst.name == info.rd_buf.name:
+            # The previouse passes should have seperated the initialization
+            # from declaration
+            assert inst.has_children() is False
+            new_inst = VarDecl(None)
+            new_inst.type = 'char *'
+            new_inst.name = inst.name
+            T2 = MyType()
+            T2.spelling = 'char'
+            T2.kind = clang.TypeKind.SCHAR
+            T = MyType()
+            T.spelling = 'char *'
+            T.under_type = T2
+            T.kind = clang.TypeKind.POINTER
+            e = info.sym_tbl.insert_entry(inst.name, T, new_inst.kind, None)
+            e.is_bpf_ctx = True
+            e.bpf_ctx_off = 0
+            # replace this instruction
+            return new_inst
+
+    return inst
+
+
+def _do_pass(inst, info, more):
+    lvl, ctx, parent_list = more.unpack()
+    new_children = []
+
+
+    with cb_ref.new_ref(ctx, parent_list):
+        # Process current instruction
+        inst = _process_current_inst(inst, info, more)
+        if inst is None:
+            return None
+
+        # Continue deeper
+        for child, tag in inst.get_children_context_marked():
+            is_list = isinstance(child, list)
+            if not is_list:
+                child = [child]
+            new_child = []
+            for i in child:
+                obj = PassObject.pack(lvl+1, tag, new_child)
+                new_inst = _do_pass(i, info, obj)
+                if new_inst is None:
+                    continue
+                new_child.append(new_inst)
+            if not is_list:
+                assert len(new_child) == 1
+                new_child = new_child[-1]
+            new_children.append(new_child)
+
+    new_inst = inst.clone(new_children)
+    return new_inst
+
+
+def transform_vars_pass(inst, info, more):
+    return _do_pass(inst, info, more)

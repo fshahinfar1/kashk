@@ -1,6 +1,5 @@
 import sys
 import clang.cindex as clang
-import queue
 
 from utility import parse_file, find_elem, show_insts, report_on_cursor
 from understand_program_state import (extract_state, get_state_for,)
@@ -11,20 +10,19 @@ from data_structure import *
 from instruction import *
 from bpf_code_gen import generate_bpf_prog
 
-from sym_table import scope_mapping, SymbolTableEntry
+from sym_table import SymbolTableEntry
 from sym_table_gen import build_sym_table
 
 from passes.pass_obj import PassObject
-from passes.verifier import verifier_pass
+from passes.linear_code import linear_code_pass
 from passes.possible_path_analysis import possible_path_analysis_pass
-from passes.userspace_fallback import userspace_fallback_pass
-from passes.reduce_params import reduce_params_pass
 from passes.clone import clone_pass
+from passes.transform_vars import transform_vars_pass
+from passes.userspace_fallback import userspace_fallback_pass
+from passes.verifier import verifier_pass
+from passes.reduce_params import reduce_params_pass
 from passes.select_user import select_user_pass
 # from passes.cfg_gen import cfg_gen_pass
-from passes.linear_code import linear_code_pass
-
-from bpf_code_gen import gen_code
 
 
 # TODO: make a framework agnostic interface, allow for porting to other
@@ -79,8 +77,7 @@ def generate_offload(file_path, entry_func_name):
         # Find the buffer representing the packet
         find_read_write_bufs(ev_loop, info)
 
-        # Go through the AST, generate instructions, transform access to variables
-        # and read/write buffers.
+        # Go through the AST, generate instructions
         body_of_loop = list(ev_loop.get_children())[-1]
         insts = gather_instructions_under(body_of_loop, info, BODY)
 
@@ -89,21 +86,37 @@ def generate_offload(file_path, entry_func_name):
     bpf = Block(BODY)
     bpf.extend_inst(insts)
 
+    bpf = do_passes(bpf, info)
+
+    # TODO: split the code between parser and verdict
+    bpf_parser = Block(BODY)
+    bpf_parser.add_inst(Literal('return skb->len;', CODE_LITERAL))
+    info.prog.parser_code = bpf_parser
+    info.prog.verdict_code = bpf
+
+    # Print the code we have generated
+    text = generate_bpf_prog(info)
+    print(text)
+
+
+def do_passes(bpf,info):
+    ## Simplify Code
     # Move function calls out of the ARG context!
     bpf = linear_code_pass(bpf, info, PassObject())
     for f in Function.directory.values():
         f.body = linear_code_pass(f.body, info, PassObject())
 
+    ## Possible Path Analysis
     # Mark inpossible paths and annotate which functions may fail or suceed
     bpf = possible_path_analysis_pass(bpf, info, PassObject())
 
     # Create a clone of unmodified but marked AST, later used for creating the
     # userspace program
     user = clone_pass(bpf, info, PassObject())
-    # user_cfg = cfg_gen_pass(user, info, PassObject())
+    user_sym_tbl = info.sym_tbl.clone()
 
-    select_user_pass(user, info, PassObject())
-    info.user_prog.show(info)
+    # Transform access to variables and read/write buffers.
+    bpf = transform_vars_pass(bpf, info, PassObject())
 
     # Handle moving to userspace and removing the instruction not possible in
     # BPF
@@ -118,15 +131,12 @@ def generate_offload(file_path, entry_func_name):
     bpf = reduce_params_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
-    # TODO: split the code between parser and verdict
-    bpf_parser = Block(BODY)
-    bpf_parser.add_inst(Literal('return skb->len;', CODE_LITERAL))
-    info.prog.parser_code = bpf_parser
-    info.prog.verdict_code = bpf
 
-    # Print the code we have generated
-    text = generate_bpf_prog(info)
-    print(text)
+    ## Generate userspace program
+    select_user_pass(user, info, PassObject())
+    info.user_prog.show(info)
+
+    return bpf
 
 
 def boot_starp_global_state(cursor, info):
@@ -138,7 +148,7 @@ def boot_starp_global_state(cursor, info):
     # Set the scope to the Server::handle_connection
     entry_name = info.entry_func_name
     entry_name = entry_name.replace('::', '_')
-    scope = scope_mapping[entry_name]
+    scope = info.sym_tbl.scope_mapping[entry_name]
     info.sym_tbl.current_scope = scope
 
     tcp_conn_entry = info.sym_tbl.lookup('class_TCPConnection')

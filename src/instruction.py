@@ -144,7 +144,7 @@ class VarDecl(Instruction):
         return f'<VarDecl {self.kind}: {self.type} {self.name} = {self.init}>'
 
     def has_children(self):
-        if self.init:
+        if self.init.has_children():
             return True
         return False
 
