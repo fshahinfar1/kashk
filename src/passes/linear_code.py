@@ -88,7 +88,7 @@ def _process_current_inst(inst, info, more):
         return _move_function_out(inst, info, more)
 
     if inst.kind == clang.CursorKind.VAR_DECL:
-        if inst.init.has_children():
+        if inst.has_children():
             return _separate_var_decl_and_init(inst, info, more)
 
     return inst
