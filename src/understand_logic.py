@@ -165,7 +165,6 @@ def __convert_cursor_to_inst(c, info):
                 break
         else:
             init = []
-            report_on_cursor(c)
             children = list(c.get_children())
             # TODO: why there is a TYPE_REF in VAR_DECL children?
             # Get rid of TYPE_REF in the init list!

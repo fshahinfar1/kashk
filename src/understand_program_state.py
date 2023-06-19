@@ -22,11 +22,16 @@ def generate_decleration_for(cursor):
 
     orig = cursor
 
+
     T = cursor.type
     if T.kind == clang.TypeKind.POINTER:
         T = T.get_pointee()
+    elif T.kind == clang.TypeKind.CONSTANTARRAY:
+        T = T.element_type
+
     if T.kind in PRIMITIVE_TYPES:
         return []
+
     c = T.get_declaration()
     if c is None:
         error(f'Failed to find the definition for {T.spelling}')
