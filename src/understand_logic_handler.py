@@ -8,10 +8,11 @@ from understand_logic import (gather_instructions_from,
         gather_instructions_under, cb_ref)
 from sym_table import *
 
-from prune import should_process_this_file, READ_PACKET, WRITE_PACKET
+from prune import should_process_this_file
+#, READ_PACKET, WRITE_PACKET
 
-from bpf_code_gen import gen_code
-from template import bpf_get_data, send_response_template
+# from bpf_code_gen import gen_code
+# from template import bpf_get_data, send_response_template
 
 
 COROUTINE_FUNC_NAME = ('await_resume', 'await_transform', 'await_ready', 'await_suspend')
@@ -69,21 +70,28 @@ def __get_func_args(inst, info):
     # the first argument
     if inst.is_method:
         if inst.owner:
-            hierarchy = []
-            owner_symb = owner_to_ref(inst.owner, info)
-            if owner_symb:
-                for obj in owner_symb:
-                    hierarchy.append(obj.name)
-                    link = '->' if obj.is_pointer else '.'
-                    hierarchy.append(link)
-                hierarchy.pop()
-            else:
-                error('owner list is not empty but we did not found the symbols')
-            ref_name = ''.join(hierarchy)
-            args = ['&'+ref_name] + args
+            # hierarchy = []
+            # owner_symb = owner_to_ref(inst.owner, info)
+            # if owner_symb:
+            #     for obj in owner_symb:
+            #         hierarchy.append(obj.name)
+            #         link = '->' if obj.is_pointer else '.'
+            #         hierarchy.append(link)
+            #     hierarchy.pop()
+            # else:
+            #     error('owner list is not empty but we did not found the symbols')
+            # ref_name = ''.join(hierarchy)
+            # args = ['&'+ref_name] + args
+
+            ref = Ref(None, clang.CursorKind.MEMBER_REF_EXPR)
+            ref.name = inst.owner[0]
+            ref.owner = inst.owner[1:]
+            args = [ref] + args
         else:
             # The first argument of methods are self and it is a reference
-            args = ['self'] + args
+            ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
+            ref.name = 'self'
+            args = [ref] + args
     return args
 
 
@@ -99,21 +107,48 @@ def __add_func_definition(inst, info):
             hierarchy = owner_to_ref(inst.owner, info)
             if hierarchy:
                 method_obj = hierarchy[-1]
-                ref = f'struct {method_obj.type.spelling} *self'
+
+                T = MyType()
+                T.spelling = f'struct {method_obj.type.spelling} *'
+                T.kind = clang.TypeKind.POINTER
+                T.under_type = MyType()
+                T.under_type.spelling = f'struct {method_obj.type.spelling}'
+                T.under_type.kind = clang.TypeKind.RECORD
+
+                ref = StateObject(None)
+                ref.name = 'self'
+                ref.kind = clang.CursorKind.PARM_DECL
+                ref.type =  T.spelling
+                ref.is_pointer = True
+                ref.type_ref = T
             else:
                 cls = scope.lookup('__class__')
                 cls_text = cls.type.spelling
-                method_obj = cls.ref
-                ref = f'struct {cls_text} *self'
+
+                T = MyType()
+                T.spelling = f'struct {cls_text} *'
+                T.kind = clang.TypeKind.POINTER
+                T.under_type = MyType()
+                T.under_type.spelling = f'struct {cls_text}'
+                T.under_type.kind = clang.TypeKind.RECORD
+
+                ref = StateObject(None)
+                ref.name = 'self'
+                ref.kind = clang.CursorKind.PARM_DECL
+                ref.type =  T.spelling
+                ref.is_pointer = True
+                ref.type_ref = T
         else:
-            method_obj = Object()
-            method_obj.type = None
-            method_obj.kind = None
-            ref = 'T *self'
+            T = MyType()
+            ref = StateObject(None)
+            ref.name = 'self'
+            ref.kind = clang.CursorKind.PARM_DECL
+            ref.type = 'T *'
+            ref.is_pointer = True
+            ref.type_ref = T
+            raise Exception('This is weired! I do not know the type')
+
         f.args = [ref] + f.args
-        # Add the first argument to the scope
-        e = SymbolTableEntry('self', method_obj.type, method_obj.kind, method_obj)
-        scope.insert(e)
 
     # Recursively analize the function body
     if f.body_cursor:
@@ -126,8 +161,7 @@ def __add_func_definition(inst, info):
             if isinstance(a, str):
                 error('Function argument is string not a Cursor, StateObj, ...')
             else:
-                c = a.cursor
-                info.sym_tbl.insert_entry(c.spelling, c.type, c.kind, c)
+                info.sym_tbl.insert_entry(a.name, a.type_ref, a.kind, a)
 
         # Process function body recursively
         body = gather_instructions_under(f.body_cursor, info, BODY)
@@ -144,23 +178,23 @@ def understand_call_expr(c, info):
     if tmp_func_name in COROUTINE_FUNC_NAME:
         # Ignore these
         return None
-    elif tmp_func_name == READ_PACKET:
-        # Assign packet pointer on a previouse line
-        text = bpf_get_data(info.rd_buf.name)
-        assign_inst = Literal(text, CODE_LITERAL)
-        blk = cb_ref.get(BODY)
-        blk.append(assign_inst)
-        # TODO: what if `skb` is not defined in this scope?
-        # Set the return value
-        text = f'skb->len'
-        inst = Literal(text, CODE_LITERAL)
-        return inst
-    elif tmp_func_name == WRITE_PACKET:
-        buf = info.wr_buf.name
-        write_size, _ = gen_code(info.wr_buf.write_size_cursor, info, context=ARG)
-        text = send_response_template(buf, write_size)
-        inst = Literal(text, CODE_LITERAL)
-        return inst
+    # elif tmp_func_name == READ_PACKET:
+    #     # Assign packet pointer on a previouse line
+    #     text = bpf_get_data(info.rd_buf.name)
+    #     assign_inst = Literal(text, CODE_LITERAL)
+    #     blk = cb_ref.get(BODY)
+    #     blk.append(assign_inst)
+    #     # TODO: what if `skb` is not defined in this scope?
+    #     # Set the return value
+    #     text = f'skb->len'
+    #     inst = Literal(text, CODE_LITERAL)
+    #     return inst
+    # elif tmp_func_name == WRITE_PACKET:
+    #     buf = info.wr_buf.name
+    #     write_size, _ = gen_code(info.wr_buf.write_size_cursor, info, context=ARG)
+    #     text = send_response_template(buf, write_size)
+    #     inst = Literal(text, CODE_LITERAL)
+    #     return inst
 
     # A call to the function
     inst = Call(c)

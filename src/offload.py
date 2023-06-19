@@ -107,33 +107,33 @@ def do_passes(bpf,info):
 
     ## Possible Path Analysis
     # Mark inpossible paths and annotate which functions may fail or suceed
-    bpf = possible_path_analysis_pass(bpf, info, PassObject())
+    # bpf = possible_path_analysis_pass(bpf, info, PassObject())
 
     # Create a clone of unmodified but marked AST, later used for creating the
     # userspace program
-    user = clone_pass(bpf, info, PassObject())
-    user_sym_tbl = info.sym_tbl.clone()
+    # user = clone_pass(bpf, info, PassObject())
+    # user_sym_tbl = info.sym_tbl.clone()
 
     # Transform access to variables and read/write buffers.
-    bpf = transform_vars_pass(bpf, info, PassObject())
+    # bpf = transform_vars_pass(bpf, info, PassObject())
 
     # Handle moving to userspace and removing the instruction not possible in
     # BPF
-    bpf = userspace_fallback_pass(bpf, info, PassObject())
+    # bpf = userspace_fallback_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Verifier
-    bpf = verifier_pass(bpf, info, PassObject())
+    # bpf = verifier_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Reduce number of parameters
-    bpf = reduce_params_pass(bpf, info, PassObject())
+    # bpf = reduce_params_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
 
     ## Generate userspace program
-    select_user_pass(user, info, PassObject())
-    info.user_prog.show(info)
+    # select_user_pass(user, info, PassObject())
+    # info.user_prog.show(info)
 
     return bpf
 
@@ -171,7 +171,9 @@ def boot_starp_global_state(cursor, info):
         field.type = 'TCPConnection'
         field.kind = clang.TypeKind.RECORD
         field.is_global = True
-        field.type_ref = tcp_conn_struct
+        field.type_ref = MyType()
+        field.type_ref.spelling = 'struct TCPConnection'
+        field.type_ref.kind = field.kind
 
         add_state_decl_to_bpf(info.prog, [field], decls)
 

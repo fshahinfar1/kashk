@@ -59,7 +59,7 @@ def _handle_function_may_fail(inst, func, info, more):
         T.spelling = flag_obj.type
         T.under_type = T2
         T.kind = clang.TypeKind.POINTER
-        flag_obj.real_type = T
+        flag_obj.type_ref = T
         func.args.append(flag_obj)
         # Update the flag to the symbol table for the function scope
         scope = info.sym_tbl.scope_mapping.get(inst.name)

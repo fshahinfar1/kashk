@@ -1,7 +1,9 @@
 import clang.cindex as clang
 from log import error, debug
 from bpf_code_gen import gen_code
-from template import prepare_shared_state_var
+from template import (prepare_shared_state_var, bpf_get_data,
+        send_response_template)
+from prune import READ_PACKET, WRITE_PACKET
 
 from data_structure import *
 from instruction import *
@@ -54,6 +56,25 @@ def _process_current_inst(inst, info, more):
             e.bpf_ctx_off = 0
             # replace this instruction
             return new_inst
+    elif inst.kind == clang.CursorKind.CALL_EXPR:
+        if inst.name == READ_PACKET:
+            # Assign packet pointer on a previouse line
+            text = bpf_get_data(info.rd_buf.name)
+            assign_inst = Literal(text, CODE_LITERAL)
+            blk = cb_ref.get(BODY)
+            blk.append(assign_inst)
+            # TODO: what if `skb` is not defined in this scope?
+            # Set the return value
+            text = f'skb->len'
+            inst = Literal(text, CODE_LITERAL)
+            return inst
+        elif inst.name == WRITE_PACKET:
+            buf = info.wr_buf.name
+            # TODO: maybe it is too soon to convert instructions to the code
+            write_size, _ = gen_code(info.wr_buf.write_size_cursor, info, context=ARG)
+            text = send_response_template(buf, write_size)
+            inst = Literal(text, CODE_LITERAL)
+            return inst
 
     return inst
 

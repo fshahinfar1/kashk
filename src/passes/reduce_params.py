@@ -87,7 +87,7 @@ def _function_check_param_reduc(inst, func, info, more):
         T.spelling = ex_obj.type
         T.under_type = T2
         T.kind = clang.TypeKind.POINTER
-        ex_obj.real_type = T
+        ex_obj.type_ref = T
         func.args.append(ex_obj)
         sym = SymbolTableEntry(ex_obj.name, T, clang.CursorKind.PARM_DECL, None)
         func_scope.insert(sym)

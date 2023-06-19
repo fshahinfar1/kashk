@@ -165,7 +165,7 @@ def _handle_call(inst, info, more):
             T.kind = clang.TypeKind.POINTER
             # This is added to the scope of function being called
             info.sym_tbl.insert_entry(skb_obj.name, T, clang.CursorKind.PARM_DECL, None)
-            skb_obj.real_type = T
+            skb_obj.type_ref = T
 
             # TODO: update every invocation of this function with the skb parameter
             # TODO: what if the caller function does not have access to skb?

@@ -1,6 +1,7 @@
 import itertools
 import clang.cindex as clang
 
+from utility import get_owner
 from data_structure import StateObject, Function
 from log import error, debug
 

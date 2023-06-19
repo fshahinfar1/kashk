@@ -2,6 +2,7 @@ from contextlib import contextmanager
 import clang.cindex as clang
 
 from log import error, debug
+from prune import READ_PACKET, WRITE_PACKET
 from data_structure import *
 from instruction import *
 
@@ -29,7 +30,7 @@ def remember_func(func):
 def is_function_call_possible(inst, info):
     func = inst.get_function_def()
     if not func:
-        if inst.name in ('memcpy', ):
+        if inst.name in ('memcpy', READ_PACKET, WRITE_PACKET):
             # It is fine
             return True
         # debug('function is not possible (no def):', inst.name)
@@ -66,6 +67,7 @@ def _failed_to_generate_inst(i, info, body):
 
     if current_function:
         current_function.may_fail = True
+
 
 def _process_child(child, inst, info, more):
     lvl, tag, parent_list = more.unpack()
@@ -121,7 +123,6 @@ def _do_pass(inst, info, more):
             new_child = _process_child(child, inst, info, obj)
             if new_child is None:
                 return None
-
 
             failed = obj.failed
             # TODO: when should I propagate the failure to the upper level

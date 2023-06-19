@@ -99,19 +99,17 @@ class StateObject:
             self.type = c.type.spelling
             self.kind = c.type.kind
             self.is_pointer = c.type.kind == clang.TypeKind.POINTER
-            if self.is_pointer:
-                self.real_type = c.type.get_pointee()
-            else:
-                self.real_type = c.type
+            self.type_ref = c.type
         else:
             self.cursor = None
             self.name = None
             self.type = None
             self.kind = None
             self.is_pointer = False
+            self.type_ref = None
 
+        # self.type_ref = None
         self.is_global = False
-        self.type_ref = None
 
 
     def clone(self):
@@ -132,11 +130,11 @@ class StateObject:
                     return f
 
     def get_c_code(self):
-        if self.real_type.kind == clang.TypeKind.CONSTANTARRAY:
+        if self.type_ref.kind == clang.TypeKind.CONSTANTARRAY:
             el_type = self.cursor.type.element_type.spelling
             el_count = self.cursor.type.element_count
             return f'{el_type} {self.name}[{el_count}];'
-        elif self.real_type.kind == clang.TypeKind.RECORD:
+        elif self.type_ref.kind == clang.TypeKind.RECORD:
             return f'struct {self.type} {self.name};'
         return f'{self.type} {self.name};'
 

@@ -398,6 +398,7 @@ def __generate_code_type_definition(inst, info):
         for a in inst.args:
             if isinstance(a, str):
                 args.append(a)
+                error('Unexpected: Function argument is a string!')
             else:
                 # remove the semicolon
                 text = a.get_c_code()[:-1]
