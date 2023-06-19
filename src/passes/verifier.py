@@ -166,6 +166,9 @@ def _handle_call(inst, info, more):
             # This is added to the scope of function being called
             info.sym_tbl.insert_entry(skb_obj.name, T, clang.CursorKind.PARM_DECL, None)
             skb_obj.type_ref = T
+            # debug(f'add skb: {inst.name} ------------------------')
+            # debug(info.sym_tbl.current_scope.symbols)
+            # debug('--------------------------------')
 
             # TODO: update every invocation of this function with the skb parameter
             # TODO: what if the caller function does not have access to skb?

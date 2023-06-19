@@ -135,19 +135,24 @@ def do_passes(bpf,info):
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Reduce number of parameters
-    bpf = reduce_params_pass(bpf, info, PassObject())
+    # bpf = reduce_params_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
 
     # Switch the symbol table to the state suitable for userspace program
+    bpf_sym_tbl = info.sym_tbl
     info.sym_tbl = user_sym_tbl
     # Switch functions to state suitable for userspace
+    bpf_func_dir = Function.directory
     Function.directory = user_func_dir
+
     ## Generate userspace program
-    text, _ = gen_code(user, info)
-    debug(text)
     select_user_pass(user, info, PassObject())
     info.user_prog.show(info)
+
+    # Switch back
+    info.sym_tbl = bpf_sym_tbl
+    Function.directory = bpf_func_dir
 
     return bpf
 

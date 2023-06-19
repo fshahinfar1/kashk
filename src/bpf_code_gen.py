@@ -150,7 +150,9 @@ def handle_member_ref_expr(inst, info, more):
             links.append(link)
         links.append(inst.name)
         text = ''.join(links)
-
+    # if 'skb' in inst.owner:
+    #     debug(hierarchy)
+    #     debug(info.sym_tbl.current_scope.symbols)
     text = indent(text, lvl)
     return text
 
@@ -406,16 +408,10 @@ def __generate_code_type_definition(inst, info):
         text_args = ', '.join(args)
 
         # Change the context
-        scope = info.sym_tbl.scope_mapping.get(inst.name)
-        if not scope:
-            raise Exception(f'could not find the scope for function {inst.name}')
-        # TODO: simiplify the scope switch process by using a stack in symbol
-        # table and exposing an API
-        old_scope = info.sym_tbl.current_scope
-        info.sym_tbl.current_scope = scope
-        body, _ = gen_code(inst.body, info)
-        # Change scope back
-        info.sym_tbl.current_scope = old_scope
+        with info.sym_tbl.with_func_scope(inst.name):
+            # debug('inside:', inst.name, 'scope')
+            body, _ = gen_code(inst.body, info)
+            # debug('out of',inst.name, 'scope')
 
         body = indent(body)
         text = f'{inst.return_type} {inst.name} ({text_args}) {{\n{body}\n}}\n\n'
