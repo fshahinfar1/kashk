@@ -150,10 +150,12 @@ class SymbolTable:
         cur_scp_num = self.current_scope.number
 
         # if I found:  glb  | cur
+        book = {}
         found =       [False, False]
         q = [new_tbl.shared_scope]
         while q:
             scp = q.pop()
+            book[scp.number] = scp
             if scp.number == glb_scp_num:
                 found[0] = True
                 new_tbl.global_scope = scp
@@ -169,6 +171,11 @@ class SymbolTable:
             debug(found)
             debug(glb_scp_num, cur_scp_num)
             raise Exception('Failed to clone the scope')
+
+        # Clone the scope mapping
+        for name, scope in self.scope_mapping.scope_mapping.items():
+            scp_number = scope.number
+            new_tbl.scope_mapping[name] = book[scp_number]
 
         return new_tbl
 

@@ -12,6 +12,7 @@ from passes.pass_obj import PassObject
 MODULE_TAG = '[Select Userspace Pass]'
 user_graph_node = None
 
+
 @contextmanager
 def graph_node(node):
     global user_graph_node

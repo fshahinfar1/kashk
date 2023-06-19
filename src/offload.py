@@ -8,7 +8,7 @@ from understand_logic import (find_event_loop,
         gather_instructions_under, gather_instructions_from)
 from data_structure import *
 from instruction import *
-from bpf_code_gen import generate_bpf_prog
+from bpf_code_gen import generate_bpf_prog, gen_code
 
 from sym_table import SymbolTableEntry
 from sym_table_gen import build_sym_table
@@ -104,36 +104,50 @@ def do_passes(bpf,info):
     bpf = linear_code_pass(bpf, info, PassObject())
     for f in Function.directory.values():
         f.body = linear_code_pass(f.body, info, PassObject())
+    debug('~~~~~~~~~~~~~~~~~~~~~')
 
     ## Possible Path Analysis
     # Mark inpossible paths and annotate which functions may fail or suceed
     bpf = possible_path_analysis_pass(bpf, info, PassObject())
+    debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Create a clone of unmodified but marked AST, later used for creating the
     # userspace program
-    # user = clone_pass(bpf, info, PassObject())
-    # user_sym_tbl = info.sym_tbl.clone()
+    user = clone_pass(bpf, info, PassObject())
+    user_sym_tbl = info.sym_tbl.clone()
+    user_func_dir = {}
+    for func in Function.directory.values():
+        debug(func.name)
+        new_f = func.clone(user_func_dir)
+    debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Transform access to variables and read/write buffers.
-    # bpf = transform_vars_pass(bpf, info, PassObject())
+    bpf = transform_vars_pass(bpf, info, PassObject())
+    debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Handle moving to userspace and removing the instruction not possible in
     # BPF
-    # bpf = userspace_fallback_pass(bpf, info, PassObject())
+    bpf = userspace_fallback_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Verifier
-    # bpf = verifier_pass(bpf, info, PassObject())
+    bpf = verifier_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Reduce number of parameters
-    # bpf = reduce_params_pass(bpf, info, PassObject())
+    bpf = reduce_params_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
 
+    # Switch the symbol table to the state suitable for userspace program
+    info.sym_tbl = user_sym_tbl
+    # Switch functions to state suitable for userspace
+    Function.directory = user_func_dir
     ## Generate userspace program
-    # select_user_pass(user, info, PassObject())
-    # info.user_prog.show(info)
+    text, _ = gen_code(user, info)
+    debug(text)
+    select_user_pass(user, info, PassObject())
+    info.user_prog.show(info)
 
     return bpf
 

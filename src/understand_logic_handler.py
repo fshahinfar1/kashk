@@ -68,28 +68,16 @@ def __get_func_args(inst, info):
         arg = gather_instructions_from(x, info)
         args.extend(arg)
 
-    # TODO: I am just sending the object as a string to be placed in the first
-    # argument. Maybe I need to share a symbol object
-    # If function is a method, we need to pass the reference to the object as
-    # the first argument
     if inst.is_method:
         if inst.owner:
-            # hierarchy = []
-            # owner_symb = owner_to_ref(inst.owner, info)
-            # if owner_symb:
-            #     for obj in owner_symb:
-            #         hierarchy.append(obj.name)
-            #         link = '->' if obj.is_pointer else '.'
-            #         hierarchy.append(link)
-            #     hierarchy.pop()
-            # else:
-            #     error('owner list is not empty but we did not found the symbols')
-            # ref_name = ''.join(hierarchy)
-            # args = ['&'+ref_name] + args
-
-            ref = Ref(None, clang.CursorKind.MEMBER_REF_EXPR)
+            new_owner = inst.owner[1:]
+            if len(new_owner) > 0:
+                new_kind = clang.CursorKind.MEMBER_REF_EXPR
+            else:
+                new_kind = clang.CursorKind.DECL_REF_EXPR
+            ref = Ref(None, new_kind)
             ref.name = inst.owner[0]
-            ref.owner = inst.owner[1:]
+            ref.owner = new_owner
             args = [ref] + args
         else:
             # The first argument of methods are self and it is a reference
@@ -155,20 +143,27 @@ def __add_func_definition(inst, info):
         f.args = [ref] + f.args
 
     # Recursively analize the function body
-    if f.body_cursor:
+
+    c = inst.func_ptr
+    body = None
+    if c is not None and c.is_definition():
+        children = list(c.get_children())
+        body = children[-1]
+        while body.kind == clang.CursorKind.UNEXPOSED_STMT:
+            body = next(body.get_children())
+        assert (body.kind == clang.CursorKind.COMPOUND_STMT)
+
+    if body:
         # Switch scope
         old_scope = info.sym_tbl.current_scope
         info.sym_tbl.current_scope = scope
 
         # Add parameters to the function scope
         for a in f.args:
-            if isinstance(a, str):
-                error('Function argument is string not a Cursor, StateObj, ...')
-            else:
-                info.sym_tbl.insert_entry(a.name, a.type_ref, a.kind, a)
+            info.sym_tbl.insert_entry(a.name, a.type_ref, a.kind, a)
 
         # Process function body recursively
-        body = gather_instructions_under(f.body_cursor, info, BODY)
+        body = gather_instructions_under(body, info, BODY)
         f.body.extend_inst(body)
         info.sym_tbl.current_scope = old_scope
 
@@ -180,25 +175,7 @@ def understand_call_expr(c, info):
 
     # Check if this a special type of function
     if tmp_func_name in COROUTINE_FUNC_NAME:
-        # Ignore these
         return None
-    # elif tmp_func_name == READ_PACKET:
-    #     # Assign packet pointer on a previouse line
-    #     text = bpf_get_data(info.rd_buf.name)
-    #     assign_inst = Literal(text, CODE_LITERAL)
-    #     blk = cb_ref.get(BODY)
-    #     blk.append(assign_inst)
-    #     # TODO: what if `skb` is not defined in this scope?
-    #     # Set the return value
-    #     text = f'skb->len'
-    #     inst = Literal(text, CODE_LITERAL)
-    #     return inst
-    # elif tmp_func_name == WRITE_PACKET:
-    #     buf = info.wr_buf.name
-    #     write_size, _ = gen_code(info.wr_buf.write_size_cursor, info, context=ARG)
-    #     text = send_response_template(buf, write_size)
-    #     inst = Literal(text, CODE_LITERAL)
-    #     return inst
 
     # A call to the function
     inst = Call(c)

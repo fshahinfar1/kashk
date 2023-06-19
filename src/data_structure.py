@@ -226,35 +226,39 @@ class Record(TypeDefinition):
 
 class Function(TypeDefinition):
 
+    # TODO: I need to seperate the directory for BPF and Userspace program
     directory = {}
-    def __init__(self, name, c):
+    def __init__(self, name, c, directory=None):
         # TODO: what to do about this dependency??
         from instruction import Block, BODY
         super().__init__(name)
 
-        self.cursor = c
-        if c.is_definition():
-            children = list(c.get_children())
-            body = children[-1]
-            while body.kind == clang.CursorKind.UNEXPOSED_STMT:
-                body = next(body.get_children())
-            assert (body.kind == clang.CursorKind.COMPOUND_STMT)
+        # self.cursor = c
+        if c is not None:
+            self.args = [StateObject(a) for a in c.get_arguments()]
+            self.return_type = c.result_type.spelling
         else:
-            body = None
+            self.args = []
+            self.return_type = None
 
-        self.body_cursor = body
         self.body = Block(BODY)
-        self.args = [StateObject(a) for a in c.get_arguments()]
-        self.return_type = c.result_type.spelling
         self.is_method = False
-
         self.may_have_context_ptr = False
         self.may_fail = False
         self.may_succeed = False
 
-        if self.name in Function.directory:
+        if directory is None:
+            directory = Function.directory
+        if self.name in directory:
+            debug(directory)
             raise Exception(f'Function is already defined ({self.name})')
-        Function.directory[self.name] = self
+        directory[self.name] = self
+
+    def clone(self, directory):
+        f = Function(self.name, None, directory)
+        for k, v in vars(self).items():
+            setattr(f, k, v)
+        return f
 
     def get_c_code(self):
         # raise Exception('Not implemented')

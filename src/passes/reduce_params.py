@@ -161,7 +161,11 @@ def _handle_ref(inst, info, more):
 
     top_lvl_var_name = inst.name
     if inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
-        top_lvl_var_name = inst.owner[-1]
+        if inst.owner:
+            top_lvl_var_name = inst.owner[-1]
+        else:
+            # using c++ implicit `this'
+            top_lvl_var_name = 'self'
 
     flag = current_change_ctx.should_update_ref(top_lvl_var_name)
     if flag:

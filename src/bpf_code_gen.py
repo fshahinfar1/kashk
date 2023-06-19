@@ -391,7 +391,7 @@ def gen_code(list_instructions, info, context=BODY):
 
 def __generate_code_type_definition(inst, info):
     if isinstance(inst, Function):
-        if inst.cursor.spelling in (READ_PACKET, WRITE_PACKET):
+        if inst.name in (READ_PACKET, WRITE_PACKET):
             return ''
 
         args = []
