@@ -9,21 +9,7 @@ from instruction import *
 
 MODULE_TAG = '[Create Fallback Pass]'
 cb_ref = CodeBlockRef()
-
-
-# def _do_pass(inst, info, more):
-#     q = [(self.graph, 0)]
-#     while q:
-#         g, lvl = q.pop()
-        
-#         for p in g.paths:
-#             text, _ = gen_code(p, info)
-#             debug(text)
-#             debug('----')
-
-#         next_lvl = lvl + 1
-#         for c in reversed(g.children):
-#             q.append((c, next_lvl))
+new_functions = []
 
 
 def _branch_to_path(p, ids):
@@ -66,12 +52,10 @@ def _branch_to_path(p, ids):
     blk.add_inst(if_stmt)
 
 
-new_functions = []
-
 def _process_node(node, info):
     # Paths are the codes that maybe run
     for p in node.paths:
-        failure_ids = [1]
+        failure_ids = node.path_ids
         if len(node.children) > 0:
             # The node has childrens, so
             # I expect the first instruction contain a function invocation
@@ -118,14 +102,10 @@ def create_fallback_pass(inst, info, more):
     # TODO: create the state loading and path selection code here
     # TODO: load the failure_number
     entry = Block(BODY)
+    info.user_prog.entry_body = entry
     g = info.user_prog.graph
     with cb_ref.new_ref(entry.tag, entry):
         # _do_pass(inst, info, more)
         _process_node(g, info)
-
-    text, _ = gen_code(entry, info)
-    debug(text)
-
-    for f in new_functions:
-        text, _ = gen_code([f], info)
-        debug(text)
+    info.user_prog.fallback_funcs_def = new_functions
+    return entry

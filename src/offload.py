@@ -11,6 +11,7 @@ from data_structure import *
 from instruction import *
 
 from bpf_code_gen import generate_bpf_prog, gen_code
+from user import generate_user_prog
 from sym_table import SymbolTableEntry
 from sym_table_gen import build_sym_table
 
@@ -26,6 +27,7 @@ from bpf_passes.verifier import verifier_pass
 from bpf_passes.reduce_params import reduce_params_pass
 
 from user_passes.select_user import select_user_pass
+from user_passes.number_fallback_graph import number_fallback_graph_pass
 from user_passes.create_fallback import create_fallback_pass
 
 
@@ -120,8 +122,12 @@ def gen_user_code(user, info, out_user):
     with info.user_prog.select_context(info):
         # Populates the user_prog graph
         select_user_pass(user, info, PassObject())
-        create_fallback_pass(user, info, PassObject()) 
-        # info.user_prog.show(info)
+        number_fallback_graph_pass(info)
+        user = create_fallback_pass(user, info, PassObject()) 
+        text = generate_user_prog(info)
+
+    with open(out_user, 'w') as f:
+        f.write(text)
 
 
 def gen_bpf_code(bpf, info, out_bpf):
