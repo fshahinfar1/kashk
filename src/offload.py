@@ -14,20 +14,20 @@ from sym_table import SymbolTableEntry
 from sym_table_gen import build_sym_table
 
 from passes.pass_obj import PassObject
-from passes.linear_code import linear_code_pass
-from passes.possible_path_analysis import possible_path_analysis_pass
 from passes.clone import clone_pass
-from passes.transform_vars import transform_vars_pass
-from passes.userspace_fallback import userspace_fallback_pass
-from passes.verifier import verifier_pass
-from passes.reduce_params import reduce_params_pass
-from passes.select_user import select_user_pass
 # from passes.cfg_gen import cfg_gen_pass
+from bpf_passes.linear_code import linear_code_pass
+from bpf_passes.possible_path_analysis import possible_path_analysis_pass
+from bpf_passes.transform_vars import transform_vars_pass
+from bpf_passes.userspace_fallback import userspace_fallback_pass
+from bpf_passes.verifier import verifier_pass
+from bpf_passes.reduce_params import reduce_params_pass
+from user_passes.select_user import select_user_pass
 
 
 # TODO: make a framework agnostic interface, allow for porting to other
 # functions
-def generate_offload(file_path, entry_func_name):
+def generate_offload(file_path, entry_func_name, out_bpf, out_user):
     # Keep track of which variable name is what, what types has been defined
     # and other information learned about the program
     info = Info()
@@ -85,20 +85,6 @@ def generate_offload(file_path, entry_func_name):
     bpf = Block(BODY)
     bpf.extend_inst(insts)
 
-    bpf = do_passes(bpf, info)
-
-    # TODO: split the code between parser and verdict
-    bpf_parser = Block(BODY)
-    bpf_parser.add_inst(Literal('return skb->len;', CODE_LITERAL))
-    info.prog.parser_code = bpf_parser
-    info.prog.verdict_code = bpf
-
-    # Print the code we have generated
-    text = generate_bpf_prog(info)
-    print(text)
-
-
-def do_passes(bpf,info):
     ## Simplify Code
     # Move function calls out of the ARG context!
     bpf = linear_code_pass(bpf, info, PassObject())
@@ -114,13 +100,26 @@ def do_passes(bpf,info):
     # Create a clone of unmodified but marked AST, later used for creating the
     # userspace program
     user = clone_pass(bpf, info, PassObject())
-    user_sym_tbl = info.sym_tbl.clone()
-    user_func_dir = {}
+    info.user_prog.sym_tbl = info.sym_tbl.clone()
+    info.user_prog.func_dir = {}
     for func in Function.directory.values():
-        debug(func.name)
-        new_f = func.clone(user_func_dir)
+        new_f = func.clone(info.user_prog.func_dir)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
+    gen_bpf_code(bpf, info, out_bpf)
+    gen_user_code(user, info, out_user)
+
+
+
+def gen_user_code(user, info, out_user):
+    # Switch the symbol table and functions to the snapshot suitable for
+    # userspace analysis
+    with info.user_prog.select_context(info):
+        select_user_pass(user, info, PassObject())
+        info.user_prog.show(info)
+
+
+def gen_bpf_code(bpf, info, out_bpf):
     # Transform access to variables and read/write buffers.
     bpf = transform_vars_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
@@ -135,26 +134,19 @@ def do_passes(bpf,info):
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Reduce number of parameters
-    # bpf = reduce_params_pass(bpf, info, PassObject())
+    bpf = reduce_params_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
+    # TODO: split the code between parser and verdict
+    bpf_parser = Block(BODY)
+    bpf_parser.add_inst(Literal('return skb->len;', CODE_LITERAL))
+    info.prog.parser_code = bpf_parser
+    info.prog.verdict_code = bpf
 
-    # Switch the symbol table to the state suitable for userspace program
-    bpf_sym_tbl = info.sym_tbl
-    info.sym_tbl = user_sym_tbl
-    # Switch functions to state suitable for userspace
-    bpf_func_dir = Function.directory
-    Function.directory = user_func_dir
-
-    ## Generate userspace program
-    select_user_pass(user, info, PassObject())
-    info.user_prog.show(info)
-
-    # Switch back
-    info.sym_tbl = bpf_sym_tbl
-    Function.directory = bpf_func_dir
-
-    return bpf
+    # Write the code we have generated
+    text = generate_bpf_prog(info)
+    with open(out_bpf, 'w') as f:
+        f.write(text)
 
 
 def boot_starp_global_state(cursor, info):

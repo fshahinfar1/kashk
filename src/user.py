@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+from data_structure import Function
 from bpf_code_gen import gen_code
 from log import debug
 
@@ -43,6 +45,21 @@ class Graph:
 class UserProg:
     def __init__(self):
         self.graph = Graph()
+        self.sym_tbl = None
+        self.func_dir = None
+
+    @contextmanager
+    def select_context(self, info):
+        prev_sym_tbl = info.sym_tbl
+        prev_func_dir = Function.directory
+        info.sym_tbl = self.sym_tbl
+        Function.directory = self.func_dir
+        try:
+            yield None
+        finally:
+            info.sym_tbl = prev_sym_tbl
+            Function.directory = prev_func_dir
+
 
     # def add_path(self, inst):
     #     """

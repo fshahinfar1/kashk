@@ -120,12 +120,6 @@ def handle_ref_expr(inst, info, more):
     if is_global:
         text = 'sock_ctx->state.' + inst.name
     elif is_shared:
-        # TODO: WHERE SHOULD I PUT THESE CODE? IT SHOULD BE ON SOME PART OF THE
-        # FUNCTION BODY BEFORE REACHING THIS STATEMENT.
-        # res, definition = check_if_shared_obj_is_loaded(info)
-        # if res:
-        #     text = definition + '\n' + text
-
         text = 'shared->' + inst.name
     else:
         text = inst.name
@@ -150,9 +144,6 @@ def handle_member_ref_expr(inst, info, more):
             links.append(link)
         links.append(inst.name)
         text = ''.join(links)
-    # if 'skb' in inst.owner:
-    #     debug(hierarchy)
-    #     debug(info.sym_tbl.current_scope.symbols)
     text = indent(text, lvl)
     return text
 
