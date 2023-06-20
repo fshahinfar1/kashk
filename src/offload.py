@@ -1,28 +1,32 @@
 import sys
 import clang.cindex as clang
 
-from utility import parse_file, find_elem, show_insts, report_on_cursor
+from utility import parse_file, find_elem
 from understand_program_state import (extract_state, get_state_for,)
 from understand_logic import (find_event_loop,
         get_variable_declaration_before_elem, get_all_read, get_all_send,
         gather_instructions_under, gather_instructions_from)
+
 from data_structure import *
 from instruction import *
-from bpf_code_gen import generate_bpf_prog, gen_code
 
+from bpf_code_gen import generate_bpf_prog, gen_code
 from sym_table import SymbolTableEntry
 from sym_table_gen import build_sym_table
 
 from passes.pass_obj import PassObject
 from passes.clone import clone_pass
 # from passes.cfg_gen import cfg_gen_pass
+
 from bpf_passes.linear_code import linear_code_pass
 from bpf_passes.possible_path_analysis import possible_path_analysis_pass
 from bpf_passes.transform_vars import transform_vars_pass
 from bpf_passes.userspace_fallback import userspace_fallback_pass
 from bpf_passes.verifier import verifier_pass
 from bpf_passes.reduce_params import reduce_params_pass
+
 from user_passes.select_user import select_user_pass
+from user_passes.create_fallback import create_fallback_pass
 
 
 # TODO: make a framework agnostic interface, allow for porting to other
@@ -110,13 +114,14 @@ def generate_offload(file_path, entry_func_name, out_bpf, out_user):
     gen_user_code(user, info, out_user)
 
 
-
 def gen_user_code(user, info, out_user):
     # Switch the symbol table and functions to the snapshot suitable for
     # userspace analysis
     with info.user_prog.select_context(info):
+        # Populates the user_prog graph
         select_user_pass(user, info, PassObject())
-        info.user_prog.show(info)
+        create_fallback_pass(user, info, PassObject()) 
+        # info.user_prog.show(info)
 
 
 def gen_bpf_code(bpf, info, out_bpf):
@@ -215,11 +220,9 @@ def find_read_write_bufs(ev_loop, info):
     assert len(writes) == 1, 'I currently expect only one send system call'
     for c in writes:
         # TODO: this code is not going to work. it is so specific
-        # report_on_cursor(c)
         args = list(c.get_arguments())
         buf_def = args[1].get_definition()
         remove_def = buf_def
-        # report_on_cursor(buf_def)
         buf_def = next(buf_def.get_children())
         args = list(buf_def.get_arguments())
         buf_def = args[0].get_definition()

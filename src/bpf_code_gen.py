@@ -368,13 +368,13 @@ def gen_code(list_instructions, info, context=BODY):
                 text = f'<empty code generated kind: {inst.kind}>'
                 debug('<empty code>: ', inst, inst.kind)
 
-        if context == BODY:
-            if inst.kind in NEED_SEMI_COLON:
+            if context == BODY:
+                if inst.kind in NEED_SEMI_COLON:
+                    text += ';\n'
+                elif inst.kind in GOTO_NEXT_LINE:
+                    text += '\n'
+            elif context == DEF:
                 text += ';\n'
-            elif inst.kind in GOTO_NEXT_LINE:
-                text += '\n'
-        elif context == DEF:
-            text += ';\n'
 
 
         code.append(text)

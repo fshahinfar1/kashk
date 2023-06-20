@@ -131,7 +131,7 @@ class SymbolTable:
         cur = self.current_scope
         self.current_scope = scope
         try:
-            yield None
+            yield scope
         finally:
             self.current_scope = cur
 

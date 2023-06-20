@@ -255,9 +255,16 @@ class Function(TypeDefinition):
         directory[self.name] = self
 
     def clone(self, directory):
-        f = Function(self.name, None, directory)
+        return self.clone2(self.name, directory)
+
+    def clone2(self, name, directory):
+        f = Function(name, None, directory)
         for k, v in vars(self).items():
+            if isinstance(v, list):
+                # clone the list
+                v = v[:]
             setattr(f, k, v)
+        f.name = name
         return f
 
     def get_c_code(self):

@@ -61,14 +61,6 @@ class UserProg:
             Function.directory = prev_func_dir
 
 
-    # def add_path(self, inst):
-    #     """
-    #     @param inst: expect it to be a `Block' of code.
-    #     """
-    #     path = UserPath(inst)
-    #     self.graph.append(path)
-    #     return path
-
     def insert_super_node(self):
         cur = self.graph
         node = Graph()
@@ -98,16 +90,3 @@ class UserProg:
             next_lvl = lvl + 1
             for c in reversed(g.children):
                 q.append((c, next_lvl))
-
-
-# class UserPath:
-#     _path_number_gen = 0
-
-#     def __init__(self, inst):
-#         self.number = UserPath._path_number_gen
-#         UserPath._path_number_gen += 1
-
-#         self.body = inst
-
-#         # TODO: how am I going to implement this?
-#         self.states_it_need = []
