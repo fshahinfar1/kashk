@@ -111,7 +111,8 @@ def _do_pass(inst, info, more):
 
             user_inst = Block(BODY)
             user_inst.extend_inst(more.remember)
-            user_graph_node.append(user_inst)
+            path = user_graph_node.append(user_inst)
+            path.original_scope = info.sym_tbl.current_scope
 
             # Set the signal off! do not propagate.
             _init_userland_signal(more)

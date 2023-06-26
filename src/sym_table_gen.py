@@ -34,7 +34,6 @@ def __collect_information_about_func(cursor, info):
     # Add function parameters to the scope
     for pos, arg in enumerate(cursor.get_arguments()):
         e = info.sym_tbl.insert_entry(arg.spelling, arg.type, arg.kind, arg)
-        e.param_pos = pos
 
     # TODO: Do I need to process the body of each functions?
     # body = children[-1]

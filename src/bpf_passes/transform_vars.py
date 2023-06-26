@@ -53,7 +53,6 @@ def _process_current_inst(inst, info, more):
             T.kind = clang.TypeKind.POINTER
             e = info.sym_tbl.insert_entry(inst.name, T, new_inst.kind, None)
             e.is_bpf_ctx = True
-            e.bpf_ctx_off = 0
             # replace this instruction
             return new_inst
     elif inst.kind == clang.CursorKind.CALL_EXPR:

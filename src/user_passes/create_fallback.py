@@ -5,11 +5,21 @@ from bpf_code_gen import gen_code
 from log import error, debug
 from data_structure import *
 from instruction import *
+from sym_table import Scope
+from user import USER_EVENT_LOOP_ENTRY
 
 
 MODULE_TAG = '[Create Fallback Pass]'
 cb_ref = CodeBlockRef()
 new_functions = []
+
+
+fnum = 1
+def get_func_name():
+    global fnum
+    name = f'f{fnum}'
+    fnum += 1
+    return name
 
 
 def _branch_to_path(p, ids):
@@ -54,7 +64,10 @@ def _branch_to_path(p, ids):
 
 def _process_node(node, info):
     # Paths are the codes that maybe run
-    for p in node.paths:
+    for path in node.paths:
+        path.scope = info.sym_tbl.current_scope
+
+        p = path.code
         failure_ids = node.path_ids
         if len(node.children) > 0:
             # The node has childrens, so
@@ -77,14 +90,16 @@ def _process_node(node, info):
             if call_inst:
                 original_name = call_inst.name
                 # rename the function
-                call_inst.name += '_fail_path_' + '_'.join(map(str, failure_ids))
+                # call_inst.name += '_fail_path_' + '_'.join(map(str, failure_ids))
+                call_inst.name = get_func_name()
                 new_func = func.clone2(call_inst.name, Function.directory)
                 new_func.body = Block(BODY)
+                new_func.args.clear()
                 new_functions.append(new_func)
 
-                with info.sym_tbl.with_func_scope(original_name) as scope:
-                    clone_scope = scope.clone(scope.parent)
-                    info.sym_tbl.scope_mapping[call_inst.name] = clone_scope
+                # Create a new empty scope for the new function we want to define
+                new_scope = Scope()
+                info.sym_tbl.scope_mapping[call_inst.name] = new_scope
 
                 with info.sym_tbl.with_func_scope(call_inst.name):
                     with cb_ref.new_ref(new_func.body.tag, new_func.body):
@@ -104,8 +119,13 @@ def create_fallback_pass(inst, info, more):
     entry = Block(BODY)
     info.user_prog.entry_body = entry
     g = info.user_prog.graph
-    with cb_ref.new_ref(entry.tag, entry):
-        # _do_pass(inst, info, more)
-        _process_node(g, info)
+
+    new_scope = Scope()
+    info.sym_tbl.scope_mapping[USER_EVENT_LOOP_ENTRY] = new_scope
+
+    with info.sym_tbl.with_func_scope(USER_EVENT_LOOP_ENTRY):
+        with cb_ref.new_ref(entry.tag, entry):
+            # _do_pass(inst, info, more)
+            _process_node(g, info)
     info.user_prog.fallback_funcs_def = new_functions
     return entry

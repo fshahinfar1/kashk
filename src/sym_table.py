@@ -5,19 +5,17 @@ from log import error, debug
 
 
 class SymbolTableEntry:
-    def __init__(self, name, type, kind, ref):
+    def __init__(self, name, type_, kind, ref):
         self.name = name
-        self.type = type
+        self.type = type_
         self.kind = kind
         self.ref = ref
 
-        self.is_pointer = type.kind == clang.TypeKind.POINTER
-
-        # Optional
-        self.value = None
-        self.param_pos = 0
+        if type_ is not None:
+            self.is_pointer = type_.kind == clang.TypeKind.POINTER
+        else:
+            self.is_pointer = False
         self.is_bpf_ctx = False
-        self.bpf_ctx_off = 0
 
     def clone(self):
         e = SymbolTableEntry(self.name, self.type, self.kind, self.ref)

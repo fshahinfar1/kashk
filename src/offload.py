@@ -1,4 +1,3 @@
-import sys
 import clang.cindex as clang
 
 from utility import parse_file, find_elem
@@ -28,6 +27,7 @@ from bpf_passes.reduce_params import reduce_params_pass
 
 from user_passes.select_user import select_user_pass
 from user_passes.number_fallback_graph import number_fallback_graph_pass
+from user_passes.var_dependency import var_dependency_pass
 from user_passes.create_fallback import create_fallback_pass
 
 
@@ -95,7 +95,8 @@ def generate_offload(file_path, entry_func_name, out_bpf, out_user):
     # Move function calls out of the ARG context!
     bpf = linear_code_pass(bpf, info, PassObject())
     for f in Function.directory.values():
-        f.body = linear_code_pass(f.body, info, PassObject())
+        with info.sym_tbl.with_func_scope(f.name):
+            f.body = linear_code_pass(f.body, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     ## Possible Path Analysis
@@ -124,6 +125,7 @@ def gen_user_code(user, info, out_user):
         select_user_pass(user, info, PassObject())
         number_fallback_graph_pass(info)
         user = create_fallback_pass(user, info, PassObject()) 
+        var_dependency_pass(user, info)
         text = generate_user_prog(info)
 
     with open(out_user, 'w') as f:

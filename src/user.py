@@ -3,6 +3,15 @@ from data_structure import Function
 from bpf_code_gen import gen_code
 from log import debug
 
+USER_EVENT_LOOP_ENTRY = '__user_event_loop_entry__'
+
+class Path:
+    def __init__(self):
+        self.code = None
+        self.var_deps = []
+        self.scope = None
+        self.original_scope = None
+
 
 class FallbackRegionGraph:
     def __init__(self):
@@ -15,11 +24,14 @@ class FallbackRegionGraph:
         # Id of paths that cross this node
         self.path_ids = []
 
-    def append(self, path):
+    def append(self, code):
         """
         Associate a path of code with this node
         """
+        path = Path()
+        path.code = code
         self.paths.append(path)
+        return path
 
     def add_child(self, node):
         self.children.append(node)
