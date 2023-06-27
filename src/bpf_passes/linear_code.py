@@ -77,6 +77,9 @@ def _separate_var_decl_and_init(inst, info, more):
     bin_op.lhs.add_inst(ref)
     bin_op.rhs.add_inst(rhs)
 
+    # If the declartion was ignored, also ignore the initialization
+    bin_op.bpf_ignore = clone.bpf_ignore
+
     blk.append(clone)
     return bin_op
 

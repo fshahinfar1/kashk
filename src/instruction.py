@@ -25,6 +25,7 @@ def _generate_marked_children(groups, context):
 class Instruction:
     def __init__(self):
         self.kind = None
+        self.bpf_ignore = False
 
     def has_children(self):
         if hasattr(self, 'body'):
@@ -114,6 +115,7 @@ class Call(Instruction):
         new.owner = list(self.owner)
         new.is_method = self.is_method
         new.is_operator = self.is_operator
+        new.bpf_ignore = self.bpf_ignore
         return new
 
 
@@ -163,6 +165,7 @@ class VarDecl(Instruction):
         if children:
             new.init = children[0]
         new.is_array = self.is_array
+        new.bpf_ignore = self.bpf_ignore
         return new
 
 
@@ -194,6 +197,7 @@ class ControlFlowInst(Instruction):
         new.cond = children[0]
         new.body = children[1]
         new.other_body = children[2]
+        new.bpf_ignore = self.bpf_ignore
         return new
 
 
@@ -230,6 +234,7 @@ class UnaryOp(Instruction):
         new = UnaryOp(self.cursor)
         new.op = self.op
         new.child = children[0]
+        new.bpf_ignore = self.bpf_ignore
         return new
 
 
@@ -280,6 +285,7 @@ class BinOp(Instruction):
         assert isinstance(children[0], Block)
         new.lhs = children[0]
         new.rhs = children[1]
+        new.bpf_ignore = self.bpf_ignore
         return new
 
 
@@ -306,6 +312,7 @@ class CaseSTMT(Instruction):
         new = CaseSTMT(self.cursor)
         new.case = children[0]
         new.body = children[1]
+        new.bpf_ignore = self.bpf_ignore
         return new
 
 
@@ -333,6 +340,7 @@ class ArrayAccess(Instruction):
         new = ArrayAccess(self.cursor)
         new.array_ref = children[0]
         new.index = children[1]
+        new.bpf_ignore = self.bpf_ignore
         return new
 
 
@@ -354,6 +362,7 @@ class Parenthesis(Instruction):
     def clone(self, children):
         new = Parenthesis()
         new.body = children[0]
+        new.bpf_ignore = self.bpf_ignore
         return new
 
 
@@ -377,6 +386,7 @@ class Cast(Instruction):
         new = Cast()
         new.cast_type = self.cast_type
         new.castee = children[0]
+        new.bpf_ignore = self.bpf_ignore
         return new
 
 
@@ -397,6 +407,7 @@ class Ref(Instruction):
         new.name = self.name
         clone_owner = list(self.owner)
         new.owner = clone_owner
+        new.bpf_ignore = self.bpf_ignore
         return new
 
 
@@ -411,6 +422,7 @@ class Literal(Instruction):
 
     def clone(self, _):
         new = Literal(self.text, self.kind)
+        new.bpf_ignore = self.bpf_ignore
         return new
 
 class ForLoop(Instruction):
@@ -441,6 +453,7 @@ class ForLoop(Instruction):
         new.cond = children[1]
         new.post = children[2]
         new.body = children[3]
+        new.bpf_ignore = self.bpf_ignore
         return new
 
 
@@ -471,6 +484,7 @@ class Block(Instruction):
     def clone(self, children):
         new = Block(self.tag)
         new.children = children[0]
+        new.bpf_ignore = self.bpf_ignore
         return new
 
 
@@ -485,6 +499,7 @@ class ToUserspace(Instruction):
         new = ToUserspace()
         new.is_bpf_main = self.is_bpf_main
         new.return_type = self.return_type
+        new.bpf_ignore = self.bpf_ignore
         return new
 
     @classmethod

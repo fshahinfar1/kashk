@@ -324,9 +324,6 @@ def gather_instructions_from(cursor, info, context=BODY):
                 or not should_process_this_file(c.location.file.name)):
             continue
 
-        if c.get_usr() in info.remove_cursor:
-            continue
-
         if (c.kind == clang.CursorKind.COMPOUND_STMT
                 or c.kind == clang.CursorKind.UNEXPOSED_EXPR):
             d.go_deep()
@@ -343,6 +340,8 @@ def gather_instructions_from(cursor, info, context=BODY):
             continue
 
         inst = __convert_cursor_to_inst(c, info)
+        if c.get_usr() in info.remove_cursor:
+            inst.bpf_ignore = True
         if inst:
             ops.append(inst)
     cb_ref.pop()

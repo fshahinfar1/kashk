@@ -8,6 +8,7 @@ from instruction import *
 
 from bpf_code_gen import gen_code
 from passes.pass_obj import PassObject
+from passes.clone import clone_pass
 
 
 MODULE_TAG = '[Possible Path Pass]'
@@ -102,6 +103,11 @@ def _do_pass(inst, info, more):
     new_children = []
     failed = more.get('failed', False)
 
+    if inst.bpf_ignore is True:
+        debug('ignore:', inst)
+        new_inst = clone_pass(inst, info, PassObject())
+        return new_inst
+
     with cb_ref.new_ref(ctx, parent_list):
         if failed:
             inst, failed = inst, failed
@@ -110,6 +116,8 @@ def _do_pass(inst, info, more):
             if failed:
                 blk = cb_ref.get(BODY)
                 _failed_to_generate_inst(inst, info, blk)
+                text, _ = gen_code([inst], info)
+                debug(MODULE_TAG, 'Go to userspace at instruction:', text)
                 more.failed = failed
 
         if inst is None:

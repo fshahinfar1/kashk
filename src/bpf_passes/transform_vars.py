@@ -82,6 +82,8 @@ def _do_pass(inst, info, more):
     lvl, ctx, parent_list = more.unpack()
     new_children = []
 
+    if inst.bpf_ignore is True:
+        return None
 
     with cb_ref.new_ref(ctx, parent_list):
         # Process current instruction
