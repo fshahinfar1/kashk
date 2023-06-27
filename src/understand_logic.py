@@ -342,6 +342,9 @@ def gather_instructions_from(cursor, info, context=BODY):
         inst = __convert_cursor_to_inst(c, info)
         if c.get_usr() in info.remove_cursor:
             inst.bpf_ignore = True
+        if 'socket' in c.type.spelling:
+            report_on_cursor(c)
+
         if inst:
             ops.append(inst)
     cb_ref.pop()

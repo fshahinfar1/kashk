@@ -5,10 +5,11 @@ from log import debug
 
 USER_EVENT_LOOP_ENTRY = '__user_event_loop_entry__'
 
+
 class Path:
     def __init__(self):
         self.code = None
-        self.var_deps = []
+        self.var_deps = set()
         self.scope = None
         self.original_scope = None
 

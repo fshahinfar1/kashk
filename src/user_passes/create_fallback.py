@@ -94,12 +94,14 @@ def _process_node(node, info):
                 call_inst.name = get_func_name()
                 new_func = func.clone2(call_inst.name, Function.directory)
                 new_func.body = Block(BODY)
-                new_func.args.clear()
                 new_functions.append(new_func)
 
                 # Create a new empty scope for the new function we want to define
                 new_scope = Scope()
                 info.sym_tbl.scope_mapping[call_inst.name] = new_scope
+                for arg in new_func.args:
+                    new_scope.insert_entry(arg.name, arg.type_ref,
+                            clang.CursorKind.PARM_DECL, None)
 
                 with info.sym_tbl.with_func_scope(call_inst.name):
                     with cb_ref.new_ref(new_func.body.tag, new_func.body):

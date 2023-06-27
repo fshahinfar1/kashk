@@ -104,7 +104,6 @@ def _do_pass(inst, info, more):
     failed = more.get('failed', False)
 
     if inst.bpf_ignore is True:
-        debug('ignore:', inst)
         new_inst = clone_pass(inst, info, PassObject())
         return new_inst
 
@@ -117,7 +116,7 @@ def _do_pass(inst, info, more):
                 blk = cb_ref.get(BODY)
                 _failed_to_generate_inst(inst, info, blk)
                 text, _ = gen_code([inst], info)
-                debug(MODULE_TAG, 'Go to userspace at instruction:', text)
+                # debug(MODULE_TAG, 'Go to userspace at instruction:', text)
                 more.failed = failed
 
         if inst is None:

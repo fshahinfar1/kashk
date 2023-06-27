@@ -126,6 +126,21 @@ def gen_user_code(user, info, out_user):
         number_fallback_graph_pass(info)
         user = create_fallback_pass(user, info, PassObject()) 
         var_dependency_pass(user, info)
+
+        # Look at the status
+        # q = [info.user_prog.graph, 0]
+        # lvl = 0
+        # while q:
+        #     node = q.pop()
+        #     if node == 0:
+        #         lvl += 1
+        #         continue
+        #     debug('lvl:', lvl)
+        #     for p in node.paths:
+        #         debug(p.var_deps)
+        #     q.extend(reversed(node.children))
+        #     q.append(0)
+
         text = generate_user_prog(info)
 
     with open(out_user, 'w') as f:
@@ -238,6 +253,7 @@ def find_read_write_bufs(ev_loop, info):
         info.wr_buf = PacketBuffer(buf_def)
         info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
         info.remove_cursor.add(remove_def.get_usr())
+
 
 
 def add_state_decl_to_bpf(prog, states, decls):

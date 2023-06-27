@@ -17,6 +17,17 @@ RHS = 3
 DEF = 4
 FUNC = 5
 
+def get_context_name(ctx):
+    return {
+            BODY: 'BODY',
+            ARG: 'ARG',
+            LHS: 'LHS',
+            RHS: 'RHS',
+            DEF: 'DEF',
+            FUNC: 'FUNC',
+            }[ctx]
+
+
 
 def _generate_marked_children(groups, context):
     return tuple(map(lambda x: (x, x.tag), groups))
