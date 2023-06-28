@@ -69,6 +69,9 @@ def _do_pass(inst, info, more):
 
             # Propagate the signal to caller context
             if func.may_fail:
+                # If we have already failed, then why are we considering this
+                # paths?
+                assert(more.in_user_land is False)
                 _set_in_userland(more)
 
     for child, tag in inst.get_children_context_marked():

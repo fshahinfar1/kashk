@@ -62,55 +62,63 @@ def _branch_to_path(p, ids):
     blk.add_inst(if_stmt)
 
 
+def _prepare_new_frame(node, code, info):
+    # The node has childrens, so
+    # I expect the first instruction contain a function invocation
+    first_inst = code.get_children()[0]
+    call_inst = None
+    func = None
+    if first_inst.kind == clang.CursorKind.CALL_EXPR:
+        call_inst = first_inst
+    elif first_inst.kind == clang.CursorKind.BINARY_OPERATOR:
+        if first_inst.op == '=' and first_inst.rhs.has_children():
+            tmp_inst = first_inst.rhs.children[0]
+            if tmp_inst.kind == clang.CursorKind.CALL_EXPR:
+                call_inst = tmp_inst
+
+    if call_inst:
+        func = call_inst.get_function_def()
+        if not func or not func.may_fail:
+            call_inst = None
+
+    # The case which the called function fails
+    if call_inst:
+        # Define a new function
+        call_inst.name = get_func_name()
+        new_func = func.clone2(call_inst.name, Function.directory)
+        new_func.body = Block(BODY)
+        new_functions.append(new_func)
+
+        # Create a new empty scope for the new function we want to define
+        new_scope = Scope()
+        info.sym_tbl.scope_mapping[call_inst.name] = new_scope
+        for arg in new_func.args:
+            new_scope.insert_entry(arg.name, arg.type_ref,
+                    clang.CursorKind.PARM_DECL, None)
+
+        with info.sym_tbl.with_func_scope(call_inst.name):
+            with cb_ref.new_ref(new_func.body.tag, new_func.body):
+                for child in node.children:
+                    # TODO: this looks bad, I probably have made logical error
+                    tmp = child.paths
+                    tmp.func_obj = new_func
+                    tmp.call_inst = call_inst
+                    _process_node(child, info)
+    else:
+        raise Exception('I have not implemented this case')
+
+
 def _process_node(node, info):
     # Paths are the codes that maybe run
-    for path in node.paths:
-        path.scope = info.sym_tbl.current_scope
+    path = node.paths
+    path.scope = info.sym_tbl.current_scope
 
-        p = path.code
-        failure_ids = node.path_ids
-        if len(node.children) > 0:
-            # The node has childrens, so
-            # I expect the first instruction contain a function invocation
-            first_inst = p.children[0]
-            call_inst = None
-            func = None
-            if first_inst.kind == clang.CursorKind.CALL_EXPR:
-                call_inst = first_inst
-            elif first_inst.kind == clang.CursorKind.BINARY_OPERATOR:
-                if first_inst.op == '=' and first_inst.rhs.has_children():
-                    tmp_inst = first_inst.rhs.children[0]
-                    if tmp_inst.kind == clang.CursorKind.CALL_EXPR:
-                        call_inst = tmp_inst
-                        func = call_inst.get_function_def()
-                        if not func or not func.may_fail:
-                            call_inst = None
+    code = path.code
+    failure_ids = node.path_ids
+    if len(node.children) > 0:
+        _prepare_new_frame(node, code, info)
 
-            # The case which the called function fails
-            if call_inst:
-                original_name = call_inst.name
-                # rename the function
-                # call_inst.name += '_fail_path_' + '_'.join(map(str, failure_ids))
-                call_inst.name = get_func_name()
-                new_func = func.clone2(call_inst.name, Function.directory)
-                new_func.body = Block(BODY)
-                new_functions.append(new_func)
-
-                # Create a new empty scope for the new function we want to define
-                new_scope = Scope()
-                info.sym_tbl.scope_mapping[call_inst.name] = new_scope
-                for arg in new_func.args:
-                    new_scope.insert_entry(arg.name, arg.type_ref,
-                            clang.CursorKind.PARM_DECL, None)
-
-                with info.sym_tbl.with_func_scope(call_inst.name):
-                    with cb_ref.new_ref(new_func.body.tag, new_func.body):
-                        for child in node.children:
-                            _process_node(child, info)
-            else:
-                raise Exception('I have not implemented this case')
-
-        _branch_to_path(p, failure_ids)
+    _branch_to_path(code, failure_ids)
 
 
 def create_fallback_pass(inst, info, more):
@@ -127,7 +135,6 @@ def create_fallback_pass(inst, info, more):
 
     with info.sym_tbl.with_func_scope(USER_EVENT_LOOP_ENTRY):
         with cb_ref.new_ref(entry.tag, entry):
-            # _do_pass(inst, info, more)
             _process_node(g, info)
     info.user_prog.fallback_funcs_def = new_functions
     return entry

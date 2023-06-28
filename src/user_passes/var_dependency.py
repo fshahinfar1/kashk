@@ -1,6 +1,6 @@
 import clang.cindex as clang
 from log import error, debug
-from sym_table import Scope
+from sym_table import Scope, SymbolAccessMode
 from utility import report_on_cursor
 from instruction import *
 
@@ -64,12 +64,17 @@ def _handle_reference(path, inst, info, ctx, parent_bin_op):
             if ctx == LHS and parent_bin_op.op == '=':
                 # writing to this unknow variable --> I do not need to share the result
                 # debug(f'not caring about {sym.name}')
-                pass
+                sym.is_accessed = SymbolAccessMode.FIRST_WRITE
             else:
+                sym.is_accessed = SymbolAccessMode.HAS_READ
                 path.var_deps.add(sym)
-                debug('external:', inst.name, 'type:', orig_sym.type.spelling,
-                        'Context:', get_context_name(ctx))
-
+                # debug('external:', inst.name, 'type:', orig_sym.type.spelling,
+                #         'Context:', get_context_name(ctx))
+    else:
+        if ctx == LHS and parent_bin_op.op == '=':
+            sym.is_accessed = SymbolAccessMode.FIRST_WRITE
+        else:
+            sym.is_accessed = SymbolAccessMode.HAS_READ
 
 
 def _analyse_var_dep_for_path(path, info):
@@ -95,29 +100,34 @@ def _analyse_var_dep_for_path(path, info):
 def _process_node(node, info):
     for c in node.children:
         _process_node(c, info)
-        for p2 in node.paths:
-            for p in c.paths:
-                for d in p.var_deps:
-                    p2.var_deps.add(d)
 
-    for p in node.paths:
-        _analyse_var_dep_for_path(p, info)
+        # Every variable that is needed in a child node is also needed in the
+        # parent because parent does not know about them.
+        for d in c.paths.var_deps:
+            node.paths.var_deps.add(d)
+
+        p = c.paths
+        func_obj = p.func_obj
+        if func_obj is not None:
+            remove = []
+            for i, arg in enumerate(func_obj.args):
+                sym = p.scope.lookup(arg.name)
+                # print(arg.name, p.code.children, p.scope, func_obj.name)
+                assert sym is not None
+                if sym.is_accessed != SymbolAccessMode.HAS_READ:
+                    debug(f'The variable {sym.name} is not needed in function argument of {func_obj.name}')
+                    remove.append(i)
+                else:
+                    debug(f'The variable {sym.name} is needed at {func_obj.name}')
+
+            for already_poped, pos in enumerate(remove):
+                pop_index = pos - already_poped
+                p.func_obj.args.pop(pop_index)
+                p.call_inst.args.pop(pop_index)
+
+    _analyse_var_dep_for_path(node.paths, info)
 
 
 def var_dependency_pass(inst, info):
     root = info.user_prog.graph
-
-    # test_scope = Scope()
-    # t_shar = info.sym_tbl.shared_scope
-    # t_glob = info.sym_tbl.global_scope
-    # t_cur = info.sym_tbl.current_scope
-    # info.sym_tbl.shared_scope = test_scope
-    # info.sym_tbl.global_scope = test_scope
-    # info.sym_tbl.current_scope = test_scope
-    # TODO: maybe share the global variables between both BPF and Userspace
-
     _process_node(root, info)
-
-    # info.sym_tbl.shared_scope = t_shar
-    # info.sym_tbl.global_scope = t_glob
-    # info.sym_tbl.current_scope = t_cur

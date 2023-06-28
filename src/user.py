@@ -8,10 +8,17 @@ USER_EVENT_LOOP_ENTRY = '__user_event_loop_entry__'
 
 class Path:
     def __init__(self):
+        # The code this path should execute
         self.code = None
+        # External variables that this path depend
         self.var_deps = set()
+        # The scope coresponding to this path
         self.scope = None
+        # The scope which originally holded this path
         self.original_scope = None
+        # Function definition which holds this path
+        self.func_obj = None
+        self.call_inst = None
 
 
 class FallbackRegionGraph:
@@ -21,7 +28,8 @@ class FallbackRegionGraph:
         # TODO: maybe use a set?
         self.children = []
         # Codes associated with this node
-        self.paths = []
+        # self.paths = []
+        self.paths = None
         # Id of paths that cross this node
         self.path_ids = []
 
@@ -29,16 +37,19 @@ class FallbackRegionGraph:
         """
         Associate a path of code with this node
         """
+        assert self.paths is None
         path = Path()
         path.code = code
-        self.paths.append(path)
+        # self.paths.append(path)
+        self.paths = path
         return path
 
     def add_child(self, node):
         self.children.append(node)
 
     def is_empty(self):
-        return len(self.children) == 0 and len(self.paths) == 0
+        # return len(self.children) == 0 and len(self.paths) == 0
+        return len(self.children) == 0 and self.paths is None
 
     def is_leaf(self):
         return len(self.children) == 0
@@ -51,7 +62,8 @@ class FallbackRegionGraph:
         # TODO: what happens to the children?
         assert len(self.children) == 0
 
-        self.paths.clear()
+        # self.paths.clear()
+        self.paths = None
 
     def remove_child(self, child):
         self.children.remove(child)
@@ -115,10 +127,11 @@ class UserProg:
             g, lvl = q.pop()
 
             debug('level:', lvl)
-            for p in g.paths:
-                text, _ = gen_code(p, info)
-                debug(text)
-                debug('----')
+            # for p in g.paths:
+            p = g.paths
+            text, _ = gen_code(p, info)
+            debug(text)
+            debug('----')
 
             next_lvl = lvl + 1
             for c in reversed(g.children):

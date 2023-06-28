@@ -128,18 +128,17 @@ def gen_user_code(user, info, out_user):
         var_dependency_pass(user, info)
 
         # Look at the status
-        # q = [info.user_prog.graph, 0]
-        # lvl = 0
-        # while q:
-        #     node = q.pop()
-        #     if node == 0:
-        #         lvl += 1
-        #         continue
-        #     debug('lvl:', lvl)
-        #     for p in node.paths:
-        #         debug(p.var_deps)
-        #     q.extend(reversed(node.children))
-        #     q.append(0)
+        q = [info.user_prog.graph, 0]
+        lvl = 0
+        while q:
+            node = q.pop()
+            if node == 0:
+                lvl += 1
+                continue
+            debug('lvl:', lvl)
+            debug(node.paths.var_deps)
+            q.extend(reversed(node.children))
+            q.append(0)
 
         text = generate_user_prog(info)
 

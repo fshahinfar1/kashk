@@ -4,6 +4,12 @@ import pprint
 from log import error, debug
 
 
+class SymbolAccessMode:
+    NOT_ACCESSED = 0
+    FIRST_WRITE = 1
+    HAS_READ = 2
+
+
 class SymbolTableEntry:
     def __init__(self, name, type_, kind, ref):
         self.name = name
@@ -16,6 +22,7 @@ class SymbolTableEntry:
         else:
             self.is_pointer = False
         self.is_bpf_ctx = False
+        self.is_accessed = SymbolAccessMode.NOT_ACCESSED
 
     def clone(self):
         e = SymbolTableEntry(self.name, self.type, self.kind, self.ref)
