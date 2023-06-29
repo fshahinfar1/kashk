@@ -5,6 +5,7 @@ from log import error, debug
 from instruction import *
 from sym_table import Scope
 from user import USER_EVENT_LOOP_ENTRY
+from user import Path
 
 from passes.pass_obj import PassObject
 from passes.clone import clone_pass
@@ -70,7 +71,7 @@ def _get_call_inst(inst):
     return call_inst
 
 
-def _starts_with_func_call(node, info):
+def _starts_with_func_call(node, info, child):
     if not node.has_code():
         return None, None, None
 
@@ -105,22 +106,30 @@ def _starts_with_func_call(node, info):
     for arg in new_func.args:
         new_scope.insert_entry(arg.name, arg.type_ref,
                 clang.CursorKind.PARM_DECL, None)
+
+    obj = child.paths
+    obj.func_obj = new_func
+    obj.call_inst = call_inst
+
     return call_inst, new_func, clone_first_inst
 
 
 
 def _process_node(node, info):
+    synth_orig_scope = False
+    if node.paths is None:
+        node.paths = Path()
+        node.paths.original_scope = Scope()
+        synth_orig_scope = True
+
     blk = Block(BODY)
     for child in node.children:
-        call_inst, new_func, first_inst = _starts_with_func_call(node, info)
+        call_inst, new_func, first_inst = _starts_with_func_call(node, info, child)
         if new_func is None:
             body = _process_node(child, info)
         else:
             with info.sym_tbl.with_func_scope(call_inst.name):
                 body = _process_node(child, info)
-                obj = child.paths
-                obj.func_obj = new_func
-                obj.call_inst = call_inst
                 new_func.body = body
 
         # Check if there are multiple failure path or just one!
@@ -140,11 +149,13 @@ def _process_node(node, info):
                 blk.add_inst(first_inst)
                 node.paths.code.children.pop(0)
 
-
     if node.has_code():
         insts = node.paths.code.get_children()
         blk.extend_inst(insts)
+
     assert blk.has_children()
+    node.paths.code = blk
+    node.paths.scope = info.sym_tbl.current_scope
     return blk
 
 

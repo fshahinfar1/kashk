@@ -82,7 +82,7 @@ class FallbackRegionGraph:
             self.parent.set_id(i)
 
     def has_code(self):
-        return self.paths is not None
+        return self.paths is not None and self.paths.code is not None
 
 
 class UserProg:
