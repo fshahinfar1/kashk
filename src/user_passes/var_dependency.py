@@ -90,7 +90,6 @@ def _analyse_var_dep_for_path(path, info):
 
     # DFS
     queue = list(_get_children(block, None))
-    debug(queue)
     while queue:
         inst, ctx, parent_bin_op = queue.pop()
 

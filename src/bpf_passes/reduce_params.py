@@ -95,8 +95,7 @@ def _function_check_param_reduc(inst, func, info, more):
         # Add this new struct to the definition list
         rec = Record(change.struct_name, change.list_of_params)
         rec.update_symbol_table(info.sym_tbl)
-        text = rec.get_c_code()
-        info.prog.add_declaration(text)
+        info.prog.add_declaration(rec)
     
     # Go through the body of the function and replace the variables or check
     # for other function invocations.

@@ -355,6 +355,8 @@ def gen_code(list_instructions, info, context=BODY):
             if not text:
                 # We do not want this definition
                 continue
+            if isinstance(inst, Record):
+                text += ';\n'
         else:
             # Some special rules
             if inst.kind == clang.CursorKind.CALL_EXPR and inst.name == 'operator<<':
