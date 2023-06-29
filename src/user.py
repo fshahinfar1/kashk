@@ -81,6 +81,9 @@ class FallbackRegionGraph:
         if self.parent is not None:
             self.parent.set_id(i)
 
+    def has_code(self):
+        return self.paths is not None
+
 
 class UserProg:
     """

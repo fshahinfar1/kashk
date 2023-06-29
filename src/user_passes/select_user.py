@@ -40,6 +40,8 @@ def _init_userland_signal(obj):
 
 
 def _do_pass(inst, info, more):
+    global user_graph_node
+
     lvl = more.lvl
     ctx = more.ctx
     if not hasattr(more, 'in_user_land'):
@@ -51,21 +53,23 @@ def _do_pass(inst, info, more):
     #     debug(f'{lvl:3d}', ("|" * lvl) + '+->', inst, f'(signal:{more.in_user_land})')
 
     if inst.kind == TO_USERSPACE_INST:
-        # debug('reach "to user space inst"')
+        debug('reach "to user space inst"')
         _set_in_userland(more)
     elif inst.kind == clang.CursorKind.CALL_EXPR:
         func = inst.get_function_def()
         if func:
             node = user_graph_node.new_child()
             # Step inside the function
-            # debug('Investigate:', inst.name)
+            debug('Investigate:', inst.name)
             obj = PassObject()
             with graph_node(node):
                 with info.sym_tbl.with_func_scope(inst.name):
                     ret = _do_pass(func.body, info, obj)
-                if node.is_empty():
-                    node.remove()
-            # debug (f'step out of function: {inst.name} and userland state in function is: {obj.in_user_land}')
+                # It is important that the code which check the user_graph_node
+                # be in the context of "graph_node(node)"
+                if user_graph_node.is_empty():
+                    user_graph_node.remove()
+            debug (f'step out of function: {inst.name} and userland state in function is: {obj.in_user_land}')
 
             # Propagate the signal to caller context
             if func.may_fail:
@@ -105,10 +109,10 @@ def _do_pass(inst, info, more):
             # The userland boundy was found in this block. And this block
             # has ended.
 
-            # debug('---------------------------------')
+            debug('---------------------------------')
             # debug('## number of user inst:', len(more.remember))
-            # debug(more.remember)
-            # debug('---------------------------------')
+            debug(more.remember)
+            debug('---------------------------------')
 
             # TODO: I might want to postpone this to the upper block
 
@@ -119,9 +123,17 @@ def _do_pass(inst, info, more):
 
             # Set the signal off! do not propagate.
             _init_userland_signal(more)
+            # Create a new node
+            node = user_graph_node.parent.new_child()
+            user_graph_node = node
 
 
 def select_user_pass(inst, info, more):
     # Initialize the pass
-    with graph_node(info.user_prog.graph):
-        return _do_pass(inst, info, more)
+    node = info.user_prog.graph.new_child()
+    with graph_node(node):
+        ret = _do_pass(inst, info, more)
+        if user_graph_node.is_empty():
+            user_graph_node.remove()
+
+    return ret

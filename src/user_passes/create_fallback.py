@@ -1,30 +1,28 @@
 import itertools
 import clang.cindex as clang
 
-from bpf_code_gen import gen_code
 from log import error, debug
-from data_structure import *
 from instruction import *
 from sym_table import Scope
 from user import USER_EVENT_LOOP_ENTRY
 
+from passes.pass_obj import PassObject
+from passes.clone import clone_pass
+
 
 MODULE_TAG = '[Create Fallback Pass]'
-cb_ref = CodeBlockRef()
 new_functions = []
 
 
 fnum = 1
-def get_func_name():
+def _get_func_name():
     global fnum
     name = f'f{fnum}'
     fnum += 1
     return name
 
 
-def _branch_to_path(p, ids):
-    blk = cb_ref.get(BODY)
-
+def _generate_id_check(ids):
     if_stmt = ControlFlowInst()
     if_stmt.kind = clang.CursorKind.IF_STMT
 
@@ -57,84 +55,107 @@ def _branch_to_path(p, ids):
     else:
         cond = id_checks[0]
     if_stmt.cond.add_inst(cond)
-    if_stmt.body = p
-
-    blk.add_inst(if_stmt)
+    return if_stmt
 
 
-def _prepare_new_frame(node, code, info):
-    # The node has childrens, so
-    # I expect the first instruction contain a function invocation
-    first_inst = code.get_children()[0]
+def _get_call_inst(inst):
     call_inst = None
-    func = None
-    if first_inst.kind == clang.CursorKind.CALL_EXPR:
-        call_inst = first_inst
-    elif first_inst.kind == clang.CursorKind.BINARY_OPERATOR:
-        if first_inst.op == '=' and first_inst.rhs.has_children():
-            tmp_inst = first_inst.rhs.children[0]
+    if inst.kind == clang.CursorKind.CALL_EXPR:
+        call_inst = inst
+    elif inst.kind == clang.CursorKind.BINARY_OPERATOR:
+        if inst.op == '=' and inst.rhs.has_children():
+            tmp_inst = inst.rhs.children[0]
             if tmp_inst.kind == clang.CursorKind.CALL_EXPR:
                 call_inst = tmp_inst
+    return call_inst
+
+
+def _starts_with_func_call(node, info):
+    if not node.has_code():
+        return None, None, None
+
+    code = node.paths.code
+    if not code.has_children():
+        return None, None, None
+
+    first_inst = code.get_children()[0]
+    func = None
+    call_inst = _get_call_inst(first_inst)
 
     if call_inst:
         func = call_inst.get_function_def()
         if not func or not func.may_fail:
             call_inst = None
 
-    # The case which the called function fails
-    if call_inst:
-        # Define a new function
-        call_inst.name = get_func_name()
-        new_func = func.clone2(call_inst.name, Function.directory)
-        new_func.body = Block(BODY)
-        new_functions.append(new_func)
+    if not call_inst:
+        return None, None, None
 
-        # Create a new empty scope for the new function we want to define
-        new_scope = Scope()
-        info.sym_tbl.scope_mapping[call_inst.name] = new_scope
-        for arg in new_func.args:
-            new_scope.insert_entry(arg.name, arg.type_ref,
-                    clang.CursorKind.PARM_DECL, None)
+    # Define a new function
+    clone_first_inst = clone_pass(first_inst, info, PassObject())
+    call_inst = _get_call_inst(clone_first_inst)
 
-        with info.sym_tbl.with_func_scope(call_inst.name):
-            with cb_ref.new_ref(new_func.body.tag, new_func.body):
-                for child in node.children:
-                    # TODO: this looks bad, I probably have made logical error
-                    tmp = child.paths
-                    tmp.func_obj = new_func
-                    tmp.call_inst = call_inst
-                    _process_node(child, info)
-    else:
-        raise Exception('I have not implemented this case')
+    call_inst.name = _get_func_name()
+    new_func = func.clone2(call_inst.name, Function.directory)
+    new_func.body = Block(BODY)
+    new_functions.append(new_func)
+
+    # Create a new empty scope for the new function we want to define
+    new_scope = Scope()
+    info.sym_tbl.scope_mapping[call_inst.name] = new_scope
+    for arg in new_func.args:
+        new_scope.insert_entry(arg.name, arg.type_ref,
+                clang.CursorKind.PARM_DECL, None)
+    return call_inst, new_func, clone_first_inst
+
 
 
 def _process_node(node, info):
-    # Paths are the codes that maybe run
-    path = node.paths
-    path.scope = info.sym_tbl.current_scope
+    blk = Block(BODY)
+    for child in node.children:
+        call_inst, new_func, first_inst = _starts_with_func_call(node, info)
+        if new_func is None:
+            body = _process_node(child, info)
+        else:
+            with info.sym_tbl.with_func_scope(call_inst.name):
+                body = _process_node(child, info)
+                obj = child.paths
+                obj.func_obj = new_func
+                obj.call_inst = call_inst
+                new_func.body = body
 
-    code = path.code
-    failure_ids = node.path_ids
-    if len(node.children) > 0:
-        _prepare_new_frame(node, code, info)
+        # Check if there are multiple failure path or just one!
+        if len(node.path_ids) > 1:
+            if_inst = _generate_id_check(node.path_ids)
+            if new_func is None:
+                if_inst.body = body
+            else:
+                if_inst.body.add_inst(first_inst)
+                # remove the first instruction
+                node.paths.code.children.pop(0)
+            blk.add_inst(if_inst)
+        else:
+            if new_func is None:
+                blk.extend_inst(body.children)
+            else:
+                blk.add_inst(first_inst)
+                node.paths.code.children.pop(0)
 
-    _branch_to_path(code, failure_ids)
+
+    if node.has_code():
+        insts = node.paths.code.get_children()
+        blk.extend_inst(insts)
+    assert blk.has_children()
+    return blk
 
 
 def create_fallback_pass(inst, info, more):
-    # TODO: The user program graph is not generated in a way that supports all
-    # the cases. It needs improvement.
-    # TODO: create the state loading and path selection code here
-    # TODO: load the failure_number
-    entry = Block(BODY)
-    info.user_prog.entry_body = entry
     g = info.user_prog.graph
 
     new_scope = Scope()
     info.sym_tbl.scope_mapping[USER_EVENT_LOOP_ENTRY] = new_scope
 
     with info.sym_tbl.with_func_scope(USER_EVENT_LOOP_ENTRY):
-        with cb_ref.new_ref(entry.tag, entry):
-            _process_node(g, info)
+        body = _process_node(g, info)
     info.user_prog.fallback_funcs_def = new_functions
-    return entry
+    info.user_prog.entry_body = body
+    return body
