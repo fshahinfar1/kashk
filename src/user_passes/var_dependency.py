@@ -63,21 +63,22 @@ def _handle_reference(path, inst, info, ctx, parent_bin_op):
         if orig_sym is None:
             error(f'Variable {inst.name} was not found in the symbol table! Assuming it is not needed in userspace')
         elif _should_not_share_variable(inst, orig_sym, info):
-            debug('not share:', inst.name, 'type:', orig_sym.type.spelling)
+            # debug('not share:', inst.name, 'type:', orig_sym.type.spelling)
             pass
         else:
             sym = path.scope.insert_entry(inst.name, orig_sym.type, orig_sym.kind, None)
             if ctx == LHS and parent_bin_op.op == '=':
                 # writing to this unknow variable --> I do not need to share the result
-                debug(f'not caring about {sym.name}')
+                # debug(f'not caring about {sym.name}')
                 sym.is_accessed = SymbolAccessMode.FIRST_WRITE
             else:
                 sym.is_accessed = SymbolAccessMode.HAS_READ
                 path.var_deps.add(sym)
-                debug('external:', inst.name, 'type:', orig_sym.type.spelling,
-                        'Context:', get_context_name(ctx))
+                # debug('external:', inst.name, 'type:', orig_sym.type.spelling,
+                #         'Context:', get_context_name(ctx))
                 if ctx == LHS:
-                    debug(parent_bin_op.op)
+                    # debug(parent_bin_op.op)
+                    pass
     else:
         if ctx == LHS and parent_bin_op.op == '=':
             sym.is_accessed = SymbolAccessMode.FIRST_WRITE
@@ -117,10 +118,11 @@ def _remove_unused_args(func_obj, call_inst, scope):
         # print(arg.name, p.code.children, p.scope, func_obj.name)
         assert sym is not None
         if sym.is_accessed != SymbolAccessMode.HAS_READ:
-            debug(f'The variable {sym.name} is not needed in function argument of {func_obj.name}')
+            # debug(f'The variable {sym.name} is not needed in function argument of {func_obj.name}')
             remove.append(i)
         else:
-            debug(f'The variable {sym.name} is needed at {func_obj.name}')
+            # debug(f'The variable {sym.name} is needed at {func_obj.name}')
+            pass
 
     for already_poped, pos in enumerate(remove):
         pop_index = pos - already_poped
@@ -132,6 +134,7 @@ def _process_node(node, info):
     for child in node.children:
         _process_node(child, info)
 
+        # TODO: seperate it for different paths.
         # Every variable that is needed in a child node is also needed in the
         # parent because parent does not know about them.
         for d in child.paths.var_deps:

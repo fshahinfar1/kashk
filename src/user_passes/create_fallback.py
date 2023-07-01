@@ -94,6 +94,7 @@ def _starts_with_func_call(node, info, child):
     # Define a new function
     clone_first_inst = clone_pass(first_inst, info, PassObject())
     call_inst = _get_call_inst(clone_first_inst)
+    assert call_inst is not None
 
     call_inst.name = _get_func_name()
     new_func = func.clone2(call_inst.name, Function.directory)

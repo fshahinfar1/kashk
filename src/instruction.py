@@ -283,19 +283,19 @@ class BinOp(Instruction):
         return True
 
     def get_children(self):
-        return (self.lhs, self.rhs)
+        return (self.rhs, self.lhs)
 
     def get_children_context_marked(self):
         context = (ARG, ARG)
-        groups = (self.lhs, self.rhs)
+        groups = (self.rhs, self.lhs)
         return _generate_marked_children(groups, context)
 
     def clone(self, children):
         new = BinOp(None)
         new.op = self.op
         assert isinstance(children[0], Block)
-        new.lhs = children[0]
-        new.rhs = children[1]
+        new.rhs = children[0]
+        new.lhs = children[1]
         new.bpf_ignore = self.bpf_ignore
         return new
 

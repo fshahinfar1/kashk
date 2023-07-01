@@ -96,6 +96,7 @@ class UserProg:
         self.func_dir = None
         self.entry_body = None
         self.fallback_funcs_def = []
+        self.declarations = []
 
     @contextmanager
     def select_context(self, info):
@@ -146,6 +147,10 @@ def generate_user_prog(info):
     Generate the final userspace program
     """
     code = []
+
+    declarations, _ = gen_code(info.user_prog.declarations, info)
+    code.append(declarations)
+    code.append('\n')
 
     func_text, _ = gen_code(info.user_prog.fallback_funcs_def, info)
     code.append(func_text)

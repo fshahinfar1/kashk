@@ -63,10 +63,10 @@ def generate_offload(file_path, entry_func_name, out_bpf, out_user):
         body_of_loop = list(entry_func.get_children())[-1]
         insts = gather_instructions_under(body_of_loop, info, BODY)
     else:
-        # All declerations between event loop is shared among multiple packets of
+        # All declarations between event loop is shared among multiple packets of
         # one connection
-        all_declerations_before_loop = get_variable_declaration_before_elem(entry_func, ev_loop, info)
-        for d in all_declerations_before_loop:
+        all_declarations_before_loop = get_variable_declaration_before_elem(entry_func, ev_loop, info)
+        for d in all_declarations_before_loop:
             states, decls = get_state_for(d.cursor)
             add_state_decl_to_bpf(info.prog, states, decls)
             for s in states:
@@ -113,8 +113,8 @@ def generate_offload(file_path, entry_func_name, out_bpf, out_user):
         new_f = func.clone(info.user_prog.func_dir)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
-    gen_bpf_code(bpf, info, out_bpf)
     gen_user_code(user, info, out_user)
+    gen_bpf_code(bpf, info, out_bpf)
 
 
 def gen_user_code(user, info, out_user):
@@ -141,18 +141,34 @@ def gen_user_code(user, info, out_user):
         var_dependency_pass(user, info)
 
         # Look at the status
-        q = [info.user_prog.graph, 0]
-        lvl = 0
-        while q:
-            node = q.pop()
-            if node == 0:
-                lvl += 1
-                continue
-            debug('lvl:', lvl)
-            debug(node.paths.var_deps)
-            q.extend(reversed(node.children))
-            q.append(0)
+        # q = [info.user_prog.graph, 0]
+        # lvl = 0
+        # while q:
+        #     node = q.pop()
+        #     if node == 0:
+        #         lvl += 1
+        #         continue
+        #     debug('lvl:', lvl)
+        #     debug(node.paths.var_deps)
+        #     q.extend(reversed(node.children))
+        #     q.append(0)
 
+        # debug(info.user_prog.graph.paths.var_deps)
+        fields = []
+        for var in info.user_prog.graph.paths.var_deps:
+            T = MyType()
+            T.kind = var.type.kind
+            T.spelling = var.type.spelling
+            state_obj = StateObject(None)
+            state_obj.name = var.name
+            state_obj.type = T.spelling
+            state_obj.type_ref = T
+            fields.append(state_obj)
+        meta = Record('meta', fields)
+        info.prog.add_declaration(meta)
+        info.user_prog.declarations.append(meta)
+
+        # Generate the user code in the context of userspace program
         text = generate_user_prog(info)
 
     with open(out_user, 'w') as f:

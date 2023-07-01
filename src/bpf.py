@@ -7,7 +7,6 @@ from log import debug
 class SK_SKB_PROG:
     def __init__(self):
         self.connection_state = []
-        self._decs = set()
         self.declarations = []
         self.parser_code = []
         self.verdict_code = []
@@ -46,9 +45,7 @@ class SK_SKB_PROG:
         self.connection_state.append(state)
 
     def add_declaration(self, text):
-        if text not in self._decs:
-            self._decs.add(text)
-            self.declarations.append(text)
+        self.declarations.append(text)
 
     def _per_connection_state(self):
         return ([
