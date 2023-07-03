@@ -6,7 +6,7 @@ from utility import (find_elem, get_code, generate_struct_with_fields,
 from bpf import SK_SKB_PROG
 from data_structure import *
 
-from prune import should_process_this_cursor
+from prune import should_process_this_cursor, get_namespace_of_cursor
 
 
 # TODO: I have messed up finding the right type, I should refactor, rewrite
@@ -81,6 +81,11 @@ def extract_state(cursor):
     for c in cursor.type.get_fields():
         obj = StateObject(c)
         if c.type.kind in (clang.TypeKind.RECORD, clang.TypeKind.ELABORATED):
+            # Check that the field is not a ASIO type
+            ns = get_namespace_of_cursor(c)
+            if ns == 'asio':
+                continue
+
             d = generate_decleration_for(c)
             decl += d
         states.append(obj)

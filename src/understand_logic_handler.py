@@ -6,14 +6,10 @@ from prune import READ_PACKET, WRITE_PACKET
 from data_structure import *
 from instruction import *
 from understand_logic import (gather_instructions_from,
-        gather_instructions_under, cb_ref)
+        gather_instructions_under, cb_ref, get_global_for_bpf)
 from sym_table import *
 
-from prune import should_process_this_file
-#, READ_PACKET, WRITE_PACKET
-
-# from bpf_code_gen import gen_code
-# from template import bpf_get_data, send_response_template
+from prune import should_process_this_cursor
 
 
 COROUTINE_FUNC_NAME = ('await_resume', 'await_transform', 'await_ready', 'await_suspend')
@@ -25,9 +21,7 @@ def __function_is_of_interest(inst):
     """
     cursor = inst.cursor
     definition = cursor.get_definition()
-    if (not definition
-            or not definition.location.file
-            or not should_process_this_file(definition.location.file.name)):
+    if (not definition or not should_process_this_cursor(definition)):
         return False
     if inst.name.startswith('operator'):
         # TODO: I do not want operators for now. But It would be good to
@@ -183,7 +177,9 @@ def understand_call_expr(c, info):
     inst.args = __get_func_args(inst, info)
 
     # check if function is defined
-    if __function_is_of_interest(inst) and inst.name not in Function.directory:
+    if (get_global_for_bpf()
+            and __function_is_of_interest(inst)
+            and inst.name not in Function.directory):
         __add_func_definition(inst, info)
 
     return inst

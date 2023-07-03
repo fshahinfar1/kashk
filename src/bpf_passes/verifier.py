@@ -89,7 +89,6 @@ END_BLOCK = 202
 
 
 def _handle_binop(inst, info, more):
-    # debug(inst.lhs.children, inst.op, inst.rhs.children)
     lhs = inst.lhs.children[0]
     rhs = inst.rhs.children[0]
     # Track which variables are pointer to the BPF context

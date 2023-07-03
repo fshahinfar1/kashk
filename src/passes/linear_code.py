@@ -51,8 +51,12 @@ def _move_function_out(inst, info, more):
         bin_op = BinOp(None)
         bin_op.op = '='
         bin_op.lhs.add_inst(tmp_ref)
-        bin_op.rhs.add_inst(inst)
+        cloned_inst = clone_pass(inst, info, PassObject())
+        bin_op.rhs.add_inst(cloned_inst)
         blk.append(bin_op)
+
+        tmp_decl.bpf_ignore = cloned_inst.bpf_ignore
+        bin_op.bpf_ignore = cloned_inst.bpf_ignore
 
         # Use a variable instead of function call
         return tmp_ref.clone([])

@@ -1,11 +1,12 @@
 import itertools
+from contextlib import contextmanager
 import clang.cindex as clang
 
 from log import error
 from utility import get_code, report_on_cursor, visualize_ast, get_owner
 from data_structure import *
 from instruction import *
-from prune import (should_process_this_file, READ_PACKET, WRITE_PACKET)
+from prune import (should_process_this_cursor, READ_PACKET, WRITE_PACKET)
 from understand_program_state import get_state_for
 
 from dfs import DFSPass
@@ -116,8 +117,11 @@ def __convert_cursor_to_inst(c, info):
             or c.kind == clang.CursorKind.COMPOUND_ASSIGNMENT_OPERATOR):
         inst = BinOp(c)
         children = c.get_children()
-        inst.lhs.extend_inst(gather_instructions_from(next(children), info, context=LHS))
-        inst.rhs.extend_inst(gather_instructions_from(next(children), info, context=RHS))
+        lhs_inst = gather_instructions_from(next(children), info, context=LHS)[0]
+        inst.lhs.add_inst(lhs_inst)
+        rhs_inst = gather_instructions_from(next(children), info, context=RHS)[0]
+        inst.rhs.add_inst(rhs_inst)
+        inst.bpf_ignore = lhs_inst.bpf_ignore or rhs_inst.bpf_ignore
         return inst
     elif (c.kind == clang.CursorKind.UNARY_OPERATOR
             or c.kind == clang.CursorKind.CXX_UNARY_EXPR):
@@ -312,7 +316,24 @@ def __convert_cursor_to_inst(c, info):
         return None
 
 
+code_for_bpf = True
+def get_global_for_bpf():
+    return code_for_bpf
+
+
+@contextmanager
+def set_global_for_bpf(val):
+    global code_for_bpf
+    tmp = code_for_bpf
+    code_for_bpf = val
+    try:
+        yield None
+    finally:
+        code_for_bpf = tmp
+
+
 def gather_instructions_from(cursor, info, context=BODY):
+
     """
     Convert the cursor to a instruction
     """
@@ -320,8 +341,12 @@ def gather_instructions_from(cursor, info, context=BODY):
     cb_ref.push(context, ops)
     d = DFSPass(cursor)
     for c, lvl in d:
-        if (not c.location.file
-                or not should_process_this_file(c.location.file.name)):
+        if not should_process_this_cursor(c):
+            with set_global_for_bpf(False):
+                inst = __convert_cursor_to_inst(c, info)
+                if inst:
+                    inst.bpf_ignore = True
+                    ops.append(inst)
             continue
 
         if (c.kind == clang.CursorKind.COMPOUND_STMT
@@ -339,9 +364,12 @@ def gather_instructions_from(cursor, info, context=BODY):
             d.enque(children[0], lvl+1)
             continue
 
-        inst = __convert_cursor_to_inst(c, info)
         if c.get_usr() in info.remove_cursor:
-            inst.bpf_ignore = True
+            with set_global_for_bpf(False):
+                inst = __convert_cursor_to_inst(c, info)
+                inst.bpf_ignore = True
+        else:
+            inst = __convert_cursor_to_inst(c, info)
 
         if inst:
             ops.append(inst)
