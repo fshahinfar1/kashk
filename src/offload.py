@@ -16,9 +16,9 @@ from sym_table_gen import build_sym_table
 
 from passes.pass_obj import PassObject
 from passes.clone import clone_pass
+from passes.linear_code import linear_code_pass
 # from passes.cfg_gen import cfg_gen_pass
 
-from bpf_passes.linear_code import linear_code_pass
 from bpf_passes.possible_path_analysis import possible_path_analysis_pass
 from bpf_passes.transform_vars import transform_vars_pass
 from bpf_passes.userspace_fallback import userspace_fallback_pass
