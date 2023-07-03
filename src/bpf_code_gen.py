@@ -311,6 +311,7 @@ jump_table = {
         clang.CursorKind.CHARACTER_LITERAL: handle_literal,
         clang.CursorKind.STRING_LITERAL: handle_literal,
         clang.CursorKind.CXX_BOOL_LITERAL_EXPR: handle_literal,
+        clang.CursorKind.MACRO_INSTANTIATION: handle_literal,
         CODE_LITERAL: handle_literal,
         # Control FLow
         clang.CursorKind.IF_STMT: handle_if_stmt,

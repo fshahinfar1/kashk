@@ -19,6 +19,7 @@ from passes.clone import clone_pass
 from passes.linear_code import linear_code_pass
 # from passes.cfg_gen import cfg_gen_pass
 
+from bpf_passes.loop_end import loop_end_pass
 from bpf_passes.possible_path_analysis import possible_path_analysis_pass
 from bpf_passes.transform_vars import transform_vars_pass
 from bpf_passes.userspace_fallback import userspace_fallback_pass
@@ -176,6 +177,10 @@ def gen_user_code(user, info, out_user):
 
 
 def gen_bpf_code(bpf, info, out_bpf):
+    # End event loop with packet drop
+    bpf = loop_end_pass(bpf, info, PassObject())
+    debug('~~~~~~~~~~~~~~~~~~~~~')
+
     # Transform access to variables and read/write buffers.
     bpf = transform_vars_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')

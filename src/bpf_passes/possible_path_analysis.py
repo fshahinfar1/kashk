@@ -125,7 +125,7 @@ def _do_pass(inst, info, more):
 
         # Continue deeper
         for child, tag in inst.get_children_context_marked():
-            obj = PassObject.pack(lvl, tag, parent_list)
+            obj = PassObject.pack(lvl + 1, tag, parent_list)
             obj.failed = failed
             new_child = _process_child(child, inst, info, obj)
             if new_child is None:
