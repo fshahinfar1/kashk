@@ -96,8 +96,23 @@ def _handle_function_may_fail(inst, func, info, more):
         tmp = Literal('/* check if function fail */\n', CODE_LITERAL)
         after_func_call.append(tmp)
         if current_function == None:
+            code = '''
+__adjust_skb_size(skb, sizeof(struct meta));
+if (((void *)(__u64)skb->data + sizeof(struct meta))  > (void *)(__u64)skb->data_end) {
+  return SK_DROP;
+}
+struct meta *__m = (void *)(__u64)skb->data;
+'''
+            # TODO: I need to know the failure number and failure structure
+            meta = info.user_prog.declarations[0]
+            store = []
+            for f in meta.fields: 
+                store.append(f'__m->{f.name} = {f.name};')
+
+            code += '\n'.join(store) + '\n'
+
             # we are in the bpf function
-            return_stmt = '/*Go to userspace */\n  return SK_PASS;\n'
+            return_stmt = code + '/*Go to userspace */\n  return SK_PASS;\n'
         elif func.return_type.spelling == 'void':
             return_stmt = 'return;'
         else:
