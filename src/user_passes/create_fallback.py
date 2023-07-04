@@ -71,24 +71,21 @@ def _get_call_inst(inst):
     return call_inst
 
 
-def _starts_with_func_call(node, info, child):
+def _starts_with_func_call(node, info):
     if not node.has_code():
         return None, None, None
 
     code = node.paths.code
-    if not code.has_children():
-        return None, None, None
-
-    first_inst = code.get_children()[0]
+    first_inst = code.children[0]
     func = None
     call_inst = _get_call_inst(first_inst)
 
-    if call_inst:
-        func = call_inst.get_function_def()
-        if not func or not func.may_fail:
-            call_inst = None
-
     if not call_inst:
+        return None, None, None
+
+    func = call_inst.get_function_def()
+    if not func:
+        assert func.may_fail
         return None, None, None
 
     # Define a new function
@@ -105,53 +102,56 @@ def _starts_with_func_call(node, info, child):
     new_scope = Scope()
     info.sym_tbl.scope_mapping[call_inst.name] = new_scope
     for arg in new_func.args:
-        new_scope.insert_entry(arg.name, arg.type_ref,
-                clang.CursorKind.PARM_DECL, None)
-
-    obj = child.paths
-    obj.func_obj = new_func
-    obj.call_inst = call_inst
+        # The upper function will provide the arguments. Add them as known
+        # values. We will remove the unused arguments later.
+        new_scope.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
 
     return call_inst, new_func, clone_first_inst
 
 
-
 def _process_node(node, info):
-    synth_orig_scope = False
-    if node.paths is None:
-        node.paths = Path()
-        node.paths.original_scope = Scope()
-        synth_orig_scope = True
-
     blk = Block(BODY)
+    assert len(node.children) > 0 or node.has_code()
+    remove_first_inst = False
+
     for child in node.children:
-        call_inst, new_func, first_inst = _starts_with_func_call(node, info, child)
-        if new_func is None:
-            body = _process_node(child, info)
-        else:
+        # Create a new function for each child that is in another function
+        call_inst, new_func, first_inst = _starts_with_func_call(node, info)
+
+        if new_func:
             with info.sym_tbl.with_func_scope(call_inst.name):
                 body = _process_node(child, info)
-                new_func.body = body
+            child.paths.func_obj = new_func
+            child.paths.call_inst = call_inst
+            child.paths.code = body
+        else:
+            body = _process_node(child, info)
 
         # Check if there are multiple failure path or just one!
         if len(node.path_ids) > 1:
             if_inst = _generate_id_check(node.path_ids)
             if new_func is None:
                 if_inst.body = body
+                # TODO: what is this?
+                node.paths.original_scope.symbols.update(child.paths.original_scope.symbols)
             else:
+                remove_first_inst = True
                 if_inst.body.add_inst(first_inst)
-                # remove the first instruction
-                node.paths.code.children.pop(0)
             blk.add_inst(if_inst)
         else:
             if new_func is None:
                 blk.extend_inst(body.children)
+                # TODO: what is this?
+                node.paths.original_scope.symbols.update(child.paths.original_scope.symbols)
             else:
+                remove_first_inst = True
                 blk.add_inst(first_inst)
-                node.paths.code.children.pop(0)
 
+    # Add the instructions associated with this node
     if node.has_code():
         insts = node.paths.code.get_children()
+        if remove_first_inst:
+            insts.pop(0)
         blk.extend_inst(insts)
 
     assert blk.has_children()
@@ -161,13 +161,11 @@ def _process_node(node, info):
 
 
 def create_fallback_pass(inst, info, more):
-    g = info.user_prog.graph
+    root = info.user_prog.graph
 
     new_scope = Scope()
     info.sym_tbl.scope_mapping[USER_EVENT_LOOP_ENTRY] = new_scope
 
     with info.sym_tbl.with_func_scope(USER_EVENT_LOOP_ENTRY):
-        body = _process_node(g, info)
+        _process_node(root, info)
     info.user_prog.fallback_funcs_def = new_functions
-    info.user_prog.entry_body = body
-    return body

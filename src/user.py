@@ -2,34 +2,38 @@ from contextlib import contextmanager
 from data_structure import Function
 from bpf_code_gen import gen_code
 from log import debug
+from sym_table import Scope
 
 USER_EVENT_LOOP_ENTRY = '__user_event_loop_entry__'
 
 
 class Path:
     def __init__(self):
-        # The code this path should execute
-        self.code = None
         # External variables that this path depend
         self.var_deps = set()
         # The scope coresponding to this path
-        self.scope = None
+        self.scope = Scope()
         # The scope which originally holded this path
-        self.original_scope = None
+        self.original_scope = Scope()
         # Function definition which holds this path
-        self.func_obj = None
+        self.func_obj = Function('__empty__', None, {})
         self.call_inst = None
+
+    @property
+    def code(self):
+        return self.func_obj.body
+
+    @code.setter
+    def code(self, body):
+        self.func_obj.body = body
 
 
 class FallbackRegionGraph:
     def __init__(self):
         self.parent = None
-        # Other nodes of control graph
-        # TODO: maybe use a set?
         self.children = []
         # Codes associated with this node
-        # self.paths = []
-        self.paths = None
+        self.paths = Path()
         # Id of paths that cross this node
         self.path_ids = []
 
@@ -37,10 +41,8 @@ class FallbackRegionGraph:
         """
         Associate a path of code with this node
         """
-        assert self.paths is None
         path = Path()
         path.code = code
-        # self.paths.append(path)
         self.paths = path
         return path
 
@@ -49,7 +51,7 @@ class FallbackRegionGraph:
 
     def is_empty(self):
         # return len(self.children) == 0 and len(self.paths) == 0
-        return len(self.children) == 0 and self.paths is None
+        return len(self.children) == 0 and not self.paths.code.has_children()
 
     def is_leaf(self):
         return len(self.children) == 0
@@ -82,7 +84,7 @@ class FallbackRegionGraph:
             self.parent.set_id(i)
 
     def has_code(self):
-        return self.paths is not None and self.paths.code is not None
+        return self.paths is not None and self.paths.code.has_children()
 
 
 class UserProg:
@@ -94,7 +96,6 @@ class UserProg:
         self.graph = FallbackRegionGraph()
         self.sym_tbl = None
         self.func_dir = None
-        self.entry_body = None
         self.fallback_funcs_def = []
         self.declarations = []
 
@@ -155,7 +156,7 @@ def generate_user_prog(info):
     func_text, _ = gen_code(info.user_prog.fallback_funcs_def, info)
     code.append(func_text)
 
-    entry_body, _ = gen_code(info.user_prog.entry_body, info)
+    entry_body, _ = gen_code(info.user_prog.graph.paths.code, info)
     code.append(entry_body)
 
     return '\n'.join(code)

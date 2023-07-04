@@ -124,6 +124,10 @@ def gen_user_code(user, info, out_user):
     with info.user_prog.select_context(info):
         # Populates the user_prog graph
         select_user_pass(user, info, PassObject())
+        number_fallback_graph_pass(info)
+
+        create_fallback_pass(user, info, PassObject()) 
+        var_dependency_pass(info)
 
         # # What graph looks like
         # q = [info.user_prog.graph, 0]
@@ -133,13 +137,9 @@ def gen_user_code(user, info, out_user):
         #     if node == 0:
         #         lvl += 1
         #         continue
-        #     debug('lvl:', lvl, 'children:', len(node.children))
+        #     debug('lvl:', lvl, 'children:', len(node.children), node.paths.code.children)
         #     q.extend(reversed(node.children))
         #     q.append(0)
-
-        number_fallback_graph_pass(info)
-        user = create_fallback_pass(user, info, PassObject()) 
-        var_dependency_pass(user, info)
 
         # Look at the status
         # q = [info.user_prog.graph, 0]

@@ -42,16 +42,9 @@ def _process_current_inst(inst, info, more):
             # from declaration
             assert inst.has_children() is False
             new_inst = VarDecl(None)
-            new_inst.type = 'char *'
+            new_inst.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
             new_inst.name = inst.name
-            T2 = MyType()
-            T2.spelling = 'char'
-            T2.kind = clang.TypeKind.SCHAR
-            T = MyType()
-            T.spelling = 'char *'
-            T.under_type = T2
-            T.kind = clang.TypeKind.POINTER
-            e = info.sym_tbl.insert_entry(inst.name, T, new_inst.kind, None)
+            e = info.sym_tbl.insert_entry(inst.name, new_inst.type, new_inst.kind, None)
             e.is_bpf_ctx = True
             # replace this instruction
             return new_inst

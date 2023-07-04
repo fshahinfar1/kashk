@@ -61,13 +61,13 @@ def call_send_packet(inst, info, more):
 def handle_var(inst, info, more):
     lvl = more[0]
     if inst.is_array:
-        el_type = inst.cursor.type.element_type.spelling
-        el_count = inst.cursor.type.element_count
+        el_type = inst.type.element_type.spelling
+        el_count = inst.type.element_count
         text = f'{el_type} {inst.name}[{el_count}]'
     elif inst.is_record:
-        text = f'struct {inst.type} {inst.name}'
+        text = f'struct {inst.type.spelling} {inst.name}'
     else:
-        text = f'{inst.type} {inst.name}'
+        text = f'{inst.type.spelling} {inst.name}'
     if inst.init.has_children():
         init_text, _ = gen_code(inst.init, info, context=RHS)
         text += ' = ' + init_text
@@ -269,10 +269,10 @@ def handle_to_userspace(inst, info, more):
     lvl = more[0]
     if inst.is_bpf_main:
         tmp_stmt = 'return SK_PASS;'
-    elif inst.return_type == 'void':
+    elif inst.return_type.spelling == 'void':
         tmp_stmt = 'return;'
     else:
-        tmp_stmt = f'return ({inst.return_type})0;'
+        tmp_stmt = f'return ({inst.return_type.spelling})0;'
     text = ('/* Return from this point to the caller */\n'
             + f'{tmp_stmt}')
     text = indent(text, lvl)
@@ -408,7 +408,7 @@ def __generate_code_type_definition(inst, info):
             # debug('out of',inst.name, 'scope')
 
         body = indent(body)
-        text = f'{inst.return_type} {inst.name} ({text_args}) {{\n{body}\n}}\n\n'
+        text = f'{inst.return_type.spelling} {inst.name} ({text_args}) {{\n{body}\n}}\n\n'
         return text
     else:
         return inst.get_c_code()

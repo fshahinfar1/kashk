@@ -10,18 +10,10 @@ from passes.pass_obj import PassObject
 
 
 MODULE_TAG = '[Select Userspace Pass]'
-user_graph_node = None
 
 
-@contextmanager
-def graph_node(node):
-    global user_graph_node
-    tmp = user_graph_node
-    user_graph_node = node
-    try:
-        yield None
-    finally:
-        user_graph_node = tmp
+NODE = 128
+cb_ref = CodeBlockRef()
 
 
 def _propagate_userland_signal(old, new):
@@ -40,12 +32,8 @@ def _init_userland_signal(obj):
 
 
 def _do_pass(inst, info, more):
-    global user_graph_node
-
     lvl = more.lvl
     ctx = more.ctx
-    if not hasattr(more, 'in_user_land'):
-        _init_userland_signal(more)
 
     assert more.in_user_land is False
 
@@ -58,24 +46,25 @@ def _do_pass(inst, info, more):
     elif inst.kind == clang.CursorKind.CALL_EXPR:
         func = inst.get_function_def()
         if func:
-            node = user_graph_node.new_child()
+            parent_node = cb_ref.get(NODE)
+            node = parent_node.new_child()
             # Step inside the function
             # debug('Investigate:', inst.name)
-            obj = PassObject()
-            with graph_node(node):
-                with info.sym_tbl.with_func_scope(inst.name):
+            obj = more.repack(0, None, None)
+            with cb_ref.new_ref(NODE, node):
+                with info.sym_tbl.with_func_scope(func.name):
                     ret = _do_pass(func.body, info, obj)
                 # It is important that the code which check the user_graph_node
                 # be in the context of "graph_node(node)"
-                if user_graph_node.is_empty():
-                    user_graph_node.remove()
+                node = cb_ref.get(NODE)
+                if node.is_empty():
+                    node.remove()
             # debug (f'step out of function: {inst.name} and userland state in function is: {obj.in_user_land}')
 
             # Propagate the signal to caller context
             if func.may_fail:
-                # If we have already failed, then why are we considering this
-                # paths?
-                assert(more.in_user_land is False)
+                # If we have already failed, then why are we considering this paths?
+                assert more.in_user_land is False
                 _set_in_userland(more)
 
     for child, tag in inst.get_children_context_marked():
@@ -118,22 +107,25 @@ def _do_pass(inst, info, more):
 
             user_inst = Block(BODY)
             user_inst.extend_inst(more.remember)
-            path = user_graph_node.append(user_inst)
+            node = cb_ref.get(NODE)
+            path = node.append(user_inst)
             path.original_scope = info.sym_tbl.current_scope
 
             # Set the signal off! do not propagate.
             _init_userland_signal(more)
             # Create a new node
-            node = user_graph_node.parent.new_child()
-            user_graph_node = node
+            new_node = node.parent.new_child()
+            cb_ref.set(NODE, new_node)
 
 
 def select_user_pass(inst, info, more):
     # Initialize the pass
+    _init_userland_signal(more)
     node = info.user_prog.graph.new_child()
-    with graph_node(node):
-        ret = _do_pass(inst, info, more)
-        if user_graph_node.is_empty():
-            user_graph_node.remove()
-
-    return ret
+    with cb_ref.new_ref(NODE, node):
+        # Performe the pass
+        _do_pass(inst, info, more)
+        # Clean up
+        node = cb_ref.get(NODE)
+        if node.is_empty():
+            node.remove()

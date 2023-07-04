@@ -1,12 +1,15 @@
 import clang.cindex as clang
 from log import error, debug
-from sym_table import Scope, SymbolAccessMode
-from utility import report_on_cursor
+from sym_table import SymbolAccessMode
+from data_structure import MyType, CodeBlockRef
 from instruction import *
-from data_structure import MyType
+
+from passes.pass_obj import PassObject
 
 
+PARENT_BIN_OP = 560
 MODULE_TAG = '[Var Dependency]'
+cb_ref = CodeBlockRef()
 
 
 def _is_ref_local(ref, info):
@@ -59,12 +62,18 @@ def _handle_reference(path, inst, info, ctx, parent_bin_op):
     sym, scope = path.scope.lookup2(inst.name)
     is_local = sym is not None and scope == path.scope
     if not is_local:
+        blk = cb_ref.get(BODY)
         orig_sym = path.original_scope.lookup(inst.name)
         if orig_sym is None:
             error(f'Variable {inst.name} was not found in the symbol table! Assuming it is not needed in userspace')
         elif _should_not_share_variable(inst, orig_sym, info):
-            # debug('not share:', inst.name, 'type:', orig_sym.type.spelling)
-            pass
+            debug('not share:', inst.name, 'type:', orig_sym.type.spelling)
+            decl = VarDecl(None)
+            decl.name = inst.name
+            decl.type = orig_sym.type
+            decl.is_array = orig_sym.type.kind == clang.TypeKind.CONSTANTARRAY
+            decl.is_record = orig_sym.type.kind == clang.TypeKind.RECORD
+            blk.append(decl)
         else:
             sym = path.scope.insert_entry(inst.name, orig_sym.type, orig_sym.kind, None)
             if ctx == LHS and parent_bin_op.op == '=':
@@ -86,29 +95,49 @@ def _handle_reference(path, inst, info, ctx, parent_bin_op):
             sym.is_accessed = SymbolAccessMode.HAS_READ
 
 
-def _analyse_var_dep_for_path(path, info):
-    block = path.code
+def _do_recursive_var_analysis(inst, info, more):
+    lvl, ctx, parent_list = more.unpack()
+    path = more.path
+    new_children = []
 
-    # DFS
-    queue = list(_get_children(block, None))
-    while queue:
-        inst, ctx, parent_bin_op = queue.pop()
+    # Process instruction
+    if inst.kind == clang.CursorKind.VAR_DECL:
+        sym = path.original_scope.lookup(inst.name)
+        if sym is not None:
+            path.scope.insert_entry(inst.name, sym.type, inst.kind, None)
+        else:
+            T = MyType()
+            T.spelling = inst.type
+            path.scope.insert_entry(inst.name, T, inst.kind, None)
+        # debug('learn about:', sym.name)
+    elif inst.kind == clang.CursorKind.DECL_REF_EXPR:
+        bin_op = cb_ref.get(PARENT_BIN_OP)
+        _handle_reference(path, inst, info, ctx, bin_op)
+    elif inst.kind == clang.CursorKind.BINARY_OPERATOR:
+        cb_ref.push(PARENT_BIN_OP, inst)
 
-        if inst.kind == clang.CursorKind.VAR_DECL:
-            sym = path.original_scope.lookup(inst.name)
-            if sym is not None:
-                path.scope.insert_entry(inst.name, sym.type, inst.kind, inst)
+    with cb_ref.new_ref(ctx, parent_list):
+        for child, tag in inst.get_children_context_marked():
+            if isinstance(child, list):
+                new_child = []
+                for i in child:
+                    obj = more.repack(lvl+1, tag, new_child)
+                    new_inst = _do_recursive_var_analysis(i, info, obj)
+                    if new_inst is None:
+                        continue
+                    new_child.append(new_inst)
             else:
-                T = MyType()
-                T.spelling = inst.type
-                path.scope.insert_entry(inst.name, T, inst.kind, inst)
-            # debug('learn about:', sym.name)
-        elif inst.kind == clang.CursorKind.DECL_REF_EXPR:
-            _handle_reference(path, inst, info, ctx, parent_bin_op)
-        elif inst.kind == clang.CursorKind.BINARY_OPERATOR:
-            parent_bin_op = inst
+                obj = more.repack(lvl+1, tag, None)
+                new_child = _do_recursive_var_analysis(child, info, obj)
+                assert new_child is not None
+            new_children.append(new_child)
 
-        queue.extend(_get_children(inst, parent_bin_op))
+    # Pop the parent binary operator
+    if inst.kind == clang.CursorKind.BINARY_OPERATOR:
+        cb_ref.pop()
+
+    new_inst = inst.clone(new_children)
+    return new_inst
 
 
 def _remove_unused_args(func_obj, call_inst, scope):
@@ -145,9 +174,23 @@ def _process_node(node, info):
             _remove_unused_args(child_p.func_obj, child_p.call_inst, child_p.scope)
 
     if node.has_code():
-        _analyse_var_dep_for_path(node.paths, info)
+        path = node.paths
+        obj = PassObject.pack(0, None, None)
+        obj.path = path
+        new_block = _do_recursive_var_analysis(path.code, info, obj)
+        path.code = new_block
+        # print(new_block.children)
 
 
-def var_dependency_pass(inst, info):
+def var_dependency_pass(info):
+    # print('begin')
+
+    # TODO: note there is a difference between root of the graph and body of
+    # event loop! maybe there are multiple failure paths in the event loop.
+    # this means that some of the intermediate nodes may not have associated
+    # new functions. So, some the nodes are not directly converted to the code!
     root = info.user_prog.graph
     _process_node(root, info)
+
+    # print('test:', root.paths.code.children)
+    # print('end')

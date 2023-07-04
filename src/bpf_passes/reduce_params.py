@@ -126,7 +126,7 @@ def _handle_call(inst, info, more):
     # Create an instance of struct which should be passed to the function
     extra_args = [inst.args.pop() for i in range(count_extra)]
     decl = VarDecl(None)
-    decl.type = change.struct_name
+    decl.type = MyType.make_simple(change.struct_name, clang.TypeKind.RECORD)
     # TODO: what if there are multiple extra args in a block?
     decl.name = '__ex'
     decl.is_record = True

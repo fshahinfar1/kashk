@@ -82,6 +82,12 @@ class CodeBlockRef:
     def get(self, name, default=None):
         return self.code_block_reference.get(name, default)
 
+    def set(self, name, value):
+        """
+        Set the value of `name', but does not change the state of stack.
+        """
+        self.code_block_reference[name] = value
+
     @contextmanager
     def new_ref(self, name, code):
         self.push(name, code)
@@ -143,15 +149,72 @@ class StateObject:
 
 
 class MyType:
+    @classmethod
+    def make_array(cls, name, T, count):
+        obj = MyType()
+        obj.spelling = name
+        obj.under_type = T
+        obj._element_count = count
+        obj.kind = clang.TypeKind.CONSTANTARRAY
+        return obj
+
+    @classmethod
+    def make_pointer(cls, T):
+        obj = MyType()
+        obj.spelling = f'{T.spelling} *'
+        obj.under_type = T
+        obj.kind = clang.TypeKind.POINTER
+        return obj
+
+    @classmethod
+    def make_simple(cls, name, kind):
+        obj = MyType()
+        obj.spelling = name
+        obj.kind = kind
+        return obj
+
+    @classmethod
+    def from_cursor_type(cls, T):
+        obj = MyType()
+        obj.spelling = T.spelling
+        obj.kind = T.kind
+        if obj.is_pointer():
+            obj.under_type = MyType.from_cursor_type(T.get_pointee())
+        elif obj.is_array():
+            obj.under_type = MyType.from_cursor_type(T.element_type)
+            obj._element_count = T.element_count
+        return obj
+
     def __init__(self):
         self.spelling = None
         self.under_type = None
         self.kind = None
+        self._element_count = 0
 
     def get_pointee(self):
         if self.kind == clang.TypeKind.POINTER:
             return self.under_type
         raise Exception('Not a pointer')
+
+    @property
+    def element_type(self):
+        assert self.kind == clang.CursorKind.CONSTANTARRAY
+        assert self.under_type is not None
+        return self.under_type
+
+    @property
+    def element_count(self):
+        assert self.kind == clang.TypeKind.CONSTANTARRAY
+        return self._element_count
+
+    def is_array(self):
+        return self.kind == clang.TypeKind.CONSTANTARRAY
+
+    def is_pointer(self):
+        return self.kind == clang.TypeKind.POINTER
+
+    def is_record(self):
+        return self.kind == clang.TypeKind.RECORD
 
 
 class TypeDefinition:
@@ -236,7 +299,7 @@ class Function(TypeDefinition):
         # self.cursor = c
         if c is not None:
             self.args = [StateObject(a) for a in c.get_arguments()]
-            self.return_type = c.result_type.spelling
+            self.return_type = MyType.from_cursor_type(c.result_type)
         else:
             self.args = []
             self.return_type = None
@@ -271,3 +334,15 @@ class Function(TypeDefinition):
         # raise Exception('Not implemented')
         return f'// [[ definition of function {self.name} ]]'
 
+
+
+BASE_TYPES = {}
+def prepare_base_types():
+    kind_name_map = {
+            clang.TypeKind.SCHAR: 'char'
+            }
+
+    for kind, name in kind_name_map.items():
+        BASE_TYPES[kind] = MyType.make_simple(name, kind)
+
+prepare_base_types()

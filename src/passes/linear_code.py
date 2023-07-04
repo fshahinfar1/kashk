@@ -30,16 +30,14 @@ def _move_function_out(inst, info, more):
     blk = cb_ref.get(BODY)
     assert blk is not None
 
-    if func.return_type != 'void':
+    if func.return_type.spelling != 'void':
         tmp_var_name = _get_tmp_var_name()
         # Declare tmp
         tmp_decl = VarDecl(None)
         tmp_decl.name = tmp_var_name
         tmp_decl.type = func.return_type
         tmp_decl.state_obj = None
-        T = MyType()
-        T.spelling = func.return_type
-        T.kind = None
+        T = func.return_type
         blk.append(tmp_decl)
 
         # Update the symbol table

@@ -2,7 +2,7 @@ import itertools
 import clang.cindex as clang
 
 from utility import get_owner
-from data_structure import StateObject, Function
+from data_structure import StateObject, Function, MyType
 from log import error, debug
 
 
@@ -140,9 +140,9 @@ class VarDecl(Instruction):
             self.cursor = c
             self.state_obj = StateObject(c)
 
-            self.type = c.type.spelling
+            self.type = MyType.from_cursor_type(c.type)
             self.name = c.spelling
-            self.is_array = c.type.kind == clang.TypeKind.CONSTANTARRAY
+            self.is_array = self.type.is_array()
             self.is_record = self.cursor.type.kind == clang.TypeKind.RECORD
         else:
             self.cursor = None
