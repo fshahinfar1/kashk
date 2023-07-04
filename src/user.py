@@ -153,7 +153,8 @@ def generate_user_prog(info):
     code.append(declarations)
     code.append('\n')
 
-    func_text, _ = gen_code(info.user_prog.fallback_funcs_def, info)
+    funcs = list(reversed(info.user_prog.fallback_funcs_def))
+    func_text, _ = gen_code(funcs, info)
     code.append(func_text)
 
     entry_body, _ = gen_code(info.user_prog.graph.paths.code, info)

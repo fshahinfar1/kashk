@@ -125,7 +125,10 @@ def _process_node(node, info):
             child.paths.call_inst = call_inst
             child.paths.code = body
         else:
+            cur = info.sym_tbl.current_scope
+            info.sym_tbl.current_scope = node.paths.scope
             body = _process_node(child, info)
+            info.sym_tbl.current_scope = cur
 
         # Check if there are multiple failure path or just one!
         if len(node.path_ids) > 1:

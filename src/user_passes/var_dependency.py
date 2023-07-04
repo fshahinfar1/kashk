@@ -67,16 +67,17 @@ def _handle_reference(path, inst, info, ctx, parent_bin_op):
         if orig_sym is None:
             error(f'Variable {inst.name} was not found in the symbol table! Assuming it is not needed in userspace')
         elif _should_not_share_variable(inst, orig_sym, info):
-            # debug('not share:', inst.name, 'type:', orig_sym.type.spelling)
+            debug('not share:', inst.name, 'type:', orig_sym.type.spelling)
             decl = VarDecl(None)
             decl.name = inst.name
             decl.type = orig_sym.type
             blk.append(decl)
+            sym = path.scope.insert_entry(inst.name, orig_sym.type, orig_sym.kind, None)
         else:
             sym = path.scope.insert_entry(inst.name, orig_sym.type, orig_sym.kind, None)
             if ctx == LHS and parent_bin_op.op == '=':
                 # writing to this unknow variable --> I do not need to share the result
-                # debug(f'not caring about {sym.name}')
+                debug(f'not caring about {sym.name}')
                 sym.is_accessed = SymbolAccessMode.FIRST_WRITE
 
                 decl = VarDecl(None)
