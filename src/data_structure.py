@@ -198,7 +198,7 @@ class MyType:
 
     @property
     def element_type(self):
-        assert self.kind == clang.CursorKind.CONSTANTARRAY
+        assert self.kind == clang.TypeKind.CONSTANTARRAY
         assert self.under_type is not None
         return self.under_type
 

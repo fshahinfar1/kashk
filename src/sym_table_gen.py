@@ -3,12 +3,14 @@ from log import debug, error
 from prune import should_process_this_cursor
 from utility import report_on_cursor
 
+from data_structure import MyType
 import clang.cindex as clang
 
 
 def __collect_information_about_class(cursor, info):
     # map __class__ identifier to the class representing current scope -
-    e = info.sym_tbl.insert_entry('__class__', cursor.type, cursor.kind, cursor)
+    T = MyType.from_cursor_type(cursor.type)
+    e = info.sym_tbl.insert_entry('__class__', T, cursor.kind, None)
     # override the name form __class__ to actual class name
     e.name = cursor.spelling
     # -------------------------------------------------------------------
@@ -17,10 +19,12 @@ def __collect_information_about_class(cursor, info):
     class_name = cursor.spelling
     for c, l in d:
         if c.kind == clang.CursorKind.FIELD_DECL:
-            info.sym_tbl.insert_entry(c.spelling, c.type, c.kind, c)
+            T = MyType.from_cursor_type(c.type)
+            info.sym_tbl.insert_entry(c.spelling, T, c.kind, None)
         elif c.kind == clang.CursorKind.CXX_METHOD:
             method_name = f'{class_name}_{c.spelling}'
-            info.sym_tbl.insert_entry(method_name, c.result_type, c.kind, c)
+            T = MyType.from_cursor_type(c.result_type)
+            info.sym_tbl.insert_entry(method_name, T, c.kind, None)
 
             with info.sym_tbl.new_scope() as scope:
                 info.sym_tbl.scope_mapping[method_name] = scope
@@ -33,7 +37,8 @@ def __collect_information_about_func(cursor, info):
 
     # Add function parameters to the scope
     for pos, arg in enumerate(cursor.get_arguments()):
-        e = info.sym_tbl.insert_entry(arg.spelling, arg.type, arg.kind, arg)
+        T = MyType.from_cursor_type(arg.type)
+        e = info.sym_tbl.insert_entry(arg.spelling, T, arg.kind, arg)
 
     # TODO: Do I need to process the body of each functions?
     # body = children[-1]
@@ -46,7 +51,8 @@ def pass_over_global_variables(cursor, info):
     d = DFSPass(cursor)
     for c, l in d:
         if c.kind == clang.CursorKind.VAR_DECL:
-            info.sym_tbl.insert_entry(c.spelling, c.type, c.kind, c)
+            T = MyType.from_cursor_type(c.type)
+            info.sym_tbl.insert_entry(c.spelling, T, c.kind, c)
         if c.kind == clang.CursorKind.TRANSLATION_UNIT:
             d.go_deep()
 
@@ -79,7 +85,8 @@ def build_sym_table(cursor, info):
                 continue
 
             scope_key = f'class_{c.spelling}'
-            info.sym_tbl.insert_entry(scope_key, c.type, c.kind, c)
+            T = MyType.from_cursor_type(c.type)
+            info.sym_tbl.insert_entry(scope_key, T, c.kind, None)
 
             with info.sym_tbl.new_scope() as scope:
                 info.sym_tbl.scope_mapping[scope_key] = scope
@@ -87,14 +94,16 @@ def build_sym_table(cursor, info):
             continue
         elif c.kind == clang.CursorKind.VAR_DECL and l > 1:
             # If it is a variable decleration and it is not a global variable
-            info.sym_tbl.insert_entry(c.spelling, c.type, c.kind, c)
+            T = MyType.from_cursor_type(c.type)
+            info.sym_tbl.insert_entry(c.spelling, T, c.kind, None)
             continue
         elif c.kind == clang.CursorKind.FUNCTION_DECL:
             if not c.is_definition():
                 continue
 
             scope_key = f'{c.spelling}'
-            info.sym_tbl.insert_entry(scope_key, c.result_type, c.kind, c)
+            T = MyType.from_cursor_type(c.result_type)
+            info.sym_tbl.insert_entry(scope_key, T, c.kind, c)
 
             with info.sym_tbl.new_scope() as scope:
                 info.sym_tbl.scope_mapping[scope_key] = scope
@@ -104,7 +113,8 @@ def build_sym_table(cursor, info):
             if not c.is_definition():
                 continue
             scope_key = f'class_struct {c.spelling}'
-            info.sym_tbl.insert_entry(scope_key, c.type, c.kind, c)
+            T = MyType.from_cursor_type(c.type)
+            info.sym_tbl.insert_entry(scope_key, T, c.kind, c)
             with info.sym_tbl.new_scope() as scope:
                 info.sym_tbl.scope_mapping[scope_key] = scope
                 __collect_information_about_class(c, info)

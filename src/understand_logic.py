@@ -182,7 +182,7 @@ def __convert_cursor_to_inst(c, info):
         # Add variable to the scope
         if info.sym_tbl.lookup(c.spelling) is not None:
             error(f'{MODULE_TAG} Shadowing variables are not supported and can cause issues! ({c.spelling})')
-        info.sym_tbl.insert_entry(c.spelling, c.type, c.kind, c)
+        info.sym_tbl.insert_entry(inst.name, inst.type, inst.kind, None)
 
         # Check if there is a type dependencies which we need to define
         _, decls = get_state_for(c)

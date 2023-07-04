@@ -231,7 +231,9 @@ def boot_starp_global_state(cursor, info):
         # -----------------------------
 
         # The fields and its dependencies
-        states, decls = extract_state(tcp_conn_entry.ref)
+        ref = find_elem(cursor, 'TCPConnection')
+        # states, decls = extract_state(tcp_conn_entry.ref)
+        states, decls = extract_state(ref)
 
         # The input argument is of this type
         tcp_conn_struct = Record('TCPConnection', states)

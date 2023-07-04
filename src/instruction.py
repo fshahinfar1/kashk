@@ -142,17 +142,21 @@ class VarDecl(Instruction):
 
             self.type = MyType.from_cursor_type(c.type)
             self.name = c.spelling
-            self.is_array = self.type.is_array()
-            self.is_record = self.cursor.type.kind == clang.TypeKind.RECORD
         else:
             self.cursor = None
             self.state_obj = None
-            self.type = ''
+            self.type = None
             self.name = ''
-            self.is_array = False
-            self.is_record = False
         self.kind = clang.CursorKind.VAR_DECL
         self.init = Block(RHS)
+
+    @property
+    def is_array(self):
+        return self.type.is_array()
+
+    @property
+    def is_record(self):
+        return self.type.is_record()
 
     def __str__(self):
         return f'<VarDecl {self.kind}: {self.type} {self.name} = {self.init}>'
@@ -175,7 +179,6 @@ class VarDecl(Instruction):
         new.kind = self.kind
         if children:
             new.init = children[0]
-        new.is_array = self.is_array
         new.bpf_ignore = self.bpf_ignore
         return new
 

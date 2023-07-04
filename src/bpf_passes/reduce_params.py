@@ -129,7 +129,6 @@ def _handle_call(inst, info, more):
     decl.type = MyType.make_simple(change.struct_name, clang.TypeKind.RECORD)
     # TODO: what if there are multiple extra args in a block?
     decl.name = '__ex'
-    decl.is_record = True
     # TODO: How to implement a struct initialization?
     tmp = []
     for field, var in zip(change.list_of_params, extra_args):
