@@ -87,11 +87,6 @@ def _handle_reference(path, inst, info, ctx, parent_bin_op):
             else:
                 sym.is_accessed = SymbolAccessMode.HAS_READ
                 path.var_deps.add(sym)
-                # debug('external:', inst.name, 'type:', orig_sym.type.spelling,
-                #         'Context:', get_context_name(ctx))
-                if ctx == LHS:
-                    # debug(parent_bin_op.op)
-                    pass
     else:
         if ctx == LHS and parent_bin_op.op == '=':
             sym.is_accessed = SymbolAccessMode.FIRST_WRITE
@@ -171,7 +166,11 @@ def _process_node(node, info):
         # Every variable that is needed in a child node is also needed in the
         # parent because parent does not know about them.
         for d in child.paths.var_deps:
-            node.paths.var_deps.add(d)
+            if node.paths.scope.lookup(d.name) is None:
+                node.paths.var_deps.add(d)
+                # Add it to scope because the child needs it and parent does
+                # not have. So it is declaring it as needed.
+                node.paths.scope.insert(d)
 
         child_p = child.paths
         if child_p.func_obj is not None:

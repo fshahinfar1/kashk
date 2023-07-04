@@ -143,6 +143,38 @@ class UserProg:
                 q.append((c, next_lvl))
 
 
+def _load_meta(info):
+    meta = info.user_prog.declarations[0]
+
+    declare = []
+    load = []
+    for f in meta.fields:
+        declare.append(f.get_c_code())
+        load.append(f'{f.name} = __m->{f.name};')
+
+
+    recv_pkt = f"""
+struct {meta.name} *__m;
+const size_t __size = sizeof(struct {meta.name});
+char __buf[__size];
+auto __b = asio::buffer(__buf, __size);
+/* Receive message and check the return value */
+try {{
+  co_await conn->socket().async_read_some(b, asio::use_awaitable);
+}} catch (const std::system_error &error) {{
+  if (error.code() != asio::error::eof && error.code() != asio::error::connection_reset) {{
+    std::cerr << "Error: " << error.what() << std::endl;
+  }}
+  co_return;
+}}
+__m = (struct {meta.name} *)__buf;
+"""
+
+    declare = '\n'.join(declare)
+    load = '\n'.join(load)
+    return declare + '\n' + recv_pkt + '\n' + load
+
+
 def generate_user_prog(info):
     """
     Generate the final userspace program
@@ -157,7 +189,9 @@ def generate_user_prog(info):
     func_text, _ = gen_code(funcs, info)
     code.append(func_text)
 
+    meta_load = _load_meta(info)
     entry_body, _ = gen_code(info.user_prog.graph.paths.code, info)
+    entry_body = meta_load + '\n' + entry_body
     code.append(entry_body)
 
     return '\n'.join(code)
