@@ -46,12 +46,12 @@ def find_event_loop(cursor):
     return None
 
 
-def get_all_read(cursor):
+def get_all_read(block):
     """
     Get all the read instructions under the cursor
     """
     result = []
-    q = [cursor]
+    q = [block]
     # Outside the connection polling loop
     while q:
         c = q.pop()
@@ -86,7 +86,7 @@ def get_all_send(cursor):
                 # These functions are for coroutine and make things complex
                 continue
 
-            if c.spelling == WRITE_PACKET:
+            if c.spelling in WRITE_PACKET:
                 result.append(c)
                 continue
 
@@ -143,9 +143,11 @@ def __convert_cursor_to_inst(c, info):
         inst.body.extend_inst(gather_instructions_from(next(children), info, context=ARG))
         return inst
     elif (c.kind == clang.CursorKind.CXX_REINTERPRET_CAST_EXPR
-            or c.kind == clang.CursorKind.CSTYLE_CAST_EXPR):
+            or c.kind == clang.CursorKind.CSTYLE_CAST_EXPR
+            or c.kind == clang.CursorKind.CXX_STATIC_CAST_EXPR):
         children = list(c.get_children())
         count_children = len(children)
+        # TODO: I do not remember why I am doing this check
         assert count_children < 3
         inst = Cast()
         inst.castee.extend_inst(gather_instructions_from(children[-1], info, context=ARG))
@@ -246,6 +248,15 @@ def __convert_cursor_to_inst(c, info):
         inst.cond.extend_inst(gather_instructions_from(cond, info, context=ARG))
         inst.body.extend_inst(gather_instructions_under(body, info, BODY))
         return inst
+    elif c.kind == clang.CursorKind.WHILE_STMT:
+        children = c.get_children()
+        cond = next(children)
+        body = next(children)
+        inst = ControlFlowInst()
+        inst.kind = c.kind
+        inst.cond.extend_inst(gather_instructions_from(cond, info, context=ARG))
+        inst.body.extend_inst(gather_instructions_under(body, info, context=BODY))
+        return inst
     elif c.kind == clang.CursorKind.FOR_STMT:
         children = list(c.get_children())
         assert len(children) == 4
@@ -307,7 +318,18 @@ def __convert_cursor_to_inst(c, info):
             inst.kind = clang.CursorKind.RETURN_STMT
             inst.body = []
             return inst
+        else:
+            error('TODO:')
+            report_on_cursor(c)
         return None
+    elif c.kind == clang.CursorKind.UNEXPOSED_EXPR:
+        children = list(c.get_children())
+        if len(children) == 1:
+            child = children[0]
+            return  __convert_cursor_to_inst(child, info)
+        else:
+            error('TODO:')
+            report_on_cursor(c)
     elif c.kind == clang.CursorKind.NULL_STMT:
         return None
     else:

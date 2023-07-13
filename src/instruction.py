@@ -105,6 +105,9 @@ class Call(Instruction):
     def __str__(self):
         return f'<Call {self.name} ({self.args})>'
 
+    def get_arguments(self):
+        return list(self.args)
+
     def get_function_def(self):
         func = Function.directory.get(self.name)
         return func
@@ -415,6 +418,10 @@ class Ref(Instruction):
             self.name = cursor.spelling
             self.kind = cursor.kind if kind is None else kind
         self.owner = []
+        self.variable_declaration_inst = None
+
+    def get_definition(self):
+        return self.variable_declaration_inst
 
     def clone(self, _):
         new = Ref(self.cursor, self.kind)

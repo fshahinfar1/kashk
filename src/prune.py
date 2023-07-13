@@ -2,7 +2,7 @@ import clang.cindex as clang
 
 
 READ_PACKET = 'async_read_some'
-WRITE_PACKET = 'async_write'
+WRITE_PACKET = ['async_write', 'async_write_some']
 
 
 def get_namespace_of_cursor(cursor):
@@ -23,17 +23,9 @@ def should_process_this_cursor(cursor):
     if not f or not should_process_this_file(f.name):
         return False
     ns = get_namespace_of_cursor(cursor)
-
-    # ns = get_namespace_of_cursor(cursor)
-    # if ns == 'asio':
-    #     return []
-    # print(cursor.spelling)
-    # print(ns)
-    # print('~~~~~~~~')
     if ns == 'asio':
         return False
     return True
-
 
 
 def should_process_this_file(path):

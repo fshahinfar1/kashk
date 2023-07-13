@@ -60,7 +60,7 @@ def _process_current_inst(inst, info, more):
             text = f'skb->len'
             inst = Literal(text, CODE_LITERAL)
             return inst
-        elif inst.name == WRITE_PACKET:
+        elif inst.name in WRITE_PACKET:
             buf = info.wr_buf.name
             # TODO: maybe it is too soon to convert instructions to the code
             write_size, _ = gen_code(info.wr_buf.write_size_cursor, info, context=ARG)
@@ -97,7 +97,9 @@ def _do_pass(inst, info, more):
                     continue
                 new_child.append(new_inst)
             if not is_list:
-                assert len(new_child) == 1
+                if len(new_child) < 1:
+                    return None
+                assert len(new_child) == 1, f'expect to receive one object (count = {len(new_child)})'
                 new_child = new_child[-1]
             new_children.append(new_child)
 

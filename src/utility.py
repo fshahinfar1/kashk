@@ -29,8 +29,13 @@ clang.TypeKind.LONGDOUBLE,
 ]
 
 
-def get_type_name(t):
-    pass
+def get_body_of_the_loop(cursor):
+    body_of_loop = None
+    for child in cursor.get_children():
+        if child.kind == clang.CursorKind.COMPOUND_STMT:
+            body_of_loop = child
+            break
+    return body_of_loop
 
 def parse_file(file_path):
     # compiler_args = '-I /usr/include/ -I /opt/clang-16/include/c++/v1/'.split()
@@ -143,10 +148,13 @@ def show_insts(lst, depth=0):
     """
     Visualize the tree of instructions
     """
+    indent = '  '
     for i in lst:
-        debug('  '*depth + str(i))
-        if i.has_children():
-            show_insts(i.body, depth=depth+1)
+        debug(indent * depth + str(i))
+        if isinstance(i, list):
+            show_insts(i, depth=depth+1)
+        elif i.has_children():
+            show_insts(i.get_children(), depth=depth+1)
 
 
 def get_owner(cursor):
@@ -203,3 +211,19 @@ def indent(text, count=1):
         indented.append(INDENT * count + b)
     body = '\n'.join(indented)
     return body
+
+
+def filter_insts(block, filter_fn):
+    result = []
+    q = [block]
+    # Outside the connection polling loop
+    while q:
+        c = q.pop()
+        if filter_fn(c):
+            result.append(c)
+            continue
+
+        # Continue deeper
+        for child in reversed(c.get_children()):
+            q.append(child)
+    return result

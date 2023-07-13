@@ -1,6 +1,6 @@
 import clang.cindex as clang
 
-from utility import parse_file, find_elem
+from utility import parse_file, find_elem, show_insts, get_body_of_the_loop
 from understand_program_state import (extract_state, get_state_for,)
 from understand_logic import (find_event_loop,
         get_variable_declaration_before_elem, get_all_read, get_all_send,
@@ -84,9 +84,9 @@ def generate_offload(file_path, entry_func_name, out_bpf, out_user):
         find_read_write_bufs(ev_loop, info)
 
         # Go through the AST, generate instructions
-        body_of_loop = list(ev_loop.get_children())[-1]
+        body_of_loop = get_body_of_the_loop(ev_loop)
+        assert body_of_loop is not None
         insts = gather_instructions_under(body_of_loop, info, BODY)
-
 
     # TODO: Think more about the API of each pass
     bpf = Block(BODY)
@@ -99,6 +99,10 @@ def generate_offload(file_path, entry_func_name, out_bpf, out_user):
         with info.sym_tbl.with_func_scope(f.name):
             f.body = linear_code_pass(f.body, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
+
+    # # Take peek on the event loop body
+    # text, _ = gen_code(insts, info)
+    # print(text)
 
     ## Possible Path Analysis
     # Mark inpossible paths and annotate which functions may fail or suceed
@@ -126,7 +130,7 @@ def gen_user_code(user, info, out_user):
         select_user_pass(user, info, PassObject())
         number_fallback_graph_pass(info)
 
-        create_fallback_pass(user, info, PassObject()) 
+        create_fallback_pass(user, info, PassObject())
         var_dependency_pass(info)
 
         # # What graph looks like
@@ -252,43 +256,92 @@ def boot_starp_global_state(cursor, info):
         add_state_decl_to_bpf(info.prog, [field], decls)
 
 
+# TODO: the code which finds the buffer is very bad! Re organize and think
+# about it!
 def find_read_write_bufs(ev_loop, info):
     reads = get_all_read(ev_loop)
     if len(reads) > 1:
         error('Multiple read function was found!')
         return
     for r in reads:
+        args = list(r.get_arguments())
+
         # the buffer is in the first arg
-        first_arg = list(r.get_arguments())[0]
-        # TODO: Only if the buffer is assigned before and is not a function call
-        buf_def = first_arg.get_definition()
-        remove_def = buf_def
-        buf_def = next(buf_def.get_children())
-        args = list(buf_def.get_arguments())
-        buf_def = args[0].get_definition()
-        buf_sz = args[1]
-        info.rd_buf = PacketBuffer(buf_def)
-        info.rd_buf.size_cursor = gather_instructions_from(buf_def, info)
-        info.remove_cursor.add(remove_def.get_usr())
+        first_arg = args[0]
+        while first_arg.kind == clang.CursorKind.UNEXPOSED_EXPR:
+            children = list(first_arg.get_children())
+            assert len(children) == 1, f'len(children) == {len(children)}'
+            first_arg = children[0]
+
+        if first_arg.kind == clang.CursorKind.CALL_EXPR:
+            args = list(first_arg.get_arguments())
+            buf_def = args[0].get_definition()
+            info.rd_buf = PacketBuffer(buf_def)
+            if len(args) == 2:
+                buf_sz = args[1]
+                info.rd_buf.size_cursor = gather_instructions_from(buf_def, info)
+            else:
+                # TODO: I need to some how know the size and I might not know
+                # it! I can try to find the underlying array. But what if it is
+                # not an array?
+                error('I need to know the buffer size')
+                info.rd_buf.size_cursor = [Literal('2048', clang.CursorKind.INTEGER_LITERAL)]
+        else:
+            # if the buffer is assigned before and is not a function call
+            buf_def = first_arg.get_definition()
+            remove_def = buf_def
+            buf_def = next(buf_def.get_children())
+            args = list(buf_def.get_arguments())
+            buf_def = args[0].get_definition()
+            buf_sz = args[1]
+            info.rd_buf = PacketBuffer(buf_def)
+            info.rd_buf.size_cursor = gather_instructions_from(buf_def, info)
+            info.remove_cursor.add(remove_def.get_usr())
+
     if info.rd_buf is None:
         error('Failed to find the packet buffer')
         return
 
     writes = get_all_send(ev_loop)
-    assert len(writes) == 1, 'I currently expect only one send system call'
+    assert len(writes) == 1, f'I currently expect only one send system call (count found: {len(writes)})'
     for c in writes:
         # TODO: this code is not going to work. it is so specific
         args = list(c.get_arguments())
-        buf_def = args[1].get_definition()
-        remove_def = buf_def
-        buf_def = next(buf_def.get_children())
-        args = list(buf_def.get_arguments())
-        buf_def = args[0].get_definition()
-        buf_sz = args[1]
-        info.wr_buf = PacketBuffer(buf_def)
-        info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
-        info.remove_cursor.add(remove_def.get_usr())
 
+        if c.spelling == 'async_write':
+            buf_arg = args[1]
+        elif c.spelling == 'async_write_some':
+            buf_arg = args[0]
+
+        while buf_arg.kind == clang.CursorKind.UNEXPOSED_EXPR:
+            children = list(buf_arg.get_children())
+            assert len(children) == 1, f'len(children) == {len(children)}'
+            buf_arg = children[0]
+
+
+        if buf_arg.kind == clang.CursorKind.CALL_EXPR:
+            args = list(buf_arg.get_arguments())
+            buf_def = args[0].get_definition()
+            info.wr_buf = PacketBuffer(buf_def)
+            if len(args) == 2:
+                buf_sz = args[1]
+                info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
+            else:
+                # TODO: I need to some how know the size and I might not know
+                # it! I can try to find the underlying array. But what if it is
+                # not an array?
+                error('I need to know the buffer size')
+                info.wr_buf.write_size_cursor = [Literal('2048', clang.CursorKind.INTEGER_LITERAL)]
+        else:
+            buf_def = buf_arg.get_definition()
+            remove_def = buf_def
+            buf_def = next(buf_def.get_children())
+            args = list(buf_def.get_arguments())
+            buf_def = args[0].get_definition()
+            buf_sz = args[1]
+            info.wr_buf = PacketBuffer(buf_def)
+            info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
+            info.remove_cursor.add(remove_def.get_usr())
 
 
 def add_state_decl_to_bpf(prog, states, decls):

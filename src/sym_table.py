@@ -180,6 +180,9 @@ class SymbolTable:
         # Clone the scope mapping
         for name, scope in self.scope_mapping.scope_mapping.items():
             scp_number = scope.number
+            if scp_number not in book:
+                debug('some scopes are not being cloned!')
+                continue
             new_tbl.scope_mapping[name] = book[scp_number]
 
         return new_tbl

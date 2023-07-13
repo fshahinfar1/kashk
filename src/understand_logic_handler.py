@@ -39,7 +39,7 @@ def __function_is_of_interest(inst):
 
 def __get_func_name(inst, info):
     func_name = inst.cursor.spelling
-    if func_name in (READ_PACKET, WRITE_PACKET):
+    if func_name in (READ_PACKET, *WRITE_PACKET):
         # do not rewrite the read/send functions
         return func_name
     if inst.is_method:
@@ -111,12 +111,10 @@ def __add_func_definition(inst, info):
                 cls = scope.lookup('__class__')
                 cls_text = cls.type.spelling
 
-                T = MyType()
-                T.spelling = f'struct {cls_text} *'
-                T.kind = clang.TypeKind.POINTER
-                T.under_type = MyType()
-                T.under_type.spelling = f'struct {cls_text}'
-                T.under_type.kind = clang.TypeKind.RECORD
+                cls_type = MyType()
+                cls_type.spelling = f'struct {cls_text}'
+                cls_type.kind = clang.TypeKind.RECORD
+                T = MyType.make_pointer(cls_type)
 
                 ref = StateObject(None)
                 ref.name = 'self'
@@ -125,19 +123,24 @@ def __add_func_definition(inst, info):
                 ref.is_pointer = True
                 ref.type_ref = T
         else:
-            T = MyType()
+            # Use the current class as the type
+            cls_sym = info.sym_tbl.lookup('__class__')
+
+            cls_type = MyType()
+            cls_type.spelling = 'struct {cls_sym.name}'
+            cls_type.kind = clang.TypeKind.RECORD
+            T = MyType.make_pointer(cls_type)
+
             ref = StateObject(None)
             ref.name = 'self'
             ref.kind = clang.CursorKind.PARM_DECL
-            ref.type = 'T *'
+            ref.type = T.spelling
             ref.is_pointer = True
             ref.type_ref = T
-            raise Exception('This is weired! I do not know the type')
 
         f.args = [ref] + f.args
 
     # Recursively analize the function body
-
     c = inst.func_ptr
     body = None
     if c is not None and c.is_definition():

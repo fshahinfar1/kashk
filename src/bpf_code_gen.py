@@ -198,6 +198,16 @@ def handle_do_stmt(inst, info, more):
     return text
 
 
+def handle_while_stmt(inst, info, more):
+    lvl = more[0]
+    cond, _ = gen_code(inst.cond, info, context=ARG)
+    body, _ = gen_code(inst.body, info, context=BODY)
+    body = indent(body, 1)
+    text = f'while ({cond}) {{\n' + body + '\n}'
+    text = indent(text, lvl)
+    return text
+
+
 def handle_for_stmt(inst, info,more):
     lvl = more[0]
     pre, _  =  gen_code(inst.pre, info, context=ARG)
@@ -288,7 +298,8 @@ NEED_SEMI_COLON = set((clang.CursorKind.CALL_EXPR, clang.CursorKind.VAR_DECL,
 # Go to next line after these nodes
 GOTO_NEXT_LINE = (clang.CursorKind.IF_STMT, clang.CursorKind.FOR_STMT,
         clang.CursorKind.SWITCH_STMT, clang.CursorKind.CASE_STMT,
-        clang.CursorKind.DEFAULT_STMT, CODE_LITERAL, TO_USERSPACE_INST)
+        clang.CursorKind.DEFAULT_STMT, CODE_LITERAL, TO_USERSPACE_INST,
+        clang.CursorKind.WHILE_STMT)
 
 NO_MODIFICATION = 0
 REPLACE_READ = 1
@@ -316,6 +327,7 @@ jump_table = {
         # Control FLow
         clang.CursorKind.IF_STMT: handle_if_stmt,
         clang.CursorKind.DO_STMT: handle_do_stmt,
+        clang.CursorKind.WHILE_STMT: handle_while_stmt,
         clang.CursorKind.FOR_STMT: handle_for_stmt,
         clang.CursorKind.SWITCH_STMT: handle_switch_stmt,
         clang.CursorKind.CASE_STMT: handle_case_stmt,
@@ -387,7 +399,7 @@ def gen_code(list_instructions, info, context=BODY):
 
 def __generate_code_type_definition(inst, info):
     if isinstance(inst, Function):
-        if inst.name in (READ_PACKET, WRITE_PACKET):
+        if inst.name in (READ_PACKET, *WRITE_PACKET):
             return ''
 
         args = []

@@ -31,7 +31,7 @@ def remember_func(func):
 def is_function_call_possible(inst, info):
     func = inst.get_function_def()
     if not func:
-        if inst.name in ('memcpy', READ_PACKET, WRITE_PACKET):
+        if inst.name in ('memcpy', READ_PACKET, *WRITE_PACKET):
             # It is fine
             return True
         # debug('function is not possible (no def):', inst.name)
