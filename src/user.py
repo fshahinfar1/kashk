@@ -160,7 +160,7 @@ char __buf[__size];
 auto __b = asio::buffer(__buf, __size);
 /* Receive message and check the return value */
 try {{
-  co_await conn->socket().async_read_some(b, asio::use_awaitable);
+  co_await conn->socket().async_read_some(__b, asio::use_awaitable);
 }} catch (const std::system_error &error) {{
   if (error.code() != asio::error::eof && error.code() != asio::error::connection_reset) {{
     std::cerr << "Error: " << error.what() << std::endl;
