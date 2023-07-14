@@ -1,23 +1,21 @@
 import clang.cindex as clang
 
-from utility import parse_file, find_elem, show_insts, get_body_of_the_loop
-from understand_program_state import (extract_state, get_state_for,)
-from understand_logic import (find_event_loop,
-        get_variable_declaration_before_elem, get_all_read, get_all_send,
-        gather_instructions_under, gather_instructions_from)
-
+from log import *
 from data_structure import *
 from instruction import *
+from utility import (parse_file, find_elem, add_state_decl_to_bpf)
+from find_ev_loop import find_request_processing_logic
+from sym_table_gen import build_sym_table
+from understand_program_state import extract_state
+from understand_logic import (get_all_read, get_all_send,
+        gather_instructions_from)
 
 from bpf_code_gen import generate_bpf_prog, gen_code
 from user import generate_user_prog
-from sym_table import SymbolTableEntry
-from sym_table_gen import build_sym_table
 
 from passes.pass_obj import PassObject
 from passes.clone import clone_pass
 from passes.linear_code import linear_code_pass
-# from passes.cfg_gen import cfg_gen_pass
 
 from bpf_passes.loop_end import loop_end_pass
 from bpf_passes.possible_path_analysis import possible_path_analysis_pass
@@ -46,49 +44,21 @@ def generate_offload(file_path, entry_func_name, out_bpf, out_user):
     # Collect information about classes, functions, variables, ...
     build_sym_table(cursor, info)
 
+    # The arguments to the entry function is part of the connection state
+    # entry_func_params = [get_state_for(arg) for arg in entry_func.get_arguments()]
+    boot_starp_global_state(cursor, info)
+
     # Find the entry function
     entry_func = find_elem(cursor, entry_func_name)
     if entry_func is None:
         error('Did not found the entry function')
         return
 
-    # The arguments to the entry function is part of the connection state
-    # entry_func_params = [get_state_for(arg) for arg in entry_func.get_arguments()]
-    boot_starp_global_state(cursor, info)
+    body_of_loop = find_request_processing_logic(entry_func, info)
+    # Find the buffer representing the packet
+    find_read_write_bufs(body_of_loop, info)
 
-    # Find the event-loop
-    ev_loop = find_event_loop(entry_func)
-    if ev_loop is None:
-        error('Did not found event loop')
-        debug('Assuming it is a test case!')
-        body_of_loop = list(entry_func.get_children())[-1]
-        insts = gather_instructions_under(body_of_loop, info, BODY)
-    else:
-        # All declarations between event loop is shared among multiple packets of
-        # one connection
-        all_declarations_before_loop = get_variable_declaration_before_elem(entry_func, ev_loop, info)
-        for d in all_declarations_before_loop:
-            states, decls = get_state_for(d.cursor)
-            add_state_decl_to_bpf(info.prog, states, decls)
-            for s in states:
-                s.is_global = True
-                # Add it to the global scope
-                c = s.cursor
-                entry = SymbolTableEntry(c.spelling, c.type, c.kind, c)
-                info.sym_tbl.global_scope.insert(entry)
-
-        # TODO: all the initialization and operations done before the event loop is
-        # probably part of the control program setting up the BPF program.
-
-        # Find the buffer representing the packet
-        find_read_write_bufs(ev_loop, info)
-
-        # Go through the AST, generate instructions
-        body_of_loop = get_body_of_the_loop(ev_loop)
-        assert body_of_loop is not None
-        insts = gather_instructions_under(body_of_loop, info, BODY)
-
-    # TODO: Think more about the API of each pass
+    insts = gather_instructions_from(body_of_loop, info, BODY)
     bpf = Block(BODY)
     bpf.extend_inst(insts)
 
@@ -100,9 +70,9 @@ def generate_offload(file_path, entry_func_name, out_bpf, out_user):
             f.body = linear_code_pass(f.body, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
-    # # Take peek on the event loop body
-    # text, _ = gen_code(insts, info)
-    # print(text)
+    # Take peek on the event loop body
+    text, _ = gen_code(insts, info)
+    print(text)
 
     ## Possible Path Analysis
     # Mark inpossible paths and annotate which functions may fail or suceed
@@ -342,10 +312,3 @@ def find_read_write_bufs(ev_loop, info):
             info.wr_buf = PacketBuffer(buf_def)
             info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
             info.remove_cursor.add(remove_def.get_usr())
-
-
-def add_state_decl_to_bpf(prog, states, decls):
-    for s in states:
-        prog.add_connection_state(s)
-    for d in decls:
-        prog.add_declaration(d)

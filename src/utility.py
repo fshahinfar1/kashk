@@ -227,3 +227,20 @@ def filter_insts(block, filter_fn):
         for child in reversed(c.get_children()):
             q.append(child)
     return result
+
+
+def skip_unexposed_stmt(cursor):
+    ptr = cursor
+    while (ptr.kind == clang.CursorKind.UNEXPOSED_STMT or
+            ptr.kind == clang.CursorKind.UNEXPOSED_EXPR):
+        children = list(ptr.get_children())
+        # assert len(children) == 1
+        ptr = children[0]
+    return ptr
+
+
+def add_state_decl_to_bpf(prog, states, decls):
+    for s in states:
+        prog.add_connection_state(s)
+    for d in decls:
+        prog.add_declaration(d)
