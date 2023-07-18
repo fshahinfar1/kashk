@@ -62,7 +62,7 @@ def get_all_read(block):
                 # These functions are for coroutine and make things complex
                 continue
 
-            if c.spelling == READ_PACKET:
+            if c.spelling in READ_PACKET:
                 result.append(c)
                 continue
 

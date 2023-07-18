@@ -39,7 +39,7 @@ def __function_is_of_interest(inst):
 
 def __get_func_name(inst, info):
     func_name = inst.cursor.spelling
-    if func_name in (READ_PACKET, *WRITE_PACKET):
+    if func_name in (*READ_PACKET, *WRITE_PACKET):
         # do not rewrite the read/send functions
         return func_name
     if inst.is_method:

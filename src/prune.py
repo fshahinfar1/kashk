@@ -1,8 +1,10 @@
 import clang.cindex as clang
 
 
-READ_PACKET = 'async_read_some'
-WRITE_PACKET = ['async_write', 'async_write_some']
+# TODO: How to make sure that `read` is the read system-call and not a simple
+# function?
+READ_PACKET = ['async_read_some', 'read']
+WRITE_PACKET = ['async_write', 'async_write_some', 'write']
 
 
 def get_namespace_of_cursor(cursor):

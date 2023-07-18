@@ -236,16 +236,25 @@ def find_read_write_bufs(ev_loop, info):
     for r in reads:
         args = list(r.get_arguments())
 
-        # the buffer is in the first arg
-        first_arg = args[0]
-        while first_arg.kind == clang.CursorKind.UNEXPOSED_EXPR:
-            children = list(first_arg.get_children())
-            assert len(children) == 1, f'len(children) == {len(children)}'
-            first_arg = children[0]
+        buf_arg = None
+        buf_sz = None
 
-        if first_arg.kind == clang.CursorKind.CALL_EXPR:
-            args = list(first_arg.get_arguments())
-            buf_def = args[0].get_definition()
+        # the buffer is in the first arg
+        buf_arg = args[0]
+        while buf_arg.kind == clang.CursorKind.UNEXPOSED_EXPR:
+            children = list(buf_arg.get_children())
+            assert len(children) == 1, f'len(children) == {len(children)}'
+            buf_arg = children[0]
+
+        if r.spelling == 'async_read_some':
+            buf_arg = args[0]
+        elif r.spelling == 'read':
+            buf_arg = args[1]
+            buf_sz = args[2]
+
+        if buf_arg.kind == clang.CursorKind.CALL_EXPR:
+            args = list(buf_arg.get_arguments())
+            buf_def = buf_arg.get_definition()
             info.rd_buf = PacketBuffer(buf_def)
             if len(args) == 2:
                 buf_sz = args[1]
@@ -258,15 +267,20 @@ def find_read_write_bufs(ev_loop, info):
                 info.rd_buf.size_cursor = [Literal('2048', clang.CursorKind.INTEGER_LITERAL)]
         else:
             # if the buffer is assigned before and is not a function call
-            buf_def = first_arg.get_definition()
+            buf_def = buf_arg.get_definition()
             remove_def = buf_def
-            buf_def = next(buf_def.get_children())
-            args = list(buf_def.get_arguments())
-            buf_def = args[0].get_definition()
-            buf_sz = args[1]
-            info.rd_buf = PacketBuffer(buf_def)
-            info.rd_buf.size_cursor = gather_instructions_from(buf_def, info)
             info.remove_cursor.add(remove_def.get_usr())
+            if buf_def.kind == clang.CursorKind.CALL_EXPR:
+                buf_def = next(buf_def.get_children())
+                args = list(buf_def.get_arguments())
+                buf_def = args[0].get_definition()
+                buf_sz = args[1]
+                info.rd_buf = PacketBuffer(buf_def)
+                info.rd_buf.size_cursor = gather_instructions_from(buf_sz, info)
+            else:
+                info.rd_buf = PacketBuffer(buf_def)
+                assert buf_sz is not None
+                info.rd_buf.size_cursor = gather_instructions_from(buf_sz, info)
 
     if info.rd_buf is None:
         error('Failed to find the packet buffer')
@@ -278,10 +292,16 @@ def find_read_write_bufs(ev_loop, info):
         # TODO: this code is not going to work. it is so specific
         args = list(c.get_arguments())
 
+        buf_arg = None
+        buf_sz = None
+
         if c.spelling == 'async_write':
             buf_arg = args[1]
         elif c.spelling == 'async_write_some':
             buf_arg = args[0]
+        elif c.spelling == 'write':
+            buf_arg = args[1]
+            buf_sz = args[2]
 
         while buf_arg.kind == clang.CursorKind.UNEXPOSED_EXPR:
             children = list(buf_arg.get_children())
@@ -305,10 +325,17 @@ def find_read_write_bufs(ev_loop, info):
         else:
             buf_def = buf_arg.get_definition()
             remove_def = buf_def
-            buf_def = next(buf_def.get_children())
-            args = list(buf_def.get_arguments())
-            buf_def = args[0].get_definition()
-            buf_sz = args[1]
-            info.wr_buf = PacketBuffer(buf_def)
-            info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
             info.remove_cursor.add(remove_def.get_usr())
+            if buf_def.kind == clang.CursorKind.CALL_EXPR:
+                buf_def = next(buf_def.get_children())
+                args = list(buf_def.get_arguments())
+                buf_def = args[0].get_definition()
+                buf_sz = args[1]
+                info.wr_buf = PacketBuffer(buf_def)
+                info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
+                info.remove_cursor.add(remove_def.get_usr())
+            else:
+                info.wr_buf = PacketBuffer(buf_def)
+                assert buf_sz is not None
+                info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
+

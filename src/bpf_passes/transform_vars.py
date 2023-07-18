@@ -49,7 +49,7 @@ def _process_current_inst(inst, info, more):
             # replace this instruction
             return new_inst
     elif inst.kind == clang.CursorKind.CALL_EXPR:
-        if inst.name == READ_PACKET:
+        if inst.name in READ_PACKET:
             # Assign packet pointer on a previouse line
             text = bpf_get_data(info.rd_buf.name)
             assign_inst = Literal(text, CODE_LITERAL)
