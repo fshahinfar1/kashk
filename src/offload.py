@@ -132,9 +132,9 @@ def gen_user_code(user, info, out_user):
         # debug(info.user_prog.graph.paths.var_deps)
         fields = []
         for var in info.user_prog.graph.paths.var_deps:
-            T = MyType()
-            T.kind = var.type.kind
-            T.spelling = var.type.spelling
+            print(var.name, var.type.kind, var.type.under_type)
+            # TODO: do I need to clone?
+            T = var.type.clone()
             state_obj = StateObject(None)
             state_obj.name = var.name
             state_obj.type = T.spelling

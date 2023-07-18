@@ -105,7 +105,7 @@ class StateObject:
             self.type = c.type.spelling
             self.kind = c.type.kind
             self.is_pointer = c.type.kind == clang.TypeKind.POINTER
-            self.type_ref = c.type
+            self.type_ref = MyType.from_cursor_type(c.type)
         else:
             self.cursor = None
             self.name = None
@@ -137,8 +137,8 @@ class StateObject:
 
     def get_c_code(self):
         if self.type_ref.kind == clang.TypeKind.CONSTANTARRAY:
-            el_type = self.cursor.type.element_type.spelling
-            el_count = self.cursor.type.element_count
+            el_type = self.type_ref.element_type.spelling
+            el_count = self.type_ref.element_count
             return f'{el_type} {self.name}[{el_count}];'
         elif self.type_ref.kind == clang.TypeKind.RECORD:
             return f'struct {self.type} {self.name};'
@@ -215,6 +215,15 @@ class MyType:
 
     def is_record(self):
         return self.kind == clang.TypeKind.RECORD
+
+    def clone(self):
+        obj = MyType()
+        obj.spelling = self.spelling
+        if self.under_type is not None:
+            obj.under_type = self.under_type.clone()
+        obj.kind = self.kind
+        obj._element_count = self._element_count
+        return obj
 
 
 class TypeDefinition:
