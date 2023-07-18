@@ -45,7 +45,7 @@ def _do_pass(inst, info, more):
         _set_in_userland(more)
     elif inst.kind == clang.CursorKind.CALL_EXPR:
         func = inst.get_function_def()
-        if func:
+        if func and func.body.has_children():
             parent_node = cb_ref.get(NODE)
             node = parent_node.new_child()
             # Step inside the function

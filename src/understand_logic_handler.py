@@ -81,6 +81,12 @@ def __get_func_args(inst, info):
     return args
 
 
+def __add_empty_func_definition(inst, info):
+    debug('----', inst.name)
+    f = Function(inst.name, inst.func_ptr)
+    f.is_method = inst.is_method
+
+
 def __add_func_definition(inst, info):
     scope = info.sym_tbl.scope_mapping.get(inst.name)
     if not scope:
@@ -180,9 +186,10 @@ def understand_call_expr(c, info):
     inst.args = __get_func_args(inst, info)
 
     # check if function is defined
-    if (get_global_for_bpf()
-            and __function_is_of_interest(inst)
-            and inst.name not in Function.directory):
-        __add_func_definition(inst, info)
+    if inst.name not in Function.directory:
+        if get_global_for_bpf() and __function_is_of_interest(inst):
+            __add_func_definition(inst, info)
+        else:
+            __add_empty_func_definition(inst, info)
 
     return inst

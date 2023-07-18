@@ -66,18 +66,26 @@ def generate_offload(file_path, entry_func_name, out_bpf, out_user):
     # Move function calls out of the ARG context!
     bpf = linear_code_pass(bpf, info, PassObject())
     for f in Function.directory.values():
+        if not f.body.has_children():
+            continue
         with info.sym_tbl.with_func_scope(f.name):
             f.body = linear_code_pass(f.body, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
-    # print('Take a peek on the event loop!')
-    # text, _ = gen_code(insts, info)
-    # print(text)
-    # print('------------------------------')
+    print('Take a peek on the event loop!')
+    text, _ = gen_code(insts, info)
+    print(text)
+    print('------------------------------')
+    text, _ = gen_code(Function.directory['process_request'].body, info)
+    print(text)
+    print('------------------------------')
 
     ## Possible Path Analysis
     # Mark inpossible paths and annotate which functions may fail or suceed
     bpf = possible_path_analysis_pass(bpf, info, PassObject())
+    for func in Function.directory.values():
+        print(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_succeed)
+
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Create a clone of unmodified but marked AST, later used for creating the

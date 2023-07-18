@@ -12,6 +12,7 @@ from passes.clone import clone_pass
 
 
 MODULE_TAG = '[Possible Path Pass]'
+FAILED = 999
 
 current_function = None
 cb_ref = CodeBlockRef()
@@ -31,10 +32,19 @@ def remember_func(func):
 def is_function_call_possible(inst, info):
     func = inst.get_function_def()
     if not func:
+        print('there', inst.name)
         if inst.name in ('memcpy', *READ_PACKET, *WRITE_PACKET):
             # It is fine
             return True
         # debug('function is not possible (no def):', inst.name)
+        return False
+    if not func.body.has_children():
+        if inst.name in ('memcpy', *READ_PACKET, *WRITE_PACKET):
+            # It is fine
+            return True
+
+        print('here', func.name)
+        func.may_fail = True
         return False
 
     with remember_func(func):
@@ -116,7 +126,7 @@ def _do_pass(inst, info, more):
                 blk = cb_ref.get(BODY)
                 _failed_to_generate_inst(inst, info, blk)
                 text, _ = gen_code([inst], info)
-                # debug(MODULE_TAG, 'Go to userspace at instruction:', text)
+                debug(MODULE_TAG, 'Go to userspace at instruction:', text)
                 more.failed = failed
 
         if inst is None:
@@ -140,6 +150,7 @@ def _do_pass(inst, info, more):
             new_children.append(new_child)
 
             if not failed and inst.kind == clang.CursorKind.RETURN_STMT:
+                debug(inst, inst.body[0].name, inst.kind)
                 current_function.may_succeed = True
 
     new_inst = inst.clone(new_children)
@@ -147,4 +158,5 @@ def _do_pass(inst, info, more):
 
 
 def possible_path_analysis_pass(inst, info, more):
-    return _do_pass(inst, info, more)
+    with cb_ref.new_ref(FAILED, False):
+        return _do_pass(inst, info, more)
