@@ -3,7 +3,7 @@ from log import error, debug
 from data_structure import *
 from instruction import *
 from sym_table import SymbolTableEntry
-from utility import indent 
+from utility import indent
 from bpf_code_gen import gen_code
 from passes.pass_obj import PassObject
 
@@ -96,7 +96,7 @@ def _function_check_param_reduc(inst, func, info, more):
         rec = Record(change.struct_name, change.list_of_params)
         rec.update_symbol_table(info.sym_tbl)
         info.prog.add_declaration(rec)
-    
+
     # Go through the body of the function and replace the variables or check
     # for other function invocations.
     with info.sym_tbl.with_func_scope(inst.name):
@@ -107,7 +107,7 @@ def _function_check_param_reduc(inst, func, info, more):
 
 def _handle_call(inst, info, more):
     func = inst.get_function_def()
-    if not func:
+    if not func or not func.body.has_children():
         # Ignore this instruction. There is no change
         return inst
 
@@ -122,7 +122,7 @@ def _handle_call(inst, info, more):
     if not count_extra:
         # No change to the invocation of the function
         return inst
-    
+
     # Create an instance of struct which should be passed to the function
     extra_args = [inst.args.pop() for i in range(count_extra)]
     decl = VarDecl(None)
@@ -148,7 +148,7 @@ def _handle_call(inst, info, more):
     unary.op = '&'
     unary.child.add_inst(ref)
     inst.args.append(unary)
-    
+
     return inst
 
 

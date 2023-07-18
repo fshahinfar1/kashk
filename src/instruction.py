@@ -1,7 +1,7 @@
 import itertools
 import clang.cindex as clang
 
-from utility import get_owner
+from utility import get_owner, report_on_cursor
 from data_structure import StateObject, Function, MyType
 from log import error, debug
 

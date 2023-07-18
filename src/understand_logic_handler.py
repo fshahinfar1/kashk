@@ -82,7 +82,6 @@ def __get_func_args(inst, info):
 
 
 def __add_empty_func_definition(inst, info):
-    debug('----', inst.name)
     f = Function(inst.name, inst.func_ptr)
     f.is_method = inst.is_method
 

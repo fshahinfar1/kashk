@@ -258,6 +258,7 @@ def __convert_cursor_to_inst(c, info):
         inst.body.extend_inst(gather_instructions_under(body, info, context=BODY))
         return inst
     elif c.kind == clang.CursorKind.FOR_STMT:
+        report_on_cursor(c)
         children = list(c.get_children())
         assert len(children) == 4
         inst = ForLoop()
