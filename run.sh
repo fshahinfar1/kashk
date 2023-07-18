@@ -1,14 +1,22 @@
 #! /bin/bash
-source ./venv/bin/activate
+
+# If there is a virtual environment directory, enable it
+if [ -d ./venv/ ]; then
+	source ./venv/bin/activate
+fi
 SCRIPT=./src/main.py
+CASE_STUDY_DIR=$HOME/auto_bpf_offload/auto_bpf_offload_case_study
 
-# FILE=~/asio_case_study/src/kv/kv.cpp
+# FILE=$CASE_STUDY_DIR/src/kv/kv.cpp
 
-# FILE=~/asio_case_study/src/lookup/lookup.cpp
+# FILE=$CASE_STUDY_DIR/src/lookup/lookup.cpp
 # ENTRY=Server::handle_connection
 
-FILE=~/asio_case_study/src/twt/twt.cpp
-ENTRY=WebServer::process_socket
+# FILE=$CASE_STUDY_DIR/src/twt/twt.cpp
+# ENTRY=WebServer::process_socket
+
+FILE=$CASE_STUDY_DIR/src/twt_c/twt_c.c
+ENTRY=handle_connection
 
 python3 $SCRIPT $FILE  $ENTRY
 # python3 $SCRIPT $FILE  $ENTRY | clang-format-12

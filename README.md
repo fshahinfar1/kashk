@@ -10,7 +10,7 @@ Automatic generation of eBPF kernel offload programs from application source cod
 
 ## Dependancy
 
-* `pip install clang=15.0.7`
+* `pip install clang==15.0.7`
 * clang-15
-* Asio header files
+* Asio header files [It is provided in `deps/` folder. No need to install anything]
 
