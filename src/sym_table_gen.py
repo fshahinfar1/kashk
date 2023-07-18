@@ -7,6 +7,9 @@ from data_structure import MyType
 import clang.cindex as clang
 
 
+remember_unnamed_struct_name = {}
+
+
 def __collect_information_about_class(cursor, info):
     # map __class__ identifier to the class representing current scope -
     T = MyType.from_cursor_type(cursor.type)
@@ -73,6 +76,7 @@ def build_sym_table(cursor, info):
 
     info.sym_tbl.scope_mapping['__global__'] = info.sym_tbl.current_scope
 
+    unnamed_struct_coutner = 0
     d = DFSPass(cursor)
     for c, l in d:
         # debug('|  '*l + f'+- {c.spelling} {c.kind}')
@@ -112,7 +116,13 @@ def build_sym_table(cursor, info):
         elif c.kind == clang.CursorKind.STRUCT_DECL:
             if not c.is_definition():
                 continue
-            scope_key = f'class_struct {c.spelling}'
+            if not c.spelling:
+                # An unnamed struct
+                scope_key = f'class_struct unnamed_{unnamed_struct_coutner}'
+                unnamed_struct_coutner += 1
+                remember_unnamed_struct_name[c.get_usr()] = scope_key
+            else:
+                scope_key = f'class_struct {c.spelling}'
             T = MyType.from_cursor_type(c.type)
             info.sym_tbl.insert_entry(scope_key, T, c.kind, c)
             with info.sym_tbl.new_scope() as scope:
