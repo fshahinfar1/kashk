@@ -6,6 +6,18 @@ import clang.cindex as clang
 READ_PACKET = ['async_read_some', 'read']
 WRITE_PACKET = ['async_write', 'async_write_some', 'write']
 
+# TODO: is it formally correct to ignore a function? We should ignore a
+# function based on the effects that it makes. If the effects are not of
+# interest only then we can ignore a funciton.
+IGNORE_FUNC = ['printf',]
+
+
+def __is_ignored_function(cursor):
+    if cursor.kind == clang.CursorKind.CALL_EXPR:
+        if cursor.spelling in IGNORE_FUNC:
+            return True
+    return False
+
 
 def get_namespace_of_cursor(cursor):
     cursor = cursor.type.get_declaration()
@@ -26,6 +38,8 @@ def should_process_this_cursor(cursor):
         return False
     ns = get_namespace_of_cursor(cursor)
     if ns == 'asio':
+        return False
+    if __is_ignored_function(cursor):
         return False
     return True
 
