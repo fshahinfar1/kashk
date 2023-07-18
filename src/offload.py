@@ -70,10 +70,10 @@ def generate_offload(file_path, entry_func_name, out_bpf, out_user):
             f.body = linear_code_pass(f.body, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
-    print('Take a peek on the event loop!')
-    text, _ = gen_code(insts, info)
-    print(text)
-    print('------------------------------')
+    # print('Take a peek on the event loop!')
+    # text, _ = gen_code(insts, info)
+    # print(text)
+    # print('------------------------------')
 
     ## Possible Path Analysis
     # Mark inpossible paths and annotate which functions may fail or suceed

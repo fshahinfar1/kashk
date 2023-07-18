@@ -129,5 +129,17 @@ def build_sym_table(cursor, info):
                 info.sym_tbl.scope_mapping[scope_key] = scope
                 __collect_information_about_class(c, info)
             continue
+        elif c.kind == clang.CursorKind.TYPEDEF_DECL:
+            scope_key = f'class_{c.spelling}'
+            x = c.underlying_typedef_type
+            x = x.get_declaration()
+            usr = x.get_usr()
+            equivalent_scope_key = remember_unnamed_struct_name[usr]
+            equivalent_scope = info.sym_tbl.scope_mapping[equivalent_scope_key]
+            info.sym_tbl.scope_mapping[scope_key] = equivalent_scope
+            info.sym_tbl.insert_entry(scope_key, T, c.kind, c)
+            equiv_sym = info.sym_tbl.lookup(equivalent_scope_key)
+            info.sym_tbl.insert(equiv_sym)
+            continue
 
         d.go_deep()

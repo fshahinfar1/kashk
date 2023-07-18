@@ -9,7 +9,7 @@ WRITE_PACKET = ['async_write', 'async_write_some', 'write']
 # TODO: is it formally correct to ignore a function? We should ignore a
 # function based on the effects that it makes. If the effects are not of
 # interest only then we can ignore a funciton.
-IGNORE_FUNC = ['printf',]
+IGNORE_FUNC = ['printf', 'fprintf']
 
 
 def __is_ignored_function(cursor):

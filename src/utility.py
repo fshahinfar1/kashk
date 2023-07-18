@@ -174,12 +174,15 @@ def get_owner(cursor):
     elif parent.kind == clang.CursorKind.MEMBER_REF_EXPR:
         res.append(parent.spelling)
         res += get_owner(parent)
+    elif parent.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
+        res.append(cursor.spelling)
+        res += get_owner(parent)
     elif parent.kind == clang.CursorKind.CALL_EXPR:
         res += get_owner(parent)
     elif parent.kind == clang.CursorKind.UNEXPOSED_EXPR:
         res += get_owner(parent)
     else:
-        error('get_owner: unhandled cursor kind')
+        error('get_owner: unhandled cursor kind', parent.kind)
 
     return res
 
