@@ -136,10 +136,27 @@ class StateObject:
                     return f
 
     def get_c_code(self):
-        if self.type_ref.kind == clang.TypeKind.CONSTANTARRAY:
-            el_type = self.type_ref.element_type.spelling
-            el_count = self.type_ref.element_count
-            return f'{el_type} {self.name}[{el_count}];'
+        T = self.type_ref
+        if T.is_array():
+            el_count = T.element_count
+            # The following lines of code is for handling the multi-dimensional arrays.
+            sub_T = T.element_type
+            if sub_T.is_array():
+                sub_var = StateObject(None)
+                sub_var.type_ref = self.type_ref.element_type
+                sub_var.type = sub_var.type_ref.spelling
+                sub_var.name = self.name
+                tmp = sub_var.get_c_code() # recursion
+                assert tmp[-1] == ';'
+                tmp = tmp[:-1] # drop the semi-colon
+
+                first_brack = tmp.find('[')
+                # insert the array dimension before the current existing ones
+                text = f'{tmp[:first_brack]}[{el_count}]{tmp[first_brack:]};'
+            else:
+                text = f'{sub_T.spelling} {self.name}[{el_count}];'
+
+            return text
         elif self.type_ref.kind == clang.TypeKind.RECORD:
             return f'struct {self.type} {self.name};'
         return f'{self.type} {self.name};'

@@ -63,7 +63,18 @@ def handle_var(inst, info, more):
     if inst.is_array:
         el_type = inst.type.element_type.spelling
         el_count = inst.type.element_count
-        text = f'{el_type} {inst.name}[{el_count}]'
+
+        # The following lines of code is for handling the multi-dimensional arrays.
+        sub_var = VarDecl(None)
+        sub_var.type = inst.type.element_type
+        sub_var.name = inst.name
+        tmp = handle_var(sub_var, info, more) # recursion
+        if sub_var.is_array:
+            first_brack = tmp.find('[')
+            # insert the array dimension before the current existing ones
+            text = f'{tmp[:first_brack]}[{el_count}]{tmp[first_brack:]}'
+        else:
+            text = f'{tmp}[{el_count}]'
     elif inst.is_record:
         text = f'struct {inst.type.spelling} {inst.name}'
     else:
@@ -107,6 +118,9 @@ def handle_bin_op(inst, info, more):
 def handle_unary_op(inst, info, more):
     lvl = more[0]
     child, _ = gen_code(inst.child, info, context=ARG)
+    # TODO: in case of ++ operator, it makes a difference if it is before or
+    # after the `child'. Currently it can introduce bugs in the generated
+    # program because of not considering this.
     text = f'{inst.op}({child})'
     return text
 
@@ -293,7 +307,8 @@ def handle_to_userspace(inst, info, more):
 NEED_SEMI_COLON = set((clang.CursorKind.CALL_EXPR, clang.CursorKind.VAR_DECL,
     clang.CursorKind.BINARY_OPERATOR, clang.CursorKind.CONTINUE_STMT,
     clang.CursorKind.DO_STMT, clang.CursorKind.RETURN_STMT,
-    clang.CursorKind.CONTINUE_STMT, clang.CursorKind.BREAK_STMT, clang.CursorKind.CXX_THROW_EXPR,))
+    clang.CursorKind.CONTINUE_STMT, clang.CursorKind.BREAK_STMT,
+    clang.CursorKind.CXX_THROW_EXPR, clang.CursorKind.UNARY_OPERATOR,))
 
 # Go to next line after these nodes
 GOTO_NEXT_LINE = (clang.CursorKind.IF_STMT, clang.CursorKind.FOR_STMT,
