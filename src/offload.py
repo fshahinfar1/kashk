@@ -84,7 +84,7 @@ def generate_offload(file_path, entry_func_name, out_bpf, out_user):
     # Mark inpossible paths and annotate which functions may fail or suceed
     bpf = possible_path_analysis_pass(bpf, info, PassObject())
     for func in Function.directory.values():
-        print(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_succeed)
+        print(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_fail)
 
     debug('~~~~~~~~~~~~~~~~~~~~~')
 

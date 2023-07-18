@@ -32,7 +32,6 @@ def remember_func(func):
 def is_function_call_possible(inst, info):
     func = inst.get_function_def()
     if not func:
-        print('there', inst.name)
         if inst.name in ('memcpy', *READ_PACKET, *WRITE_PACKET):
             # It is fine
             return True
@@ -43,7 +42,6 @@ def is_function_call_possible(inst, info):
             # It is fine
             return True
 
-        print('here', func.name)
         func.may_fail = True
         return False
 
@@ -102,8 +100,6 @@ def _process_child(child, inst, info, more):
         obj = more.repack(lvl + 1, tag, parent_list)
         new_child = _do_pass(child, info, obj)
 
-    more.failed = obj.failed
-
     return new_child
 
 
@@ -111,7 +107,7 @@ def _do_pass(inst, info, more):
     # TODO: fix this ugly if-else
     lvl, ctx, parent_list = more.unpack()
     new_children = []
-    failed = more.get('failed', False)
+    failed = cb_ref.get(FAILED)
 
     if inst.bpf_ignore is True:
         new_inst = clone_pass(inst, info, PassObject())
@@ -127,7 +123,8 @@ def _do_pass(inst, info, more):
                 _failed_to_generate_inst(inst, info, blk)
                 text, _ = gen_code([inst], info)
                 debug(MODULE_TAG, 'Go to userspace at instruction:', text)
-                more.failed = failed
+                # Not a stack
+                cb_ref.set(FAILED, True)
 
         if inst is None:
             # This instruction should be removed
@@ -135,17 +132,17 @@ def _do_pass(inst, info, more):
 
         # Continue deeper
         for child, tag in inst.get_children_context_marked():
-            obj = PassObject.pack(lvl + 1, tag, parent_list)
-            obj.failed = failed
-            new_child = _process_child(child, inst, info, obj)
-            if new_child is None:
-                return None
+            with cb_ref.new_ref(FAILED, failed):
+                obj = PassObject.pack(lvl + 1, tag, parent_list)
+                new_child = _process_child(child, inst, info, obj)
+                if new_child is None:
+                    return None
+                failed = cb_ref.get(FAILED)
 
-            failed = obj.failed
             # TODO: when should I propagate the failure to the upper level
             # context?
             if inst.kind != clang.CursorKind.IF_STMT:
-                more.failed = failed
+                cb_ref.set(FAILED, failed)
 
             new_children.append(new_child)
 
