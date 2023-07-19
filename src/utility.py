@@ -253,3 +253,74 @@ def add_state_decl_to_bpf(prog, states, decls):
         prog.add_connection_state(s)
     for d in decls:
         prog.add_declaration(d)
+
+
+def draw_tree(root):
+    delimeter = ' '
+    v_space = 3
+    h_space = 2
+
+    count_children = len(root.children)
+    number_of_lines = 0
+    sub_trees = []
+    for child in root.children:
+        sub_tree = draw_tree(child)
+        lines = list(filter(lambda x: bool(x), sub_tree.split('\n')))
+        height = len(lines)
+        width = max([len(l) for l in lines])
+        sub_trees.append((lines, width))
+        number_of_lines = max(number_of_lines, height)
+
+    width = 0
+    below = []
+    for l in range(number_of_lines):
+        line = ''
+        for sub_tree, width in sub_trees:
+            if len(sub_tree) > l:
+                line = line + sub_tree[l] + (delimeter * v_space) 
+            else:
+                line = line + ' ' * width + (delimeter * v_space) 
+        below.append(line)
+        width = max(width, len(line))
+    below = ('\n' * h_space).join(below)
+    node = f'[{count_children}]'
+    space_needed = width - len(node)
+    left_space = space_needed // 2
+    right_space = space_needed - left_space
+    node = (' ' * left_space) + node + (' ' * right_space) + '\n'
+    result = node + ('\n' * h_space) + below
+    return result
+
+
+def report_user_program_graph(info):
+    root = info.user_prog.graph
+    s = draw_tree(root)
+    debug(s, '\n')
+
+    q = [0, info.user_prog.graph]
+    lvl = 0
+    while q:
+        node = q.pop()
+        if node == 0:
+            lvl += 1
+            continue
+        debug('lvl:', lvl, 'children:', len(node.children), []) # node.paths.code.children
+        q.append(0)
+        q.extend(reversed(node.children))
+
+    # Look at the status
+    q = [0, info.user_prog.graph]
+    lvl = 0
+    while q:
+        node = q.pop()
+        if node == 0:
+            lvl += 1
+            continue
+        debug('lvl:', lvl, node.path_ids)
+        debug(node.paths.var_deps)
+        from bpf_code_gen import gen_code
+        text, _ = gen_code(node.paths.code, info)
+        debug(text)
+        debug('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+        q.append(0)
+        q.extend(reversed(node.children))

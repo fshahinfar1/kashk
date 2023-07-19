@@ -258,8 +258,8 @@ def __convert_cursor_to_inst(c, info):
         inst.body.extend_inst(gather_instructions_under(body, info, context=BODY))
         return inst
     elif c.kind == clang.CursorKind.FOR_STMT:
-        report_on_cursor(c)
         children = list(c.get_children())
+        # TODO: it will not work when parts of for-loop instruction is omitted. I should fix it.
         assert len(children) == 4
         inst = ForLoop()
         inst.cursor = c

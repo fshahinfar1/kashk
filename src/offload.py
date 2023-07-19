@@ -3,7 +3,7 @@ import clang.cindex as clang
 from log import *
 from data_structure import *
 from instruction import *
-from utility import (parse_file, find_elem, add_state_decl_to_bpf)
+from utility import (parse_file, find_elem, add_state_decl_to_bpf, report_user_program_graph)
 from find_ev_loop import find_request_processing_logic
 from sym_table_gen import build_sym_table
 from understand_program_state import extract_state
@@ -112,35 +112,13 @@ def gen_user_code(user, info, out_user):
         create_fallback_pass(user, info, PassObject())
         var_dependency_pass(info)
 
-        # # What graph looks like
-        # q = [info.user_prog.graph, 0]
-        # lvl = 0
-        # while q:
-        #     node = q.pop()
-        #     if node == 0:
-        #         lvl += 1
-        #         continue
-        #     debug('lvl:', lvl, 'children:', len(node.children), node.paths.code.children)
-        #     q.extend(reversed(node.children))
-        #     q.append(0)
-
-        # Look at the status
-        # q = [info.user_prog.graph, 0]
-        # lvl = 0
-        # while q:
-        #     node = q.pop()
-        #     if node == 0:
-        #         lvl += 1
-        #         continue
-        #     debug('lvl:', lvl)
-        #     debug(node.paths.var_deps)
-        #     q.extend(reversed(node.children))
-        #     q.append(0)
+        # What graph looks like
+        report_user_program_graph(info)
 
         # debug(info.user_prog.graph.paths.var_deps)
         fields = []
         for var in info.user_prog.graph.paths.var_deps:
-            print(var.name, var.type.kind, var.type.under_type)
+            debug('bpf/user-shared:', var.name, var.type.kind, var.type.under_type)
             # TODO: do I need to clone?
             T = var.type.clone()
             state_obj = StateObject(None)
