@@ -9,6 +9,9 @@ from data_structure import *
 from prune import should_process_this_cursor, get_namespace_of_cursor
 
 
+MODULE_TAG = '[Program State]'
+
+
 # TODO: I have messed up finding the right type, I should refactor, rewrite
 # this function.
 def generate_decleration_for(cursor):
@@ -24,21 +27,24 @@ def generate_decleration_for(cursor):
 
 
     T = cursor.type
-    if T.kind == clang.TypeKind.POINTER:
-        T = T.get_pointee()
-    elif T.kind == clang.TypeKind.CONSTANTARRAY:
-        T = T.element_type
+    while True:
+        if T.kind == clang.TypeKind.POINTER:
+            T = T.get_pointee()
+        elif T.kind == clang.TypeKind.CONSTANTARRAY:
+            T = T.element_type
+        else:
+            break
 
     if T.kind in PRIMITIVE_TYPES:
         return []
 
     c = T.get_declaration()
     if c is None:
-        error(f'Failed to find the definition for {T.spelling}')
+        error(MODULE_TAG, f'Failed to find the definition for {T.spelling}')
         return []
     c = c.get_definition()
     if c is None:
-        error(f'Failed to find the definition for {T.spelling}')
+        error(MODULE_TAG, f'Failed to find the definition for {T.spelling}')
         return []
     cursor = c
     T = cursor.type
