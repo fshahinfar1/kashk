@@ -174,17 +174,29 @@ def get_owner(cursor):
     elif parent.kind == clang.CursorKind.MEMBER_REF_EXPR:
         res.append(parent.spelling)
         res += get_owner(parent)
-    elif parent.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
-        res.append(cursor.spelling)
-        res += get_owner(parent)
-    elif parent.kind == clang.CursorKind.CALL_EXPR:
-        res += get_owner(parent)
-    elif parent.kind == clang.CursorKind.UNEXPOSED_EXPR:
+    elif parent.kind in (clang.CursorKind.ARRAY_SUBSCRIPT_EXPR,
+            clang.CursorKind.CALL_EXPR, clang.CursorKind.UNEXPOSED_EXPR):
         res += get_owner(parent)
     else:
         error('get_owner: unhandled cursor kind', parent.kind)
 
     return res
+
+
+"""
+This method is for finding the object type in the case of having pointers of
+pointers or multi-dimensional arrays.
+"""
+def get_actual_type(_T):
+    T = _T
+    while True:
+        if T.kind == clang.TypeKind.POINTER:
+            T = T.get_pointee()
+        elif T.kind == clang.TypeKind.CONSTANTARRAY:
+            T = T.element_type
+        else:
+            break
+    return T
 
 
 def owner_to_ref(owner, info):
@@ -198,11 +210,8 @@ def owner_to_ref(owner, info):
             debug('did not found obj:', x)
             break
         hierarchy.append(obj)
-        if obj.type.kind == clang.TypeKind.POINTER and obj.type.get_pointee():
-            obj_cls = obj.type.get_pointee().spelling
-        else:
-            obj_cls = obj.type.spelling
-        key = f'class_{obj_cls}'
+        obj_cls_name = get_actual_type(obj.type).spelling
+        key = f'class_{obj_cls_name}'
         scope = info.sym_tbl.scope_mapping.get(key)
         if not scope:
             debug(f'scope not found for: |{key}|') 

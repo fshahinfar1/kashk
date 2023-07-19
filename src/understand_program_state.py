@@ -2,7 +2,7 @@ import sys
 import clang.cindex as clang
 
 from utility import (find_elem, get_code, generate_struct_with_fields,
-        PRIMITIVE_TYPES, report_on_cursor)
+        PRIMITIVE_TYPES, report_on_cursor, get_actual_type)
 from bpf import SK_SKB_PROG
 from data_structure import *
 
@@ -26,14 +26,7 @@ def generate_decleration_for(cursor):
     orig = cursor
 
 
-    T = cursor.type
-    while True:
-        if T.kind == clang.TypeKind.POINTER:
-            T = T.get_pointee()
-        elif T.kind == clang.TypeKind.CONSTANTARRAY:
-            T = T.element_type
-        else:
-            break
+    T = get_actual_type(cursor.type)
 
     if T.kind in PRIMITIVE_TYPES:
         return []
