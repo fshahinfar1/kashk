@@ -228,13 +228,21 @@ class UnaryOp(Instruction):
         self.child = Block(ARG)
         if cursor is not None:
             self.cursor = cursor
+            self.comes_after = False
             self.op = self.__get_op()
         else:
             self.cursor = None
             self.op = '<not set>'
+            self.comes_after = False
 
     def __get_op(self):
-        return next(self.cursor.get_tokens()).spelling
+        tokens = [t.spelling for t in self.cursor.get_tokens()]
+        assert len(tokens) == 2, 'Expected there be only two tokens in the UnaryOp but there are {len(tokens)}'
+        candid = tokens[0]
+        if candid not in UnaryOp.OPS:
+            candid = tokens[1]
+            self.comes_after = True
+        return candid
 
     def has_children(self):
         return True
@@ -248,9 +256,15 @@ class UnaryOp(Instruction):
         return _generate_marked_children(groups, context)
 
     def clone(self, children):
+        """
+        Clone the Unary Operator instruction
+        @param children: list of cloned children (This functio will not clone the children it self)
+        @returns a new UnaryOp object with representing the same instruction is this object.
+        """
         new = UnaryOp(self.cursor)
         new.op = self.op
         new.child = children[0]
+        new.comes_after = self.comes_after
         new.bpf_ignore = self.bpf_ignore
         return new
 
