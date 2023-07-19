@@ -3,7 +3,8 @@ import clang.cindex as clang
 from log import *
 from data_structure import *
 from instruction import *
-from utility import (parse_file, find_elem, add_state_decl_to_bpf, report_user_program_graph)
+from utility import (parse_file, find_elem, add_state_decl_to_bpf,
+        report_user_program_graph)
 from find_ev_loop import find_request_processing_logic
 from sym_table_gen import build_sym_table
 from understand_program_state import extract_state
@@ -28,6 +29,9 @@ from user_passes.select_user import select_user_pass
 from user_passes.number_fallback_graph import number_fallback_graph_pass
 from user_passes.var_dependency import var_dependency_pass
 from user_passes.create_fallback import create_fallback_pass
+
+
+MODULE_TAG = '[Gen Offload]'
 
 
 # TODO: make a framework agnostic interface, allow for porting to other
@@ -113,12 +117,12 @@ def gen_user_code(user, info, out_user):
         var_dependency_pass(info)
 
         # What graph looks like
-        report_user_program_graph(info)
+        # report_user_program_graph(info)
 
         # debug(info.user_prog.graph.paths.var_deps)
         fields = []
         for var in info.user_prog.graph.paths.var_deps:
-            debug('bpf/user-shared:', var.name, var.type.kind, var.type.under_type)
+            debug(MODULE_TAG, 'bpf/user-shared:', var.name, var.type.kind, var.type.under_type)
             # TODO: do I need to clone?
             T = var.type.clone()
             state_obj = StateObject(None)
