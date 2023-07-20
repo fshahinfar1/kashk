@@ -4,7 +4,11 @@ from bpf_code_gen import gen_code
 from log import debug
 from sym_table import Scope
 
+from framework_support import InputOutputContext
+
 USER_EVENT_LOOP_ENTRY = '__user_event_loop_entry__'
+
+MODULE_TAG = '[User Code]'
 
 
 class Path:
@@ -150,17 +154,11 @@ class UserProg:
                 q.append((c, next_lvl))
 
 
-def _load_meta(info):
-    meta = info.user_prog.declarations[0]
-
-    declare = []
-    load = []
-    for f in meta.fields:
-        declare.append(f.get_c_code())
-        load.append(f'{f.name} = __m->{f.name};')
-
-
-    recv_pkt = f"""
+def _get_recv_func(meta, info):
+    # TODO: these part has been hard-coded not because it is not possible to do
+    # it right but becasue I think there are more important things to work on.
+    if info.io_ctx.input_framework == InputOutputContext.INPUT_CPP_ASIO20:
+        return f"""
 struct {meta.name} *__m;
 const size_t __size = sizeof(struct {meta.name});
 char __buf[__size];
@@ -176,7 +174,32 @@ try {{
 }}
 __m = (struct {meta.name} *)__buf;
 """
+    elif info.io_ctx.input_framework == InputOutputContext.INPUT_C_EPOLL:
+        return f"""
+struct {meta.name} *__m;
+const size_t __size = sizeof(struct {meta.name}) + 1;
+char __b[__size];
+int __len = read(sockfd, __b, __size);
+if (__len <= 0) {{
+  fprintf(stderr, "Error reading from socket.\\n");
+  close(sockfd);
+  return;
+}}
+__b[__size] = '\\0';
+__m = (struct {meta.name} *)__buf;
+"""
+    else:
+        raise Exception(MODULE_TAG, 'Unexpected IO Framework!')
 
+
+def _load_meta(info):
+    meta = info.user_prog.declarations[0]
+    declare = []
+    load = []
+    for f in meta.fields:
+        declare.append(f.get_c_code())
+        load.append(f'{f.name} = __m->{f.name};')
+    recv_pkt = _get_recv_func(meta, info)
     declare = '\n'.join(declare)
     load = '\n'.join(load)
     return declare + '\n' + recv_pkt + '\n' + load

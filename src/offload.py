@@ -36,11 +36,18 @@ MODULE_TAG = '[Gen Offload]'
 
 # TODO: make a framework agnostic interface, allow for porting to other
 # functions
-def generate_offload(file_path, entry_func_name, out_bpf, out_user):
+def generate_offload(io_ctx):
+    # TODO: this is the legacy way, update the code to use the context
+    file_path = io_ctx.input_file
+    entry_func_name = io_ctx.entry_func
+    out_bpf = io_ctx.bpf_out_file
+    out_user = io_ctx.user_out_file
+
     # Keep track of which variable name is what, what types has been defined
     # and other information learned about the program
     info = Info()
     info.entry_func_name = entry_func_name
+    info.io_ctx = io_ctx
 
     # This is the AST generated with Clang
     index, tu, cursor = parse_file(file_path)
