@@ -5,8 +5,8 @@ from log import error, debug
 
 
 PRIMITIVE_TYPES = [
-clang.TypeKind.BOOL, 
-clang.TypeKind.CHAR_U, 
+clang.TypeKind.BOOL,
+clang.TypeKind.CHAR_U,
 clang.TypeKind.UCHAR,
 clang.TypeKind.CHAR16,
 clang.TypeKind.CHAR32,
@@ -63,7 +63,7 @@ def find_elem(cursor, func_name):
     candid = [cursor]
     h = func_name.split('::')
     for name in h:
-        new_candid = [] 
+        new_candid = []
         for cursor in candid:
             match = list(filter(lambda c: c.spelling == name, cursor.get_children()))
             new_candid.extend(match)
@@ -164,18 +164,23 @@ def show_insts(lst, depth=0):
 
 
 def get_owner(cursor):
+    from understand_logic import gather_instructions_from
     res = []
     children = list(cursor.get_children())
     if len(children) == 0:
         return []
     parent = children[0]
-    if parent.kind == clang.CursorKind.DECL_REF_EXPR: 
-        res.append(parent.spelling)
-    elif parent.kind == clang.CursorKind.MEMBER_REF_EXPR:
-        res.append(parent.spelling)
-        res += get_owner(parent)
-    elif parent.kind in (clang.CursorKind.ARRAY_SUBSCRIPT_EXPR,
-            clang.CursorKind.CALL_EXPR, clang.CursorKind.UNEXPOSED_EXPR):
+    if parent.kind in (clang.CursorKind.DECL_REF_EXPR,
+            clang.CursorKind.MEMBER_REF_EXPR,
+            clang.CursorKind.ARRAY_SUBSCRIPT_EXPR,
+            clang.CursorKind.CALL_EXPR,):
+        ref = gather_instructions_from(parent, None)
+        assert len(ref) == 1, f'{ref}'
+        ref = ref[0]
+        res.append(ref)
+        if hasattr(ref, 'owner'):
+            res = res + ref.owner
+    elif parent.kind == clang.CursorKind.UNEXPOSED_EXPR:
         res += get_owner(parent)
     else:
         error('get_owner: unhandled cursor kind', parent.kind)
@@ -197,35 +202,6 @@ def get_actual_type(_T):
         else:
             break
     return T
-
-
-def owner_to_ref(owner, info):
-    owner = reversed(owner)
-    hierarchy = []
-    scope = info.sym_tbl.current_scope
-    obj = None
-    for x in owner:
-        obj = scope.lookup(x)
-        if obj is None:
-            print('variable is in the shared scope:', x in info.sym_tbl.shared_scope.symbols)
-            print('shared scope number is:', info.sym_tbl.shared_scope.number)
-            scp = scope
-            print('at:', scp.number)
-            while True:
-                scp = scp.parent
-                if scp is None:
-                    break
-                print('at:', scp.number)
-            debug('did not found obj:', x)
-            break
-        hierarchy.append(obj)
-        obj_cls_name = get_actual_type(obj.type).spelling
-        key = f'class_{obj_cls_name}'
-        scope = info.sym_tbl.scope_mapping.get(key)
-        if not scope:
-            debug(f'scope not found for: |{key}|') 
-            break
-    return hierarchy
 
 
 INDENT = '  '
@@ -295,9 +271,9 @@ def draw_tree(root):
         line = ''
         for sub_tree, width in sub_trees:
             if len(sub_tree) > l:
-                line = line + sub_tree[l] + (delimeter * v_space) 
+                line = line + sub_tree[l] + (delimeter * v_space)
             else:
-                line = line + ' ' * width + (delimeter * v_space) 
+                line = line + ' ' * width + (delimeter * v_space)
         below.append(line)
         width = max(width, len(line))
     below = ('\n' * h_space).join(below)

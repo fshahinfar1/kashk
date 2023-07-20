@@ -1,6 +1,5 @@
 import clang.cindex as clang
-from utility import (get_code, report_on_cursor, visualize_ast, get_owner,
-        owner_to_ref)
+from utility import (get_code, report_on_cursor, visualize_ast)
 from log import error, debug
 from prune import READ_PACKET, WRITE_PACKET
 from data_structure import *
@@ -49,8 +48,7 @@ def __get_func_name(inst, info):
         else:
             # Use the previouse objects to find the type of the class this
             # method belongs to
-            owner_symb = owner_to_ref(inst.owner, info)
-            func_name = list(map(lambda obj: obj.type.spelling, owner_symb))
+            func_name = [o.type.spelling for o in reversed(inst.owner)]
             func_name.append(inst.name)
             func_name = '_'.join(func_name[-2:])
     return func_name
@@ -95,38 +93,21 @@ def __add_func_definition(inst, info):
     f.is_method = inst.is_method
     if f.is_method:
         if inst.owner:
-            hierarchy = owner_to_ref(inst.owner, info)
-            if hierarchy:
-                method_obj = hierarchy[-1]
+            method_obj, _ = gen_code(inst.owner[0], info)
 
-                T = MyType()
-                T.spelling = f'struct {method_obj.type.spelling} *'
-                T.kind = clang.TypeKind.POINTER
-                T.under_type = MyType()
-                T.under_type.spelling = f'struct {method_obj.type.spelling}'
-                T.under_type.kind = clang.TypeKind.RECORD
+            T = MyType()
+            T.spelling = f'struct {method_obj.type.spelling} *'
+            T.kind = clang.TypeKind.POINTER
+            T.under_type = MyType()
+            T.under_type.spelling = f'struct {method_obj.type.spelling}'
+            T.under_type.kind = clang.TypeKind.RECORD
 
-                ref = StateObject(None)
-                ref.name = 'self'
-                ref.kind = clang.CursorKind.PARM_DECL
-                ref.type =  T.spelling
-                ref.is_pointer = True
-                ref.type_ref = T
-            else:
-                cls = scope.lookup('__class__')
-                cls_text = cls.type.spelling
-
-                cls_type = MyType()
-                cls_type.spelling = f'struct {cls_text}'
-                cls_type.kind = clang.TypeKind.RECORD
-                T = MyType.make_pointer(cls_type)
-
-                ref = StateObject(None)
-                ref.name = 'self'
-                ref.kind = clang.CursorKind.PARM_DECL
-                ref.type =  T.spelling
-                ref.is_pointer = True
-                ref.type_ref = T
+            ref = StateObject(None)
+            ref.name = 'self'
+            ref.kind = clang.CursorKind.PARM_DECL
+            ref.type =  T.spelling
+            ref.is_pointer = True
+            ref.type_ref = T
         else:
             # Use the current class as the type
             cls_sym = info.sym_tbl.lookup('__class__')

@@ -38,7 +38,7 @@ def is_value_from_bpf_ctx(inst, info, R=None):
             return True
     elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
         # TODO: what if there are multiple member access?
-        owner = inst.owner[-1]
+        owner = inst.owner[-1].name
         sym = info.sym_tbl.lookup(owner)
         if sym.is_bpf_ctx:
             # We are accessing BPF context

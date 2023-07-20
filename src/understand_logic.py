@@ -3,7 +3,7 @@ from contextlib import contextmanager
 import clang.cindex as clang
 
 from log import error
-from utility import get_code, report_on_cursor, visualize_ast, get_owner
+from utility import get_code, report_on_cursor, visualize_ast
 from data_structure import *
 from instruction import *
 from prune import (should_process_this_cursor, READ_PACKET, WRITE_PACKET)
@@ -194,7 +194,6 @@ def __convert_cursor_to_inst(c, info):
         return inst
     elif c.kind == clang.CursorKind.MEMBER_REF_EXPR:
         inst = Ref(c)
-        inst.owner = get_owner(c)
         return inst
     elif (c.kind == clang.CursorKind.DECL_REF_EXPR
             or c.kind == clang.CursorKind.TYPE_REF):
@@ -387,7 +386,7 @@ def gather_instructions_from(cursor, info, context=BODY):
             d.enque(children[0], lvl+1)
             continue
 
-        if c.get_usr() in info.remove_cursor:
+        if info is not None and c.get_usr() in info.remove_cursor:
             with set_global_for_bpf(False):
                 inst = __convert_cursor_to_inst(c, info)
                 inst.bpf_ignore = True

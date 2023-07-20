@@ -2,7 +2,7 @@ import clang.cindex as clang
 
 from data_structure import *
 from instruction import *
-from utility import (indent, INDENT, report_on_cursor, owner_to_ref)
+from utility import (indent, INDENT, report_on_cursor)
 from prune import READ_PACKET, WRITE_PACKET
 
 from template import (memcpy_internal_defs, license_text,
@@ -153,11 +153,11 @@ def handle_member_ref_expr(inst, info, more):
         text = f'self->{inst.name}'
     else:
         # This object is not for this class
-        hierarchy = owner_to_ref(inst.owner, info)
         links = []
-        for obj in hierarchy:
-            links.append(obj.name)
-            link = '->' if obj.is_pointer else '.'
+        for obj in inst.owner:
+            text, _ = gen_code([obj], info)
+            links.append(text)
+            link = '->' if obj.type.is_pointer() else '.'
             links.append(link)
         links.append(inst.name)
         text = ''.join(links)

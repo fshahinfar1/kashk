@@ -352,7 +352,7 @@ class ArrayAccess(Instruction):
         super().__init__()
         self.kind = clang.CursorKind.ARRAY_SUBSCRIPT_EXPR
         self.cursor = cursor
-        self.type = cursor.type
+        self.type = MyType.from_cursor_type(cursor.type)
         self.array_ref = Block(ARG)
         self.index = Block(ARG)
 
@@ -428,10 +428,13 @@ class Ref(Instruction):
         if cursor is None:
             self.name = '<unnamed>'
             self.kind = kind
+            self.owner = []
+            self.type = None
         else:
             self.name = cursor.spelling
             self.kind = cursor.kind if kind is None else kind
-        self.owner = []
+            self.owner = get_owner(self.cursor)
+            self.type = MyType.from_cursor_type(cursor.type)
         self.variable_declaration_inst = None
 
     def get_definition(self):

@@ -119,8 +119,6 @@ class StateObject:
 
 
     def clone(self):
-        if not self.cursor:
-            print(self)
         new = StateObject(self.cursor)
         new.name = self.name
         new.type = self.type
