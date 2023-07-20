@@ -38,6 +38,10 @@ def __collect_information_about_func(cursor, info):
     children = list(cursor.get_children())
     assert len(children) != 0
 
+    T = MyType.from_cursor_type(cursor.type)
+    e = info.sym_tbl.insert_entry('__func__', T, cursor.kind, None)
+    e.name = cursor.spelling
+
     # Add function parameters to the scope
     for pos, arg in enumerate(cursor.get_arguments()):
         T = MyType.from_cursor_type(arg.type)

@@ -145,7 +145,7 @@ struct meta *__m = (void *)(__u64)skb->data;
             bin_op.rhs.add_inst(true)
 
             after_func_call.append(bin_op)
-            after_func_call.append(ToUserspace.from_func_obj(func))
+            after_func_call.append(ToUserspace.from_func_obj(current_function))
         else:
             # The caller knows we are going to fail (this function never
             # succeed)
