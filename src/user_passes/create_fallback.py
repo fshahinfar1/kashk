@@ -132,7 +132,7 @@ def _process_node(node, info):
 
         # Check if there are multiple failure path or just one!
         if len(node.path_ids) > 1:
-            if_inst = _generate_id_check(node.path_ids)
+            if_inst = _generate_id_check(child.path_ids)
             if new_func is None:
                 if_inst.body = body
                 # TODO: what is this?
