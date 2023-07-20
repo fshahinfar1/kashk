@@ -24,8 +24,6 @@ def generate_decleration_for(cursor):
         return []
 
     orig = cursor
-
-
     T = get_actual_type(cursor.type)
 
     if T.kind in PRIMITIVE_TYPES:
@@ -39,10 +37,9 @@ def generate_decleration_for(cursor):
     if c is None:
         error(MODULE_TAG, f'Failed to find the definition for {T.spelling}')
         return []
+
     cursor = c
     T = cursor.type
-
-
     type_name = T.spelling
 
     # List of type dependencies for this specific type
@@ -64,7 +61,9 @@ def generate_decleration_for(cursor):
         # TODO: No further deps?
         return []
     elif T.kind == clang.TypeKind.TYPEDEF:
-        pass
+        x = c.underlying_typedef_type
+        x = x.get_declaration()
+        return generate_decleration_for(x)
     else:
         error('Unexpected! ' + str(cursor.type.kind))
 

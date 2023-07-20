@@ -7,7 +7,7 @@ from utility import (parse_file, find_elem, add_state_decl_to_bpf,
         report_user_program_graph)
 from find_ev_loop import find_request_processing_logic
 from sym_table_gen import build_sym_table
-from understand_program_state import extract_state
+from understand_program_state import extract_state, get_state_for
 from understand_logic import (get_all_read, get_all_send,
         gather_instructions_from)
 
@@ -55,8 +55,6 @@ def generate_offload(io_ctx):
     # Collect information about classes, functions, variables, ...
     build_sym_table(cursor, info)
 
-    # The arguments to the entry function is part of the connection state
-    # entry_func_params = [get_state_for(arg) for arg in entry_func.get_arguments()]
     boot_starp_global_state(cursor, info)
 
     # Find the entry function
@@ -64,6 +62,12 @@ def generate_offload(io_ctx):
     if entry_func is None:
         error('Did not found the entry function')
         return
+
+    # The arguments to the entry function is part of the connection state
+    from_entry_params = [get_state_for(arg) for arg in entry_func.get_arguments()]
+    for states, decls in from_entry_params:
+        add_state_decl_to_bpf(info.prog, states, decls)
+    # debug(MODULE_TAG, from_entry_params)
 
     body_of_loop = find_request_processing_logic(entry_func, info)
     # Find the buffer representing the packet
