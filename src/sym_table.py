@@ -36,6 +36,11 @@ class SymbolTableEntry:
 
 class Scope:
     def __init__(self, parent=None):
+        # TODO: the nubmer system is wrong and misleading. I should assign a
+        # name to each scope. This way, the relation between scopes can easily
+        # analysed, The scope_mapping could be generated better, The clone
+        # scope know the original scope and can change their names if needed
+        # afterward.
         self.number = 0 if parent is None else parent.number + len(parent.children) + 1
         self.symbols = {}
         self.parent = parent
@@ -44,7 +49,7 @@ class Scope:
             parent.add_child_scope(self)
 
     def clone(self, parent):
-        # TODO: I do not know how to clone from the midle of the tree
+        # TODO: I only have considered cloning from the top of the tree
         assert parent is not None or self.parent is None
         clone_scope = Scope(parent)
 
@@ -151,37 +156,25 @@ class SymbolTable:
         # it. I just need to find the coresponding references and set the
         # pointesr.
 
+        shared_scp_num = self.shared_scope.number
         glb_scp_num = self.global_scope.number
         cur_scp_num = self.current_scope.number
 
-        # if I found:  glb  | cur
+
         book = {}
-        found =       [False, False]
         q = [new_tbl.shared_scope]
         while q:
             scp = q.pop()
             book[scp.number] = scp
-            if scp.number == glb_scp_num:
-                found[0] = True
-                new_tbl.global_scope = scp
-            if scp.number == cur_scp_num:
-                found[1] = True
-                new_tbl.current_scope = scp
-            if all(found):
-                break
             q.extend(reversed(scp.children))
 
-        if not all(found):
-            error('Failed to clone the scope')
-            debug(found)
-            debug(glb_scp_num, cur_scp_num)
-            raise Exception('Failed to clone the scope')
+        new_tbl.global_scope = book[glb_scp_num]
 
         # Clone the scope mapping
         for name, scope in self.scope_mapping.scope_mapping.items():
             scp_number = scope.number
             if scp_number not in book:
-                debug('some scopes are not being cloned!')
+                debug('some scopes are not being cloned! scope:', scope)
                 continue
             new_tbl.scope_mapping[name] = book[scp_number]
 

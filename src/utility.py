@@ -207,6 +207,15 @@ def owner_to_ref(owner, info):
     for x in owner:
         obj = scope.lookup(x)
         if obj is None:
+            print('variable is in the shared scope:', x in info.sym_tbl.shared_scope.symbols)
+            print('shared scope number is:', info.sym_tbl.shared_scope.number)
+            scp = scope
+            print('at:', scp.number)
+            while True:
+                scp = scp.parent
+                if scp is None:
+                    break
+                print('at:', scp.number)
             debug('did not found obj:', x)
             break
         hierarchy.append(obj)

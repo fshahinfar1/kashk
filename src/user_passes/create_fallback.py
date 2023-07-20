@@ -99,7 +99,7 @@ def _starts_with_func_call(node, info):
     new_functions.append(new_func)
 
     # Create a new empty scope for the new function we want to define
-    new_scope = Scope()
+    new_scope = Scope(info.sym_tbl.global_scope)
     info.sym_tbl.scope_mapping[call_inst.name] = new_scope
     for arg in new_func.args:
         # The upper function will provide the arguments. Add them as known
@@ -166,7 +166,7 @@ def _process_node(node, info):
 def create_fallback_pass(inst, info, more):
     root = info.user_prog.graph
 
-    new_scope = Scope()
+    new_scope = Scope(info.sym_tbl.global_scope)
     info.sym_tbl.scope_mapping[USER_EVENT_LOOP_ENTRY] = new_scope
 
     with info.sym_tbl.with_func_scope(USER_EVENT_LOOP_ENTRY):

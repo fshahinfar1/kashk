@@ -105,11 +105,18 @@ class UserProg:
         prev_func_dir = Function.directory
         info.sym_tbl = self.sym_tbl
         Function.directory = self.func_dir
+        # Switch to the entry function scope
+        user_old_scope = self.sym_tbl.current_scope
+        entry_name = info.entry_func_name
+        entry_name = entry_name.replace('::', '_')
+        scope = info.sym_tbl.scope_mapping[entry_name]
+        info.sym_tbl.current_scope = scope
         try:
             yield None
         finally:
             info.sym_tbl = prev_sym_tbl
             Function.directory = prev_func_dir
+            self.sym_tbl.current_scope = user_old_scope
 
     def insert_super_node(self):
         cur = self.graph

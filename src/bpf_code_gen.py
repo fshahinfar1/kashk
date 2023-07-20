@@ -433,7 +433,9 @@ def __generate_code_type_definition(inst, info):
 
         # Change the context
         with info.sym_tbl.with_func_scope(inst.name):
-            # debug('inside:', inst.name, 'scope')
+            scope = info.sym_tbl.current_scope
+            scp_num = scope.number
+            # debug('inside:', inst.name, 'scope', f'(scope number: {scp_num})')
             body, _ = gen_code(inst.body, info)
             # debug('out of',inst.name, 'scope')
 

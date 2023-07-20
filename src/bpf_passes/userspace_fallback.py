@@ -2,6 +2,7 @@ import itertools
 import clang.cindex as clang
 
 from log import error, debug
+from utility import indent
 from data_structure import *
 from instruction import *
 
@@ -112,12 +113,13 @@ struct meta *__m = (void *)(__u64)skb->data;
             code += '\n'.join(store) + '\n'
 
             # we are in the bpf function
-            return_stmt = code + '/*Go to userspace */\n  return SK_PASS;\n'
+            return_stmt = code + '/*Go to userspace */\nreturn SK_PASS;\n'
         elif func.return_type.spelling == 'void':
             return_stmt = 'return;'
         else:
             return_stmt = f'return ({func.return_type.spelling})0;'
-        check_flag = f'if({FLAG_PARAM_NAME} == 1) {{\n  {return_stmt}\n}}\n'
+        return_stmt = indent(return_stmt)
+        check_flag = f'if({FLAG_PARAM_NAME} == 1) {{\n{return_stmt}\n}}\n'
         tmp = Literal(check_flag, CODE_LITERAL)
         after_func_call.append(tmp)
 

@@ -122,7 +122,7 @@ def gen_user_code(user, info, out_user):
         # debug(info.user_prog.graph.paths.var_deps)
         fields = []
         for var in info.user_prog.graph.paths.var_deps:
-            debug(MODULE_TAG, 'bpf/user-shared:', var.name, var.type.kind, var.type.under_type)
+            debug(MODULE_TAG, 'bpf/user-shared:', f'{var.name}:{var.type.spelling}')
             # TODO: do I need to clone?
             T = var.type.clone()
             state_obj = StateObject(None)
@@ -187,6 +187,8 @@ def boot_starp_global_state(cursor, info):
     scope = info.sym_tbl.scope_mapping[entry_name]
     info.sym_tbl.current_scope = scope
 
+    # TODO: what is happening here. Do I need this? I think this is because I
+    # was avoiding analysing the parameters of the entry function.
     tcp_conn_entry = info.sym_tbl.lookup('class_TCPConnection')
     if tcp_conn_entry:
         e = info.sym_tbl.insert_entry('conn', tcp_conn_entry.type, clang.CursorKind.PARM_DECL, None)
