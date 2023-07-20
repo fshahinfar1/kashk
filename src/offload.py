@@ -335,7 +335,7 @@ def find_read_write_bufs(ev_loop, info):
         else:
             buf_def = buf_arg.get_definition()
             remove_def = buf_def
-            info.remove_cursor.add(remove_def.get_usr())
+            # info.remove_cursor.add(remove_def.get_usr())
             if buf_def.kind == clang.CursorKind.CALL_EXPR:
                 buf_def = next(buf_def.get_children())
                 args = list(buf_def.get_arguments())
@@ -343,9 +343,7 @@ def find_read_write_bufs(ev_loop, info):
                 buf_sz = args[1]
                 info.wr_buf = PacketBuffer(buf_def)
                 info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
-                info.remove_cursor.add(remove_def.get_usr())
             else:
                 info.wr_buf = PacketBuffer(buf_def)
                 assert buf_sz is not None
                 info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
-
