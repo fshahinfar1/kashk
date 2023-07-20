@@ -49,6 +49,9 @@ def generate_decleration_for(cursor):
         return decl
 
     if T.kind == clang.TypeKind.RECORD:
+        #TODO: what should I do about it???
+        if type_name.startswith('struct '):
+            type_name = type_name[len('struct '):]
         # Go through the fields, add any dependencies field might have, then
         # define a struct for it.
         fields, new_decl = extract_state(cursor)

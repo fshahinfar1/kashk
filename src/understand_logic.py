@@ -386,6 +386,8 @@ def gather_instructions_from(cursor, info, context=BODY):
             d.enque(children[0], lvl+1)
             continue
 
+        # TODO: the info = None is a case I introduced when hacking the
+        # get_owner helper function. It should be avoided. It is bad code.
         if info is not None and c.get_usr() in info.remove_cursor:
             with set_global_for_bpf(False):
                 inst = __convert_cursor_to_inst(c, info)

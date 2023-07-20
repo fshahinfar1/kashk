@@ -34,6 +34,16 @@ from user_passes.create_fallback import create_fallback_pass
 MODULE_TAG = '[Gen Offload]'
 
 
+def run_pass_on_all_functions(pass_fn, main_inst, info):
+    ret = pass_fn(main_inst, info, PassObject())
+    for f in Function.directory.values():
+        if not f.body.has_children():
+            continue
+        with info.sym_tbl.with_func_scope(f.name):
+            f.body = pass_fn(f.body, info, PassObject())
+    return ret
+
+
 # TODO: make a framework agnostic interface, allow for porting to other
 # functions
 def generate_offload(io_ctx):
@@ -73,18 +83,14 @@ def generate_offload(io_ctx):
     # Find the buffer representing the packet
     find_read_write_bufs(body_of_loop, info)
 
+    # Start the passes
     insts = gather_instructions_from(body_of_loop, info, BODY)
     bpf = Block(BODY)
     bpf.extend_inst(insts)
 
     ## Simplify Code
     # Move function calls out of the ARG context!
-    bpf = linear_code_pass(bpf, info, PassObject())
-    for f in Function.directory.values():
-        if not f.body.has_children():
-            continue
-        with info.sym_tbl.with_func_scope(f.name):
-            f.body = linear_code_pass(f.body, info, PassObject())
+    bpf = run_pass_on_all_functions(linear_code_pass, bpf, info)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # print('Take a peek on the event loop!')
@@ -158,7 +164,7 @@ def gen_bpf_code(bpf, info, out_bpf):
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Transform access to variables and read/write buffers.
-    bpf = transform_vars_pass(bpf, info, PassObject())
+    bpf = run_pass_on_all_functions(transform_vars_pass, bpf, info)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Handle moving to userspace and removing the instruction not possible in
