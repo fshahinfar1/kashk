@@ -228,7 +228,6 @@ def boot_starp_global_state(cursor, info):
         field.name = 'conn'
         field.type = 'TCPConnection'
         field.kind = clang.TypeKind.RECORD
-        field.is_global = True
         field.type_ref = MyType()
         field.type_ref.spelling = 'struct TCPConnection'
         field.type_ref.kind = field.kind

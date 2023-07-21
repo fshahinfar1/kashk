@@ -23,7 +23,6 @@ def find_request_processing_logic(cursor, info):
             states, decls = get_state_for(d.cursor)
             add_state_decl_to_bpf(info.prog, states, decls)
             for s in states:
-                s.is_global = True
                 # Add it to the global scope
                 c = s.cursor
                 entry = SymbolTableEntry(c.spelling, c.type, c.kind, c)

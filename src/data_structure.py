@@ -114,16 +114,11 @@ class StateObject:
             self.is_pointer = False
             self.type_ref = None
 
-        # self.type_ref = None
-        self.is_global = False
-
-
     def clone(self):
         new = StateObject(self.cursor)
         new.name = self.name
         new.type = self.type
         new.kind = self.kind
-        new.is_global = self.is_global
         new.type_ref = self.type_ref
         return new
 
