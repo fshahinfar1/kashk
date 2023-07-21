@@ -73,11 +73,22 @@ def generate_offload(io_ctx):
         error('Did not found the entry function')
         return
 
+    # TODO: move the following block of code to some where more appropriate
     # The arguments to the entry function is part of the connection state
     from_entry_params = [get_state_for(arg) for arg in entry_func.get_arguments()]
     for states, decls in from_entry_params:
         add_state_decl_to_bpf(info.prog, states, decls)
+        for state in states:
+            e = info.sym_tbl.global_scope.insert_entry(state.name, state.type_ref, clang.CursorKind.PARM_DECL, None)
     # debug(MODULE_TAG, from_entry_params)
+    # remove the symbols related to the parameters of entry function from its scope (fixing the shadowing effect)
+    to_remove = []
+    scope = info.sym_tbl.scope_mapping[entry_func_name]
+    for k, v in scope.symbols.items():
+        if v.kind == clang.CursorKind.PARM_DECL:
+            to_remove.append(k)
+    for k in to_remove:
+        scope.delete(k)
 
     body_of_loop = find_request_processing_logic(entry_func, info)
     # Find the buffer representing the packet
@@ -208,7 +219,7 @@ def boot_starp_global_state(cursor, info):
     # was avoiding analysing the parameters of the entry function.
     tcp_conn_entry = info.sym_tbl.lookup('class_TCPConnection')
     if tcp_conn_entry:
-        e = info.sym_tbl.insert_entry('conn', tcp_conn_entry.type, clang.CursorKind.PARM_DECL, None)
+        e = info.sym_tbl.global_scope.insert_entry('conn', tcp_conn_entry.type, clang.CursorKind.PARM_DECL, None)
         # Override what the clang thinks
         e.is_pointer = False
         e.name = 'sock_ctx->state.conn'
