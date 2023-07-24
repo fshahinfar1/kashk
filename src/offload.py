@@ -133,6 +133,28 @@ def generate_offload(io_ctx):
     gen_bpf_code(bpf, info, out_bpf)
 
 
+def dfs_over_deps_vars(root):
+    """
+    recursion basis is on the length of children
+
+    @param root: a node of the User Program Graph
+    @returns a list of set of variables dependencies a long with the failues number
+    """
+    this_node_deps = root.paths.var_deps
+
+    if len(root.children) == 0:
+        assert len(root.path_ids) == 1
+        return [{'vars': list(this_node_deps), 'path_id': root.path_ids[0]}]
+
+    results = []
+    for child in root.children:
+        mid_res = dfs_over_deps_vars(child)
+        for r in mid_res:
+            r['vars'].extend(this_node_deps)
+            results.append(r)
+    return results
+
+
 def gen_user_code(user, info, out_user):
     # Switch the symbol table and functions to the snapshot suitable for
     # userspace analysis
@@ -154,19 +176,24 @@ def gen_user_code(user, info, out_user):
         debug(tree)
         # ----
 
-        fields = []
-        for var in info.user_prog.graph.paths.var_deps:
-            debug(MODULE_TAG, 'bpf/user-shared:', f'{var.name}:{var.type.spelling}')
-            # TODO: do I need to clone?
-            T = var.type.clone()
-            state_obj = StateObject(None)
-            state_obj.name = var.name
-            state_obj.type = T.spelling
-            state_obj.type_ref = T
-            fields.append(state_obj)
-        meta = Record('meta', fields)
-        info.prog.add_declaration(meta)
-        info.user_prog.declarations.append(meta)
+        meta_structs = dfs_over_deps_vars(info.user_prog.graph)
+        print(meta_structs)
+
+        for x in meta_structs:
+            fields = []
+            for var in x['vars']:
+                # debug(MODULE_TAG, 'bpf/user-shared:', f'{var.name}:{var.type.spelling}')
+                # TODO: do I need to clone?
+                T = var.type.clone()
+                state_obj = StateObject(None)
+                state_obj.name = var.name
+                state_obj.type = T.spelling
+                state_obj.type_ref = T
+                fields.append(state_obj)
+            path_id = x['path_id']
+            meta = Record(f'meta_{path_id}', fields)
+            info.prog.add_declaration(meta)
+            info.user_prog.declarations.append(meta)
 
         # Generate the user code in the context of userspace program
         text = generate_user_prog(info)
