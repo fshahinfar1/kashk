@@ -157,3 +157,21 @@ if (!shared) {
 '''
     new_inst = Literal(text, CODE_LITERAL)
     return new_inst
+
+
+def prepare_meta_data(filure_number, meta_declaration):
+    # TODO: use the Instruction object instead of hard coded strings
+    code = '''
+__adjust_skb_size(skb, sizeof(struct meta));
+if (((void *)(__u64)skb->data + sizeof(struct meta))  > (void *)(__u64)skb->data_end) {
+  return SK_DROP;
+}
+struct meta *__m = (void *)(__u64)skb->data;
+'''
+    # TODO: I need to know the failure number and failure structure
+    store = []
+    for f in meta_declaration.fields: 
+        store.append(f'__m->{f.name} = {f.name};')
+    code += '\n'.join(store) + '\n'
+    tmp = Literal(code, CODE_LITERAL)
+    return tmp

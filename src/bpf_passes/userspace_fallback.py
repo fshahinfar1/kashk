@@ -3,6 +3,7 @@ import clang.cindex as clang
 
 from log import error, debug
 from utility import indent
+from template import prepare_meta_data
 from data_structure import *
 from instruction import *
 
@@ -97,21 +98,11 @@ def _handle_function_may_fail(inst, func, info, more):
         tmp = Literal('/* check if function fail */\n', CODE_LITERAL)
         after_func_call.append(tmp)
         if current_function == None:
-            code = '''
-__adjust_skb_size(skb, sizeof(struct meta));
-if (((void *)(__u64)skb->data + sizeof(struct meta))  > (void *)(__u64)skb->data_end) {
-  return SK_DROP;
-}
-struct meta *__m = (void *)(__u64)skb->data;
-'''
-            # TODO: I need to know the failure number and failure structure
+            # TODO: use the instructions objects and not strings
+            failure_number = 0
             meta = info.user_prog.declarations[0]
-            store = []
-            for f in meta.fields: 
-                store.append(f'__m->{f.name} = {f.name};')
-
-            code += '\n'.join(store) + '\n'
-
+            code = prepare_meta_data(failure_number, meta)
+            code = code.text
             # we are in the bpf function
             return_stmt = code + '/*Go to userspace */\nreturn SK_PASS;\n'
         elif func.return_type.spelling == 'void':
@@ -173,6 +164,13 @@ def _process_current_inst(inst, info, more):
         # we only need to investigate functions that may fail
         if func and func.may_fail:
             return _handle_function_may_fail(inst, func, info, more)
+    elif inst.kind == TO_USERSPACE_INST and current_function is None:
+        # Found a split point on the BPF entry function
+        failure_number = 0
+        meta = info.user_prog.declarations[0]
+        prepare_pkt = prepare_meta_data(failure_number, meta)
+        blk = cb_ref.get(BODY)
+        blk.append(prepare_pkt)
     return inst
 
 
@@ -180,8 +178,6 @@ def _do_pass(inst, info, more):
     lvl, ctx, parent_list = more.unpack()
     new_children = []
 
-    # TODO: remember body seems to be redundant, one assignment could solve the
-    # issue?
     with cb_ref.new_ref(ctx, parent_list):
         # Process current instruction
         inst = _process_current_inst(inst, info, more)
