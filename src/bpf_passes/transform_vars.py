@@ -23,7 +23,7 @@ def _check_if_ref_is_global_state(inst, info):
         # TODO: what if a variable named shared is already defined but it is
         # not our variable?
         sym = info.sym_tbl.lookup('shared')
-        debug(MODULE_TAG, 'shared symbol is defined:', sym is not None)
+        # debug(MODULE_TAG, 'shared symbol is defined:', sym is not None)
         if sym is None:
             # Perform a lookup on the map for globally shared values
             new_inst = prepare_shared_state_var()

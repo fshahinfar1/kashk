@@ -249,16 +249,16 @@ def add_state_decl_to_bpf(prog, states, decls):
         prog.add_declaration(d)
 
 
-def draw_tree(root):
+def draw_tree(root, fn=lambda x: str(len(x.children))):
     delimeter = ' '
     v_space = 3
     h_space = 2
 
-    count_children = len(root.children)
+    # count_children = len(root.children)
     number_of_lines = 0
     sub_trees = []
     for child in root.children:
-        sub_tree = draw_tree(child)
+        sub_tree = draw_tree(child, fn=fn)
         lines = list(filter(lambda x: bool(x), sub_tree.split('\n')))
         height = len(lines)
         width = max([len(l) for l in lines])
@@ -277,7 +277,7 @@ def draw_tree(root):
         below.append(line)
         width = max(width, len(line))
     below = ('\n' * h_space).join(below)
-    node = f'[{count_children}]'
+    node = f'[{fn(root)}]'
     space_needed = width - len(node)
     left_space = space_needed // 2
     right_space = space_needed - left_space

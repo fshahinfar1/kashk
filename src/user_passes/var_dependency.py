@@ -52,6 +52,17 @@ def _should_not_share_variable(inst, sym, info):
     return False
 
 
+def __is_local(path, inst, info):
+    sym, scope = path.scope.lookup2(inst.name)
+    if sym is None:
+        return False, sym
+    if scope == path.scope:
+        return True, sym
+    if scope == info.sym_tbl.shared_scope:
+        return True, sym
+    return False, sym
+
+
 def _handle_reference(path, inst, info, ctx, parent_bin_op):
     # TODO: since the scope is built before hand, the definitions that
     # come later are also present in this scope.
@@ -59,8 +70,7 @@ def _handle_reference(path, inst, info, ctx, parent_bin_op):
     # in this scope!
 
     # debug(path.code.children)
-    sym, scope = path.scope.lookup2(inst.name)
-    is_local = sym is not None and scope == path.scope
+    is_local, sym = __is_local(path, inst, info)
     if not is_local:
         blk = cb_ref.get(BODY)
         orig_sym = path.original_scope.lookup(inst.name)
@@ -87,6 +97,12 @@ def _handle_reference(path, inst, info, ctx, parent_bin_op):
             else:
                 sym.is_accessed = SymbolAccessMode.HAS_READ
                 path.var_deps.add(sym)
+                if sym.name == 'num_messages':
+                    debug(MODULE_TAG, 'adding:', sym.name)
+                    scp = path.scope
+                    while scp is not None:
+                        print(scp)
+                        scp = scp.parent
     else:
         if ctx == LHS and parent_bin_op.op == '=':
             sym.is_accessed = SymbolAccessMode.FIRST_WRITE
@@ -167,10 +183,13 @@ def _process_node(node, info):
         # parent because parent does not know about them.
         for d in child.paths.var_deps:
             if node.paths.scope.lookup(d.name) is None:
-                node.paths.var_deps.add(d)
+                # TODO: I do not want to propagate the var dependency up
+                # node.paths.var_deps.add(d)
+
                 # Add it to scope because the child needs it and parent does
                 # not have. So it is declaring it as needed.
                 node.paths.scope.insert(d)
+                pass
 
         child_p = child.paths
         if child_p.func_obj is not None:

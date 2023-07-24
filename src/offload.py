@@ -4,7 +4,7 @@ from log import *
 from data_structure import *
 from instruction import *
 from utility import (parse_file, find_elem, add_state_decl_to_bpf,
-        report_user_program_graph)
+        report_user_program_graph, draw_tree)
 from find_ev_loop import find_request_processing_logic
 from sym_table_gen import build_sym_table
 from understand_program_state import extract_state, get_state_for
@@ -147,7 +147,13 @@ def gen_user_code(user, info, out_user):
         # What graph looks like
         # report_user_program_graph(info)
 
-        # debug(info.user_prog.graph.paths.var_deps)
+        # Look at var deps
+        debug(MODULE_TAG, 'Tree of variable dependencies')
+        tree = draw_tree(info.user_prog.graph, fn=lambda x: str(x.paths.var_deps))
+        # debug(MODULE_TAG, info.user_prog.graph.paths.var_deps)
+        debug(tree)
+        # ----
+
         fields = []
         for var in info.user_prog.graph.paths.var_deps:
             debug(MODULE_TAG, 'bpf/user-shared:', f'{var.name}:{var.type.spelling}')
