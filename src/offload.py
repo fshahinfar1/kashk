@@ -129,6 +129,7 @@ def generate_offload(io_ctx):
         new_f = func.clone(info.user_prog.func_dir)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
+    # TODO: right now the order of generating the userspace and then BPF is important
     gen_user_code(user, info, out_user)
     gen_bpf_code(bpf, info, out_bpf)
 

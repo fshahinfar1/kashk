@@ -10,5 +10,7 @@ def number_fallback_graph_pass(info):
         q.extend(node.children)
 
     
-    for i, leaf in enumerate(leafs):
+    for i, leaf in enumerate(leafs, start=1):
         leaf.set_id(i)
+        if leaf.to_user_inst is not None:
+            leaf.to_user_inst.path_id = i

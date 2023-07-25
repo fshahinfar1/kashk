@@ -532,11 +532,13 @@ class ToUserspace(Instruction):
         self.kind = TO_USERSPACE_INST
         self.is_bpf_main = False
         self.return_type = None
+        self.path_id = None
 
     def clone(self, _):
         new = ToUserspace()
         new.is_bpf_main = self.is_bpf_main
         new.return_type = self.return_type
+        new.path_id = self.path_id
         new.bpf_ignore = self.bpf_ignore
         return new
 

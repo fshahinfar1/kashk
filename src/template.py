@@ -166,7 +166,7 @@ __adjust_skb_size(skb, sizeof(struct meta));
 if (((void *)(__u64)skb->data + sizeof(struct meta))  > (void *)(__u64)skb->data_end) {
   return SK_DROP;
 }
-struct meta *__m = (void *)(__u64)skb->data;
+struct {meta_declaration.name} *__m = (void *)(__u64)skb->data;
 '''
     # TODO: I need to know the failure number and failure structure
     store = []

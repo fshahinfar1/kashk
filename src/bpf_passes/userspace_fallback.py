@@ -95,6 +95,7 @@ def _handle_function_may_fail(inst, func, info, more):
             inst.args.append(flag_ref)
 
         # check if function fail
+        # TODO: What about using a TO_USERSPACE instruction
         tmp = Literal('/* check if function fail */\n', CODE_LITERAL)
         after_func_call.append(tmp)
         if current_function == None:
@@ -167,7 +168,9 @@ def _process_current_inst(inst, info, more):
     elif inst.kind == TO_USERSPACE_INST and current_function is None:
         # Found a split point on the BPF entry function
         failure_number = 0
-        meta = info.user_prog.declarations[0]
+        print(inst)
+        path_id = inst.path_id
+        meta = info.user_prog.declarations[path_id]
         prepare_pkt = prepare_meta_data(failure_number, meta)
         blk = cb_ref.get(BODY)
         blk.append(prepare_pkt)

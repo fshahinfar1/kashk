@@ -43,6 +43,9 @@ def _do_pass(inst, info, more):
     if inst.kind == TO_USERSPACE_INST:
         # debug('reach "to user space inst"')
         _set_in_userland(more)
+        # TODO: what am I doing
+        print('TO USERSPACE found')
+        cb_ref.push(TO_USERSPACE_INST, inst)
     elif inst.kind == clang.CursorKind.CALL_EXPR:
         func = inst.get_function_def()
         if func and func.body.has_children():
@@ -66,6 +69,7 @@ def _do_pass(inst, info, more):
                 # If we have already failed, then why are we considering this paths?
                 assert more.in_user_land is False
                 _set_in_userland(more)
+                print('The function may fail!')
 
     for child, tag in inst.get_children_context_marked():
         if not isinstance(child, list):
@@ -86,6 +90,7 @@ def _do_pass(inst, info, more):
                 # The nearest BLOCK which contains the failure
                 if tag == BODY and cur_signal and not prev_signal:
                     boundy_begin_flag = True
+                    print('new boundry era')
 
             if more.in_user_land and boundy_begin_flag:
                 # debug(f'{lvl:3d}', ("|" * lvl * 1) + '+->', '(selected)', inst)
@@ -110,6 +115,14 @@ def _do_pass(inst, info, more):
             node = cb_ref.get(NODE)
             path = node.append(user_inst)
             path.original_scope = info.sym_tbl.current_scope
+
+            to_user_inst_ref = cb_ref.get(TO_USERSPACE_INST)
+            if to_user_inst_ref is not None:
+                assert to_user_inst_ref is not None
+                path.to_user_inst = to_user_inst_ref
+                # TODO: this type of managing the state is very tricky. what the hell!
+                cb_ref.pop() # the TO_USERSPACE_INST was consumed! 
+                print('TO USERSPACE dead')
 
             # Set the signal off! do not propagate.
             _init_userland_signal(more)

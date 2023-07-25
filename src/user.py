@@ -41,6 +41,8 @@ class FallbackRegionGraph:
         # Id of paths that cross this node
         self.path_ids = []
 
+        self.to_user_inst = None
+
     def append(self, code):
         """
         Associate a path of code with this node
