@@ -10,6 +10,8 @@ from instruction import *
 from sym_table import SymbolTableEntry
 from passes.pass_obj import PassObject
 
+from bpf_code_gen import gen_code
+
 
 MODULE_TAG = '[Fallback Pass]'
 
@@ -52,15 +54,10 @@ def _handle_function_may_fail(inst, func, info, more):
         # Update the signature of the function
         flag_obj = StateObject(None)
         flag_obj.name = FLAG_PARAM_NAME
-        flag_obj.type = 'char *'
         flag_obj.is_pointer = True
-        T2 = MyType()
-        T2.spelling = 'char'
-        T2.kind = clang.TypeKind.SCHAR
-        T = MyType()
-        T.spelling = flag_obj.type
-        T.under_type = T2
-        T.kind = clang.TypeKind.POINTER
+        T2 = BASE_TYPES[clang.TypeKind.SCHAR]
+        T = MyType.make_pointer(T2)
+        flag_obj.type = T.spelling
         flag_obj.type_ref = T
         func.args.append(flag_obj)
         # Update the flag to the symbol table for the function scope
@@ -98,22 +95,46 @@ def _handle_function_may_fail(inst, func, info, more):
         # TODO: What about using a TO_USERSPACE instruction
         tmp = Literal('/* check if function fail */\n', CODE_LITERAL)
         after_func_call.append(tmp)
+
+        # How should we return to from this function?
+        return_stmt = ToUserspace.from_func_obj(current_function)
+
         if current_function == None:
-            # TODO: use the instructions objects and not strings
-            failure_number = 0
-            meta = info.user_prog.declarations[0]
-            code = prepare_meta_data(failure_number, meta)
-            code = code.text
-            # we are in the bpf function
-            return_stmt = code + '/*Go to userspace */\nreturn SK_PASS;\n'
-        elif func.return_type.spelling == 'void':
-            return_stmt = 'return;'
-        else:
-            return_stmt = f'return ({func.return_type.spelling})0;'
-        return_stmt = indent(return_stmt)
-        check_flag = f'if({FLAG_PARAM_NAME} == 1) {{\n{return_stmt}\n}}\n'
-        tmp = Literal(check_flag, CODE_LITERAL)
-        after_func_call.append(tmp)
+            debug(MODULE_TAG, func.name, func.path_ids)
+            assert len(func.path_ids) > 0
+
+            first_failure_case = None
+            prev_failure_case = None
+
+            failure_flag_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
+            failure_flag_ref.name = FLAG_PARAM_NAME
+            failure_flag_ref.type = BASE_TYPES[clang.TypeKind.SCHAR]
+
+            for failure_number in func.path_ids:
+                # TODO: change declaration to a dictionary instead of array
+                meta = info.user_prog.declarations[failure_number-1]
+                prepare_meta_code = prepare_meta_data(failure_number, meta)
+
+                # Check the failure number
+                int_literal = Literal(str(failure_number), clang.CursorKind.INTEGER_LITERAL)
+                cond = BinOp.build_op(failure_flag_ref, '==', int_literal)
+                if_inst = ControlFlowInst.build_if_inst(cond)
+                if_inst.body.add_inst(prepare_meta_code)
+                if_inst.body.add_inst(ToUserspace.from_func_obj(current_function))
+
+                if prev_failure_case is not None:
+                    prev_failure_case.other_body.add_inst(if_inst)
+                else:
+                    first_failure_case = if_inst
+                prev_failure_case = if_inst
+            # The code that should run when there is a failure
+            return_stmt = first_failure_case
+
+        int_literal = Literal('0', clang.CursorKind.INTEGER_LITERAL)
+        cond = BinOp.build_op(failure_flag_ref, '!=', int_literal)
+        if_inst = ControlFlowInst.build_if_inst(cond)
+        if_inst.body.add_inst(return_stmt)
+        after_func_call.append(if_inst)
 
         # Analyse the called function.
         with remember_func(func):
@@ -160,17 +181,19 @@ def _handle_function_may_fail(inst, func, info, more):
 
 
 def _process_current_inst(inst, info, more):
+    # text, _ = gen_code([inst, ], info)
+    # print(text)
     if inst.kind == clang.CursorKind.CALL_EXPR:
         func = inst.get_function_def()
         # we only need to investigate functions that may fail
         if func and func.may_fail:
+            # debug(MODULE_TAG, func, func.may_succeed, func.may_fail)
             return _handle_function_may_fail(inst, func, info, more)
     elif inst.kind == TO_USERSPACE_INST and current_function is None:
         # Found a split point on the BPF entry function
-        failure_number = 0
-        print(inst)
-        path_id = inst.path_id
-        meta = info.user_prog.declarations[path_id]
+        failure_number = inst.path_id
+        print(failure_number, info.user_prog.declarations)
+        meta = info.user_prog.declarations[failure_number - 1]
         prepare_pkt = prepare_meta_data(failure_number, meta)
         blk = cb_ref.get(BODY)
         blk.append(prepare_pkt)

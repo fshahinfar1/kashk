@@ -13,6 +13,7 @@ from passes.clone import clone_pass
 
 MODULE_TAG = '[Possible Path Pass]'
 FAILED = 999
+PARENT_INST = 1000
 
 current_function = None
 cb_ref = CodeBlockRef()
@@ -67,15 +68,24 @@ def _process_current_inst(inst, info, more):
         if func and current_function and func.may_fail:
             # The called function may fail
             current_function.may_fail = True
+            # We might not see any split point in this function, but functions
+            # called from this function have split points
+            current_function.path_ids.extend(func.path_ids)
     return inst, False
 
 
+failure_path_id = 1
 def _failed_to_generate_inst(i, info, body):
+    global failure_path_id
     to_user_inst = ToUserspace.from_func_obj(current_function)
+    to_user_inst.path_id = failure_path_id
+    failure_path_id += 1
     body.append(to_user_inst)
+    debug(MODULE_TAG, 'new failure path:', to_user_inst.path_id)
 
     if current_function:
         current_function.may_fail = True
+        current_function.path_ids.append(to_user_inst.path_id)
 
 
 def _process_child(child, inst, info, more):
@@ -104,7 +114,6 @@ def _process_child(child, inst, info, more):
 
 
 def _do_pass(inst, info, more):
-    # TODO: fix this ugly if-else
     lvl, ctx, parent_list = more.unpack()
     new_children = []
     failed = cb_ref.get(FAILED)
@@ -134,15 +143,18 @@ def _do_pass(inst, info, more):
         for child, tag in inst.get_children_context_marked():
             with cb_ref.new_ref(FAILED, failed):
                 obj = PassObject.pack(lvl + 1, tag, parent_list)
-                new_child = _process_child(child, inst, info, obj)
+                with cb_ref.new_ref(PARENT_INST, inst):
+                    new_child = _process_child(child, inst, info, obj)
                 if new_child is None:
                     return None
                 failed = cb_ref.get(FAILED)
 
             # TODO: when should I propagate the failure to the upper level
             # context?
-            if inst.kind != clang.CursorKind.IF_STMT:
+            parent = cb_ref.get(PARENT_INST)
+            if parent is None or parent.kind != clang.CursorKind.IF_STMT:
                 cb_ref.set(FAILED, failed)
+                # debug(MODULE_TAG, 'propagate failure: ', inst.kind, inst)
 
             new_children.append(new_child)
 
@@ -154,5 +166,6 @@ def _do_pass(inst, info, more):
 
 
 def possible_path_analysis_pass(inst, info, more):
-    with cb_ref.new_ref(FAILED, False):
-        return _do_pass(inst, info, more)
+    with cb_ref.new_ref(PARENT_INST, None):
+        with cb_ref.new_ref(FAILED, False):
+            return _do_pass(inst, info, more)

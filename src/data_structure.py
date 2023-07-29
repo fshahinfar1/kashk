@@ -329,6 +329,8 @@ class Function(TypeDefinition):
         self.may_fail = False
         self.may_succeed = False
 
+        self.path_ids = []
+
         if directory is None:
             directory = Function.directory
         if self.name in directory:
@@ -352,7 +354,6 @@ class Function(TypeDefinition):
     def get_c_code(self):
         # raise Exception('Not implemented')
         return f'// [[ definition of function {self.name} ]]'
-
 
 
 BASE_TYPES = {}

@@ -117,7 +117,14 @@ def generate_offload(io_ctx):
     bpf = possible_path_analysis_pass(bpf, info, PassObject())
     # for func in Function.directory.values():
     #     print(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_fail)
+    debug('~~~~~~~~~~~~~~~~~~~~~')
 
+    # Create the userspace program graph 
+    select_user_pass(bpf, info, PassObject())
+    debug('~~~~~~~~~~~~~~~~~~~~~')
+
+    # Number the failure paths
+    # number_fallback_graph_pass(info)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Create a clone of unmodified but marked AST, later used for creating the
@@ -144,7 +151,7 @@ def dfs_over_deps_vars(root):
     this_node_deps = root.paths.var_deps
 
     if len(root.children) == 0:
-        assert len(root.path_ids) == 1
+        assert len(root.path_ids) == 1, f'Expected the leaf to have one failure number. But it has more/less (list: {root.path_ids})'
         return [{'vars': list(this_node_deps), 'path_id': root.path_ids[0]}]
 
     results = []
@@ -160,10 +167,6 @@ def gen_user_code(user, info, out_user):
     # Switch the symbol table and functions to the snapshot suitable for
     # userspace analysis
     with info.user_prog.select_context(info):
-        # Populates the user_prog graph
-        select_user_pass(user, info, PassObject())
-        number_fallback_graph_pass(info)
-
         create_fallback_pass(user, info, PassObject())
         var_dependency_pass(info)
 

@@ -137,7 +137,7 @@ class SymbolTable:
     @contextmanager
     def with_func_scope(self, func_name):
         scope = self.scope_mapping.get(func_name)
-        assert scope is not None
+        assert scope is not None, f'Failed to find the scope for function {func_name}'
         cur = self.current_scope
         self.current_scope = scope
         try:

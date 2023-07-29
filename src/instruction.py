@@ -187,6 +187,14 @@ class VarDecl(Instruction):
 
 
 class ControlFlowInst(Instruction):
+
+    @classmethod
+    def build_if_inst(cls, condition_inst):
+        obj = ControlFlowInst()
+        obj.kidn = clang.CursorKind.IF_STMT
+        obj.cond.add_inst(condition_inst) 
+        return obj
+
     def __init__(self):
         super().__init__()
         self.kind = None
@@ -237,7 +245,7 @@ class UnaryOp(Instruction):
 
     def __get_op(self):
         tokens = [t.spelling for t in self.cursor.get_tokens()]
-        assert len(tokens) == 2, 'Expected there be only two tokens in the UnaryOp but there are {len(tokens)}'
+        assert len(tokens) >= 2, f'Expected there be more than two tokens in the UnaryOp but there are {len(tokens)}\n{" ".join(tokens)}'
         candid = tokens[0]
         if candid not in UnaryOp.OPS:
             candid = tokens[1]
@@ -271,7 +279,7 @@ class UnaryOp(Instruction):
 
 
 class BinOp(Instruction):
-    REL_OP = ('>', '>=', '<', '<=', '==')
+    REL_OP = ('>', '>=', '<', '<=', '==', '!=')
     ARITH_OP = ('+', '-', '*', '/')
     ASSIGN_OP = ('=', '+=', '-=', '*=', '/=', '<<=', '>>=', '&=', '|=')
     BIT_OP = ('&', '|', '<<', '>>')
@@ -279,6 +287,14 @@ class BinOp(Instruction):
 
     OPEN_GROUP = '({['
     CLOSE_GROUP = ')}]'
+
+    @classmethod
+    def build_op(cls, lhs_inst, op, rhs_inst):
+        assert op in BinOp.ALL_OP, f'Unexpected binary operation requseted ({op})'
+        obj = BinOp(None)
+        obj.lhs.add_inst(lhs_inst)
+        obj.op = op
+        obj.rhs.add_inst(rhs_inst)
 
     def __init__(self, cursor):
         super().__init__()
