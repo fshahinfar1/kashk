@@ -1,4 +1,5 @@
 import clang.cindex as clang
+from pprint import pformat
 
 from log import *
 from data_structure import *
@@ -168,7 +169,9 @@ def gen_user_code(user, info, out_user):
     # userspace analysis
     with info.user_prog.select_context(info):
         create_fallback_pass(user, info, PassObject())
+        debug('~~~~~~~~~~~~~~~~~~~~~')
         var_dependency_pass(info)
+        debug('~~~~~~~~~~~~~~~~~~~~~')
 
         # What graph looks like
         # report_user_program_graph(info)
@@ -176,12 +179,14 @@ def gen_user_code(user, info, out_user):
         # Look at var deps
         debug(MODULE_TAG, 'Tree of variable dependencies')
         tree = draw_tree(info.user_prog.graph, fn=lambda x: str(x.paths.var_deps))
-        # debug(MODULE_TAG, info.user_prog.graph.paths.var_deps)
         debug(tree)
+        # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
+        # debug(MODULE_TAG, info.user_prog.graph.paths.var_deps)
+        # debug(tree)
         # ----
 
         meta_structs = dfs_over_deps_vars(info.user_prog.graph)
-        print(meta_structs)
+        debug(MODULE_TAG, 'Metadata structures:', pformat(meta_structs))
 
         for x in meta_structs:
             fields = []
@@ -201,6 +206,7 @@ def gen_user_code(user, info, out_user):
 
         # Generate the user code in the context of userspace program
         text = generate_user_prog(info)
+        debug('~~~~~~~~~~~~~~~~~~~~~')
 
     with open(out_user, 'w') as f:
         f.write(text)

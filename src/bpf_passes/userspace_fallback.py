@@ -100,7 +100,6 @@ def _handle_function_may_fail(inst, func, info, more):
         return_stmt = ToUserspace.from_func_obj(current_function)
 
         if current_function == None:
-            debug(MODULE_TAG, func.name, func.path_ids)
             assert len(func.path_ids) > 0
 
             first_failure_case = None
@@ -192,7 +191,6 @@ def _process_current_inst(inst, info, more):
     elif inst.kind == TO_USERSPACE_INST and current_function is None:
         # Found a split point on the BPF entry function
         failure_number = inst.path_id
-        print(failure_number, info.user_prog.declarations)
         meta = info.user_prog.declarations[failure_number - 1]
         prepare_pkt = prepare_meta_data(failure_number, meta)
         blk = cb_ref.get(BODY)

@@ -191,7 +191,7 @@ class ControlFlowInst(Instruction):
     @classmethod
     def build_if_inst(cls, condition_inst):
         obj = ControlFlowInst()
-        obj.kidn = clang.CursorKind.IF_STMT
+        obj.kind = clang.CursorKind.IF_STMT
         obj.cond.add_inst(condition_inst) 
         return obj
 
@@ -295,6 +295,7 @@ class BinOp(Instruction):
         obj.lhs.add_inst(lhs_inst)
         obj.op = op
         obj.rhs.add_inst(rhs_inst)
+        return obj
 
     def __init__(self, cursor):
         super().__init__()
@@ -519,6 +520,7 @@ class Block(Instruction):
         self.children = []
 
     def add_inst(self, inst):
+        assert inst is not None
         self.children.append(inst)
 
     def extend_inst(self, insts):
