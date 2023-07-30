@@ -355,11 +355,15 @@ class Function(TypeDefinition):
         # raise Exception('Not implemented')
         return f'// [[ definition of function {self.name} ]]'
 
+    def is_empty(self):
+        return not self.body.has_children()
+
 
 BASE_TYPES = {}
 def prepare_base_types():
     kind_name_map = {
-            clang.TypeKind.SCHAR: 'char'
+            clang.TypeKind.SCHAR: 'char',
+            clang.TypeKind.VOID: 'void',
             }
 
     for kind, name in kind_name_map.items():

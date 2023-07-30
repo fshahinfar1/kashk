@@ -107,7 +107,7 @@ def _function_check_param_reduc(inst, func, info, more):
 
 def _handle_call(inst, info, more):
     func = inst.get_function_def()
-    if not func or not func.body.has_children():
+    if not func or func.is_empty():
         # Ignore this instruction. There is no change
         return inst
 
@@ -168,7 +168,15 @@ def _handle_ref(inst, info, more):
     flag = current_change_ctx.should_update_ref(top_lvl_var_name)
     if flag:
         new_inst = inst.clone([])
-        new_inst.owner.append(EXTRA_PARAM_NAME)
+
+        struct_name = current_change_ctx.struct_name
+        ex_ref = Ref(None)
+        ex_ref.name = EXTRA_PARAM_NAME
+        ex_ref.kind = clang.CursorKind.DECL_REF_EXPR
+        tmp_T = MyType.make_simple('struct {struct_name}', clang.TypeKind.RECORD)
+        ex_ref.type = MyType.make_pointer(tmp_T) 
+
+        new_inst.owner.append(ex_ref)
         new_inst.kind = clang.CursorKind.MEMBER_REF_EXPR
         return new_inst
     return inst

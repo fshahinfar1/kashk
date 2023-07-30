@@ -48,7 +48,14 @@ def __get_func_name(inst, info):
         else:
             # Use the previouse objects to find the type of the class this
             # method belongs to
-            func_name = [o.type.spelling for o in reversed(inst.owner)]
+            func_name = []
+            for o in reversed(inst.owner):
+                if o.kind == clang.CursorKind.CALL_EXPR:
+                    func = o.get_function_def()
+                    assert func is not None
+                    func_name.append(func.return_type.spelling)
+                else:
+                    raise Exception(f'Unexpected type: {o.kind} {o}')
             func_name.append(inst.name)
             func_name = '_'.join(func_name[-2:])
     return func_name

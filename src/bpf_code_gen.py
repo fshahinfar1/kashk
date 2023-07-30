@@ -157,7 +157,14 @@ def handle_member_ref_expr(inst, info, more):
         for obj in inst.owner:
             text, _ = gen_code([obj], info)
             links.append(text)
-            link = '->' if obj.type.is_pointer() else '.'
+
+            if obj.kind == clang.CursorKind.CALL_EXPR:
+                func = obj.get_function_def()
+                assert func is not None
+                type = func.return_type
+            else:
+                type = obj.type
+            link = '->' if type.is_pointer() else '.'
             links.append(link)
         links.append(inst.name)
         text = ''.join(links)

@@ -84,6 +84,7 @@ def generate_offload(io_ctx):
     # debug(MODULE_TAG, from_entry_params)
     # remove the symbols related to the parameters of entry function from its scope (fixing the shadowing effect)
     to_remove = []
+    entry_func_name = entry_func_name.replace('::', '_')
     scope = info.sym_tbl.scope_mapping[entry_func_name]
     for k, v in scope.symbols.items():
         if v.kind == clang.CursorKind.PARM_DECL:
@@ -333,6 +334,7 @@ def find_read_write_bufs(ev_loop, info):
             buf_def = buf_arg.get_definition()
             remove_def = buf_def
             info.remove_cursor.add(remove_def.get_usr())
+            report_on_cursor(buf_def)
             if buf_def.kind == clang.CursorKind.CALL_EXPR:
                 buf_def = next(buf_def.get_children())
                 args = list(buf_def.get_arguments())
@@ -341,9 +343,24 @@ def find_read_write_bufs(ev_loop, info):
                 info.rd_buf = PacketBuffer(buf_def)
                 info.rd_buf.size_cursor = gather_instructions_from(buf_sz, info)
             else:
+                #TODO: this is awful
                 info.rd_buf = PacketBuffer(buf_def)
-                assert buf_sz is not None
-                info.rd_buf.size_cursor = gather_instructions_from(buf_sz, info)
+                if buf_sz is None:
+                    children = list(buf_def.get_children())
+                    if len(children) > 0:
+                        init = children[0]
+                        if init.kind == clang.CursorKind.CALL_EXPR:
+                            args = list(init.get_arguments())
+                            buf_def = args[0].get_definition()
+                            buf_sz = args[1]
+                            info.rd_buf = PacketBuffer(buf_def)
+                            info.rd_buf.size_cursor = gather_instructions_from(buf_sz, info)
+                        else:
+                            raise Exception('')
+                    else:
+                        raise Exception('')
+                else:
+                    info.rd_buf.size_cursor = gather_instructions_from(buf_sz, info)
 
     if info.rd_buf is None:
         error('Failed to find the packet buffer')
@@ -398,5 +415,19 @@ def find_read_write_bufs(ev_loop, info):
                 info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
             else:
                 info.wr_buf = PacketBuffer(buf_def)
-                assert buf_sz is not None
-                info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
+                if buf_sz is None:
+                    children = list(buf_def.get_children())
+                    if len(children) > 0:
+                        init = children[0]
+                        if init.kind == clang.CursorKind.CALL_EXPR:
+                            args = list(init.get_arguments())
+                            buf_def = args[0].get_definition()
+                            buf_sz = args[1]
+                            info.wr_buf = PacketBuffer(buf_def)
+                            info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
+                        else:
+                            raise Exception('')
+                    else:
+                        raise Exception('')
+                else:
+                    info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)

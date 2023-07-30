@@ -40,7 +40,9 @@ def is_value_from_bpf_ctx(inst, info, R=None):
         # TODO: what if there are multiple member access?
         owner = inst.owner[-1].name
         sym = info.sym_tbl.lookup(owner)
-        if sym.is_bpf_ctx:
+        if not sym:
+            error(MODULE_TAG, f'did not found the symbol object for {owner}')
+        elif sym.is_bpf_ctx:
             # We are accessing BPF context
             ref = Ref(None)
             ref.name = sym.name
@@ -115,10 +117,18 @@ def _handle_binop(inst, info, more):
         if val_is_from_ctx:
             ref, index, T = R.pop()
 
+
+            # TODO: this definition is duplicated through this file! do something better
+            skb_ref = Ref(None)
+            skb_ref.name = 'skb'
+            skb_ref.kind = clang.CursorKind.DECL_REF_EXPR
+            tmp_T = MyType.make_simple('struct __sk_buff', clang.TypeKind.RECORD)
+            skb_ref.type = MyType.make_pointer(tmp_T)
+
             # (__u64)skb->data_end
             end_ref = Ref(None, kind=clang.CursorKind.MEMBER_REF_EXPR)
             end_ref.name = 'data_end'
-            end_ref.owner.append('skb')
+            end_ref.owner.append(skb_ref)
             data_end = Cast()
             data_end.cast_type = '__u64'
             data_end.castee.add_inst(end_ref)
@@ -147,7 +157,7 @@ def _handle_call(inst, info, more):
 
     # Find the definition of the function and step into it
     func = inst.get_function_def()
-    if func:
+    if func and not func.is_empty():
         with info.sym_tbl.with_func_scope(inst.name):
             # Add skb as the last parameter of this function
             skb_obj = StateObject(None)
@@ -199,9 +209,15 @@ def _handle_call(inst, info, more):
             size = inst.args[2]
 
             # Add the check a line before this access
+            skb_ref = Ref(None)
+            skb_ref.name = 'skb'
+            skb_ref.kind = clang.CursorKind.DECL_REF_EXPR
+            tmp_T = MyType.make_simple('struct __sk_buff', clang.TypeKind.RECORD)
+            skb_ref.type = MyType.make_pointer(tmp_T)
+
             end_ref = Ref(None, kind=clang.CursorKind.MEMBER_REF_EXPR)
             end_ref.name = 'data_end'
-            end_ref.owner.append('skb')
+            end_ref.owner.append(skb_ref)
             data_end = Cast()
             data_end.cast_type = '__u64'
             data_end.castee.add_inst(end_ref)

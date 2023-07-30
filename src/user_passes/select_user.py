@@ -46,7 +46,7 @@ def _do_pass(inst, info, more):
         cb_ref.push(TO_USERSPACE_INST, inst)
     elif inst.kind == clang.CursorKind.CALL_EXPR:
         func = inst.get_function_def()
-        if func and func.body.has_children():
+        if func and not func.is_empty():
             parent_node = node_ref.get(NODE)
             node = parent_node.new_child()
             node_used = False

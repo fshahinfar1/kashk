@@ -38,7 +38,7 @@ def is_function_call_possible(inst, info):
             return True
         # debug('function is not possible (no def):', inst.name)
         return False
-    if not func.body.has_children():
+    if func.is_empty():
         if inst.name in ('memcpy', *READ_PACKET, *WRITE_PACKET):
             # It is fine
             return True
