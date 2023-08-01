@@ -364,6 +364,7 @@ def prepare_base_types():
     kind_name_map = {
             clang.TypeKind.SCHAR: 'char',
             clang.TypeKind.VOID: 'void',
+            clang.TypeKind.INT: 'int',
             }
 
     for kind, name in kind_name_map.items():

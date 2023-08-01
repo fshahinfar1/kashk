@@ -159,7 +159,7 @@ if (!shared) {
     return new_inst
 
 
-def prepare_meta_data(filure_number, meta_declaration):
+def prepare_meta_data(failure_number, meta_declaration):
     # TODO: use the Instruction object instead of hard coded strings
     type_name = f'struct {meta_declaration.name}'
     code = f'''
@@ -170,8 +170,8 @@ if (((void *)(__u64)skb->data + sizeof({type_name}))  > (void *)(__u64)skb->data
 {type_name} *__m = (void *)(__u64)skb->data;
 '''
     # TODO: I need to know the failure number and failure structure
-    store = []
-    for f in meta_declaration.fields:
+    store = [f'__m->failure_number = {failure_number};', ]
+    for f in meta_declaration.fields[1:]:
         store.append(f'__m->{f.name} = {f.name};')
     code += '\n'.join(store) + '\n'
     tmp = Literal(code, CODE_LITERAL)

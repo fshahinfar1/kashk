@@ -190,7 +190,11 @@ def gen_user_code(user, info, out_user):
         debug(MODULE_TAG, 'Metadata structures:', pformat(meta_structs))
 
         for x in meta_structs:
-            fields = []
+            state_obj = StateObject(None)
+            state_obj.name = 'failure_number'
+            state_obj.type_ref = BASE_TYPES[clang.TypeKind.INT]
+            state_obj.type = state_obj.type_ref.spelling
+            fields = [state_obj,]
             for var in x['vars']:
                 # debug(MODULE_TAG, 'bpf/user-shared:', f'{var.name}:{var.type.spelling}')
                 # TODO: do I need to clone?
