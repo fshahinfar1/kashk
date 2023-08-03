@@ -46,6 +46,8 @@ def _get_the_rest_of_the_code(inst, blk):
         if _includes_inst(child, inst):
             gather = True
         if gather:
+            # TODO: it has issues! it may include ToUserspace instructions in
+            # userspace code!
             instructions.append(child)
     return instructions
 

@@ -17,6 +17,7 @@ PARENT_INST = 1000
 
 current_function = None
 cb_ref = CodeBlockRef()
+fail_ref = CodeBlockRef()
 
 
 @contextmanager
@@ -116,7 +117,7 @@ def _process_child(child, inst, info, more):
 def _do_pass(inst, info, more):
     lvl, ctx, parent_list = more.unpack()
     new_children = []
-    failed = cb_ref.get(FAILED)
+    failed = fail_ref.get(FAILED)
 
     if inst.bpf_ignore is True:
         new_inst = clone_pass(inst, info, PassObject())
@@ -133,7 +134,14 @@ def _do_pass(inst, info, more):
                 text, _ = gen_code([inst], info)
                 debug(MODULE_TAG, 'Go to userspace at instruction:', text)
                 # Not a stack
-                cb_ref.set(FAILED, True)
+                fail_ref.set(FAILED, True)
+            elif inst.kind == clang.CursorKind.CALL_EXPR:
+                tmp_func = inst.get_function_def()
+                assert tmp_func is not None
+                if tmp_func.may_fail and not tmp_func.may_succeed:
+                    # This function is definitely failing
+                    failed = True
+                    # TODO: maybe generate the fallback here instead of in another pass
 
         if inst is None:
             # This instruction should be removed
@@ -141,24 +149,24 @@ def _do_pass(inst, info, more):
 
         # Continue deeper
         for child, tag in inst.get_children_context_marked():
-            with cb_ref.new_ref(FAILED, failed):
+            with fail_ref.new_ref(FAILED, failed):
                 obj = PassObject.pack(lvl + 1, tag, parent_list)
                 with cb_ref.new_ref(PARENT_INST, inst):
                     new_child = _process_child(child, inst, info, obj)
                 if new_child is None:
                     return None
-                failed = cb_ref.get(FAILED)
+                failed = fail_ref.get(FAILED)
 
             # TODO: when should I propagate the failure to the upper level
             # context?
             parent = cb_ref.get(PARENT_INST)
             if parent is None or parent.kind != clang.CursorKind.IF_STMT:
-                cb_ref.set(FAILED, failed)
+                fail_ref.set(FAILED, failed)
                 # debug(MODULE_TAG, 'propagate failure: ', inst.kind, inst)
 
             new_children.append(new_child)
 
-            if not failed and inst.kind == clang.CursorKind.RETURN_STMT:
+            if current_function and not failed and inst.kind == clang.CursorKind.RETURN_STMT:
                 current_function.may_succeed = True
 
     new_inst = inst.clone(new_children)
@@ -167,5 +175,5 @@ def _do_pass(inst, info, more):
 
 def possible_path_analysis_pass(inst, info, more):
     with cb_ref.new_ref(PARENT_INST, None):
-        with cb_ref.new_ref(FAILED, False):
+        with fail_ref.new_ref(FAILED, False):
             return _do_pass(inst, info, more)

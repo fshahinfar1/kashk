@@ -188,13 +188,14 @@ if (__len <= 0) {{
   return;
 }}
 __b[__size] = '\\0';
-__m = (struct {meta.name} *)__buf;
+__m = (struct {meta.name} *)__b;
 """
     else:
         raise Exception(MODULE_TAG, 'Unexpected IO Framework!')
 
 
 def _load_meta(info):
+    # TODO: load the correct data structure based on the failure number
     meta = info.user_prog.declarations[0]
     declare = []
     load = []
