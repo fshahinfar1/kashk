@@ -83,12 +83,10 @@ def build_sym_table(cursor, info):
     unnamed_struct_coutner = 0
     d = DFSPass(cursor)
     for c, l in d:
-        # debug('|  '*l + f'+- {c.spelling} {c.kind}')
-        if not (should_process_this_cursor(c)
-                or c.kind == clang.CursorKind.TRANSLATION_UNIT):
+        if not (should_process_this_cursor(c) or c.kind == clang.CursorKind.TRANSLATION_UNIT):
             continue
 
-        if (c.kind == clang.CursorKind.CLASS_DECL):
+        if c.kind == clang.CursorKind.CLASS_DECL:
             if not c.is_definition():
                 continue
 
@@ -138,7 +136,10 @@ def build_sym_table(cursor, info):
             x = c.underlying_typedef_type
             x = x.get_declaration()
             usr = x.get_usr()
-            equivalent_scope_key = remember_unnamed_struct_name[usr]
+            equivalent_scope_key = remember_unnamed_struct_name.get(usr, None)
+            if equivalent_scope_key is None:
+                error('It seems that a unnamed type (struct, union, ...) was ignored')
+                continue
             equivalent_scope = info.sym_tbl.scope_mapping[equivalent_scope_key]
             info.sym_tbl.scope_mapping[scope_key] = equivalent_scope
             info.sym_tbl.insert_entry(scope_key, T, c.kind, c)

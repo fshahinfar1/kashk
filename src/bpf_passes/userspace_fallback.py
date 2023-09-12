@@ -185,7 +185,7 @@ def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.CALL_EXPR:
         func = inst.get_function_def()
         # we only need to investigate functions that may fail
-        if func and func.may_fail:
+        if func and not func.is_empty() and func.may_fail:
             # debug(MODULE_TAG, func, func.may_succeed, func.may_fail)
             return _handle_function_may_fail(inst, func, info, more)
     elif inst.kind == TO_USERSPACE_INST and current_function is None:

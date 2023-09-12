@@ -4,7 +4,8 @@
 if [ -d ./venv/ ]; then
 	source ./venv/bin/activate
 fi
-SCRIPT=./src/main.py
+CURDIR=$(dirname $0)
+SCRIPT=$CURDIR/src/main.py
 CASE_STUDY_DIR=$HOME/auto_bpf_offload/auto_bpf_offload_case_study
 
 # FILE=$CASE_STUDY_DIR/src/kv/kv.cpp
