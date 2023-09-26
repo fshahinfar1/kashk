@@ -70,7 +70,10 @@ def _process_current_inst(inst, info, more):
         elif inst.name in WRITE_PACKET:
             buf = info.wr_buf.name
             # TODO: maybe it is too soon to convert instructions to the code
-            write_size, _ = gen_code(info.wr_buf.write_size_cursor, info, context=ARG)
+            if info.wr_buf.size_cursor is None:
+                write_size = '<UNKNOWN WRITE BUF SIZE>'
+            else:
+                write_size, _ = gen_code(info.wr_buf.size_cursor, info, context=ARG)
             text = send_response_template(buf, write_size)
             inst = Literal(text, CODE_LITERAL)
             return inst

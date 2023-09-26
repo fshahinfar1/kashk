@@ -44,7 +44,7 @@ def call_send_packet(inst, info, more):
     is_first_time_2 = False
 
     buf = info.wr_buf.name
-    write_size, _ = gen_code(info.wr_buf.write_size_cursor, info, context=ARG)
+    write_size, _ = gen_code(info.wr_buf.size_cursor, info, context=ARG)
     code = [
         f'__adjust_skb_size(skb, {write_size});',
         f'if (((void *)(__u64)skb->data + {write_size})  > (void *)(__u64)skb->data_end) {{',

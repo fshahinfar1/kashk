@@ -69,7 +69,14 @@ def generate_offload(io_ctx):
     boot_starp_global_state(cursor, info)
 
     # Find the entry function
-    entry_func = find_elem(cursor, entry_func_name)
+    entry_func = None
+    for e in find_elem(cursor, entry_func_name):
+        if e.kind == clang.CursorKind.FUNCTION_DECL:
+            children = list(e.get_children())
+            last_child = children[-1]
+            if last_child.kind == clang.CursorKind.COMPOUND_STMT:
+                entry_func = e
+                break
     if entry_func is None:
         error('Did not found the entry function')
         return
@@ -93,6 +100,7 @@ def generate_offload(io_ctx):
         scope.delete(k)
 
     body_of_loop = find_request_processing_logic(entry_func, info)
+
     # Find the buffer representing the packet
     find_read_write_bufs(body_of_loop, info)
 
@@ -100,6 +108,8 @@ def generate_offload(io_ctx):
     insts = gather_instructions_from(body_of_loop, info, BODY)
     bpf = Block(BODY)
     bpf.extend_inst(insts)
+    text, _ =  gen_code(bpf, info)
+    debug('code:\n', text, '\n---', sep='')
 
     ## Simplify Code
     # Move function calls out of the ARG context!
@@ -123,6 +133,14 @@ def generate_offload(io_ctx):
 
     # Create the userspace program graph
     select_user_pass(bpf, info, PassObject())
+    tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
+    debug(tree)
+    root = info.user_prog.graph
+    code = root.paths.code
+    debug(id(root), root.children, code)
+    text, _ =  gen_code(code, info)
+    debug('code:\n', text, '\n---', sep='')
+    debug('is user empty:', root.is_empty())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Number the failure paths
@@ -139,7 +157,10 @@ def generate_offload(io_ctx):
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # TODO: right now the order of generating the userspace and then BPF is important
-    gen_user_code(user, info, out_user)
+    if not info.user_prog.graph.is_empty():
+        gen_user_code(user, info, out_user)
+    else:
+        report("No user space program was generated. The tool has offloaded everything to BPF.")
     gen_bpf_code(bpf, info, out_bpf)
 
 
@@ -148,7 +169,7 @@ def dfs_over_deps_vars(root):
     recursion basis is on the length of children
 
     @param root: a node of the User Program Graph
-    @returns a list of set of variables dependencies a long with the failues number
+    @returns a list of set of variables dependencies along with the failure number
     """
     this_node_deps = root.paths.var_deps
 
@@ -274,7 +295,7 @@ def boot_starp_global_state(cursor, info):
         # -----------------------------
 
         # The fields and its dependencies
-        ref = find_elem(cursor, 'TCPConnection')
+        ref = find_elem(cursor, 'TCPConnection')[0]
         # states, decls = extract_state(tcp_conn_entry.ref)
         states, decls = extract_state(ref)
 
@@ -399,13 +420,13 @@ def find_read_write_bufs(ev_loop, info):
             info.wr_buf = PacketBuffer(buf_def)
             if len(args) == 2:
                 buf_sz = args[1]
-                info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
+                info.wr_buf.size_cursor = gather_instructions_from(buf_sz, info)
             else:
                 # TODO: I need to some how know the size and I might not know
                 # it! I can try to find the underlying array. But what if it is
                 # not an array?
                 error('I need to know the buffer size')
-                info.wr_buf.write_size_cursor = [Literal('2048', clang.CursorKind.INTEGER_LITERAL)]
+                info.wr_buf.size_cursor = [Literal('2048', clang.CursorKind.INTEGER_LITERAL)]
         else:
             buf_def = buf_arg.get_definition()
             remove_def = buf_def
@@ -416,7 +437,7 @@ def find_read_write_bufs(ev_loop, info):
                 buf_def = args[0].get_definition()
                 buf_sz = args[1]
                 info.wr_buf = PacketBuffer(buf_def)
-                info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
+                info.wr_buf.size_cursor = gather_instructions_from(buf_sz, info)
             else:
                 info.wr_buf = PacketBuffer(buf_def)
                 if buf_sz is None:
@@ -428,10 +449,10 @@ def find_read_write_bufs(ev_loop, info):
                             buf_def = args[0].get_definition()
                             buf_sz = args[1]
                             info.wr_buf = PacketBuffer(buf_def)
-                            info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
+                            info.wr_buf.size_cursor = gather_instructions_from(buf_sz, info)
                         else:
                             raise Exception('')
                     else:
                         raise Exception('')
                 else:
-                    info.wr_buf.write_size_cursor = gather_instructions_from(buf_sz, info)
+                    info.wr_buf.size_cursor = gather_instructions_from(buf_sz, info)

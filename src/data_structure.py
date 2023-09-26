@@ -59,6 +59,8 @@ class PacketBuffer:
         else:
             self.cursor = cursor
             self.name = cursor.spelling
+        # Determines the size of buffer
+        self.size_cursor = None
 
 
 class CodeBlockRef:
