@@ -132,19 +132,28 @@ def build_sym_table(cursor, info):
                 __collect_information_about_class(c, info)
             continue
         elif c.kind == clang.CursorKind.TYPEDEF_DECL:
-            scope_key = f'class_{c.spelling}'
-            x = c.underlying_typedef_type
-            x = x.get_declaration()
-            usr = x.get_usr()
-            equivalent_scope_key = remember_unnamed_struct_name.get(usr, None)
-            if equivalent_scope_key is None:
-                error('It seems that a unnamed type (struct, union, ...) was ignored')
+            # Typedef is handled in multiple cases
+            under_type = c.underlying_typedef_type
+            if under_type.kind == clang.TypeKind.POINTER:
+                # It is defining a pointer type (possibly a function pointer)
+                # TODO: do I need to know something about this?
                 continue
-            equivalent_scope = info.sym_tbl.scope_mapping[equivalent_scope_key]
-            info.sym_tbl.scope_mapping[scope_key] = equivalent_scope
-            info.sym_tbl.insert_entry(scope_key, T, c.kind, c)
-            equiv_sym = info.sym_tbl.lookup(equivalent_scope_key)
-            info.sym_tbl.insert(equiv_sym)
+            elif "it is defining an anonymous type":
+                scope_key = f'class_{c.spelling}'
+                x = c.underlying_typedef_type
+                x = x.get_declaration()
+                usr = x.get_usr()
+                equivalent_scope_key = remember_unnamed_struct_name.get(usr, None)
+                if equivalent_scope_key is None:
+                    report_on_cursor(c)
+                    debug('Underlying type:', under_type.spelling, under_type.kind)
+                    error(f'It seems that a unnamed type (struct, union, ...) was ignored ({x})')
+                    continue
+                equivalent_scope = info.sym_tbl.scope_mapping[equivalent_scope_key]
+                info.sym_tbl.scope_mapping[scope_key] = equivalent_scope
+                info.sym_tbl.insert_entry(scope_key, T, c.kind, c)
+                equiv_sym = info.sym_tbl.lookup(equivalent_scope_key)
+                info.sym_tbl.insert(equiv_sym)
             continue
 
         d.go_deep()

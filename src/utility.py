@@ -1,7 +1,7 @@
 import os
 import clang.cindex as clang
 
-from log import error, debug
+from log import error, debug, info
 
 
 PRIMITIVE_TYPES = [
@@ -26,6 +26,7 @@ clang.TypeKind.INT128,
 clang.TypeKind.FLOAT,
 clang.TypeKind.DOUBLE,
 clang.TypeKind.LONGDOUBLE,
+clang.TypeKind.VOID,
 ]
 
 
@@ -46,7 +47,7 @@ def parse_file(file_path, args):
     else:
         # THis is a C++ file
         compiler_args = (args + ' -std=c++20').split()
-    print('Compiler args:', compiler_args)
+    info('Compiler args:', compiler_args)
     index = clang.Index.create()
     tu = index.parse(file_path, args=compiler_args)
     if tu.diagnostics:
