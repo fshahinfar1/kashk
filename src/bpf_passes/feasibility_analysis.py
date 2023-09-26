@@ -11,7 +11,7 @@ from passes.pass_obj import PassObject
 from passes.clone import clone_pass
 
 
-MODULE_TAG = '[Possible Path Pass]'
+MODULE_TAG = '[Feasibility Pass]'
 FAILED = 999
 PARENT_INST = 1000
 
@@ -31,13 +31,12 @@ def remember_func(func):
         current_function = tmp
 
 
-def is_function_call_possible(inst, info):
+def is_function_call_feasible(inst, info):
     func = inst.get_function_def()
     if not func:
         if inst.name in ('memcpy', *READ_PACKET, *WRITE_PACKET):
             # It is fine
             return True
-        # debug('function is not possible (no def):', inst.name)
         return False
     if func.is_empty():
         if inst.name in ('memcpy', *READ_PACKET, *WRITE_PACKET):
@@ -53,14 +52,13 @@ def is_function_call_possible(inst, info):
 
     func.body = modified
     if modified is None:
-        # debug('function is not possible (no body):', inst.name)
         return False
     return True
 
 
 def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.CALL_EXPR:
-        res = is_function_call_possible(inst, info)
+        res = is_function_call_feasible(inst, info)
         if not res:
             return inst, True
 
@@ -173,7 +171,7 @@ def _do_pass(inst, info, more):
     return new_inst
 
 
-def possible_path_analysis_pass(inst, info, more):
+def feasibilty_analysis_pass(inst, info, more):
     with cb_ref.new_ref(PARENT_INST, None):
         with fail_ref.new_ref(FAILED, False):
             return _do_pass(inst, info, more)

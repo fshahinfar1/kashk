@@ -20,7 +20,7 @@ from passes.clone import clone_pass
 from passes.linear_code import linear_code_pass
 
 from bpf_passes.loop_end import loop_end_pass
-from bpf_passes.possible_path_analysis import possible_path_analysis_pass
+from bpf_passes.feasibility_analysis import feasibilty_analysis_pass
 from bpf_passes.transform_vars import transform_vars_pass
 from bpf_passes.userspace_fallback import userspace_fallback_pass
 from bpf_passes.verifier import verifier_pass
@@ -114,14 +114,14 @@ def generate_offload(io_ctx):
     # print(text)
     # print('------------------------------')
 
-    ## Possible Path Analysis
-    # Mark inpossible paths and annotate which functions may fail or suceed
-    bpf = possible_path_analysis_pass(bpf, info, PassObject())
+    ## Feasibility Analysis
+    # Mark infeasible paths and annotate which functions may fail or succeed
+    bpf = feasibilty_analysis_pass(bpf, info, PassObject())
     # for func in Function.directory.values():
     #     print(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_fail)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
-    # Create the userspace program graph 
+    # Create the userspace program graph
     select_user_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
@@ -371,7 +371,7 @@ def find_read_write_bufs(ev_loop, info):
         return
 
     writes = get_all_send(ev_loop)
-    assert len(writes) == 1, f'I currently expect only one send system call (count found: {len(writes)})'
+    assert len(writes) <= 1, f'I currently expect only one send system call (count found: {len(writes)})'
     for c in writes:
         # TODO: this code is not going to work. it is so specific
         args = list(c.get_arguments())

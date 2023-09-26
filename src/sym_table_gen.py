@@ -1,13 +1,14 @@
 from dfs import DFSPass
 from log import debug, error
 from prune import should_process_this_cursor
-from utility import report_on_cursor
+from utility import report_on_cursor, PRIMITIVE_TYPES
 
 from data_structure import MyType
 import clang.cindex as clang
 
 
 remember_unnamed_struct_name = {}
+MODULE_TAG = '[SYM TBL GEN]'
 
 
 def __collect_information_about_class(cursor, info):
@@ -136,7 +137,16 @@ def build_sym_table(cursor, info):
             under_type = c.underlying_typedef_type
             if under_type.kind == clang.TypeKind.POINTER:
                 # It is defining a pointer type (possibly a function pointer)
-                # TODO: do I need to know something about this?
+                # TODO: do I need to know something about this? (probably)
+                continue
+            elif under_type.kind == clang.TypeKind.TYPEDEF:
+                # TODO: udpate the symbol table ?
+                continue
+            elif under_type.kind == clang.TypeKind.ELABORATED:
+                # TODO: remember that this type is same as the struct/union/enum/...
+                continue
+            elif under_type.kind in PRIMITIVE_TYPES:
+                # TODO: udpate the symbol table ?
                 continue
             elif "it is defining an anonymous type":
                 scope_key = f'class_{c.spelling}'
@@ -146,8 +156,8 @@ def build_sym_table(cursor, info):
                 equivalent_scope_key = remember_unnamed_struct_name.get(usr, None)
                 if equivalent_scope_key is None:
                     report_on_cursor(c)
-                    debug('Underlying type:', under_type.spelling, under_type.kind)
-                    error(f'It seems that a unnamed type (struct, union, ...) was ignored ({x})')
+                    debug(MODULE_TAG, 'Underlying type:', under_type.spelling, under_type.kind)
+                    error(MODULE_TAG, f'It seems that a unnamed type (struct, union, ...) was ignored ({x})')
                     continue
                 equivalent_scope = info.sym_tbl.scope_mapping[equivalent_scope_key]
                 info.sym_tbl.scope_mapping[scope_key] = equivalent_scope

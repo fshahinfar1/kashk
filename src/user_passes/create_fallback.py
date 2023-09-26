@@ -111,6 +111,8 @@ def _starts_with_func_call(node, info):
 
 def _process_node(node, info):
     blk = Block(BODY)
+    if len(node.children) <= 0 and not node.has_code():
+        debug(node)
     assert len(node.children) > 0 or node.has_code()
     remove_first_inst = False
 
