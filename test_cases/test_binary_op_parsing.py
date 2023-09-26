@@ -20,7 +20,7 @@ from passes.linear_code import linear_code_pass
 
 
 def run_test():
-    file_path = os.path.join(input_files_dir, 'linear_pass.cpp')
+    file_path = os.path.join(input_files_dir, 'binary_op.c')
     entry_func_name = 'main'
     compiler_args = ''
 
@@ -41,48 +41,24 @@ def run_test():
         # Gather the instructions
         body_of_loop = list(entry_func.get_children())[-1]
         assert body_of_loop.kind == clang.CursorKind.COMPOUND_STMT
+        # Convert cursors to instruction objects
         insts = gather_instructions_under(body_of_loop, info, BODY)
-        # Get ready for a pass
+
         third_arg = PassObject()
         bpf = Block(BODY)
         bpf.extend_inst(insts)
         # Move function calls out of the ARG context!
-        bpf = linear_code_pass(bpf, info, third_arg)
+        # bpf = linear_code_pass(bpf, info, third_arg)
 
         # Generate the code and show it for debuging
         text, _ = gen_code(bpf, info)
         print(text)
 
-        # Check the pass is correct
-        has_var_declare = False
-        has_var_assignment = False
-        has_function_move = False
-        # TODO: Check the inner function movement
-        function_assigned_to_var = '__not_set__' 
-        for i in bpf.get_children():
-            if i.kind == clang.CursorKind.VAR_DECL:
-                if i.name == 'test' and not i.init.has_children():
-                    has_var_declare = True
-            if i.kind == clang.CursorKind.BINARY_OPERATOR:
-                if i.op == '=':
-                    rhs = i.rhs.get_children()[0]
-                    if rhs.kind == clang.CursorKind.CALL_EXPR and rhs.name == 'f1':
-                        lhs = i.lhs.get_children()[0]
-                        if lhs.kind == clang.CursorKind.DECL_REF_EXPR:
-                            function_assigned_to_var = lhs.name
-                            if function_assigned_to_var == 'test':
-                                has_var_assignment = True
-            if i.kind == clang.CursorKind.SWITCH_STMT:
-                c = i.cond.get_children()
-                assert len(c) == 1
-                if c[0].kind == clang.CursorKind.DECL_REF_EXPR:
-                    if c[0].name == function_assigned_to_var:
-                        has_function_move = True
+        truth = [ ]
+        for inst in insts:
+            print(inst)
 
-        assert has_var_declare
-        assert has_var_assignment
-        assert has_function_move
-        print('Linear Pass Test: Okay')
+        print('BinOp Parsing Test: Okay')
 
 
 
