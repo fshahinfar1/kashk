@@ -61,6 +61,7 @@ class Instruction:
 
     def clone(self, children):
         if self.kind not in (clang.CursorKind.BREAK_STMT,
+                clang.CursorKind.CONTINUE_STMT,
                 clang.CursorKind.RETURN_STMT):
             error('clone Instruction:', self.kind)
         new = Instruction()
@@ -312,9 +313,15 @@ class BinOp(Instruction):
             self.op = '<operation is unknown>'
 
     def __find_op_str(self, cursor):
-        lhs_tokens = len(list(next(cursor.get_children()).get_tokens()))
+        lhs = next(cursor.get_children())
+        lhs_tokens = len(list(lhs.get_tokens()))
         # First token after lhs
-        self.op = list(cursor.get_tokens())[lhs_tokens].spelling
+        tokens = list(cursor.get_tokens())
+
+        # debug(lhs_tokens, tokens)
+        # report_on_cursor(cursor)
+
+        self.op = tokens[lhs_tokens].spelling
 
     def has_children(self):
         return True

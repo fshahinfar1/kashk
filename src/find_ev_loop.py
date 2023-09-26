@@ -1,7 +1,7 @@
 import clang.cindex as clang
 
-from log import error, debug
-from utility import skip_unexposed_stmt, add_state_decl_to_bpf, get_body_of_the_loop
+from log import error, debug, report
+from utility import skip_unexposed_stmt, add_state_decl_to_bpf, get_body_of_the_loop, report_on_cursor
 from sym_table import SymbolTableEntry
 from understand_logic import (get_variable_declaration_before_elem,
         find_event_loop, get_state_for)
@@ -12,7 +12,8 @@ def find_request_processing_logic(cursor, info):
     # Find the event-loop
     ev_loop = find_event_loop(cursor)
     if ev_loop is None:
-        error('Did not found event loop')
+        report('Did not found an event loop.')
+        report_on_cursor(cursor)
         body_of_loop = list(cursor.get_children())[-1]
         body_of_loop = skip_unexposed_stmt(body_of_loop)
     else:

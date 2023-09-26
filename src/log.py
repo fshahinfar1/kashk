@@ -20,5 +20,5 @@ def error(*args, **kwargs):
 def debug(*args, **kwargs):
     print('\033[33m', *args, '\033[0m', file=stderr, **kwargs)
 
-def info(*args, **kwargs):
+def report(*args, **kwargs):
     print('\033[36m', *args, '\033[0m', file=stderr, **kwargs)

@@ -1,4 +1,6 @@
 import clang.cindex as clang
+from utility import report_on_cursor
+from log import debug, error
 
 
 # TODO: How to make sure that `read` is the read system-call and not a simple
@@ -39,8 +41,6 @@ def should_process_this_cursor(cursor):
     ns = get_namespace_of_cursor(cursor)
     if ns == 'asio':
         return False
-    if __is_ignored_function(cursor):
-        return False
     return True
 
 
@@ -54,3 +54,33 @@ def should_process_this_file(path):
             # error(f'ignore {path}')
             return False
     return True
+
+
+def should_ignore_cursor(cursor):
+    """
+    The difference with `should_process_this_cursor' is,
+    this function is used to decide if the cursor should be removed from all processing.
+    The mentioned function decides if the cursor belongs to user-space program.
+    """
+    if __is_ignored_function(cursor):
+        return True
+    if cursor.kind == clang.CursorKind.UNARY_OPERATOR:
+        count_token = len(list(cursor.get_tokens()))
+        if count_token < 2:
+            error('Unary operator with less than 2 tokens will fail to convert to UnaryOp object. It was ignored!')
+            return True
+    if cursor.kind == clang.CursorKind.BINARY_OPERATOR:
+        count_token = len(list(cursor.get_tokens()))
+        # report_on_cursor(cursor)
+        # children = list(cursor.get_children())
+        # report_on_cursor(children[0])
+        # x = list(children[0].get_children())
+        # while x:
+        #     report_on_cursor(x[0])
+        #     x = list(x[0].get_children())
+        # print(count_token)
+        if count_token == 0:
+            error('Binary operator with zero tokens, this will fail to convert to BinOp so it was ignored!')
+            # report_on_cursor(cursor)
+            # This was observed to be a assert statement, errno == ..., what other statement does it include?
+            return True

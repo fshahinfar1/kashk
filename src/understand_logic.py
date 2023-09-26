@@ -6,7 +6,7 @@ from log import error
 from utility import get_code, report_on_cursor, visualize_ast
 from data_structure import *
 from instruction import *
-from prune import (should_process_this_cursor, READ_PACKET, WRITE_PACKET)
+from prune import (should_process_this_cursor, should_ignore_cursor, READ_PACKET, WRITE_PACKET)
 from understand_program_state import get_state_for
 
 from dfs import DFSPass
@@ -117,10 +117,15 @@ def __convert_cursor_to_inst(c, info):
             or c.kind == clang.CursorKind.COMPOUND_ASSIGNMENT_OPERATOR):
         inst = BinOp(c)
         children = c.get_children()
-        lhs_inst = gather_instructions_from(next(children), info, context=LHS)[0]
+
+        lhs_child = next(children)
+        lhs_inst = gather_instructions_from(lhs_child, info, context=LHS)[0]
         inst.lhs.add_inst(lhs_inst)
-        rhs_inst = gather_instructions_from(next(children), info, context=RHS)[0]
+
+        rhs_child = next(children)
+        rhs_inst = gather_instructions_from(rhs_child, info, context=RHS)[0]
         inst.rhs.add_inst(rhs_inst)
+
         inst.bpf_ignore = lhs_inst.bpf_ignore or rhs_inst.bpf_ignore
         return inst
     elif (c.kind == clang.CursorKind.UNARY_OPERATOR
@@ -363,6 +368,10 @@ def gather_instructions_from(cursor, info, context=BODY):
     cb_ref.push(context, ops)
     d = DFSPass(cursor)
     for c, lvl in d:
+        if should_ignore_cursor(c):
+            txt = ''.join(map(lambda x: x.spelling, c.get_tokens()))
+            return [Literal(f'/*<placeholder {txt}>*/', CODE_LITERAL)]
+
         if not should_process_this_cursor(c):
             with set_global_for_bpf(False):
                 inst = __convert_cursor_to_inst(c, info)

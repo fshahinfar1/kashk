@@ -1,7 +1,7 @@
 import os
 import clang.cindex as clang
 
-from log import error, debug, info
+from log import error, debug, report
 
 
 PRIMITIVE_TYPES = [
@@ -38,6 +38,7 @@ def get_body_of_the_loop(cursor):
             break
     return body_of_loop
 
+
 def parse_file(file_path, args):
     # compiler_args = '-I /usr/include/ -I /opt/clang-16/include/c++/v1/'.split()
     _, ext = os.path.splitext(file_path)
@@ -47,7 +48,7 @@ def parse_file(file_path, args):
     else:
         # THis is a C++ file
         compiler_args = (args + ' -std=c++20').split()
-    info('Compiler args:', compiler_args)
+    report('Compiler args:', compiler_args)
     index = clang.Index.create()
     tu = index.parse(file_path, args=compiler_args)
     if tu.diagnostics:
@@ -72,7 +73,7 @@ def find_elem(cursor, func_name):
         candid = new_candid
     if not candid:
         return None
-    return candid[0]
+    return candid
 
 
 def get_code(cursor):
