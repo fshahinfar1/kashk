@@ -9,6 +9,7 @@ def parse_args():
     parser.add_argument('func', help='name of the entry function')
     parser.add_argument('--out-bpf', help='store generated BPF program in this file', default=None)
     parser.add_argument('--out-user', help='store generated socket program in this file', default=None)
+    parser.add_argument('--cflags', help='flags to pass to the compiler', default='')
     args = parser.parse_args()
     return args
 
@@ -26,6 +27,7 @@ def main():
     if args.out_bpf:
         ctx.set_bpf_output(args.out_bpf)
     ctx.set_entry_func(args.func)
+    ctx.set_cflags(args.cflags)
 
     generate_offload(ctx)
 

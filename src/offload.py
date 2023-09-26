@@ -61,7 +61,7 @@ def generate_offload(io_ctx):
     info.io_ctx = io_ctx
 
     # This is the AST generated with Clang
-    index, tu, cursor = parse_file(file_path)
+    index, tu, cursor = parse_file(file_path, io_ctx.cflags)
 
     # Collect information about classes, functions, variables, ...
     build_sym_table(cursor, info)

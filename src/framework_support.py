@@ -11,6 +11,7 @@ class InputOutputContext:
         self.user_out_file = ''
         self.entry_func = ''
         self.input_framework = None
+        self.cflags = ''
 
     def set_input(self, path):
         self.input_file = path
@@ -37,3 +38,6 @@ class InputOutputContext:
     def set_obpf_output(self, path):
         self.bpf_out_file = path
         return self
+
+    def set_cflags(self, flags):
+        self.cflags = flags
