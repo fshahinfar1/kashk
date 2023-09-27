@@ -84,6 +84,21 @@ def find_elem(cursor, func_name):
     return candid
 
 
+def find_elems_of_kind(cursor, kind):
+    matches = []
+    if isinstance(cursor, list):
+        for c in cursor:
+            partial_res = find_elems_of_kind(c, kind)
+            matches += partial_res
+    else:
+        if cursor.kind == kind:
+            matches.append(cursor)
+        for child in cursor.get_children():
+            partial_res = find_elems_of_kind(child, kind)
+            matches += partial_res
+    return matches
+
+
 def get_code(cursor):
     """
     Convert a cursor to a line of code (naively)
@@ -193,9 +208,18 @@ def get_owner(cursor):
             res = res + ref.owner
     elif parent.kind == clang.CursorKind.UNEXPOSED_EXPR:
         res += get_owner(parent)
+    elif parent.kind == clang.CursorKind.PAREN_EXPR:
+        first_child = next(parent.get_children())
+        ref = gather_instructions_from(first_child, None)
+        assert len(ref) == 1, f'{ref}'
+        ref = ref[0]
+        res.append(ref)
+        if hasattr(ref, 'owner'):
+            res = res + ref.owner
     else:
         error('get_owner: unhandled cursor kind', parent.kind)
         report_on_cursor(cursor)
+        report_on_cursor(parent)
 
     return res
 

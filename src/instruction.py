@@ -451,6 +451,10 @@ class Cast(Instruction):
         self.castee = Block(ARG)
         self.cast_type = None
 
+    @property
+    def type(self):
+        return self.cast_type
+
     def has_children(self):
         return True
 

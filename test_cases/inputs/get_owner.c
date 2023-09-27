@@ -18,6 +18,7 @@ int main(int argc, char *argv[])
 	 * object ownership relations. That is, record has item which is of
 	 * type ...
 	 * */
+	/* const unsigned int ITEM_CHUNKED = 1U << 2; */
 	record *c = calloc(1, sizeof(record));
 	c->item = calloc(1, sizeof(item));
 	((item *)c->item)->it_flags = 0xff;
