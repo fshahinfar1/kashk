@@ -31,11 +31,12 @@ def generate_decleration_for(cursor):
 
     c = T.get_declaration()
     if c is None:
-        error(MODULE_TAG, f'Failed to find the definition for {T.spelling}')
+        error(MODULE_TAG, f'Failed to find the definition for {T.spelling} [1]')
         return []
     c = c.get_definition()
     if c is None:
-        error(MODULE_TAG, f'Failed to find the definition for {T.spelling}')
+        error(MODULE_TAG, f'Failed to find the definition for {T.spelling} [2]')
+        report_on_cursor(cursor)
         return []
 
     cursor = c

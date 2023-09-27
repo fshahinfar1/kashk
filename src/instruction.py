@@ -34,11 +34,15 @@ def _generate_marked_children(groups, context):
 
 
 class Instruction:
+    MAY_NOT_OVERLOAD = (clang.CursorKind.BREAK_STMT, clang.CursorKind.CONTINUE_STMT, clang.CursorKind.RETURN_STMT)
     def __init__(self):
         self.kind = None
         self.bpf_ignore = False
 
     def has_children(self):
+        if self.kind not in Instruction.MAY_NOT_OVERLOAD:
+            error('base has children is running for:', self.kind)
+
         if hasattr(self, 'body'):
             b = getattr(self, 'body')
             if b:
@@ -46,6 +50,9 @@ class Instruction:
         return False
 
     def get_children(self):
+        if self.kind not in Instruction.MAY_NOT_OVERLOAD:
+            error('base get children is running for:', self.kind)
+
         if hasattr(self, 'body'):
             b = getattr(self, 'body')
             if b:
@@ -53,6 +60,9 @@ class Instruction:
         return []
 
     def get_children_context_marked(self):
+        if self.kind not in Instruction.MAY_NOT_OVERLOAD:
+            error('base get children context marked is running for:', self.kind)
+
         if hasattr(self, 'body'):
             b = getattr(self, 'body')
             if b:
@@ -60,10 +70,9 @@ class Instruction:
         return []
 
     def clone(self, children):
-        if self.kind not in (clang.CursorKind.BREAK_STMT,
-                clang.CursorKind.CONTINUE_STMT,
-                clang.CursorKind.RETURN_STMT):
+        if self.kind not in Instruction.MAY_NOT_OVERLOAD:
             error('clone Instruction:', self.kind)
+
         new = Instruction()
         # new.kind = self.kind
         for name, val in vars(self).items():
@@ -116,7 +125,7 @@ class Call(Instruction):
     def has_children(self):
         return True
 
-    def get_chlidren(self):
+    def get_children(self):
         return self.args
 
     def get_children_context_marked(self):
@@ -228,7 +237,7 @@ class ControlFlowInst(Instruction):
 
 
 class UnaryOp(Instruction):
-    OPS = ('!', '-', '++', '--', '&', 'sizoef')
+    OPS = ('!', '-', '++', '--', '&', 'sizeof')
 
     def __init__(self, cursor):
         super().__init__()
@@ -244,13 +253,18 @@ class UnaryOp(Instruction):
             self.op = '<not set>'
             self.comes_after = False
 
+    def __str__(self):
+        return f'<UnaryOp {self.op}>'
+
     def __get_op(self):
         tokens = [t.spelling for t in self.cursor.get_tokens()]
-        assert len(tokens) >= 2, f'Expected there be more than two tokens in the UnaryOp but there are {len(tokens)}\n{" ".join(tokens)}'
+        assert len(tokens) >= 2, f'Expected there be more than one tokens in the UnaryOp but there are {len(tokens)}\n{" ".join(tokens)}'
         candid = tokens[0]
         if candid not in UnaryOp.OPS:
             candid = tokens[1]
             self.comes_after = True
+        # TODO: the function implementation is very flimsy
+        assert candid in UnaryOp.OPS
         return candid
 
     def has_children(self):
@@ -276,7 +290,6 @@ class UnaryOp(Instruction):
         new.comes_after = self.comes_after
         new.bpf_ignore = self.bpf_ignore
         return new
-
 
 
 class BinOp(Instruction):
@@ -311,6 +324,9 @@ class BinOp(Instruction):
 
         if not self.op:
             self.op = '<operation is unknown>'
+
+    def __str__(self):
+        return f'<BinOp {self.op}>'
 
     def __find_op_str(self, cursor):
         lhs = next(cursor.get_children())
@@ -464,6 +480,15 @@ class Ref(Instruction):
     def get_definition(self):
         return self.variable_declaration_inst
 
+    def has_children(self):
+        return False
+
+    def get_children(self):
+        return []
+
+    def get_children_context_marked(self):
+        return []
+
     def clone(self, _):
         new = Ref(self.cursor, self.kind)
         new.name = self.name
@@ -481,6 +506,15 @@ class Literal(Instruction):
 
     def __str__(self):
         return f'<Literal {self.text}>'
+
+    def has_children(self):
+        return False
+
+    def get_children(self):
+        return []
+
+    def get_children_context_marked(self):
+        return []
 
     def clone(self, _):
         new = Literal(self.text, self.kind)

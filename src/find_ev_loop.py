@@ -13,7 +13,7 @@ def find_request_processing_logic(cursor, info):
     ev_loop = find_event_loop(cursor)
     if ev_loop is None:
         report('Did not found an event loop.')
-        report_on_cursor(cursor)
+        # report_on_cursor(cursor)
         body_of_loop = list(cursor.get_children())[-1]
         body_of_loop = skip_unexposed_stmt(body_of_loop)
     else:
