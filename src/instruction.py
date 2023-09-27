@@ -172,7 +172,10 @@ class VarDecl(Instruction):
         return self.type.is_record()
 
     def __str__(self):
-        return f'<VarDecl {self.kind}: {self.type} {self.name} = {self.init}>'
+        if self.has_children():
+            return f'<VarDecl: {self.type} {self.name} = {self.init}>'
+        else:
+            return f'<VarDecl: {self.type} {self.name}>'
 
     def has_children(self):
         if self.init.has_children():
@@ -261,10 +264,14 @@ class UnaryOp(Instruction):
         assert len(tokens) >= 2, f'Expected there be more than one tokens in the UnaryOp but there are {len(tokens)}\n{" ".join(tokens)}'
         candid = tokens[0]
         if candid not in UnaryOp.OPS:
-            candid = tokens[1]
             self.comes_after = True
-        # TODO: the function implementation is very flimsy
-        assert candid in UnaryOp.OPS
+            for candid in tokens:
+                if candid in UnaryOp.OPS:
+                    break
+            else:
+                report_on_cursor(self.cursor)
+                debug(tokens)
+                raise Exception('Did not found the symbol for the UnaryOp')
         return candid
 
     def has_children(self):

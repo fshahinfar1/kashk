@@ -203,6 +203,11 @@ class MyType:
         self.kind = None
         self._element_count = 0
 
+    def __str__(self):
+        if self.is_pointer():
+            return self.spelling
+        return self.spelling
+
     def get_pointee(self):
         if self.kind == clang.TypeKind.POINTER:
             return self.under_type
