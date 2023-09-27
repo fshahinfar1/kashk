@@ -1,6 +1,7 @@
 import sys
 import clang.cindex as clang
 
+from log import *
 from utility import (find_elem, get_code, generate_struct_with_fields,
         PRIMITIVE_TYPES, report_on_cursor, get_actual_type)
 from bpf import SK_SKB_PROG
@@ -23,7 +24,6 @@ def generate_decleration_for(cursor):
     if not should_process_this_cursor(cursor):
         return []
 
-    orig = cursor
     T = get_actual_type(cursor.type)
 
     if T.kind in PRIMITIVE_TYPES:
@@ -33,13 +33,15 @@ def generate_decleration_for(cursor):
     if c is None:
         error(MODULE_TAG, f'Failed to find the definition for {T.spelling} [1]')
         return []
-    c = c.get_definition()
-    if c is None:
-        error(MODULE_TAG, f'Failed to find the definition for {T.spelling} [2]')
-        report_on_cursor(cursor)
-        return []
+    c2 = c.get_definition()
+    if c2 is None:
+        # error(MODULE_TAG, f'Failed to find the definition for {T.spelling} [2]')
+        # report_on_cursor(cursor)
+        # report_on_cursor(c)
+        report(f'Assume "{c.type.spelling}" is a private type.')
+        c2 = c
 
-    cursor = c
+    cursor = c2
     T = cursor.type
     type_name = T.spelling
 
