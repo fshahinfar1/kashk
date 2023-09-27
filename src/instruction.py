@@ -240,7 +240,7 @@ class ControlFlowInst(Instruction):
 
 
 class UnaryOp(Instruction):
-    OPS = ('!', '-', '++', '--', '&', 'sizeof')
+    OPS = ('!', '-', '++', '--', '&', '*', 'sizeof', '__extension__')
 
     def __init__(self, cursor):
         super().__init__()

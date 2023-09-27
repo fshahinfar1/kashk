@@ -1,5 +1,6 @@
 import os
 import clang.cindex as clang
+import subprocess
 
 from log import error, debug, report
 
@@ -49,8 +50,15 @@ def parse_file(file_path, args):
         # THis is a C++ file
         compiler_args = (args + ' -std=c++20').split()
     report('Compiler args:', compiler_args)
+
+    # Do preprocessing, the libclang is not doing well with macros
+    tmp = ' '.join(compiler_args)
+    cmd = f'clang -E {tmp} {file_path}'
+    prepfile = '/tmp/kashk_preprocessed_file' + ext
+    with open(prepfile, 'w') as f:
+        subprocess.run(cmd, shell=True, stdin=subprocess.DEVNULL, stdout=f)
     index = clang.Index.create()
-    tu = index.parse(file_path, args=compiler_args)
+    tu = index.parse(prepfile, args=compiler_args)
     if tu.diagnostics:
         error('Diagnostics:')
         for d in tu.diagnostics:
@@ -187,6 +195,7 @@ def get_owner(cursor):
         res += get_owner(parent)
     else:
         error('get_owner: unhandled cursor kind', parent.kind)
+        report_on_cursor(cursor)
 
     return res
 
