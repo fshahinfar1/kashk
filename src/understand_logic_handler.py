@@ -78,6 +78,7 @@ def __get_func_args(inst, info):
             ref = Ref(None, new_kind)
             ref.name = inst.owner[0]
             ref.owner = new_owner
+            # TODO: ref.type is None here!
             args = [ref] + args
         else:
             # The first argument of methods are self and it is a reference

@@ -3,6 +3,7 @@ import clang.cindex as clang
 
 from log import error, debug
 from instruction import *
+from data_structure import BASE_TYPES
 from sym_table import Scope
 from user import USER_EVENT_LOOP_ENTRY
 from user import Path
@@ -32,6 +33,7 @@ def _generate_id_check(ids):
     for i in ids:
         lhs_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
         lhs_ref.name = 'failure_number'
+        lhs_ref.type = BASE_TYPES[clang.TypeKind.INT]
         rhs_ref = Literal(str(i), clang.CursorKind.INTEGER_LITERAL)
         check = BinOp(None)
         check.op = '=='
