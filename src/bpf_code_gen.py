@@ -361,10 +361,10 @@ jump_table = {
         #
         clang.CursorKind.PAREN_EXPR: handle_paren_expr,
         #
-        clang.CursorKind.BREAK_STMT: lambda x,y,z: 'break',
-        clang.CursorKind.CONTINUE_STMT: lambda x,y,z: 'continue',
+        clang.CursorKind.BREAK_STMT: lambda x,y,z: indent('break', z[0]),
+        clang.CursorKind.CONTINUE_STMT: lambda x,y,z: indent('continue', z[0]),
         clang.CursorKind.RETURN_STMT: handle_return_stmt,
-        clang.CursorKind.CXX_THROW_EXPR: lambda x,y,z: 'return SK_DROP',
+        clang.CursorKind.CXX_THROW_EXPR: lambda x,y,z: indent('return SK_DROP', z[0]),
         #
         TO_USERSPACE_INST: handle_to_userspace,
         }
@@ -418,6 +418,7 @@ def gen_code(list_instructions, info, context=BODY):
 
 
         code.append(text)
+    # print(code)
     text = ''.join(code)
     return text, modified
 
