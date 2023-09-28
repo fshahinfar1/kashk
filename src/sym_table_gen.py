@@ -36,8 +36,8 @@ def __collect_information_about_class(cursor, info):
 
 
 def __collect_information_about_func(cursor, info):
-    children = list(cursor.get_children())
-    assert len(children) != 0
+    # children = list(cursor.get_children())
+    # assert len(children) != 0
 
     T = MyType.from_cursor_type(cursor.type)
     e = info.sym_tbl.insert_entry('__func__', T, cursor.kind, None)
@@ -65,6 +65,20 @@ def pass_over_global_variables(cursor, info):
             d.go_deep()
 
 
+def __function_decl(cursor, info):
+    assert cursor.kind == clang.CursorKind.FUNCTION_DECL
+    scope_key = f'{cursor.spelling}'
+    if scope_key in info.sym_tbl.scope_mapping:
+        # debug(MODULE_TAG, f'function {scope_key} has once been declared')
+        return
+    T = MyType.from_cursor_type(cursor.result_type)
+    info.sym_tbl.insert_entry(scope_key, T, clang.CursorKind.FUNCTION_DECL, None)
+
+    with info.sym_tbl.new_scope() as scope:
+        info.sym_tbl.scope_mapping[scope_key] = scope
+        __collect_information_about_func(cursor, info)
+
+
 def build_sym_table(cursor, info):
     """
     Go through all the declarations of class, struct, function, fields, and
@@ -83,7 +97,25 @@ def build_sym_table(cursor, info):
 
     unnamed_struct_coutner = 0
     d = DFSPass(cursor)
+    # d: dfs object
+    # c: cursor object
+    # l: level (int)
     for c, l in d:
+        if c.kind == clang.CursorKind.FUNCTION_DECL:
+            __function_decl(c, info)
+            # if not c.is_definition():
+            #     tmp = c.get_definition()
+            #     if not tmp:
+            #         # Does not have a definition for this function (private)
+            #         __function_decl(c, info)
+            #     else:
+            #         # Process the definition instead of decleration
+            #         __function_decl(tmp, info)
+            # else:
+            #     # This cursor is to the definition and not the declaration of the function
+            #     __function_decl(c, info)
+            continue
+
         if not (should_process_this_cursor(c) or c.kind == clang.CursorKind.TRANSLATION_UNIT):
             continue
 
@@ -103,18 +135,6 @@ def build_sym_table(cursor, info):
             # If it is a variable decleration and it is not a global variable
             T = MyType.from_cursor_type(c.type)
             info.sym_tbl.insert_entry(c.spelling, T, c.kind, None)
-            continue
-        elif c.kind == clang.CursorKind.FUNCTION_DECL:
-            if not c.is_definition():
-                continue
-
-            scope_key = f'{c.spelling}'
-            T = MyType.from_cursor_type(c.result_type)
-            info.sym_tbl.insert_entry(scope_key, T, c.kind, c)
-
-            with info.sym_tbl.new_scope() as scope:
-                info.sym_tbl.scope_mapping[scope_key] = scope
-                __collect_information_about_func(c, info)
             continue
         elif c.kind == clang.CursorKind.STRUCT_DECL:
             if not c.is_definition():

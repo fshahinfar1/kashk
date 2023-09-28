@@ -26,26 +26,27 @@ def _move_function_out(inst, info, more):
     if not func:
         error(MODULE_TAG, 'can not move a function that do not know the definition: ', inst.name)
         return inst
-    
+
     blk = cb_ref.get(BODY)
     assert blk is not None
 
     if func.return_type.spelling != 'void':
         tmp_var_name = _get_tmp_var_name()
         # Declare tmp
+        T = MyType.from_cursor_type(func.return_type)
         tmp_decl = VarDecl(None)
         tmp_decl.name = tmp_var_name
-        tmp_decl.type = func.return_type
+        tmp_decl.type = T
         tmp_decl.state_obj = None
-        T = func.return_type
         blk.append(tmp_decl)
 
         # Update the symbol table
-        info.sym_tbl.insert_entry(tmp_decl.name, T, tmp_decl.kind, None) 
+        info.sym_tbl.insert_entry(tmp_decl.name, T, tmp_decl.kind, None)
 
         # Assign function return value to tmp
         tmp_ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
         tmp_ref.name = tmp_var_name
+        tmp_ref.type = T
         bin_op = BinOp(None)
         bin_op.op = '='
         bin_op.lhs.add_inst(tmp_ref)
@@ -73,6 +74,7 @@ def _separate_var_decl_and_init(inst, info, more):
 
     ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
     ref.name = inst.name
+    ref.type = MyType.from_cursor_type(inst.type)
 
     bin_op = BinOp(None)
     bin_op.op = '='

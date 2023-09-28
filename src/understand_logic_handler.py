@@ -12,6 +12,7 @@ from prune import should_process_this_cursor
 
 
 COROUTINE_FUNC_NAME = ('await_resume', 'await_transform', 'await_ready', 'await_suspend')
+MODULE_TAG = 'LOGIC HANDLER'
 
 
 def __function_is_of_interest(inst):
@@ -94,7 +95,7 @@ def __add_empty_func_definition(inst, info):
 def __add_func_definition(inst, info):
     scope = info.sym_tbl.scope_mapping.get(inst.name)
     if not scope:
-        error('The scope for the function', inst.name, 'was not found')
+        error(MODULE_TAG, 'The scope for the function', inst.name, 'was not found')
         return
     f = Function(inst.name, inst.func_ptr)
     f.is_method = inst.is_method
@@ -141,7 +142,10 @@ def __add_func_definition(inst, info):
         body = children[-1]
         while body.kind == clang.CursorKind.UNEXPOSED_STMT:
             body = next(body.get_children())
-        assert (body.kind == clang.CursorKind.COMPOUND_STMT)
+        # assert (body.kind == clang.CursorKind.COMPOUND_STMT)
+        if body.kind != clang.CursorKind.COMPOUND_STMT:
+            # did not found the body
+            body = None
 
     if body:
         # Switch scope
@@ -177,6 +181,7 @@ def understand_call_expr(c, info):
         if get_global_for_bpf() and __function_is_of_interest(inst):
             __add_func_definition(inst, info)
         else:
-            __add_empty_func_definition(inst, info)
+            __add_func_definition(inst, info)
+            # __add_empty_func_definition(inst, info)
 
     return inst

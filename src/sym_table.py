@@ -185,6 +185,9 @@ class ScopeMapping:
     def __init__(self):
         self.scope_mapping = {}
 
+    def __contains__(self, item):
+        return item in self.scope_mapping
+
     def __getitem__(self, key):
         return self.scope_mapping[key]
 

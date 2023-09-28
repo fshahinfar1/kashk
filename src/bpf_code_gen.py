@@ -130,7 +130,15 @@ def handle_unary_op(inst, info, more):
 
 def handle_ref_expr(inst, info, more):
     lvl = more[0]
+
+    # The case for function pointers is simple
+    if inst.is_func_ptr():
+        text = inst.name
+        text = indent(text, lvl)
+        return text
+
     # Check if the variable is shared globally or per_connection.
+    # These variables are placed on a MAP.
     sym, scope = info.sym_tbl.lookup2(inst.name)
     is_global = scope == info.sym_tbl.global_scope
     is_shared = scope == info.sym_tbl.shared_scope
@@ -141,7 +149,6 @@ def handle_ref_expr(inst, info, more):
     else:
         text = inst.name
     text = indent(text, lvl)
-
     return text
 
 

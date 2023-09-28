@@ -53,10 +53,11 @@ def parse_file(file_path, args):
 
     # Do preprocessing, the libclang is not doing well with macros
     tmp = ' '.join(compiler_args)
-    cmd = f'clang -E {tmp} {file_path}'
-    prepfile = '/tmp/kashk_preprocessed_file' + ext
-    with open(prepfile, 'w') as f:
-        subprocess.run(cmd, shell=True, stdin=subprocess.DEVNULL, stdout=f)
+    # cmd = f'clang -E {tmp} {file_path}'
+    # prepfile = '/tmp/kashk_preprocessed_file' + ext
+    # with open(prepfile, 'w') as f:
+    #     subprocess.run(cmd, shell=True, stdin=subprocess.DEVNULL, stdout=f)
+    prepfile = file_path
     index = clang.Index.create()
     tu = index.parse(prepfile, args=compiler_args)
     if tu.diagnostics:

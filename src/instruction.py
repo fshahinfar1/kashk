@@ -205,7 +205,7 @@ class ControlFlowInst(Instruction):
     def build_if_inst(cls, condition_inst):
         obj = ControlFlowInst()
         obj.kind = clang.CursorKind.IF_STMT
-        obj.cond.add_inst(condition_inst) 
+        obj.cond.add_inst(condition_inst)
         return obj
 
     def __init__(self):
@@ -341,7 +341,7 @@ class BinOp(Instruction):
         # First token after lhs
         tokens = list(cursor.get_tokens())
 
-        # debug(lhs_tokens, tokens)
+        # debug(lhs_tokens, len(tokens), tokens)
         # report_on_cursor(cursor)
 
         self.op = tokens[lhs_tokens].spelling
@@ -488,6 +488,9 @@ class Ref(Instruction):
             self.type = MyType.from_cursor_type(cursor.type)
         self.variable_declaration_inst = None
 
+    def is_func_ptr(self):
+        return self.type.kind == clang.TypeKind.FUNCTIONPROTO
+
     def get_definition(self):
         return self.variable_declaration_inst
 
@@ -503,6 +506,7 @@ class Ref(Instruction):
     def clone(self, _):
         new = Ref(self.cursor, self.kind)
         new.name = self.name
+        new.type = self.type
         clone_owner = list(self.owner)
         new.owner = clone_owner
         new.bpf_ignore = self.bpf_ignore
