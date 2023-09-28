@@ -45,6 +45,11 @@ def run_pass_on_all_functions(pass_fn, main_inst, info):
     return ret
 
 
+def _print_code(prog, info):
+    text, _ =  gen_code(prog, info)
+    debug('code:\n', text, '\n---', sep='')
+
+
 # TODO: make a framework agnostic interface, allow for porting to other
 # functions
 def generate_offload(io_ctx):
@@ -108,27 +113,17 @@ def generate_offload(io_ctx):
     insts = gather_instructions_from(body_of_loop, info, BODY)
     bpf = Block(BODY)
     bpf.extend_inst(insts)
-    text, _ =  gen_code(bpf, info)
-    debug('code:\n', text, '\n---', sep='')
 
     ## Simplify Code
     # Move function calls out of the ARG context!
     bpf = run_pass_on_all_functions(linear_code_pass, bpf, info)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
-    # print('Take a peek on the event loop!')
-    # text, _ = gen_code(insts, info)
-    # print(text)
-    # print('------------------------------')
-    # text, _ = gen_code(Function.directory['process_request'].body, info)
-    # print(text)
-    # print('------------------------------')
-
     ## Feasibility Analysis
     # Mark infeasible paths and annotate which functions may fail or succeed
     bpf = feasibilty_analysis_pass(bpf, info, PassObject())
-    # for func in Function.directory.values():
-    #     print(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_fail)
+    for func in Function.directory.values():
+        print(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_fail)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Create the userspace program graph

@@ -41,7 +41,7 @@ class Instruction:
 
     def has_children(self):
         if self.kind not in Instruction.MAY_NOT_OVERLOAD:
-            error('base has children is running for:', self.kind)
+            error('Function of base class (Instruction) is running for object of kind:', self.kind, 'has_children')
 
         if hasattr(self, 'body'):
             b = getattr(self, 'body')
@@ -597,6 +597,15 @@ class Block(Instruction):
 
 
 class ToUserspace(Instruction):
+
+    @classmethod
+    def from_func_obj(cls, func):
+        obj = ToUserspace()
+        obj.is_bpf_main = func is None
+        if func is not None:
+            obj.return_type = func.return_type
+        return obj
+
     def __init__(self):
         super().__init__()
         self.kind = TO_USERSPACE_INST
@@ -612,10 +621,11 @@ class ToUserspace(Instruction):
         new.bpf_ignore = self.bpf_ignore
         return new
 
-    @classmethod
-    def from_func_obj(cls, func):
-        obj = ToUserspace()
-        obj.is_bpf_main = func is None
-        if func is not None:
-            obj.return_type = func.return_type
-        return obj
+    def has_children(self):
+        return False
+
+    def get_children(self):
+        return []
+
+    def get_children_context_marked(self):
+        return []

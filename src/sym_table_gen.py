@@ -148,6 +148,12 @@ def build_sym_table(cursor, info):
             elif under_type.kind in PRIMITIVE_TYPES:
                 # TODO: udpate the symbol table ?
                 continue
+            elif under_type.kind == clang.TypeKind.FUNCTIONPROTO:
+                # TODO: udpate the symbol table ?
+                continue
+            elif under_type.kind == clang.TypeKind.CONSTANTARRAY:
+                # TODO: udpate the symbol table ?
+                continue
             elif "it is defining an anonymous type":
                 scope_key = f'class_{c.spelling}'
                 x = c.underlying_typedef_type
