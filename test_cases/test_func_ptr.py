@@ -14,27 +14,27 @@ class TestCase(BasicTest):
         bpf.extend_inst(insts)
 
         # Generate the code and show it for debuging
-        # text, _ = gen_code(bpf, self.info)
+        text, _ = gen_code(bpf, self.info)
         # print(text)
         # show_insts(insts)
+        # print(self.info.prog.connection_state)
 
-        refs = find_elems_of_kind(insts, clang.CursorKind.MEMBER_REF_EXPR)
+        assert len(self.info.prog.connection_state) == 0, 'There is no per connection shared state'
+        funcs = find_elems_of_kind(insts, clang.CursorKind.CALL_EXPR)
+        assert len(funcs)== 1, 'Three is only one function call in the code'
 
-        for r in refs:
-            print(r.type, r.name,':', r.owner[0].type)
-            if r.name == 'item':
-                assert(r.owner[0].type.spelling == 'record *')
-            elif r.name == 'it_flags':
-                assert(r.owner[0].type.spelling == 'item *')
+        fnptr = funcs[0]
+        assert len(fnptr.owner) == 1
 
 
-        print('get_owner Test: Okay')
+        # assert fnptr
+        print('Function Pointer Test: Okay')
 
 
 
 if __name__ == '__main__':
     input_files_dir = os.path.join(current_file_dir, './inputs/')
-    file_path = os.path.join(input_files_dir, 'get_owner.c')
+    file_path = os.path.join(input_files_dir, 'func_ptr.c')
     entry_func_name = 'main'
     compiler_args = ''
     test = TestCase(file_path, entry_func_name, compiler_args)

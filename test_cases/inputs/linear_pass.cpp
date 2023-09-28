@@ -1,3 +1,5 @@
+#include <iostream>
+using namespace::std;
 struct s1 {
   int a;
   int b;
@@ -23,5 +25,6 @@ int main()
     default:
       break;
   }
+  cout << "test is: " << test << " and s->a is: " << s->a << endl;
   return 0;
 }

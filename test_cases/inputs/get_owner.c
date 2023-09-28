@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define ITEM_CHUNKED ((1U) << 2)
+/* #define ITEM_CHUNKED ((1U) << 2) */
 
 typedef struct item {
 	int it_flags;
@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
 	 * object ownership relations. That is, record has item which is of
 	 * type ...
 	 * */
-	/* const unsigned int ITEM_CHUNKED = 1U << 2; */
+	const unsigned int ITEM_CHUNKED = 1U << 2;
 	record *c = calloc(1, sizeof(record));
 	c->item = calloc(1, sizeof(item));
 	((item *)c->item)->it_flags = 0xff;
