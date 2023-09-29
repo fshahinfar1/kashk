@@ -14,6 +14,13 @@ int mul(int a, int b)
 	return a * b;
 }
 
+typedef void(*callback)(int);
+
+void report(int a)
+{
+	printf("res: %d\n", a);
+}
+
 int main(int argc, char *argv[])
 {
 	/* The goal is to understand how the tool cope with the function
@@ -23,8 +30,13 @@ int main(int argc, char *argv[])
 	int y = 20;
 	int res = 0;
 	struct record r;
+	struct record *r2;
+	callback cb;
+	r2 = &r;
 	r.fn = mul;
 	res = r.fn(x, y);
-	printf("res: %d\n", res);
+	res = r2->fn(x, y);
+	cb = report;
+	cb(res);
 	return 0;
 }
