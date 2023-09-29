@@ -122,7 +122,11 @@ class Call(Instruction):
             self.owner = get_owner(mem)
 
             if self.owner:
-                if self.owner[0].type.kind == clang.TypeKind.POINTER:
+                ref = self.owner[0]
+                ref_type = ref.type
+                while ref_type.kind == clang.TypeKind.TYPEDEF:
+                    ref_type = ref_type.under_type
+                if ref_type.kind == clang.TypeKind.POINTER:
                     self.is_func_ptr = True
 
     def __str__(self):

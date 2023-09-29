@@ -160,6 +160,11 @@ class StateObject:
         return f'<StateObject: {self.type} {self.name}>'
 
 
+class FunctionPrototypeType:
+    def __init__(self):
+        self.args = []
+        self.ret = None
+
 class MyType:
     @classmethod
     def make_array(cls, name, T, count):
@@ -187,6 +192,7 @@ class MyType:
 
     @classmethod
     def from_cursor_type(cls, T):
+        assert isinstance(T, clang.Type)
         obj = MyType()
         obj.spelling = T.spelling
         obj.kind = T.kind
@@ -195,6 +201,19 @@ class MyType:
         elif obj.is_array():
             obj.under_type = MyType.from_cursor_type(T.element_type)
             obj._element_count = T.element_count
+        elif obj.is_func_proto():
+            proto_obj = FunctionPrototypeType()
+            proto_obj.args = [MyType.from_cursor_type(t) for t in T.argument_types()]
+            proto_obj.ret = MyType.from_cursor_type(T.get_result())
+            obj.func_proto_obj = proto_obj
+        elif obj.kind == clang.TypeKind.TYPEDEF:
+            # TODO: maybe I want to track the declaration of types and objects
+            decl = T.get_declaration()
+            if decl:
+                obj.under_type = MyType.from_cursor_type(decl.underlying_typedef_type)
+            else:
+                error('Did not found the TYPEDEF underlying type')
+                obj.under_type = None
         return obj
 
     def __init__(self):
@@ -202,6 +221,7 @@ class MyType:
         self.under_type = None
         self.kind = None
         self._element_count = 0
+        self.func_proto_obj = None
 
     def __str__(self):
         if self.is_pointer():
@@ -232,6 +252,9 @@ class MyType:
 
     def is_record(self):
         return self.kind == clang.TypeKind.RECORD
+    
+    def is_func_proto(self):
+        return self.kind == clang.TypeKind.FUNCTIONPROTO
 
     def clone(self):
         obj = MyType()

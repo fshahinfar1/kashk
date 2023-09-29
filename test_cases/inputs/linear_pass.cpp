@@ -5,6 +5,8 @@ struct s1 {
   int b;
 };
 
+typedef int(*callback)(void);
+
 int f1() {
   return 0;
 }
@@ -24,6 +26,11 @@ int main()
       break;
     default:
       break;
+  }
+
+  callback cb = f1;
+  if (cb()) {
+    return 3;
   }
   cout << "test is: " << test << " and s->a is: " << s->a << endl;
   return 0;

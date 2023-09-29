@@ -22,18 +22,30 @@ def _get_tmp_var_name():
 
 
 def _move_function_out(inst, info, more):
-    func = inst.get_function_def()
-    if not func:
-        error(MODULE_TAG, 'can not move a function that do not know the definition: ', inst.name)
-        return inst
+    if inst.is_func_ptr:
+        ref = inst.owner[0]
+        ref_type = ref.type
+        while ref_type.kind == clang.TypeKind.TYPEDEF:
+            ref_type = ref_type.under_type
+        assert ref_type.kind == clang.TypeKind.POINTER
+        under_type = ref_type.under_type
+        assert under_type.kind == clang.TypeKind.FUNCTIONPROTO
+        return_type = under_type.func_proto_obj.ret
+    else:
+        func = inst.get_function_def()
+        if not func:
+            error(MODULE_TAG, 'can not move a function that do not know the definition: ', inst.name)
+            return inst
+        return_type = func.return_type
 
     blk = cb_ref.get(BODY)
     assert blk is not None
 
-    if func.return_type.spelling != 'void':
+    if return_type.spelling != 'void':
         tmp_var_name = _get_tmp_var_name()
         # Declare tmp
-        T = MyType.from_cursor_type(func.return_type)
+        T = return_type
+        assert isinstance(T, MyType)
         tmp_decl = VarDecl(None)
         tmp_decl.name = tmp_var_name
         tmp_decl.type = T
@@ -74,7 +86,7 @@ def _separate_var_decl_and_init(inst, info, more):
 
     ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
     ref.name = inst.name
-    ref.type = MyType.from_cursor_type(inst.type)
+    ref.type = inst.type
 
     bin_op = BinOp(None)
     bin_op.op = '='
