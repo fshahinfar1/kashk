@@ -15,16 +15,20 @@ for t in ${tests[@]}; do
 	python3 $t 1> /dev/null 2> /tmp/test_stderr
 	ret=$?
 
+	STDERR=""
+	RETCODE=""
 	if [ $(du /tmp/test_stderr | cut -f 1) -ne 0 ]; then
-		printf "\033[31m$t: failed [stderr] \033[0m\n"
-		failures=$((failures + 1))
-		continue
+		STDERR="[stderr]"
 	fi
 
-	if [ $ret -eq 0 ]; then
+	if [ $ret -ne 0 ]; then
+		RETCODE="[retcode]"
+	fi
+
+	if [ -z "$STDERR" -a -z "$RETCODE" ]; then
 		printf "\033[34m$t: passed\033[0m\n"
 	else
-		printf "\033[31m$t: failed [return code]\033[0m\n"
+		printf "\033[31m$t: failed $RETCODE $STDERR \033[0m\n"
 		failures=$((failures + 1))
 	fi
 
