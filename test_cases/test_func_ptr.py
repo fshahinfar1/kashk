@@ -14,17 +14,27 @@ class TestCase(BasicTest):
         bpf.extend_inst(insts)
 
         # Generate the code and show it for debuging
-        text, _ = gen_code(bpf, self.info)
+        # text, _ = gen_code(bpf, self.info)
         # print(text)
         # show_insts(insts)
         # print(self.info.prog.connection_state)
 
         assert len(self.info.prog.connection_state) == 0, 'There is no per connection shared state'
+
+        refs = find_elems_of_kind(insts, clang.CursorKind.DECL_REF_EXPR)
+
+        ref = refs[0]
+        assert ref.name == 'mul', 'Make sure the right reference is selected in test case'
+        assert ref.is_func_ptr() == True, 'The reference was not recognized as function pointer'
+
         funcs = find_elems_of_kind(insts, clang.CursorKind.CALL_EXPR)
         assert len(funcs)== 1, 'Three is only one function call in the code'
 
         fnptr = funcs[0]
-        assert len(fnptr.owner) == 1
+        assert len(fnptr.args) == 2, 'The function should have two arguments'
+        assert fnptr.is_method == False, 'The function invokation is not a method'
+        assert len(fnptr.owner) > 0, 'The call expression is not recognized as function ptr'
+        assert fnptr.owner[-1].name == 'r', 'The owner of the function pointer should be variable `r`'
 
 
         # assert fnptr
