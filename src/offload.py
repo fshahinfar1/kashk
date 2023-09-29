@@ -123,7 +123,7 @@ def generate_offload(io_ctx):
     # Mark infeasible paths and annotate which functions may fail or succeed
     bpf = feasibilty_analysis_pass(bpf, info, PassObject())
     for func in sorted(Function.directory.values(), key=lambda x: x.name):
-        print(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_fail)
+        debug(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_fail)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Create the userspace program graph

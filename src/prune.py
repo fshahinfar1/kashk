@@ -1,6 +1,6 @@
 import clang.cindex as clang
 from utility import report_on_cursor
-from log import debug, error
+from log import debug, error, report
 
 
 # TODO: How to make sure that `read` is the read system-call and not a simple

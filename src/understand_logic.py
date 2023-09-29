@@ -368,6 +368,7 @@ def gather_instructions_from(cursor, info, context=BODY):
     cb_ref.push(context, ops)
     d = DFSPass(cursor)
     for c, lvl in d:
+        # debug('  ' * lvl, c.kind, c.spelling)
         if should_ignore_cursor(c):
             txt = ''.join(map(lambda x: x.spelling, c.get_tokens()))
             return [Literal(f'/*<placeholder {txt}>*/', CODE_LITERAL)]

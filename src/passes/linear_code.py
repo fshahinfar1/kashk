@@ -92,6 +92,9 @@ def _process_current_inst(inst, info, more):
     ctx = more.ctx
 
     if ctx in (ARG, LHS) and inst.kind == clang.CursorKind.CALL_EXPR:
+        if inst.is_operator:
+            # Let's not mess up with operators
+            return inst
         return _move_function_out(inst, info, more)
 
     if inst.kind == clang.CursorKind.VAR_DECL:

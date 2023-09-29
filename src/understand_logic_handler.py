@@ -30,10 +30,6 @@ def __function_is_of_interest(inst):
     if inst.is_method:
         # TODO: filter based on methods of types we do not want to have
         return True
-        # for o in inst.owner:
-        #     # TODO: i need more information from the owner not just its name
-        #     if o == 'string':
-        #         return False
     return True
 
 
@@ -55,6 +51,9 @@ def __get_func_name(inst, info):
                     func = o.get_function_def()
                     assert func is not None
                     func_name.append(func.return_type.spelling)
+                elif o.kind in (clang.CursorKind.DECL_REF_EXPR, clang.CursorKind.MEMBER_REF_EXPR):
+                    # Does not change the name of the function
+                    continue
                 else:
                     raise Exception(f'Unexpected type: {o.kind} {o}')
             func_name.append(inst.name)
@@ -75,8 +74,7 @@ def __get_func_args(inst, info):
                 new_kind = clang.CursorKind.MEMBER_REF_EXPR
             else:
                 new_kind = clang.CursorKind.DECL_REF_EXPR
-            ref = Ref(None, new_kind)
-            ref.name = inst.owner[0]
+            ref = inst.owner[0]
             ref.owner = new_owner
             # TODO: ref.type is None here!
             args = [ref] + args
@@ -88,12 +86,9 @@ def __get_func_args(inst, info):
     return args
 
 
-def __add_empty_func_definition(inst, info):
-    f = Function(inst.name, inst.func_ptr)
-    f.is_method = inst.is_method
-
-
 def __add_func_definition(inst, info):
+    if not info:
+        return
     scope = info.sym_tbl.scope_mapping.get(inst.name)
     if not scope:
         error(MODULE_TAG, 'The scope for the function', inst.name, 'was not found')
@@ -178,11 +173,6 @@ def understand_call_expr(c, info):
     inst.args = __get_func_args(inst, info)
 
     # check if function is defined
-    if inst.name not in Function.directory:
-        if get_global_for_bpf() and __function_is_of_interest(inst):
-            __add_func_definition(inst, info)
-        else:
-            __add_func_definition(inst, info)
-            # __add_empty_func_definition(inst, info)
-
+    if not inst.is_operator and not inst.is_func_ptr and inst.name not in Function.directory:
+        __add_func_definition(inst, info)
     return inst

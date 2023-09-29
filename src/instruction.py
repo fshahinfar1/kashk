@@ -99,18 +99,31 @@ class Call(Instruction):
         # local or global scope. The other elements would recursivly show the
         # fields in the object.
         self.owner = []
-        self.is_method = False
-        self.is_operator = False
-
-        children = list(cursor.get_children())
-        # TODO: operator should have some sign after it. Fix this, a function name operator can confuse the code.
-        if len(children) > 0 and (children[0].kind == clang.CursorKind.MEMBER_REF_EXPR):
-            mem = children[0]
-            self.owner = get_owner(mem)
-            self.is_method = True
+        self.is_func_ptr = False
 
         if self.name.startswith('operator'):
             self.is_operator = True
+        else:
+            self.is_operator = False
+
+        fn_def = cursor.get_definition()
+        # debug(self.name, 'def:', fn_def, fn_def.kind)
+        if not self.is_operator and fn_def and fn_def.kind == clang.CursorKind.CXX_METHOD:
+            self.is_method = True
+        else:
+            self.is_method = False
+
+        children = list(cursor.get_children())
+        count_args = len(list(cursor.get_arguments()))
+        count_children = len(children)
+        if not self.is_operator and count_children > 0 and count_children > count_args:
+            assert count_children - count_args == 1, 'Expect only one extra element more than arguments in the list of chlidren'
+            mem = children[0]
+            self.owner = get_owner(mem)
+
+            if self.owner:
+                if self.owner[0].type.kind == clang.TypeKind.POINTER:
+                    self.is_func_ptr = True
 
     def __str__(self):
         return f'<Call {self.name} ({self.args})>'

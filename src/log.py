@@ -48,7 +48,7 @@ def error(*args, **kwargs):
 
 def debug(*args, **kwargs):
     clear_repeating()
-    print('\033[33m', *args, '\033[0m', file=stderr, **kwargs)
+    print('\033[33m', *args, '\033[0m', file=stdout, **kwargs)
 
 def report(*args, **kwargs):
     clear_repeating()

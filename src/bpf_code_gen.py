@@ -425,7 +425,6 @@ def gen_code(list_instructions, info, context=BODY):
 
 
         code.append(text)
-    # print(code)
     text = ''.join(code)
     return text, modified
 
