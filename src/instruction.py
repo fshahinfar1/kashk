@@ -350,7 +350,7 @@ class BinOp(Instruction):
             self.op = '<operation is unknown>'
 
     def __str__(self):
-        return f'<BinOp {self.op}>'
+        return f'<BinOp `{self.op}\' >'
 
     def __find_op_str(self, cursor):
         lhs = next(cursor.get_children())
@@ -592,6 +592,9 @@ class Block(Instruction):
         self.tag = tag
         self.children = []
 
+    def __str__(self):
+        return f'<Block>'
+
     def add_inst(self, inst):
         assert inst is not None
         self.children.append(inst)
@@ -633,6 +636,9 @@ class ToUserspace(Instruction):
         self.is_bpf_main = False
         self.return_type = None
         self.path_id = None
+
+    def __str__(self):
+        return f'<ToUserspace>'
 
     def clone(self, _):
         new = ToUserspace()

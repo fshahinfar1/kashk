@@ -10,14 +10,16 @@ from bpf_code_gen import gen_code
 from passes.pass_obj import PassObject
 from passes.clone import clone_pass
 
+from bpf_passes.mark_user_boundary import mark_user_boundary_pass
+
 
 MODULE_TAG = '[Feasibility Pass]'
 FAILED = 999
 PARENT_INST = 1000
 
 current_function = None
-cb_ref = CodeBlockRef()
-fail_ref = CodeBlockRef()
+cb_ref = None
+fail_ref = None
 
 
 @contextmanager
@@ -33,26 +35,19 @@ def remember_func(func):
 
 def is_function_call_feasible(inst, info):
     func = inst.get_function_def()
-    if not func:
+    if not func or func.is_empty():
         if inst.name in ('memcpy', *READ_PACKET, *WRITE_PACKET):
             # It is fine
             return True
-        return False
-    if func.is_empty():
-        if inst.name in ('memcpy', *READ_PACKET, *WRITE_PACKET):
-            # It is fine
-            return True
-
         func.may_fail = True
         return False
 
     with remember_func(func):
         with info.sym_tbl.with_func_scope(inst.name):
-            modified = _do_pass(func.body, info, PassObject())
+            body = _do_pass(func.body, info, PassObject())
 
-    func.body = modified
-    if modified is None:
-        return False
+    assert body is not None, 'this pass should not remove anything'
+    func.body = body
     return True
 
 
@@ -71,20 +66,6 @@ def _process_current_inst(inst, info, more):
             # called from this function have split points
             current_function.path_ids.extend(func.path_ids)
     return inst, False
-
-
-failure_path_id = 1
-def _failed_to_generate_inst(i, info, body):
-    global failure_path_id
-    to_user_inst = ToUserspace.from_func_obj(current_function)
-    to_user_inst.path_id = failure_path_id
-    failure_path_id += 1
-    body.append(to_user_inst)
-    debug(MODULE_TAG, 'new failure path:', to_user_inst.path_id)
-
-    if current_function:
-        current_function.may_fail = True
-        current_function.path_ids.append(to_user_inst.path_id)
 
 
 def _process_child(child, inst, info, more):
@@ -117,33 +98,17 @@ def _do_pass(inst, info, more):
     new_children = []
     failed = fail_ref.get(FAILED)
 
-    if inst.bpf_ignore is True:
-        new_inst = clone_pass(inst, info, PassObject())
-        return new_inst
+    if failed or inst.bpf_ignore is True:
+        return clone_pass(inst, info, PassObject())
 
     with cb_ref.new_ref(ctx, parent_list):
+        inst, failed = _process_current_inst(inst, info, more)
+        assert inst is not None
         if failed:
-            inst, failed = inst, failed
-        else:
-            inst, failed = _process_current_inst(inst, info, more)
-            if failed:
-                blk = cb_ref.get(BODY)
-                _failed_to_generate_inst(inst, info, blk)
-                text, _ = gen_code([inst], info)
-                debug(MODULE_TAG, 'Go to userspace at instruction:', text)
-                # Not a stack
-                fail_ref.set(FAILED, True)
-            elif inst.kind == clang.CursorKind.CALL_EXPR:
-                tmp_func = inst.get_function_def()
-                assert tmp_func is not None
-                if tmp_func.may_fail and not tmp_func.may_succeed:
-                    # This function is definitely failing
-                    failed = True
-                    # TODO: maybe generate the fallback here instead of in another pass
-
-        if inst is None:
-            # This instruction should be removed
-            return None
+            if current_function:
+                current_function.may_fail = True
+            # Not a stack
+            fail_ref.set(FAILED, True)
 
         # Continue deeper
         for child, tag in inst.get_children_context_marked():
@@ -171,7 +136,29 @@ def _do_pass(inst, info, more):
     return new_inst
 
 
-def feasibilty_analysis_pass(inst, info, more):
+def _do_feasibility_analisys(inst, info, more):
+    global current_function
+    global cb_ref
+    global fail_ref
+    current_function = more.get('func')
+    cb_ref = CodeBlockRef()
+    fail_ref = CodeBlockRef()
+
     with cb_ref.new_ref(PARENT_INST, None):
         with fail_ref.new_ref(FAILED, False):
             return _do_pass(inst, info, more)
+
+
+def feasibilty_analysis_pass(inst, info, more):
+    # Start the analysis from the given function and perform it on the all know
+    # functions.
+    res = _do_feasibility_analisys(inst, info, more)
+    for func in Function.directory.values():
+        if func.may_succeed or func.may_fail:
+            continue
+        obj = PassObject()
+        obj.func = func
+        _do_feasibility_analisys(func.body, info, obj)
+
+    res = mark_user_boundary_pass(res, info, PassObject())
+    return res

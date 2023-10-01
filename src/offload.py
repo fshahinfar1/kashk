@@ -35,10 +35,10 @@ from user_passes.create_fallback import create_fallback_pass
 MODULE_TAG = '[Gen Offload]'
 
 
-def run_pass_on_all_functions(pass_fn, main_inst, info):
+def run_pass_on_all_functions(pass_fn, main_inst, info, skip_if=lambda x: False):
     ret = pass_fn(main_inst, info, PassObject())
     for f in Function.directory.values():
-        if not f.body.has_children():
+        if f.is_empty() or skip_if(f):
             continue
         with info.sym_tbl.with_func_scope(f.name):
             f.body = pass_fn(f.body, info, PassObject())
@@ -122,8 +122,8 @@ def generate_offload(io_ctx):
     ## Feasibility Analysis
     # Mark infeasible paths and annotate which functions may fail or succeed
     bpf = feasibilty_analysis_pass(bpf, info, PassObject())
-    for func in sorted(Function.directory.values(), key=lambda x: x.name):
-        debug(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_fail)
+    # for func in sorted(Function.directory.values(), key=lambda x: x.name):
+    #     debug(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_fail)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Create the userspace program graph
