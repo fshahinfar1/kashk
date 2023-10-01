@@ -39,6 +39,7 @@ int main(int argc, char *argv[])
 		pthread_mutex_init(&m, NULL);
 		f1();
 	} else if (b % 3 == 2) {
+		b *= 30;
 		f2();
 	} else {
 		int c = a + b;

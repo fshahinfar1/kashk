@@ -19,6 +19,13 @@ class TestCase(BasicTest):
         bpf.extend_inst(insts)
 
         bpf = linear_code_pass(bpf, self.info, PassObject())
+        for f in Function.directory.values():
+            if not f.is_empty():
+                with self.info.sym_tbl.with_func_scope(f.name):
+                    body = linear_code_pass(f.body, self.info, PassObject())
+                    assert body is not None
+                    f.body = body
+
         bpf = feasibilty_analysis_pass(bpf, self.info, PassObject())
 
         # Generate the code and show it for debuging

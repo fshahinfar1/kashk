@@ -44,6 +44,7 @@ def _handle_function_may_fail(inst, func, info, more):
 
     flag_ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
     flag_ref.name = FLAG_PARAM_NAME
+    flag_ref.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
 
     before_func_call = []
     after_func_call = []
@@ -53,10 +54,9 @@ def _handle_function_may_fail(inst, func, info, more):
         # TODO: check that we only update the signature once
         # Update the signature of the function
         flag_obj = StateObject(None)
-        flag_obj.name = FLAG_PARAM_NAME
+        flag_obj.name = flag_ref.name
         flag_obj.is_pointer = True
-        T2 = BASE_TYPES[clang.TypeKind.SCHAR]
-        T = MyType.make_pointer(T2)
+        T = flag_ref.type
         flag_obj.type = T.spelling
         flag_obj.type_ref = T
         func.args.append(flag_obj)
@@ -69,12 +69,12 @@ def _handle_function_may_fail(inst, func, info, more):
         # Pass the flag when invoking the function
         # First check if we need to allocate the flag on the stack memory
         sym = info.sym_tbl.lookup(FLAG_PARAM_NAME)
-        is_on_the_stack = not sym
-        if is_on_the_stack:
+        is_on_the_stack = sym is not None
+        if not is_on_the_stack:
             # declare a local variable
             flag_decl = VarDecl(None)
             flag_decl.name = flag_obj.name
-            flag_decl.type = BASE_TYPES[clang.TypeKind.SCHAR]
+            flag_decl.type = flag_ref.type.under_type
             flag_decl.state_obj = flag_obj
             zero = Literal('0', clang.CursorKind.INTEGER_LITERAL)
             flag_decl.init.add_inst(zero)
@@ -82,17 +82,16 @@ def _handle_function_may_fail(inst, func, info, more):
 
         # Now add the argument to the invocation instruction
         # TODO: update every invocation of this function with the flag parameter
-        if is_on_the_stack:
+        if not is_on_the_stack:
             # pass a reference
             addr_op = UnaryOp(None)
             addr_op.op = '&'
+            flag_ref.type = flag_decl.type
             addr_op.child.add_inst(flag_ref)
             inst.args.append(addr_op)
         else:
             inst.args.append(flag_ref)
 
-        # check if function fail
-        # TODO: What about using a TO_USERSPACE instruction
         tmp = Literal('/* check if function fail */\n', CODE_LITERAL)
         after_func_call.append(tmp)
 
@@ -129,11 +128,11 @@ def _handle_function_may_fail(inst, func, info, more):
             # The code that should run when there is a failure
             return_stmt = first_failure_case
 
-        int_literal = Literal('0', clang.CursorKind.INTEGER_LITERAL)
-        cond = BinOp.build_op(failure_flag_ref, '!=', int_literal)
-        if_inst = ControlFlowInst.build_if_inst(cond)
-        if_inst.body.add_inst(return_stmt)
-        after_func_call.append(if_inst)
+            int_literal = Literal('0', clang.CursorKind.INTEGER_LITERAL)
+            cond = BinOp.build_op(failure_flag_ref, '!=', int_literal)
+            if_inst = ControlFlowInst.build_if_inst(cond)
+            if_inst.body.add_inst(return_stmt)
+            after_func_call.append(if_inst)
 
         # Analyse the called function.
         with remember_func(func):
