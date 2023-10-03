@@ -3,7 +3,7 @@ from contextlib import contextmanager
 import clang.cindex as clang
 
 from log import error
-from utility import get_code, report_on_cursor, visualize_ast
+from utility import get_code, report_on_cursor, visualize_ast, skip_unexposed_stmt
 from data_structure import *
 from instruction import *
 from prune import (should_process_this_cursor, should_ignore_cursor, READ_PACKET, WRITE_PACKET)
@@ -337,6 +337,26 @@ def __convert_cursor_to_inst(c, info):
             report_on_cursor(c)
     elif c.kind == clang.CursorKind.NULL_STMT:
         return None
+    elif c.kind == clang.CursorKind.COMPOUND_LITERAL_EXPR:
+        children = list(c.get_children())
+        assert len(children) == 2
+        type_cursor  = children[0]
+        value_cursor = children[1]
+        assert type_cursor.kind == clang.CursorKind.TYPE_REF
+        assert value_cursor.kind == clang.CursorKind.INIT_LIST_EXPR
+        value_cursor_children = list(value_cursor.get_children())
+        while len(value_cursor_children) == 1:
+            value_cursor_children = list(value_cursor_children[0].get_children())
+        if type_cursor.type.spelling == Annotation.ANNOTATION_TYPE_NAME:
+            assert len(value_cursor_children) == 2
+            mem_ref = skip_unexposed_stmt(value_cursor_children[0])
+            msg =  skip_unexposed_stmt(value_cursor_children[1])
+            assert mem_ref.spelling == Annotation.MESSAGE_FIELD_NAME
+            return Annotation(msg.spelling)
+        else:
+            error('TODO:')
+            report_on_cursor(c)
+            return None
     else:
         error('TODO:')
         report_on_cursor(c)

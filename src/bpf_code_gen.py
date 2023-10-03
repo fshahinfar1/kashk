@@ -407,6 +407,8 @@ def gen_code(list_instructions, info, context=BODY):
             if inst.kind == clang.CursorKind.CALL_EXPR and inst.name == 'operator<<':
                 text = f'// removing a call to "<<" operator'
                 modified = CHANGE_BUFFER_DEF
+            elif inst.kind == ANNOTATION_INST:
+                continue
             else:
                 handler = jump_table.get(inst.kind, lambda x,y,z: '')
                 text = handler(inst, info, [lvl])

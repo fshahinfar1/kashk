@@ -43,9 +43,10 @@ def get_body_of_the_loop(cursor):
 def parse_file(file_path, args):
     # compiler_args = '-I /usr/include/ -I /opt/clang-16/include/c++/v1/'.split()
     _, ext = os.path.splitext(file_path)
+    args += ' -Wno-unknown-attributes'
     if ext == '.c':
         # This is a C file
-        compiler_args = (args + '-DHAVE_CONFIG_H=1').split()
+        compiler_args = (args + ' -DHAVE_CONFIG_H=1').split()
     else:
         # THis is a C++ file
         compiler_args = (args + ' -std=c++20').split()

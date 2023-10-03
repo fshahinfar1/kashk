@@ -19,7 +19,7 @@ new_functions = []
 fnum = 1
 def _get_func_name():
     global fnum
-    name = f'f{fnum}'
+    name = f'__f{fnum}'
     fnum += 1
     return name
 
@@ -113,8 +113,6 @@ def _starts_with_func_call(node, info):
 
 def _process_node(node, info):
     blk = Block(BODY)
-    if len(node.children) <= 0 and not node.has_code():
-        debug(node)
     assert len(node.children) > 0 or node.has_code()
     remove_first_inst = False
 
@@ -168,6 +166,14 @@ def _process_node(node, info):
 
 
 def create_fallback_pass(inst, info, more):
+    """
+    Descripton:
+    Walk the user program graph and creat functions handling fallback paths.
+
+    Assumption:
+    there should not be any function in the form of `__f{int}' these function
+    names are used for handling fallback/failure paths.
+    """
     root = info.user_prog.graph
 
     new_scope = Scope(info.sym_tbl.global_scope)

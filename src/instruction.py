@@ -9,6 +9,7 @@ from log import error, debug
 CODE_LITERAL = 8081
 BLOCK_OF_CODE = 8082
 TO_USERSPACE_INST = 8083
+ANNOTATION_INST = 8084
 
 BODY = 0
 ARG = 1
@@ -647,6 +648,30 @@ class ToUserspace(Instruction):
         new.path_id = self.path_id
         new.bpf_ignore = self.bpf_ignore
         return new
+
+    def has_children(self):
+        return False
+
+    def get_children(self):
+        return []
+
+    def get_children_context_marked(self):
+        return []
+
+
+class Annotation(Instruction):
+    ANNOTATION_TYPE_NAME = 'struct __annotation'
+    MESSAGE_FIELD_NAME = 'message'
+    def __init__(self, msg=None):
+        self.msg = msg[1:-1]
+        self.kind = ANNOTATION_INST
+
+    def __str__(self):
+        return f'<Annotation>'
+
+    def clone(self, _):
+        # TODO: Do not need to clone :) ?! (it is goofy)
+        return self
 
     def has_children(self):
         return False

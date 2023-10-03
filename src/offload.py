@@ -128,14 +128,14 @@ def generate_offload(io_ctx):
 
     # Create the userspace program graph
     select_user_pass(bpf, info, PassObject())
-    tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
-    debug(tree)
-    root = info.user_prog.graph
-    code = root.paths.code
-    debug(id(root), root.children, code)
-    text, _ =  gen_code(code, info)
-    debug('code:\n', text, '\n---', sep='')
-    debug('is user empty:', root.is_empty())
+    # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
+    # debug(tree)
+    # root = info.user_prog.graph
+    # code = root.paths.code
+    # debug(id(root), root.children, code)
+    # text, _ =  gen_code(code, info)
+    # debug('code:\n', text, '\n---', sep='')
+    # debug('is user empty:', root.is_empty())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Number the failure paths

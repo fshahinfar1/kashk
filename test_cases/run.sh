@@ -8,6 +8,8 @@ fi
 
 # List of tests
 tests=$(find . -iname "test_*.py")
+count_tests=$(find . -iname "test_*.py" | wc -l)
+echo Number of tests $count_tests
 
 # Run each test
 failures=0
