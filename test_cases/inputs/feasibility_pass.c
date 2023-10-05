@@ -31,6 +31,7 @@ int main(int argc, char *argv[])
 {
 	int a;
 	int b;
+	int c;
 	a = 10;
 	b = a * a;
 
@@ -42,9 +43,22 @@ int main(int argc, char *argv[])
 		b *= 30;
 		f2();
 	} else {
-		int c = a + b;
+		c = a + b;
 		/* we ignore prints so this is fine */
 		printf("c = %d\n", c);
+	}
+
+
+	switch (a) {
+		case 1:
+			pthread_mutex_init(&m, NULL);
+			f1();
+			break;
+		case 2:
+			c = a + b;
+			/* we ignore prints so this is fine */
+			printf("c = %d\n", c);
+			break;
 	}
 
 	return 0;

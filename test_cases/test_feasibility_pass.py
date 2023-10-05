@@ -47,11 +47,11 @@ class TestCase(BasicTest):
             assert (func.may_succeed, func.may_fail) == expected_state[func.name], f'For funct {func.name} the expectation does not match (s:{func.may_succeed}, f:{func.may_fail})'
 
         failure_paths = get_number_of_failure_paths()
-        assert  failure_paths == 2, f'Expect 2 failure paths found {failure_paths}'
+        assert  failure_paths == 3, f'Expect 3 failure paths found {failure_paths}'
         # Find the first breaking point
         ifs = find_elems_of_kind(bpf, clang.CursorKind.IF_STMT)
         first_if = ifs[0]
-        first_if_first_inst = first_if.body.children[0]
+        first_if_first_inst = first_if.body.children[0].children[0]
         assert first_if_first_inst.kind == TO_USERSPACE_INST
 
         # Check the second breaking point

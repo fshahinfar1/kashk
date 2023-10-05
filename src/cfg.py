@@ -5,27 +5,32 @@ from data_structure import *
 from bpf_code_gen import gen_code
 
 class CFGBaseNode:
+    Simple = 100
+    Branch = 101
+    Switch = 102
+
     node_id = 0
-    def __init__(self):
+    def __init__(self, kind):
         self._id = CFGBaseNode.node_id
         CFGBaseNode.node_id += 1
+        self.kind = kind
 
 class CFGSwitch(CFGBaseNode):
     def __init__(self):
-        super().__init__()
+        super().__init__(CFGBranch.Switch)
         self.cond = None
         self.jmps = []
 
 class CFGBranch(CFGBaseNode):
     def __init__(self):
-        super().__init__()
+        super().__init__(CFGBaseNode.Branch)
         self.cond = None
         self.if_true = None
         self.if_false = None
 
 class CFGNode(CFGBaseNode):
     def __init__(self):
-        super().__init__()
+        super().__init__(CFGNode.Simple)
         self.insts = []
         self.next = None
 
@@ -123,6 +128,11 @@ class HTMLWriter:
 
 
 def _leafs(node, visited=None):
+    """
+    Retrive leaf nodes by traversing the possible paths from the given node.
+
+    The assumption is that leaf nodes are of type CFGNode
+    """
     visited = set() if visited is None else visited
     if node is None or node._id in visited:
         return []
@@ -130,6 +140,9 @@ def _leafs(node, visited=None):
     visited.add(node._id)
 
     if isinstance(node, CFGNode):
+        """
+        This is implementing the base case of recursion.
+        """
         if node.next is None:
             return [node]
         ptr = node

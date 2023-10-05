@@ -25,6 +25,7 @@ def _get_func_name():
 
 
 def _generate_id_check(ids):
+    assert len(ids) > 0
     if_stmt = ControlFlowInst()
     if_stmt.kind = clang.CursorKind.IF_STMT
 
@@ -133,7 +134,7 @@ def _process_node(node, info):
             info.sym_tbl.current_scope = cur
 
         # Check if there are multiple failure path or just one!
-        if len(node.path_ids) > 1:
+        if len(child.path_ids) > 1:
             if_inst = _generate_id_check(child.path_ids)
             if new_func is None:
                 if_inst.body = body

@@ -111,6 +111,18 @@ def __has_read(cursor):
 
 
 def __convert_cursor_to_inst(c, info):
+    if c.kind == clang.CursorKind.COMPOUND_STMT:
+        # TODO: This part is not very good or even incorrect
+        _children = list(c.get_children())
+        children = []
+        for x in _children:
+            r = gather_instructions_from(x, info, BODY)
+            if len(r) < 1:
+                return None
+            children.append(r[0])
+        blk = Block(BODY)
+        blk.children = children
+        return blk
     if c.kind == clang.CursorKind.CALL_EXPR:
         return understand_call_expr(c, info)
     elif (c.kind == clang.CursorKind.BINARY_OPERATOR
@@ -401,8 +413,7 @@ def gather_instructions_from(cursor, info, context=BODY):
                     ops.append(inst)
             continue
 
-        if (c.kind == clang.CursorKind.COMPOUND_STMT
-                or c.kind == clang.CursorKind.UNEXPOSED_EXPR):
+        if c.kind == clang.CursorKind.UNEXPOSED_EXPR:
             d.go_deep()
             continue
         elif c.kind == clang.CursorKind.CXX_TRY_STMT:
@@ -421,7 +432,8 @@ def gather_instructions_from(cursor, info, context=BODY):
         if info is not None and c.get_usr() in info.remove_cursor:
             with set_global_for_bpf(False):
                 inst = __convert_cursor_to_inst(c, info)
-                inst.bpf_ignore = True
+                if inst:
+                    inst.bpf_ignore = True
         else:
             inst = __convert_cursor_to_inst(c, info)
 

@@ -208,12 +208,10 @@ def handle_if_stmt(inst, info, more):
     lvl = more[0]
 
     body, _ = gen_code(inst.body, info, context=BODY)
-    body = indent(body, 1)
     cond, _ = gen_code(inst.cond, info, context=ARG)
-    text = f'if ({cond}) {{\n' + body + '\n}'
+    text = f'if ({cond}) {{\n' + body + '}'
     if inst.other_body.has_children():
         body, _ = gen_code(inst.other_body, info, context=BODY)
-        body = indent(body, 1)
         text += ' else {\n' + body + '\n}'
     text = indent(text, lvl)
     return text
@@ -320,6 +318,15 @@ def handle_to_userspace(inst, info, more):
     return text
 
 
+def handle_block_of_code(inst, info, more):
+    lvl = more[0]
+    body, _ = gen_code(inst.children, info, context=BODY)
+    body = indent(body, 1)
+    text = f'{{\n{body}\n}}'
+    text = indent(text, lvl)
+    return text
+
+
 # Put semi-colon and go to next line after these nodes
 NEED_SEMI_COLON = set((clang.CursorKind.CALL_EXPR, clang.CursorKind.VAR_DECL,
     clang.CursorKind.BINARY_OPERATOR, clang.CursorKind.CONTINUE_STMT,
@@ -374,6 +381,7 @@ jump_table = {
         clang.CursorKind.CXX_THROW_EXPR: lambda x,y,z: indent('return SK_DROP', z[0]),
         #
         TO_USERSPACE_INST: handle_to_userspace,
+        BLOCK_OF_CODE: handle_block_of_code,
         }
 
 

@@ -26,10 +26,13 @@ from bpf_passes.userspace_fallback import userspace_fallback_pass
 from bpf_passes.verifier import verifier_pass
 from bpf_passes.reduce_params import reduce_params_pass
 
-from user_passes.select_user import select_user_pass
+from user_passes.create_new_user_graph import create_new_user_graph
+# from user_passes.select_user import select_user_pass
 from user_passes.number_fallback_graph import number_fallback_graph_pass
 from user_passes.var_dependency import var_dependency_pass
 from user_passes.create_fallback import create_fallback_pass
+
+from cfg import make_cfg, HTMLWriter
 
 
 MODULE_TAG = '[Gen Offload]'
@@ -126,8 +129,19 @@ def generate_offload(io_ctx):
     #     debug(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_fail)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
+    # TESTING with CFG
+    cfg = make_cfg(bpf)
+    test = HTMLWriter().cfg_to_html(cfg, info)
+    if not os.path.isidr('/tmp/test/'):
+        os.path.mkdir('/tmp/test/')
+    with open('/tmp/test/mem.html', 'w') as f:
+        f.write(test)
+    print('CFG file writen to /tmp/test/mem.html')
+    # ---------------
+
     # Create the userspace program graph
-    select_user_pass(bpf, info, PassObject())
+    create_new_user_graph(cfg, info, PassObject())
+    # select_user_pass(bpf, info, PassObject())
     # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
     # debug(tree)
     # root = info.user_prog.graph
