@@ -10,7 +10,7 @@ from sym_table import *
 from passes.linear_code import linear_code_pass
 from passes.pass_obj import PassObject
 
-from cfg import make_cfg, cfg_to_html
+from cfg import make_cfg, HTMLWriter
 
 
 class TestCase(BasicTest):
@@ -27,7 +27,8 @@ class TestCase(BasicTest):
         # print(text)
 
         root = make_cfg(bpf)
-        text = cfg_to_html(root, info)
+        writer = HTMLWriter()
+        text = writer.cfg_to_html(root, info)
         with open('/tmp/test/index.html', 'w') as f:
             f.write(text)
         print (text)
