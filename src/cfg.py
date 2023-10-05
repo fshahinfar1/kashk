@@ -53,7 +53,7 @@ def _node_to_html(node, info):
         text += '\n' + _node_to_html(node._next, info)
         return text
     if isinstance(node, CFGBranch):
-        cond_text = gen_code(node.cond, info)
+        cond_text = gen_code(node.cond, info)[0]
         insts = [
                 f'<p class="nodeid">id: {node._id}</p>',
                 f'<p>Branch on "{cond_text}"</p>',

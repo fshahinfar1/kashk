@@ -30,6 +30,9 @@ clang.TypeKind.LONGDOUBLE,
 clang.TypeKind.VOID,
 ]
 
+def implies(q, p):
+    return not q or p
+
 
 def get_body_of_the_loop(cursor):
     body_of_loop = None
