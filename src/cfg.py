@@ -10,6 +10,12 @@ class CFGBaseNode:
         self._id = CFGBaseNode.node_id
         CFGBaseNode.node_id += 1
 
+class CFGSwitch(CFGBaseNode):
+    def __init__(self):
+        super().__init__()
+        self.cond = None
+        self.jmps = []
+
 class CFGBranch(CFGBaseNode):
     def __init__(self):
         super().__init__()
@@ -81,6 +87,19 @@ class HTMLWriter:
             text += '\n' + self._node_to_html(node.if_true, info)
             text += '\n' + self._node_to_html(node.if_false, info)
             return text
+        if isinstance(node, CFGSwitch):
+            cases = []
+            other_nodes_text = [] 
+            for cond, n in node.jmps:
+                cond_text, _ = gen_code(cond, info)
+                cases.append(f'<p>on "{cond_text}": {n._id if n._id else "-"}</p>')
+                other_nodes_text.append(self._node_to_html(n, info))
+            cond_text = gen_code(node.cond, info)[0]
+            insts = [ f'<p class="nodeid">id: {node._id}</p>',] + cases + [f'<p class="codetext">Switch on "{cond_text}"</p>', ]
+            text = [f'<div id={node._id} class="node">',] + insts + ['</div>',]
+            text = '\n'.join(text)
+            text += '\n' + '\n'.join(other_nodes_text)
+            return text
         raise Exception('Unexpected!')
 
     def cfg_to_html(self, node, info):
@@ -121,17 +140,28 @@ def _leafs(node, visited=None):
                 return [ptr]
         node = ptr
     
-    # node is CFGBranch object
+    if isinstance(node, CFGSwitch):
+        """
+        Gather all leaf nodes from all cases. Remove duplicates and return the
+        results.
+        """
+        l = []
+        for x in (_leafs(n) for _, n in node.jmps):
+            l.extend(x)
+        l = list(set(l))
+        return l
+
+    
     assert isinstance(node, CFGBranch)
     l = list(set(_leafs(node.if_true, visited) + _leafs(node.if_false, visited)))
     return l
         
 
 def make_cfg(inst):
-    assert inst.kind not in (clang.CursorKind.WHILE_STMT, clang.CursorKind.DO_STMT, clang.CursorKind.SWITCH_STMT, clang.CursorKind.CASE_STMT)
+    assert inst.kind not in (clang.CursorKind.WHILE_STMT, clang.CursorKind.DO_STMT)
     root = CFGNode()
     cur = root
-    if isinstance(inst, ControlFlowInst):
+    if inst.kind == clang.CursorKind.IF_STMT:
         branch_node = CFGBranch()
         branch_node.cond = inst.cond
         cur = cur.connect(branch_node)
@@ -143,7 +173,46 @@ def make_cfg(inst):
         for x in l:
             x.connect(after_node, join=True)
         cur = after_node
-    elif isinstance(inst, ForLoop):
+    elif inst.kind == clang.CursorKind.SWITCH_STMT:
+        del root
+        del cur
+        after_node = CFGNode()
+        swt = CFGSwitch()    
+        swt.cond = inst.cond
+        body = inst.body.get_children()
+        # Group instructions for each case
+        assert body[0].kind in (clang.CursorKind.CASE_STMT, clang.CursorKind.DEFAULT_STMT)
+        cases =  []
+        case_cond = None
+        current_case = []
+        for i in body:
+            if i.kind in (clang.CursorKind.CASE_STMT, clang.CursorKind.DEFAULT_STMT):
+                if current_case:
+                    cases.append((case_cond, current_case))
+                current_case = []
+                current_case.extend(i.body.get_children())
+                case_cond = i.case
+            else:
+                current_case.append(i)
+        if current_case:
+            cases.append((case_cond, current_case))
+        current_case = []
+        # End of switch body and grouping
+
+        # Creat the jumps
+        for case_cond, inst_list in cases:
+            begin = CFGNode()
+            cur = begin
+            for i in inst_list:
+                node = make_cfg(i)
+                cur = cur.connect(node)
+            # Next node after a case from this Switch statement
+            swt.jmps.append((case_cond, begin))
+            l = _leafs(cur)
+            for x in l:
+                x.connect(after_node, join=True)
+        return swt
+    elif inst.kind == clang.CursorKind.FOR_STMT:
         cur.add(inst.pre)
         branch_node = CFGBranch()
         branch_node.cond = inst.cond
