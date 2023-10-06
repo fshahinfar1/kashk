@@ -43,13 +43,22 @@ int main(int argc, char *argv[])
 	a = 10;
 	b = a * a;
 
-	if (b % 3 == 1) {
+	if (b % 4 == 1) {
 		/* should fail on this path right here */
 		pthread_mutex_init(&m, NULL);
 		f1();
-	} else if (b % 3 == 2) {
+	} else if (b % 4 == 2) {
 		b *= 30;
 		f2();
+	} else if (b % 4 == 3) {
+		/* If a function defenately is going to fail then we should not */
+		/* investigate the other failuers of this path. (we have failed */
+		/* at f1 do not create a new path for the pthread_mutex_init). */
+		/* This was a bug :)
+		 * */
+		f1();
+		b = a;
+		pthread_mutex_init(&m, NULL);
 	} else {
 		int c = a + b;
 		/* we ignore prints so this is fine */

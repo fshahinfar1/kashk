@@ -20,6 +20,10 @@ cb_ref = None
 fail_ref = None
 failure_path_id = 1
 
+NO = 0
+YES = 1
+MARKED = 2
+
 
 def get_number_of_failure_paths():
     # Number of failure paths that we have already found
@@ -49,7 +53,7 @@ def _process_current_inst(inst, info, more):
         # return inst, not func.may_succeed # This defenately is not going to suceed
 
         if func.is_empty():
-            return inst, True
+            return inst, YES
 
         # Go into the functions and mark boundary
         with remember_func(func):
@@ -58,7 +62,8 @@ def _process_current_inst(inst, info, more):
         assert body is not None, 'this pass should not remove anything'
         func.body = body
 
-    return inst, False
+    failed = fail_ref.get(FAILED)
+    return inst, failed
 
 
 def _to_userspace(i, info, body):
@@ -109,12 +114,15 @@ def _do_pass(inst, info, more):
     with cb_ref.new_ref(ctx, parent_list):
         inst, failed = _process_current_inst(inst, info, more)
         assert inst is not None, 'This pass should not remove any instruction'
-        if failed:
+        if failed == YES:
             blk = cb_ref.get(BODY)
             _to_userspace(inst, info, blk)
             text, _ = gen_code([inst], info)
             debug(MODULE_TAG, 'Go to userspace at instruction:', text)
-            fail_ref.set(FAILED, True)
+            failed = MARKED
+            fail_ref.set(FAILED, failed)
+            return clone_pass(inst, info, PassObject())
+        elif failed == MARKED:
             return clone_pass(inst, info, PassObject())
         else:
             # Continue deeper
@@ -151,5 +159,5 @@ def mark_user_boundary_pass(inst, info, more):
     fail_ref = CodeBlockRef()
 
     with cb_ref.new_ref(PARENT_INST, None):
-        with fail_ref.new_ref(FAILED, False):
+        with fail_ref.new_ref(FAILED, NO):
             return _do_pass(inst, info, more)
