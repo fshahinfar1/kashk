@@ -61,6 +61,9 @@ def _process_current_inst(inst, info, more):
                 body = _do_pass(func.body, info, PassObject())
         assert body is not None, 'this pass should not remove anything'
         func.body = body
+        if current_function:
+            # Update the current function with the failure paths
+            current_function.path_ids.extend(func.path_ids)
 
     failed = fail_ref.get(FAILED)
     return inst, failed
@@ -123,6 +126,8 @@ def _do_pass(inst, info, more):
             fail_ref.set(FAILED, failed)
             return clone_pass(inst, info, PassObject())
         elif failed == MARKED:
+            # We might not see any split point in this function, but functions
+            # called from this function have split points
             return clone_pass(inst, info, PassObject())
         else:
             # Continue deeper

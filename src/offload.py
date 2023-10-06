@@ -122,8 +122,8 @@ def generate_offload(io_ctx):
     ## Feasibility Analysis
     # Mark infeasible paths and annotate which functions may fail or succeed
     bpf = feasibilty_analysis_pass(bpf, info, PassObject())
-    # for func in sorted(Function.directory.values(), key=lambda x: x.name):
-    #     debug(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_fail)
+    for func in sorted(Function.directory.values(), key=lambda x: x.name):
+        debug(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_fail, func.path_ids)
     # code, _ = gen_code(bpf, info)
     # print(code)
     # show_insts([bpf])
@@ -131,8 +131,8 @@ def generate_offload(io_ctx):
 
     # Create the userspace program graph
     select_user_pass(bpf, info, PassObject())
-    # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
-    # debug(tree)
+    tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)) + str(x.path_ids))
+    debug(tree)
     # root = info.user_prog.graph
     # code = root.paths.code
     # debug(id(root), root.children, code)

@@ -62,9 +62,6 @@ def _process_current_inst(inst, info, more):
         if func and current_function and func.may_fail:
             # The called function may fail
             current_function.may_fail = True
-            # We might not see any split point in this function, but functions
-            # called from this function have split points
-            current_function.path_ids.extend(func.path_ids)
     return inst, False
 
 
