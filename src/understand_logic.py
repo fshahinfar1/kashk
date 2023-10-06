@@ -110,6 +110,75 @@ def __has_read(cursor):
     return False
 
 
+def _process_switch_case(c, info):
+    children = c.get_children()
+    cond = next(children)
+    body = next(children)
+    inst = ControlFlowInst()
+    inst.kind = c.kind
+    inst.cond.extend_inst(gather_instructions_from(cond, info, context=ARG))
+
+    # Remedi
+    # Group instructions for each case
+    body = list(body.get_children())
+    assert body[0].kind in (clang.CursorKind.CASE_STMT,
+            clang.CursorKind.DEFAULT_STMT)
+    cases =  []
+    cond = None
+    case_body = []
+    for cursor in body:
+        if cursor.kind in (clang.CursorKind.CASE_STMT, clang.CursorKind.DEFAULT_STMT):
+            if case_body or cond:
+                cases.append((cond, case_body))
+            else:
+                print(case_body, cond)
+            case_body = []
+            children = list(cursor.get_children())
+            assert len(children) == 2 or len(children) == 1
+            if len(children) == 2:
+                # Case:
+                cond = cursor, gather_instructions_from(children[0], info, context=ARG)
+                body_cursor = children[1]
+            else:
+                # Default:
+                cond = cursor, None
+                body_cursor = children[0]
+
+            while body_cursor.kind in (clang.CursorKind.CASE_STMT, clang.CursorKind.DEFAULT_STMT):
+                # NOTE: trying to fix the case when a case does not have a body
+                if case_body or cond:
+                    cases.append((cond, case_body))
+                case_body = []
+                children = list(body_cursor.get_children())
+                assert len(children) == 2 or len(children) == 1
+                if len(children) == 2:
+                    cond = body_cursor, gather_instructions_from(children[0], info, ARG)
+                    body_cursor = children[1]
+                else:
+                    cond = body_cursor, None
+                    body_cursor = children[0]
+
+            tmp = gather_instructions_from(body_cursor, info, context=BODY)
+            case_body.extend(tmp)
+        else:
+            i = gather_instructions_from(cursor, info)
+            case_body.extend(i)
+    if case_body or cond:
+        cases.append((cond, case_body))
+    current_case = []
+    # End of switch body and grouping
+    # Creat the jumps
+    x = 0
+    for (case_cursor, case), inst_list in cases:
+        print(x)
+        x+=1
+        case_inst = CaseSTMT(case_cursor)
+        if case:
+            case_inst.case.extend_inst(case)
+        case_inst.body.extend_inst(inst_list)
+        inst.body.add_inst(case_inst)
+    return inst
+
 def __convert_cursor_to_inst(c, info):
     if c.kind == clang.CursorKind.CALL_EXPR:
         return understand_call_expr(c, info)
@@ -273,26 +342,31 @@ def __convert_cursor_to_inst(c, info):
         inst.body.extend_inst(gather_instructions_from(children[3], info, context=BODY))
         return inst
     elif c.kind == clang.CursorKind.SWITCH_STMT:
-        children = list(c.get_children())
-        assert len(children) == 2
-        cond = gather_instructions_from(children[0], info, context=ARG)
-        body = gather_instructions_under(children[1], info, BODY)
+        inst = _process_switch_case(c, info)
+        return inst
+        # children = list(c.get_children())
+        # assert len(children) == 2
+        # cond = gather_instructions_from(children[0], info, context=ARG)
+        # body = gather_instructions_under(children[1], info, BODY)
 
-        inst = ControlFlowInst()
-        inst.kind = c.kind
-        inst.cond.extend_inst(cond)
-        inst.body.extend_inst(body)
-        return inst
+        # inst = ControlFlowInst()
+        # inst.kind = c.kind
+        # inst.cond.extend_inst(cond)
+        # inst.body.extend_inst(body)
+        # return inst
     elif c.kind == clang.CursorKind.CASE_STMT:
-        children = list(c.get_children())
-        inst = CaseSTMT(c)
-        inst.case.extend_inst(gather_instructions_from(children[0], info, context=ARG))
-        inst.body.extend_inst(gather_instructions_from(children[1], info, context=BODY))
-        return inst
+        report_on_cursor(c)
+        assert False, 'This path is discontinued. The switch statement should generate everything'
+        # children = list(c.get_children())
+        # inst = CaseSTMT(c)
+        # inst.case.extend_inst(gather_instructions_from(children[0], info, context=ARG))
+        # inst.body.extend_inst(gather_instructions_from(children[1], info, context=BODY))
+        # return inst
     elif c.kind == clang.CursorKind.DEFAULT_STMT:
-        body = next(c.get_children())
-        inst = CaseSTMT(c)
-        inst.body.extend_inst(gather_instructions_from(body, info, context=BODY))
+        assert False, 'This path is discontinued. The switch statement should generate everything'
+        # body = next(c.get_children())
+        # inst = CaseSTMT(c)
+        # inst.body.extend_inst(gather_instructions_from(body, info, context=BODY))
         return inst
     elif c.kind == clang.CursorKind.BREAK_STMT:
         inst = Instruction()
@@ -380,7 +454,6 @@ def set_global_for_bpf(val):
 
 
 def gather_instructions_from(cursor, info, context=BODY):
-
     """
     Convert the cursor to a instruction
     """

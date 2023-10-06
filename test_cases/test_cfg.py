@@ -29,8 +29,8 @@ class TestCase(BasicTest):
         root = make_cfg(bpf)
         writer = HTMLWriter()
         text = writer.cfg_to_html(root, info)
-        with open('/tmp/test/index.html', 'w') as f:
-            f.write(text)
+        # with open('/tmp/test/index.html', 'w') as f:
+        #     f.write(text)
         print (text)
         print('CFG Test: Okay')
 
