@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 import clang.cindex as clang
 
-from log import error, debug
+from log import error, debug, report
 from data_structure import *
 from instruction import *
 
@@ -20,6 +20,16 @@ def _get_tmp_var_name():
     tmp_num += 1
     return name
 
+def _make_sure_void_func_return(func, info):
+    last_inst = func.body.children[-1]
+    if last_inst.kind == clang.CursorKind.RETURN_STMT:
+        # The function end with a return
+        return
+    inst = Instruction()
+    inst.kind = clang.CursorKind.RETURN_STMT
+    inst.body = Block(ARG)
+    func.body.add_inst(inst)
+    report('Add return statement to the end of', func.name)
 
 def _move_function_out(inst, info, more):
     if inst.is_func_ptr:
@@ -146,4 +156,14 @@ def _do_pass(inst, info, more):
 
 
 def linear_code_pass(inst, info, more):
-    return _do_pass(inst, info, more)
+    res = _do_pass(inst, info, more)
+    # Make sure all the void functions are terminated with Return instructions
+    # Other functions must return something so the compiler should complain.
+    for func in Function.directory.values():
+        body = _do_pass(func.body, info, PassObject())
+        assert body is not None
+        func.body = body
+        if not func.is_empty() and func.return_type.spelling == 'void':
+            _make_sure_void_func_return(func, info)
+    return res
+

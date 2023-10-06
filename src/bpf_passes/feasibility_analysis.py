@@ -129,8 +129,9 @@ def _do_pass(inst, info, more):
 
             new_children.append(new_child)
 
-            if current_function and not failed and inst.kind == clang.CursorKind.RETURN_STMT:
-                current_function.may_succeed = True
+        # NOTE: make sure this if is out of the for block (You have messed up once) :)
+        if current_function and not failed and inst.kind == clang.CursorKind.RETURN_STMT:
+            current_function.may_succeed = True
 
     new_inst = inst.clone(new_children)
     return new_inst
@@ -156,9 +157,14 @@ def feasibilty_analysis_pass(inst, info, more):
     for func in Function.directory.values():
         if func.may_succeed or func.may_fail:
             continue
+        if func.is_empty():
+            func.may_fail = True
+            func.may_succeed = False
+            continue
         obj = PassObject()
         obj.func = func
         _do_feasibility_analisys(func.body, info, obj)
+        assert func.may_fail or func.may_succeed, 'After this processing we should have decide if function can fail or not'
 
     res = mark_user_boundary_pass(res, info, PassObject())
     return res

@@ -493,6 +493,11 @@ def gather_instructions_from(cursor, info, context=BODY):
         else:
             inst = __convert_cursor_to_inst(c, info)
 
+
+        # TODO: handling the IO frameworks needs a bit of thought
+        if inst.kind == clang.CursorKind.CALL_EXPR and inst.name in (READ_PACKET + WRITE_PACKET):
+            inst.bpf_ignore = True
+
         if inst:
             ops.append(inst)
     cb_ref.pop()

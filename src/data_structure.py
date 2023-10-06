@@ -380,6 +380,7 @@ class Function(TypeDefinition):
                 # clone the list
                 v = v[:]
             setattr(f, k, v)
+        # Use the name passed to this function
         f.name = name
         return f
 

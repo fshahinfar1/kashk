@@ -185,7 +185,10 @@ def show_insts(lst, depth=0):
     """
     Visualize the tree of instructions
     """
+    from instruction import Block
     indent = '  '
+    if isinstance(lst, Block):
+        lst = lst.children
     for i in lst:
         debug(indent * depth + str(i))
         if isinstance(i, list):

@@ -5,7 +5,7 @@ from log import *
 from data_structure import *
 from instruction import *
 from utility import (parse_file, find_elem, add_state_decl_to_bpf,
-        report_user_program_graph, draw_tree)
+        report_user_program_graph, draw_tree, show_insts)
 from find_ev_loop import find_request_processing_logic
 from sym_table_gen import build_sym_table
 from understand_program_state import extract_state, get_state_for
@@ -116,7 +116,7 @@ def generate_offload(io_ctx):
 
     ## Simplify Code
     # Move function calls out of the ARG context!
-    bpf = run_pass_on_all_functions(linear_code_pass, bpf, info)
+    bpf = linear_code_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     ## Feasibility Analysis
@@ -124,6 +124,9 @@ def generate_offload(io_ctx):
     bpf = feasibilty_analysis_pass(bpf, info, PassObject())
     # for func in sorted(Function.directory.values(), key=lambda x: x.name):
     #     debug(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_fail)
+    # code, _ = gen_code(bpf, info)
+    # print(code)
+    # show_insts([bpf])
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Create the userspace program graph
@@ -136,10 +139,6 @@ def generate_offload(io_ctx):
     # text, _ =  gen_code(code, info)
     # debug('code:\n', text, '\n---', sep='')
     # debug('is user empty:', root.is_empty())
-    debug('~~~~~~~~~~~~~~~~~~~~~')
-
-    # Number the failure paths
-    # number_fallback_graph_pass(info)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Create a clone of unmodified but marked AST, later used for creating the
@@ -242,11 +241,16 @@ def gen_bpf_code(bpf, info, out_bpf):
 
     # Transform access to variables and read/write buffers.
     bpf = run_pass_on_all_functions(transform_vars_pass, bpf, info)
+    code, _ = gen_code(bpf, info)
+    # print(code)
+    # show_insts([bpf])
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Handle moving to userspace and removing the instruction not possible in
     # BPF
     bpf = userspace_fallback_pass(bpf, info, PassObject())
+    code, _ = gen_code(bpf, info)
+    # print(code)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Verifier
