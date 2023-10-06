@@ -27,10 +27,19 @@ int f2()
 	return 0;
 }
 
+void f3(char *c)
+{
+	// The code had a problem when the function did not had any return statements!
+	int a = 0;
+	int b = 3;
+	*c = (a + b) * 30;
+}
+
 int main(int argc, char *argv[])
 {
 	int a;
 	int b;
+	char d = 'F';
 	a = 10;
 	b = a * a;
 
@@ -46,6 +55,7 @@ int main(int argc, char *argv[])
 		/* we ignore prints so this is fine */
 		printf("c = %d\n", c);
 	}
+	f3(&d);
 
 	return 0;
 }

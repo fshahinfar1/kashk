@@ -30,7 +30,7 @@ class TestCase(BasicTest):
         text, _ = gen_code([func], info)
         print(text)
 
-        # func2 = Function.directory.get('func2')
+        func2 = Function.directory.get('func2')
         # text, _ = gen_code([func2], info)
         # print(text)
 

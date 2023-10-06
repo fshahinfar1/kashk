@@ -35,13 +35,15 @@ class TestCase(BasicTest):
         # show_insts([bpf])
 
         expected_state = {
+                #      Succeed, Fail
                 'f1': (False, True),
                 'f2': (False, True),
+                'f3': (True, False),
                 'main': (True, True),
                 'calloc': (False, True),
                 'pthread_mutex_init': (False, True),
                 'pthread_mutex_lock': (False, True),
-                'pthread_mutex_unlock': (False, False), # This is not investigated at all
+                'pthread_mutex_unlock': (False, True),
                 }
         for func in sorted(Function.directory.values(), key=lambda x: x.name):
             assert (func.may_succeed, func.may_fail) == expected_state[func.name], f'For funct {func.name} the expectation does not match (s:{func.may_succeed}, f:{func.may_fail})'
