@@ -360,6 +360,8 @@ class Function(TypeDefinition):
         self.may_succeed = False
 
         self.path_ids = []
+        self.receives_fail_flag = False
+        self.last_arg_is_auto_gen = False
 
         if directory is None:
             directory = Function.directory

@@ -51,20 +51,24 @@ def _handle_function_may_fail(inst, func, info, more):
 
     if func.may_succeed:
         ## we need to pass a flag
-        # TODO: check that we only update the signature once
-        # Update the signature of the function
         flag_obj = StateObject(None)
         flag_obj.name = flag_ref.name
         flag_obj.is_pointer = True
         T = flag_ref.type
         flag_obj.type = T.spelling
         flag_obj.type_ref = T
-        func.args.append(flag_obj)
-        # Update the flag to the symbol table for the function scope
-        scope = info.sym_tbl.scope_mapping.get(inst.name)
-        assert scope is not None
-        entry = SymbolTableEntry(flag_obj.name, T, clang.CursorKind.PARM_DECL, None)
-        scope.insert(entry)
+
+        if not func.receives_fail_flag:
+            # Check that we only update the signature once
+            # Update the signature of the function
+            func.args.append(flag_obj)
+            func.receives_fail_flag = True
+
+            # Update the flag to the symbol table for the function scope
+            scope = info.sym_tbl.scope_mapping.get(inst.name)
+            assert scope is not None
+            entry = SymbolTableEntry(flag_obj.name, T, clang.CursorKind.PARM_DECL, None)
+            scope.insert(entry)
 
         # Pass the flag when invoking the function
         # First check if we need to allocate the flag on the stack memory
