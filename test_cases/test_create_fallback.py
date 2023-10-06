@@ -34,12 +34,6 @@ class TestCase(BasicTest):
 
         # Linear pass
         bpf = linear_code_pass(bpf, info, PassObject())
-        for f in Function.directory.values():
-            if not f.is_empty():
-                with info.sym_tbl.with_func_scope(f.name):
-                    body = linear_code_pass(f.body, info, PassObject())
-                    assert body is not None
-                    f.body = body
 
         # Feasibility pass
         bpf = feasibilty_analysis_pass(bpf, info, PassObject())
@@ -48,28 +42,41 @@ class TestCase(BasicTest):
         select_user_pass(bpf, info, PassObject())
 
         # Clone for User processing
-        user = clone_pass(bpf, info, PassObject())
-        info.user_prog.sym_tbl = info.sym_tbl.clone()
-        info.user_prog.func_dir = {}
-        for func in Function.directory.values():
-            new_f = func.clone(info.user_prog.func_dir)
+        # user = clone_pass(bpf, info, PassObject())
+        # info.user_prog.sym_tbl = info.sym_tbl.clone()
+        # info.user_prog.func_dir = {}
+        # for func in Function.directory.values():
+        #     new_f = func.clone(info.user_prog.func_dir)
 
-        with info.user_prog.select_context(info):
-            create_fallback_pass(bpf, info, PassObject())
+        # with info.user_prog.select_context(info):
+        create_fallback_pass(bpf, info, PassObject())
+        root = info.user_prog.graph
+        generated_funcs = info.user_prog.fallback_funcs_def
 
-            # Tests
-            root = info.user_prog.graph
-            generated_funcs = info.user_prog.fallback_funcs_def
-            assert root.paths.code.has_children()
-            assert len(generated_funcs) == 1
+        # Log
+        _print_node_code(root, self.info)
+        for x in root.children:
+            _print_node_code(x, self.info)
+            for c in x.children:
+                _print_node_code(c, self.info)
 
-            # Log
-            _print_node_code(root, self.info)
+        text, _ =  gen_code(generated_funcs, info)
+        print('code:\n', text, '\n---', sep='')
+        print(generated_funcs)
 
-            text, _ =  gen_code(generated_funcs, info)
-            print('code:\n', text, '\n---', sep='')
+        left_child_code = root.children[1].children[0].paths.code.children
+        print('lll', left_child_code)
 
-            print('Create fallback Test: Okay')
+        # Tests
+        assert root.paths.code.has_children()
+        assert len(generated_funcs) == 2
+
+        root_code = root.paths.code.children
+        assert root_code[0].kind == clang.CursorKind.IF_STMT
+
+
+        print('Create fallback Test: Okay')
+
 
 
 if __name__ == '__main__':

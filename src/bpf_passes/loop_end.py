@@ -15,8 +15,7 @@ SK_DROP = Literal('SK_DROP', clang.CursorKind.MACRO_INSTANTIATION)
 def _return_drop_inst():
     ret_inst = Instruction()
     ret_inst.kind = clang.CursorKind.RETURN_STMT
-    ret_inst.body = Block(ARG)
-    ret_inst.body.add_inst(SK_DROP.clone([]))
+    ret_inst.body = [SK_DROP.clone([]),]
     return ret_inst
 
 

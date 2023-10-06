@@ -201,7 +201,7 @@ class VarDecl(Instruction):
         return False
 
     def get_children(self):
-        return (self.init, )
+        return [self.init, ]
 
     def get_children_context_marked(self):
         return ((self.init, ARG),)
@@ -240,7 +240,7 @@ class ControlFlowInst(Instruction):
         return f'<CtrlFlow {self.kind}: {self.cond}>'
 
     def get_children(self):
-        return (self.cond, self.body, self.other_body)
+        return [self.cond, self.body, self.other_body]
 
     def get_children_context_marked(self):
         context = [ARG, BODY, BODY]
@@ -296,7 +296,7 @@ class UnaryOp(Instruction):
         return True
 
     def get_children(self):
-        return (self.child,)
+        return [self.child,]
 
     def get_children_context_marked(self):
         context = [ARG]
@@ -368,7 +368,7 @@ class BinOp(Instruction):
         return True
 
     def get_children(self):
-        return (self.rhs, self.lhs)
+        return [self.rhs, self.lhs]
 
     def get_children_context_marked(self):
         context = (ARG, ARG)
@@ -397,7 +397,7 @@ class CaseSTMT(Instruction):
         return True
 
     def get_children(self):
-        return (self.case, self.body)
+        return [self.case, self.body]
 
     def get_children_context_marked(self):
         context = (ARG, BODY)
@@ -425,7 +425,7 @@ class ArrayAccess(Instruction):
         return True
 
     def get_children(self):
-        return (self.array_ref, self.index)
+        return [self.array_ref, self.index]
 
     def get_children_context_marked(self):
         context = (None, ARG)
@@ -450,7 +450,7 @@ class Parenthesis(Instruction):
         return True
 
     def get_children(self):
-        return (self.body,)
+        return [self.body,]
 
     def get_children_context_marked(self):
         return ((self.body, self.body.tag),)
@@ -477,7 +477,7 @@ class Cast(Instruction):
         return True
 
     def get_children(self):
-        return (self.castee,)
+        return [self.castee,]
 
     def get_children_context_marked(self):
         return ((self.castee, self.castee.tag),)
@@ -568,7 +568,7 @@ class ForLoop(Instruction):
         return True
 
     def get_children(self):
-        return (self.pre, self.cond, self.post, self.body)
+        return [self.pre, self.cond, self.post, self.body]
 
     def get_children_context_marked(self):
         context =  (ARG, ARG, ARG, BODY)

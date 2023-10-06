@@ -227,6 +227,7 @@ def __convert_cursor_to_inst(c, info):
         res = gather_instructions_from(next(children), info, context=ARG)
         if res:
             return res[0]
+        raise Exception('I am removing an instruction why?')
         return None
     elif c.kind == clang.CursorKind.VAR_DECL:
         inst = VarDecl(c)
@@ -495,7 +496,7 @@ def gather_instructions_from(cursor, info, context=BODY):
 
 
         # TODO: handling the IO frameworks needs a bit of thought
-        if inst.kind == clang.CursorKind.CALL_EXPR and inst.name in (READ_PACKET + WRITE_PACKET):
+        if inst and inst.kind == clang.CursorKind.CALL_EXPR and inst.name in (READ_PACKET + WRITE_PACKET):
             inst.bpf_ignore = True
 
         if inst:

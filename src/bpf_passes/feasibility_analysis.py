@@ -161,6 +161,7 @@ def feasibilty_analysis_pass(inst, info, more):
         obj = PassObject()
         obj.func = func
         _do_feasibility_analisys(func.body, info, obj)
+        # debug(func.return_type, func.name, func.may_fail, func.may_succeed, func.body.children)
         assert func.may_fail or func.may_succeed, 'After this processing we should have decide if function can fail or not'
 
     res = mark_user_boundary_pass(res, info, PassObject())

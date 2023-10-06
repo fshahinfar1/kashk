@@ -44,8 +44,8 @@ class TestCase(BasicTest):
         root = self.info.user_prog.graph
 
         # # Show information
-        # tree = draw_tree(self.info.user_prog.graph, fn=lambda x: str(id(x)))
-        # print('\n---- Begining of the Tree ----')
+        tree = draw_tree(self.info.user_prog.graph, fn=lambda x: str(id(x)))
+        print('\n---- Begining of the Tree ----')
         # print(tree)
         # print('---- End of the Tree ----\n')
         # _print_node_code(root, self.info)
@@ -57,7 +57,7 @@ class TestCase(BasicTest):
         # Check the structure of found tree
         assert len(root.children) == 2
         assert len(root.children[0].children) == 0
-        assert len(root.children[1].children) == 1
+        assert len(root.children[1].children) == 2
         # Check the selected instructions to offload
 
         second_path = root.children[1]

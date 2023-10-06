@@ -16,11 +16,11 @@ CASE_STUDY_DIR=$HOME/auto_bpf_offload/auto_bpf_offload_case_study
 # FILE=$CASE_STUDY_DIR/src/twt/twt.cpp
 # ENTRY=WebServer::process_socket
 
-FILE=$CASE_STUDY_DIR/src/twt_c/twt_c.c
-ENTRY=handle_connection
+# FILE=$CASE_STUDY_DIR/src/twt_c/twt_c.c
+# ENTRY=handle_connection
 
-# FILE=$CASE_STUDY_DIR/src/memcached/memcached.c
-# ENTRY=event_handler
+FILE=$CASE_STUDY_DIR/src/memcached/memcached.c
+ENTRY=event_handler
 # ARGS="--cflags \-DHAVE_CONFIG_H=1"
 
 

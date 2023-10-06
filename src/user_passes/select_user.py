@@ -41,13 +41,8 @@ def _includes_inst(inst, target):
 
 def _get_the_rest_of_the_code(inst, blk):
     instructions = []
-    gather = False
     for child in blk.get_children():
         if _includes_inst(child, inst):
-            gather = True
-        if gather:
-            # TODO: it has issues! it may include ToUserspace instructions in
-            # userspace code!
             instructions.append(child)
     return instructions
 
