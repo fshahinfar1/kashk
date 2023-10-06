@@ -663,6 +663,7 @@ class Annotation(Instruction):
     ANNOTATION_TYPE_NAME = 'struct __annotation'
     MESSAGE_FIELD_NAME = 'message'
     def __init__(self, msg=None):
+        super().__init__()
         self.msg = msg[1:-1]
         self.kind = ANNOTATION_INST
 
