@@ -130,8 +130,6 @@ def _process_switch_case(c, info):
         if cursor.kind in (clang.CursorKind.CASE_STMT, clang.CursorKind.DEFAULT_STMT):
             if case_body or cond:
                 cases.append((cond, case_body))
-            else:
-                print(case_body, cond)
             case_body = []
             children = list(cursor.get_children())
             assert len(children) == 2 or len(children) == 1
@@ -168,10 +166,7 @@ def _process_switch_case(c, info):
     current_case = []
     # End of switch body and grouping
     # Creat the jumps
-    x = 0
     for (case_cursor, case), inst_list in cases:
-        print(x)
-        x+=1
         case_inst = CaseSTMT(case_cursor)
         if case:
             case_inst.case.extend_inst(case)

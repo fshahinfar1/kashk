@@ -25,6 +25,11 @@ def remember_change_ctx(func):
     finally:
         current_change_ctx = tmp
 
+_var_counter = 0
+def _get_a_var_name():
+    global _var_counter
+    _var_counter += 1
+    return f'__ex{_var_counter}'
 
 class _Change:
     """
@@ -72,6 +77,8 @@ def _function_check_param_reduc(inst, func, info, more):
             # TODO: do I need to maintain the symbol of this parameter?
             # I am passing a struct which might have a field that
             # points to the BPF context.
+            print(param.name,func.name)
+            assert func_scope.lookup(param.name) is not None
             sym = func_scope.delete(param.name)
             change.add_param(param)
 
@@ -127,8 +134,7 @@ def _handle_call(inst, info, more):
     extra_args = [inst.args.pop() for i in range(count_extra)]
     decl = VarDecl(None)
     decl.type = MyType.make_simple(change.struct_name, clang.TypeKind.RECORD)
-    # TODO: what if there are multiple extra args in a block?
-    decl.name = '__ex'
+    decl.name = _get_a_var_name()
     # TODO: How to implement a struct initialization?
     tmp = []
     for field, var in zip(change.list_of_params, extra_args):
@@ -144,6 +150,7 @@ def _handle_call(inst, info, more):
     # Pass a reference of this struct to the function
     ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
     ref.name = decl.name
+    ref.type = decl.type
     unary = UnaryOp(None)
     unary.op = '&'
     unary.child.add_inst(ref)

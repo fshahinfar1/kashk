@@ -169,6 +169,8 @@ def dfs_over_deps_vars(root):
     this_node_deps = root.paths.var_deps
 
     if len(root.children) == 0:
+        if len(root.path_ids) != 1:
+            return [{'vars': [], 'path_id': '-'}]
         assert len(root.path_ids) == 1, f'Expected the leaf to have one failure number. But it has more/less (list: {root.path_ids})'
         return [{'vars': list(this_node_deps), 'path_id': root.path_ids[0]}]
 
