@@ -127,6 +127,9 @@ def generate_offload(io_ctx):
     # code, _ = gen_code(bpf, info)
     # print(code)
     # show_insts([bpf])
+
+    # func = Function.directory.get('drive_machine')
+    # show_insts(func.body)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Create the userspace program graph

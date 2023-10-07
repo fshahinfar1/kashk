@@ -1,6 +1,6 @@
 import clang.cindex as clang
 from utility import (get_code, report_on_cursor, visualize_ast, show_insts)
-from log import error, debug
+from log import error, debug, report
 from prune import READ_PACKET, WRITE_PACKET
 from data_structure import *
 from instruction import *
@@ -91,8 +91,12 @@ def __add_func_definition(inst, info):
         return
     scope = info.sym_tbl.scope_mapping.get(inst.name)
     if not scope:
-        error(MODULE_TAG, 'The scope for the function', inst.name, 'was not found')
-        return
+        if inst.is_func_ptr:
+            debug(f'We do not have a scope for function pointer {inst.name} but allowed the creation of Function structure! (Am I breaking assumptions?)')
+            scope = None
+        else:
+            error(MODULE_TAG, 'The scope for the function', inst.name, 'was not found')
+            return
     f = Function(inst.name, inst.func_ptr)
     f.is_method = inst.is_method
     if f.is_method:
@@ -173,6 +177,6 @@ def understand_call_expr(c, info):
     inst.args = __get_func_args(inst, info)
 
     # check if function is defined
-    if (not inst.is_operator) and (not inst.is_func_ptr) and (inst.name not in Function.directory):
+    if (not inst.is_operator) and (inst.name not in Function.directory):
         __add_func_definition(inst, info)
     return inst
