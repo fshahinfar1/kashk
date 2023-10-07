@@ -506,6 +506,9 @@ class Ref(Instruction):
             self.type = MyType.from_cursor_type(cursor.type)
         self.variable_declaration_inst = None
 
+    def __str__(self):
+        return f'<Ref {self.name}>'
+
     def is_func_ptr(self):
         return self.type.kind == clang.TypeKind.FUNCTIONPROTO
 
@@ -668,7 +671,7 @@ class Annotation(Instruction):
         self.kind = ANNOTATION_INST
 
     def __str__(self):
-        return f'<Annotation>'
+        return f'<Annotation `{self.msg}\' >'
 
     def clone(self, _):
         # TODO: Do not need to clone :) ?! (it is goofy)

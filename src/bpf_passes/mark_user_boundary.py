@@ -53,6 +53,7 @@ def _process_current_inst(inst, info, more):
         # return inst, not func.may_succeed # This defenately is not going to suceed
 
         if func.is_empty():
+            fail_ref.set(FAILED, YES)
             return inst, YES
 
         # Go into the functions and mark boundary
@@ -65,6 +66,7 @@ def _process_current_inst(inst, info, more):
             # Update the current function with the failure paths
             current_function.path_ids.extend(func.path_ids)
     elif inst.kind == ANNOTATION_INST:
+        fail_ref.set(FAILED, YES)
         return inst, YES
 
     failed = fail_ref.get(FAILED)
@@ -143,7 +145,7 @@ def _do_pass(inst, info, more):
 
                 # TODO: when should I propagate the failure to the upper level context?
                 parent = cb_ref.get(PARENT_INST)
-                if parent is None or parent.kind != clang.CursorKind.IF_STMT:
+                if parent is None or parent.kind not in (clang.CursorKind.IF_STMT, clang.CursorKind.CASE_STMT):
                     fail_ref.set(FAILED, failed)
                     # debug(MODULE_TAG, 'propagate failure: ', inst.kind, inst)
 
