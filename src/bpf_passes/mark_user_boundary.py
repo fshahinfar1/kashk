@@ -44,13 +44,12 @@ def remember_func(func):
 def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.CALL_EXPR:
         func = inst.get_function_def()
-        assert func is not None
+        assert func is not None or inst.is_func_ptr, 'only function pointer are allowed to not have function structure'
+        if func is None:
+            # TODO: calling function pointers are not support for now. But I should add the support
+            error(MODULE_TAG, 'calling function pointers are not support for now')
+            return inst, YES
         assert func.may_fail or func.may_succeed, 'The information about function failures should be processed before this step'
-
-        # # TODO: This commented implementation works on function granularity. I
-        # # think working on instruction granularity may provide better chance of
-        # # summarization.
-        # return inst, not func.may_succeed # This defenately is not going to suceed
 
         if func.is_empty():
             fail_ref.set(FAILED, YES)

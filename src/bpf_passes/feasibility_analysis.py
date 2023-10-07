@@ -35,15 +35,24 @@ def remember_func(func):
 
 def is_function_call_feasible(inst, info):
     func = inst.get_function_def()
-    if not func or func.is_empty():
+    if func is None:
+        error(f'Do not have function struct for {inst.name}')
+        return False
+    if func.is_empty():
         if inst.name in ('memcpy', *READ_PACKET, *WRITE_PACKET):
             # It is fine
             return True
         func.may_fail = True
         return False
 
+    processed_before = func.may_fail or func.may_succeed
+    if processed_before:
+        return func.may_succeed
+
+    # print('is func call feasable?', inst.name)
     with remember_func(func):
         with info.sym_tbl.with_func_scope(inst.name):
+            # print(func.name)
             body = _do_pass(func.body, info, PassObject())
 
     assert body is not None, 'this pass should not remove anything'
@@ -61,6 +70,7 @@ def _process_current_inst(inst, info, more):
         func = inst.get_function_def()
         if func and current_function and func.may_fail:
             # The called function may fail
+            # print('Current function has failed:', func.name)
             current_function.may_fail = True
     return inst, False
 
@@ -155,6 +165,7 @@ def feasibilty_analysis_pass(inst, info, more):
         if func.may_succeed or func.may_fail:
             continue
         if func.is_empty():
+            # print('empty', func.name)
             func.may_fail = True
             func.may_succeed = False
             continue

@@ -11,6 +11,7 @@ from sym_table_gen import build_sym_table
 from understand_program_state import extract_state, get_state_for
 from understand_logic import (get_all_read, get_all_send,
         gather_instructions_from)
+from understand_logic_handler import create_func_objs
 
 from bpf_code_gen import generate_bpf_prog, gen_code
 from user import generate_user_prog
@@ -111,6 +112,7 @@ def generate_offload(io_ctx):
 
     # Start the passes
     insts = gather_instructions_from(body_of_loop, info, BODY)
+    create_func_objs(info)
     bpf = Block(BODY)
     bpf.extend_inst(insts)
 
@@ -130,6 +132,7 @@ def generate_offload(io_ctx):
 
     # func = Function.directory.get('drive_machine')
     # show_insts(func.body)
+
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Create the userspace program graph

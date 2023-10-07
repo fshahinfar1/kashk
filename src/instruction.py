@@ -3,7 +3,7 @@ import clang.cindex as clang
 
 from utility import get_owner, report_on_cursor
 from data_structure import StateObject, Function, MyType
-from log import error, debug
+from log import error, debug, report
 
 
 CODE_LITERAL = 8081
@@ -94,7 +94,16 @@ class Call(Instruction):
         self.cursor = cursor
         self.kind = clang.CursorKind.CALL_EXPR
         self.name = cursor.spelling
-        self.func_ptr = cursor.referenced
+
+        self.func_ptr = None
+        # self.func_ptr = cursor.referenced
+        # assert cursor.referenced is not None
+        # if not self.func_ptr.is_definition():
+        #     tmp = self.func_ptr.get_definition()
+        #     if tmp is not None:
+        #         # it would be nice if we have a pointer to definition instead of declaration
+        #         cursor.func_ptr = tmp
+
         self.args = []
         # The last element of owner should be an object accesible from
         # local or global scope. The other elements would recursivly show the

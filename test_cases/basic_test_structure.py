@@ -9,6 +9,7 @@ sys.path.insert(0, code_under_test_dir)
 from utility import parse_file, find_elem
 from sym_table_gen import build_sym_table
 from understand_logic import gather_instructions_under
+from understand_logic_handler import create_func_objs
 
 from data_structure import Info
 from instruction import BODY
@@ -40,6 +41,7 @@ class BasicTest:
             assert body_of_loop.kind == clang.CursorKind.COMPOUND_STMT
             # Convert cursors to instruction objects
             insts = gather_instructions_under(body_of_loop, self.info, BODY)
+            create_func_objs(self.info)
             self.test(insts)
 
     def test(self, insts):

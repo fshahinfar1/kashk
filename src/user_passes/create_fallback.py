@@ -88,8 +88,8 @@ def _starts_with_func_call(node, info):
 
     func = call_inst.get_function_def()
     if not func:
-        assert func.may_fail
         return None, None, None
+    assert func.may_fail
 
     # Define a new function
     clone_first_inst = clone_pass(first_inst, info, PassObject())

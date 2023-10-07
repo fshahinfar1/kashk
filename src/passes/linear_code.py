@@ -48,6 +48,8 @@ def _move_function_out(inst, info, more):
             return inst
         return_type = func.return_type
 
+    assert return_type is not None
+
     blk = cb_ref.get(BODY)
     assert blk is not None
 

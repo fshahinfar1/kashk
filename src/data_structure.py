@@ -336,8 +336,10 @@ class Record(TypeDefinition):
         return f'<Record {self.name} >'
 
 
-class Function(TypeDefinition):
 
+
+class Function(TypeDefinition):
+    func_cursor = {}
     # TODO: I need to seperate the directory for BPF and Userspace program
     directory = {}
     def __init__(self, name, c, directory=None):

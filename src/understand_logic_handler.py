@@ -1,5 +1,5 @@
 import clang.cindex as clang
-from utility import (get_code, report_on_cursor, visualize_ast, show_insts)
+from utility import (get_code, report_on_cursor, visualize_ast, show_insts, skip_unexposed_stmt)
 from log import error, debug, report
 from prune import READ_PACKET, WRITE_PACKET
 from data_structure import *
@@ -87,16 +87,18 @@ def __get_func_args(inst, info):
 
 
 def __add_func_definition(inst, info):
+    assert False, 'Should not use this'
     if not info:
         return
     scope = info.sym_tbl.scope_mapping.get(inst.name)
     if not scope:
         if inst.is_func_ptr:
-            debug(f'We do not have a scope for function pointer {inst.name} but allowed the creation of Function structure! (Am I breaking assumptions?)')
+            report(f'We do not have a scope for function pointer {inst.name} but allowed the creation of Function structure! (Am I breaking assumptions?)')
             scope = None
         else:
             error(MODULE_TAG, 'The scope for the function', inst.name, 'was not found')
             return
+
     f = Function(inst.name, inst.func_ptr)
     f.is_method = inst.is_method
     if f.is_method:
@@ -176,7 +178,75 @@ def understand_call_expr(c, info):
     inst.name = __get_func_name(inst, info)
     inst.args = __get_func_args(inst, info)
 
+    if inst.name not in Function.func_cursor:
+        func_decl = c.referenced
+        if not func_decl.is_definition():
+            tmp = func_decl.get_definition()
+            if tmp:
+                func_decl = tmp
+        Function.func_cursor[inst.name] = func_decl
+
     # check if function is defined
-    if (not inst.is_operator) and (inst.name not in Function.directory):
-        __add_func_definition(inst, info)
+    # if (not inst.is_operator) and (inst.name not in Function.directory):
+    #     __add_func_definition(inst, info)
     return inst
+
+
+def __add_func_definition2(name, cursor, info):
+    assert info is not None
+    scope = info.sym_tbl.scope_mapping.get(name)
+    if not scope:
+        error(MODULE_TAG, 'The scope for the function', name, 'was not found')
+        return
+
+    f = Function(name, cursor)
+    is_operator = name.startswith('operator')
+    is_method = False
+    fn_def = cursor.get_definition()
+    if not is_operator and fn_def and fn_def.kind == clang.CursorKind.CXX_METHOD:
+        is_method = True
+    f.is_method = is_method
+
+    if f.is_method:
+        raise Exception('Re implement passing the class object to the function')
+
+    # Recursively analize the function body
+    body = None
+    if fn_def:
+        children = list(fn_def.get_children())
+        body = children[-1]
+        body = skip_unexposed_stmt(body)
+        if body.kind != clang.CursorKind.COMPOUND_STMT:
+            # did not found the body
+            error(f'Did not found the body for function: {f.name}')
+            body = None
+
+    if body:
+        # Switch scope
+        old_scope = info.sym_tbl.current_scope
+        info.sym_tbl.current_scope = scope
+
+        # Add parameters to the function scope
+        for a in f.args:
+            info.sym_tbl.insert_entry(a.name, a.type_ref, a.kind, a)
+
+        # Process function body recursively
+        body = gather_instructions_under(body, info, BODY)
+        f.body.extend_inst(body)
+        info.sym_tbl.current_scope = old_scope
+
+        info.prog.add_declaration(f)
+
+
+def create_func_objs(info):
+    processed = set()
+    while True:
+        keys = set(Function.func_cursor.keys())
+        if keys == processed:
+            break
+        for name in keys:
+            if name in processed:
+                continue
+            cursor = Function.func_cursor[name]
+            __add_func_definition2(name, cursor, info)
+        processed.update(keys)
