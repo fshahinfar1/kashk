@@ -64,6 +64,8 @@ def _process_current_inst(inst, info, more):
         if current_function:
             # Update the current function with the failure paths
             current_function.path_ids.extend(func.path_ids)
+    elif inst.kind == ANNOTATION_INST:
+        return inst, YES
 
     failed = fail_ref.get(FAILED)
     return inst, failed
