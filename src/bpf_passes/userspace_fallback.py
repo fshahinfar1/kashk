@@ -169,6 +169,11 @@ def _handle_function_may_fail(inst, func, info, more):
                 assert (current_function.may_fail and not
                         current_function.may_succeed)
 
+            if not current_function:
+                # We are in the main BPF function, we should fallback t user
+                after_func_call.append(ToUserspace.from_func_obj(current_function))
+
+
         # Also take a look at the body of the called function. We may want to
         # remove everything after failure point.
         with remember_func(func):
