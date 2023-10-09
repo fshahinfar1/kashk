@@ -3,6 +3,8 @@ from log import debug, error
 from prune import should_process_this_cursor
 from utility import report_on_cursor, PRIMITIVE_TYPES
 
+from data_structure import Function
+
 from data_structure import MyType
 import clang.cindex as clang
 
@@ -50,6 +52,8 @@ def __collect_information_about_func(cursor, info):
 
     # TODO: Do I need to process the body of each functions?
     # body = children[-1]
+    if cursor.is_definition and should_process_this_cursor(cursor):
+        Function.func_cursor[cursor.spelling] = cursor
 
 
 def pass_over_global_variables(cursor, info):

@@ -13,6 +13,10 @@ from passes.clone import clone_pass
 MODULE_TAG = '[Linear Code Pass]'
 cb_ref = CodeBlockRef()
 
+# TODO: this is a hack, I should use a stack to associate a mapping for each
+# scope. I am Lazy:) (issue is more time constraint than lazy)
+func_ptr_mapping = {}
+
 tmp_num = 100
 def _get_tmp_var_name():
     global tmp_num
@@ -115,11 +119,26 @@ def _separate_var_decl_and_init(inst, info, more):
 def _process_current_inst(inst, info, more):
     ctx = more.ctx
 
-    if ctx in (ARG, LHS) and inst.kind == clang.CursorKind.CALL_EXPR:
-        if inst.is_operator:
-            # Let's not mess up with operators
-            return inst
-        return _move_function_out(inst, info, more)
+    if inst.kind == ANNOTATION_INST:
+        if inst.ann_kind == Annotation.ANN_FUNC_PTR:
+            ptr, actual = inst.msg.split(Annotation.FUNC_PTR_DELIMITER)
+            func_ptr_mapping[ptr] = actual
+
+    if inst.kind == clang.CursorKind.CALL_EXPR:
+        if inst.is_func_ptr:
+            actual = func_ptr_mapping.get(inst.name)
+            if actual is not None:
+                # bind function pointer to an actual function
+                report(f'Function {inst.name} is replaced with {actual}')
+                inst.name = actual
+                inst.is_func_ptr = False
+
+        # TODO: shoud it not be RHS ??
+        if ctx in (ARG, LHS):
+            if inst.is_operator:
+                # Let's not mess up with operators
+                return inst
+            return _move_function_out(inst, info, more)
 
     if inst.kind == clang.CursorKind.VAR_DECL:
         if inst.has_children():

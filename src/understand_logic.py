@@ -2,7 +2,7 @@ import itertools
 from contextlib import contextmanager
 import clang.cindex as clang
 
-from log import error
+from log import error, debug
 from utility import get_code, report_on_cursor, visualize_ast, skip_unexposed_stmt, get_token_from_source_code
 from data_structure import *
 from instruction import *
@@ -214,7 +214,13 @@ def __convert_cursor_to_inst(c, info):
     elif (c.kind == clang.CursorKind.UNARY_OPERATOR
             or c.kind == clang.CursorKind.CXX_UNARY_EXPR):
         inst = UnaryOp(c)
-        child = gather_instructions_from(next(c.get_children()), info, context=ARG)
+        children = list(c.get_children())
+        # report_on_cursor(c)
+        if len(children) != 1:
+            # TODO: what is happening (error encounter on a line  with `sizeof(int)')
+            return Literal('<unknown unary op>', CODE_LITERAL)
+        assert len(children) == 1, f'Expected the unary cursor to have 1 child it has {len(children)}'
+        child = gather_instructions_from(children[0], info, context=ARG)
         inst.child.extend_inst(child)
         return inst
     elif c.kind == clang.CursorKind.CONDITIONAL_OPERATOR:
@@ -246,7 +252,9 @@ def __convert_cursor_to_inst(c, info):
         res = gather_instructions_from(next(children), info, context=ARG)
         if res:
             return res[0]
-        raise Exception('I am removing an instruction why?')
+        report_on_cursor(c)
+        debug(res)
+        error('I am removing an instruction why?')
         return None
     elif c.kind == clang.CursorKind.VAR_DECL:
         inst = VarDecl(c)

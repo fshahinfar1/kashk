@@ -169,7 +169,7 @@ def get_token_from_source_code(c):
                 l = f.readlines()[c.location.line-1]
                 l = l.rstrip()
                 token = l[c.location.column-1:]
-                end_index = min(filter(lambda x: x > 0, [token.find(' '), token.find('\t'), token.find(';'), token.find(')'), token.find('}')]))
+                end_index = min(filter(lambda x: x > 0, [len(token) - 1, token.find(' '), token.find('\t'), token.find(';'), token.find(')'), token.find('}')]))
                 token = token[:end_index]
                 return token
     return '<token not found>'

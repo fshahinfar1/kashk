@@ -267,7 +267,7 @@ class ControlFlowInst(Instruction):
 
 
 class UnaryOp(Instruction):
-    OPS = ('!', '-', '++', '--', '&', '*', 'sizeof', '__extension__')
+    OPS = ('!', '-', '++', '--', '&', '*', 'sizeof', '__extension__', '~')
 
     def __init__(self, cursor):
         super().__init__()
@@ -675,6 +675,8 @@ class Annotation(Instruction):
     ANNOTATION_TYPE_NAME = 'struct __annotation'
     MESSAGE_FIELD_NAME = 'message'
     KIND_FIELD_NAME = 'kind'
+
+    FUNC_PTR_DELIMITER = '-->'
 
     ANN_SKIP = 'ANN_SKIP'
     ANN_FUNC_PTR = 'ANN_FUNC_PTR'

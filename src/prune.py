@@ -87,3 +87,12 @@ def should_ignore_cursor(cursor):
             # report_on_cursor(cursor)
             # This was observed to be a assert statement, errno == ..., what other statement does it include?
             return True
+
+        # Basically check if we can find the binary operator
+        lhs = next(cursor.get_children())
+        lhs_tokens = len(list(lhs.get_tokens()))
+        # First token after lhs
+        tokens = len(list(cursor.get_tokens()))
+        if lhs_tokens >= tokens:
+            error('Binary operator which we can not find the operator for')
+            return True
