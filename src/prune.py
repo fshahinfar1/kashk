@@ -14,6 +14,8 @@ COROUTINE_FUNC_NAME = ('await_resume', 'await_transform', 'await_ready', 'await_
 # interest only then we can ignore a funciton.
 IGNORE_FUNC = ['printf', 'fprintf']
 
+KNOWN_FUNCS = ['memcpy', 'memmove', 'strcpy', 'strncpy', 'strlen', 'strcmp']
+
 
 def __is_ignored_function(cursor):
     if cursor.kind == clang.CursorKind.CALL_EXPR:

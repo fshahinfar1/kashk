@@ -8,9 +8,9 @@ from instruction import *
 from bpf_code_gen import gen_code
 from passes.pass_obj import PassObject
 from template import bpf_ctx_bound_check, bpf_ctx_bound_check_bytes
+from prune import KNOWN_FUNCS
 
 MODULE_TAG = '[Verfier Pass]'
-
 
 
 def is_value_from_bpf_ctx(inst, info, R=None):
@@ -195,7 +195,7 @@ def _handle_call(inst, info, more):
         # Update the instructions of the function
         func.body = modified
     else:
-        if inst.name not in ('memcpy',):
+        if inst.name not in KNOWN_FUNCS:
             # We can not modify this function
             error(MODULE_TAG, 'function:', inst.name,
                 'receives BPF context but is not accessible for modification')
