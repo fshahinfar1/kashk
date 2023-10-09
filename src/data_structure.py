@@ -372,6 +372,8 @@ class Function(TypeDefinition):
             raise Exception(f'Function is already defined ({self.name})')
         directory[self.name] = self
 
+        self.is_used_in_bpf_code = False
+
     def clone(self, directory):
         return self.clone2(self.name, directory)
 

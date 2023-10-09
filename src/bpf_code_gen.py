@@ -395,6 +395,9 @@ def __generate_code_type_definition(inst, info):
         if inst.name in (*READ_PACKET, *WRITE_PACKET):
             return ''
 
+        if not inst.is_used_in_bpf_code:
+            return ''
+
         args = []
         for a in inst.args:
             if isinstance(a, str):

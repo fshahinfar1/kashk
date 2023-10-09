@@ -28,6 +28,7 @@ from bpf_passes.transform_vars import transform_vars_pass
 from bpf_passes.userspace_fallback import userspace_fallback_pass
 from bpf_passes.verifier import verifier_pass
 from bpf_passes.reduce_params import reduce_params_pass
+from bpf_passes.mark_used_funcs import mark_used_funcs
 
 from user_passes.select_user import select_user_pass
 from user_passes.number_fallback_graph import number_fallback_graph_pass
@@ -283,6 +284,11 @@ def gen_bpf_code(bpf, info, out_bpf):
     debug('Reduce Params')
     bpf = reduce_params_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
+
+    debug('Mark Functions used in BPF')
+    mark_used_funcs(bpf, info, PassObject())
+    debug('~~~~~~~~~~~~~~~~~~~~~')
+
 
     # TODO: split the code between parser and verdict
     debug('[Parser/Verdict Split Code]')
