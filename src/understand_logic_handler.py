@@ -1,7 +1,7 @@
 import clang.cindex as clang
 from utility import (get_code, report_on_cursor, visualize_ast, show_insts, skip_unexposed_stmt)
 from log import error, debug, report
-from prune import READ_PACKET, WRITE_PACKET
+from prune import READ_PACKET, WRITE_PACKET, COROUTINE_FUNC_NAME
 from data_structure import *
 from instruction import *
 from understand_logic import (gather_instructions_from,
@@ -11,7 +11,6 @@ from sym_table import *
 from prune import should_process_this_cursor
 
 
-COROUTINE_FUNC_NAME = ('await_resume', 'await_transform', 'await_ready', 'await_suspend')
 MODULE_TAG = 'LOGIC HANDLER'
 
 

@@ -1,6 +1,5 @@
 import clang.cindex as clang
 
-from dfs import DFSPass
 from instruction import *
 
 

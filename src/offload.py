@@ -13,6 +13,8 @@ from understand_logic import (get_all_read, get_all_send,
         gather_instructions_from)
 from understand_logic_handler import create_func_objs
 
+from mark_io import mark_io
+
 from bpf_code_gen import generate_bpf_prog, gen_code
 from user import generate_user_prog
 
@@ -107,17 +109,26 @@ def generate_offload(io_ctx):
 
     body_of_loop = find_request_processing_logic(entry_func, info)
 
-    # Find the buffer representing the packet
-    find_read_write_bufs(body_of_loop, info)
-
     # Start the passes
+    debug('First pass on the AST (initializing...)')
     insts = gather_instructions_from(body_of_loop, info, BODY)
+    debug('~~~~~~~~~~~~~~~~~~~~~')
+
+    debug('Gather Infromation About Functions')
     create_func_objs(info)
+    debug('~~~~~~~~~~~~~~~~~~~~~')
+
+    # We have our own AST now, continue processing ...
     bpf = Block(BODY)
     bpf.extend_inst(insts)
 
+    debug('Mark Read/Write Inst & Buf')
+    mark_io(bpf, info)
+    debug('~~~~~~~~~~~~~~~~~~~~~')
+
     ## Simplify Code
     # Move function calls out of the ARG context!
+    debug('Linear Code')
     bpf = linear_code_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
@@ -330,151 +341,3 @@ def boot_starp_global_state(cursor, info):
         field.type_ref.kind = field.kind
 
         add_state_decl_to_bpf(info.prog, [field], decls)
-
-
-# TODO: the code which finds the buffer is very bad! Re organize and think
-# about it!
-def find_read_write_bufs(ev_loop, info):
-    reads = get_all_read(ev_loop)
-    if len(reads) > 1:
-        error('Multiple read function was found!')
-        return
-    for r in reads:
-        args = list(r.get_arguments())
-
-        buf_arg = None
-        buf_sz = None
-
-        # the buffer is in the first arg
-        buf_arg = args[0]
-        while buf_arg.kind == clang.CursorKind.UNEXPOSED_EXPR:
-            children = list(buf_arg.get_children())
-            assert len(children) == 1, f'len(children) == {len(children)}'
-            buf_arg = children[0]
-
-        if r.spelling == 'async_read_some':
-            buf_arg = args[0]
-        elif r.spelling == 'read':
-            buf_arg = args[1]
-            buf_sz = args[2]
-        elif r.spelling == 'recvfrom':
-            # NOTE: what happens if the server respond on another socket ?
-            buf_arg = args[1]
-            buf_sz = args[2]
-
-
-        if buf_arg.kind == clang.CursorKind.CALL_EXPR:
-            args = list(buf_arg.get_arguments())
-            buf_def = buf_arg.get_definition()
-            info.rd_buf = PacketBuffer(buf_def)
-            if len(args) == 2:
-                buf_sz = args[1]
-                info.rd_buf.size_cursor = gather_instructions_from(buf_def, info)
-            else:
-                # TODO: I need to some how know the size and I might not know
-                # it! I can try to find the underlying array. But what if it is
-                # not an array?
-                error('I need to know the buffer size')
-                info.rd_buf.size_cursor = [Literal('2048', clang.CursorKind.INTEGER_LITERAL)]
-        else:
-            # if the buffer is assigned before and is not a function call
-            buf_def = buf_arg.get_definition()
-            remove_def = buf_def
-            info.remove_cursor.add(remove_def.get_usr())
-            report_on_cursor(buf_def)
-            if buf_def.kind == clang.CursorKind.CALL_EXPR:
-                buf_def = next(buf_def.get_children())
-                args = list(buf_def.get_arguments())
-                buf_def = args[0].get_definition()
-                buf_sz = args[1]
-                info.rd_buf = PacketBuffer(buf_def)
-                info.rd_buf.size_cursor = gather_instructions_from(buf_sz, info)
-            else:
-                #TODO: this is awful
-                info.rd_buf = PacketBuffer(buf_def)
-                if buf_sz is None:
-                    children = list(buf_def.get_children())
-                    if len(children) > 0:
-                        init = children[0]
-                        if init.kind == clang.CursorKind.CALL_EXPR:
-                            args = list(init.get_arguments())
-                            buf_def = args[0].get_definition()
-                            buf_sz = args[1]
-                            info.rd_buf = PacketBuffer(buf_def)
-                            info.rd_buf.size_cursor = gather_instructions_from(buf_sz, info)
-                        else:
-                            raise Exception('')
-                    else:
-                        raise Exception('')
-                else:
-                    info.rd_buf.size_cursor = gather_instructions_from(buf_sz, info)
-
-    if info.rd_buf is None:
-        error('Failed to find the packet buffer')
-        return
-
-    writes = get_all_send(ev_loop)
-    assert len(writes) <= 1, f'I currently expect only one send system call (count found: {len(writes)})'
-    for c in writes:
-        # TODO: this code is not going to work. it is so specific
-        args = list(c.get_arguments())
-
-        buf_arg = None
-        buf_sz = None
-
-        if c.spelling == 'async_write':
-            buf_arg = args[1]
-        elif c.spelling == 'async_write_some':
-            buf_arg = args[0]
-        elif c.spelling == 'write':
-            buf_arg = args[1]
-            buf_sz = args[2]
-
-        while buf_arg.kind == clang.CursorKind.UNEXPOSED_EXPR:
-            children = list(buf_arg.get_children())
-            assert len(children) == 1, f'len(children) == {len(children)}'
-            buf_arg = children[0]
-
-
-        if buf_arg.kind == clang.CursorKind.CALL_EXPR:
-            args = list(buf_arg.get_arguments())
-            buf_def = args[0].get_definition()
-            info.wr_buf = PacketBuffer(buf_def)
-            if len(args) == 2:
-                buf_sz = args[1]
-                info.wr_buf.size_cursor = gather_instructions_from(buf_sz, info)
-            else:
-                # TODO: I need to some how know the size and I might not know
-                # it! I can try to find the underlying array. But what if it is
-                # not an array?
-                error('I need to know the buffer size')
-                info.wr_buf.size_cursor = [Literal('2048', clang.CursorKind.INTEGER_LITERAL)]
-        else:
-            buf_def = buf_arg.get_definition()
-            remove_def = buf_def
-            # info.remove_cursor.add(remove_def.get_usr())
-            if buf_def.kind == clang.CursorKind.CALL_EXPR:
-                buf_def = next(buf_def.get_children())
-                args = list(buf_def.get_arguments())
-                buf_def = args[0].get_definition()
-                buf_sz = args[1]
-                info.wr_buf = PacketBuffer(buf_def)
-                info.wr_buf.size_cursor = gather_instructions_from(buf_sz, info)
-            else:
-                info.wr_buf = PacketBuffer(buf_def)
-                if buf_sz is None:
-                    children = list(buf_def.get_children())
-                    if len(children) > 0:
-                        init = children[0]
-                        if init.kind == clang.CursorKind.CALL_EXPR:
-                            args = list(init.get_arguments())
-                            buf_def = args[0].get_definition()
-                            buf_sz = args[1]
-                            info.wr_buf = PacketBuffer(buf_def)
-                            info.wr_buf.size_cursor = gather_instructions_from(buf_sz, info)
-                        else:
-                            raise Exception('')
-                    else:
-                        raise Exception('')
-                else:
-                    info.wr_buf.size_cursor = gather_instructions_from(buf_sz, info)

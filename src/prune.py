@@ -7,6 +7,7 @@ from log import debug, error, report
 # function?
 READ_PACKET = ['async_read_some', 'read', 'recvfrom']
 WRITE_PACKET = ['async_write', 'async_write_some', 'write']
+COROUTINE_FUNC_NAME = ('await_resume', 'await_transform', 'await_ready', 'await_suspend')
 
 # TODO: is it formally correct to ignore a function? We should ignore a
 # function based on the effects that it makes. If the effects are not of
