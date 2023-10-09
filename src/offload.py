@@ -134,7 +134,7 @@ def generate_offload(io_ctx):
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     ## Feasibility Analysis
-    # Mark infeasible paths and annotate which functions may fail or succeed
+    debug('Feasibility Analysis')
     bpf = feasibilty_analysis_pass(bpf, info, PassObject())
     # for func in sorted(Function.directory.values(), key=lambda x: x.name):
     #     debug(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_fail, func.path_ids)
@@ -142,9 +142,13 @@ def generate_offload(io_ctx):
     # print(code)
     # show_insts([bpf])
 
-    # func = Function.directory.get('drive_machine')
-    # show_insts(func.body)
+    # func = Function.directory.get('memmove')
+    # assert func is not None
+    # print(func.name, func.may_succeed, func.may_fail)
 
+    # func = Function.directory.get('try_read_udp')
+    # assert func
+    # show_insts(func.body)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Create the userspace program graph

@@ -41,6 +41,7 @@ def remember_func(func):
         current_function = tmp
 
 
+_have_processed = None
 def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.CALL_EXPR:
         func = inst.get_function_def()
@@ -52,15 +53,23 @@ def _process_current_inst(inst, info, more):
         assert func.may_fail or func.may_succeed, 'The information about function failures should be processed before this step'
 
         if func.is_empty():
+            if func.may_succeed:
+                # This is the case of KNOWN functions like memcpy
+                failed = fail_ref.get(FAILED)
+                return inst, failed
             fail_ref.set(FAILED, YES)
             return inst, YES
 
-        # Go into the functions and mark boundary
-        with remember_func(func):
-            with info.sym_tbl.with_func_scope(inst.name):
-                body = _do_pass(func.body, info, PassObject())
-        assert body is not None, 'this pass should not remove anything'
-        func.body = body
+        # Do not process body of a function multiple times
+        if func.name not in _have_processed:
+            # Go into the functions and mark boundary
+            with remember_func(func):
+                with info.sym_tbl.with_func_scope(inst.name):
+                    body = _do_pass(func.body, info, PassObject())
+            assert body is not None, 'this pass should not remove anything'
+            func.body = body
+            _have_processed.add(func.name)
+
         if current_function:
             # Update the current function with the failure paths
             current_function.path_ids.extend(func.path_ids)
@@ -162,9 +171,11 @@ def mark_user_boundary_pass(inst, info, more):
     global current_function
     global cb_ref
     global fail_ref
+    global _have_processed
     current_function = more.get('func')
     cb_ref = CodeBlockRef()
     fail_ref = CodeBlockRef()
+    _have_processed = set()
 
     with cb_ref.new_ref(PARENT_INST, None):
         with fail_ref.new_ref(FAILED, NO):

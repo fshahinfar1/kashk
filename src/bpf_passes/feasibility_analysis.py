@@ -165,9 +165,12 @@ def feasibilty_analysis_pass(inst, info, more):
         if func.may_succeed or func.may_fail:
             continue
         if func.is_empty():
-            # print('empty', func.name)
-            func.may_fail = True
-            func.may_succeed = False
+            if func.name in KNOWN_FUNCS:
+                func.may_fail = False
+                func.may_succeed = True
+            else:
+                func.may_fail = True
+                func.may_succeed = False
             continue
         obj = PassObject()
         obj.func = func
