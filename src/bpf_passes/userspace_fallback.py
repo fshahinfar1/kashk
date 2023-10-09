@@ -214,6 +214,7 @@ def _do_pass(inst, info, more):
         # Process current instruction
         inst = _process_current_inst(inst, info, more)
         if inst is None:
+            debug(MODULE_TAG, 'remove instruction:', inst)
             return None
 
         # Continue deeper
@@ -225,8 +226,10 @@ def _do_pass(inst, info, more):
                     new_inst = _do_pass(i, info, obj)
                     if new_inst is None:
                         if inst.tag == BODY:
+                            debug(MODULE_TAG, 'remove instruction from body:', inst)
                             continue
                         else:
+                            debug(MODULE_TAG, 'remove instruction:', inst)
                             return None
 
                     after = []
@@ -237,11 +240,13 @@ def _do_pass(inst, info, more):
                         new_child.extend(a.box)
 
                     if i.kind == TO_USERSPACE_INST:
+                        debug(MODULE_TAG, 'Found to Userspace trim the code')
                         break
             else:
                 obj = PassObject.pack(lvl+1, tag, parent_list)
                 new_child = _do_pass(child, info, obj)
                 if new_child is None:
+                    debug(MODULE_TAG, 'remove instruction:', inst)
                     return None
             new_children.append(new_child)
 

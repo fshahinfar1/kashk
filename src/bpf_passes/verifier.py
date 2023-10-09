@@ -12,6 +12,7 @@ from template import bpf_ctx_bound_check, bpf_ctx_bound_check_bytes
 MODULE_TAG = '[Verfier Pass]'
 
 
+
 def is_value_from_bpf_ctx(inst, info, R=None):
     """
     Check if an instruction result is a value from the BPF context memory
@@ -46,6 +47,8 @@ def is_value_from_bpf_ctx(inst, info, R=None):
             # We are accessing BPF context
             ref = Ref(None)
             ref.name = sym.name
+            ref.type = sym.type # TODO: is sym.type an instance of MyType?
+            assert isinstance(ref.type, MyType)
             ref.kind = clang.CursorKind.DECL_REF_EXPR
             index = Literal('0', clang.CursorKind.INTEGER_LITERAL)
             size = Literal(f'sizeof({inst.cursor.type.spelling})', CODE_LITERAL)
@@ -122,13 +125,13 @@ def _handle_binop(inst, info, more):
             skb_ref = Ref(None)
             skb_ref.name = 'skb'
             skb_ref.kind = clang.CursorKind.DECL_REF_EXPR
-            tmp_T = MyType.make_simple('struct __sk_buff', clang.TypeKind.RECORD)
-            skb_ref.type = MyType.make_pointer(tmp_T)
+            skb_ref.type = BASE_TYPES[SKB_PTR_TYPE]
 
             # (__u64)skb->data_end
             end_ref = Ref(None, kind=clang.CursorKind.MEMBER_REF_EXPR)
             end_ref.name = 'data_end'
             end_ref.owner.append(skb_ref)
+            end_ref.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
             data_end = Cast()
             data_end.cast_type = '__u64'
             data_end.castee.add_inst(end_ref)
@@ -159,30 +162,22 @@ def _handle_call(inst, info, more):
     func = inst.get_function_def()
     if func and not func.is_empty():
         with info.sym_tbl.with_func_scope(inst.name):
+            T = BASE_TYPES[SKB_PTR_TYPE]
             # Add skb as the last parameter of this function
             skb_obj = StateObject(None)
             skb_obj.name = 'skb'
-            skb_obj.type = 'struct __sk_buff *'
+            skb_obj.type = T.spelling
             skb_obj.is_pointer = True
             func.args.append(skb_obj)
-            T2 = MyType()
-            T2.spelling = 'struct __sk_buff'
-            T2.kind = clang.TypeKind.RECORD
-            T = MyType()
-            T.spelling = skb_obj.type
-            T.under_type = T2
-            T.kind = clang.TypeKind.POINTER
             # This is added to the scope of function being called
             info.sym_tbl.insert_entry(skb_obj.name, T, clang.CursorKind.PARM_DECL, None)
             skb_obj.type_ref = T
-            # debug(f'add skb: {inst.name} ------------------------')
-            # debug(info.sym_tbl.current_scope.symbols)
-            # debug('--------------------------------')
 
             # TODO: update every invocation of this function with the skb parameter
             # TODO: what if the caller function does not have access to skb?
             skb_ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
             skb_ref.name = skb_obj.name
+            skb_ref.type = T
             inst.args.append(skb_ref)
 
             for pos in pos_of_ctx_ptrs:
@@ -212,8 +207,7 @@ def _handle_call(inst, info, more):
             skb_ref = Ref(None)
             skb_ref.name = 'skb'
             skb_ref.kind = clang.CursorKind.DECL_REF_EXPR
-            tmp_T = MyType.make_simple('struct __sk_buff', clang.TypeKind.RECORD)
-            skb_ref.type = MyType.make_pointer(tmp_T)
+            skb_ref.type = BASE_TYPES[SKB_PTR_TYPE]
 
             end_ref = Ref(None, kind=clang.CursorKind.MEMBER_REF_EXPR)
             end_ref.name = 'data_end'

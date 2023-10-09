@@ -393,7 +393,8 @@ class Function(TypeDefinition):
     def is_empty(self):
         return not self.body.has_children()
 
-
+SKB_STRUCT_TYPE = 1000
+SKB_PTR_TYPE = 1001
 BASE_TYPES = {}
 def prepare_base_types():
     kind_name_map = {
@@ -404,5 +405,8 @@ def prepare_base_types():
 
     for kind, name in kind_name_map.items():
         BASE_TYPES[kind] = MyType.make_simple(name, kind)
+
+    BASE_TYPES[SKB_STRUCT_TYPE] = MyType.make_simple('struct __sk_buff', clang.TypeKind.RECORD)
+    BASE_TYPES[SKB_PTR_TYPE] = MyType.make_pointer(BASE_TYPES[SKB_STRUCT_TYPE])
 
 prepare_base_types()

@@ -16,47 +16,6 @@ def check_if_shared_obj_is_loaded(info):
         return False, ''
     return True, load_shared_object_code()
 
-def only_once(f):
-    is_first_time = True
-    def x(*args, **kwargs):
-        if not is_first_time:
-            return ''
-        is_first_time = False
-        return f(*args, **kwargs)
-    return x
-
-is_first_time_1 = True
-def call_read_packet(inst, info, more):
-    global is_first_time_1
-    lvl = more[0]
-    if not is_first_time_1:
-        return ''
-    is_first_time_1 = False
-    return indent(f'{info.rd_buf.name} = (void *)(__u64)skb->data', lvl)
-
-
-is_first_time_2 = True
-def call_send_packet(inst, info, more):
-    global is_first_time_2
-    lvl = more[0]
-    if not is_first_time_2:
-        return ''
-    is_first_time_2 = False
-
-    buf = info.wr_buf.name
-    write_size, _ = gen_code(info.wr_buf.size_cursor, info, context=ARG)
-    code = [
-        f'__adjust_skb_size(skb, {write_size});',
-        f'if (((void *)(__u64)skb->data + {write_size})  > (void *)(__u64)skb->data_end) {{',
-        f'  return SK_DROP;',
-        '}',
-        f'memcpy((void *)(__u64)skb->data, {buf}, {write_size});',
-        'return bpf_sk_redirect_map(skb, &sock_map, sock_ctx->sock_map_index, 0);',
-        ]
-    text = '\n'.join(code)
-    text = indent(text, lvl)
-    return text
-
 
 def handle_var(inst, info, more):
     lvl = more[0]

@@ -82,6 +82,8 @@ def __get_func_args(inst, info):
             # The first argument of methods are self and it is a reference
             ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
             ref.name = 'self'
+            ref.type = MyType.make_pointer(MyType.make_simple('CLASS', clang.TypeKind.RECORD))
+            assert False, 'The name of the class has not been set in the type FIX IT!'
             args = [ref] + args
     return args
 

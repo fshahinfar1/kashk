@@ -100,7 +100,7 @@ def __has_read(cursor):
     while q:
         c = q.pop()
         if c.kind == clang.CursorKind.CALL_EXPR:
-            if c.spelling == 'async_read_some':
+            if c.spelling in READ_PACKET:
                 return True
 
 

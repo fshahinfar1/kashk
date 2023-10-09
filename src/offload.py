@@ -243,41 +243,50 @@ def gen_user_code(user, info, out_user):
 
 def gen_bpf_code(bpf, info, out_bpf):
     # End event loop with packet drop
+    debug('Loop End')
     bpf = loop_end_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Transform access to variables and read/write buffers.
+    debug('Transform Vars')
     bpf = run_pass_on_all_functions(transform_vars_pass, bpf, info)
-    code, _ = gen_code(bpf, info)
+    # code, _ = gen_code(bpf, info)
     # print(code)
     # show_insts([bpf])
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Handle moving to userspace and removing the instruction not possible in
     # BPF
+    debug('Userspace Fallback')
     bpf = userspace_fallback_pass(bpf, info, PassObject())
-    code, _ = gen_code(bpf, info)
+    # code, _ = gen_code(bpf, info)
     # print(code)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Verifier
+    debug('Verifier')
     bpf = verifier_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Reduce number of parameters
+    debug('Reduce Params')
     bpf = reduce_params_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # TODO: split the code between parser and verdict
+    debug('[Parser/Verdict Split Code]')
     bpf_parser = Block(BODY)
     bpf_parser.add_inst(Literal('return skb->len;', CODE_LITERAL))
     info.prog.parser_code = bpf_parser
     info.prog.verdict_code = bpf
+    debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Write the code we have generated
+    debug('BPF Code Generation')
     text = generate_bpf_prog(info)
     with open(out_bpf, 'w') as f:
         f.write(text)
+    debug('~~~~~~~~~~~~~~~~~~~~~')
 
 
 def boot_starp_global_state(cursor, info):
@@ -348,6 +357,11 @@ def find_read_write_bufs(ev_loop, info):
         elif r.spelling == 'read':
             buf_arg = args[1]
             buf_sz = args[2]
+        elif r.spelling == 'recvfrom':
+            # NOTE: what happens if the server respond on another socket ?
+            buf_arg = args[1]
+            buf_sz = args[2]
+
 
         if buf_arg.kind == clang.CursorKind.CALL_EXPR:
             args = list(buf_arg.get_arguments())

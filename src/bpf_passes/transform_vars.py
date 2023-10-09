@@ -57,6 +57,7 @@ def _process_current_inst(inst, info, more):
             return new_inst
     elif inst.kind == clang.CursorKind.CALL_EXPR:
         if inst.name in READ_PACKET:
+            report('Assigning packet buffer to var:', info.rd_buf.name)
             # Assign packet pointer on a previouse line
             text = bpf_get_data(info.rd_buf.name)
             assign_inst = Literal(text, CODE_LITERAL)
@@ -69,6 +70,7 @@ def _process_current_inst(inst, info, more):
             return inst
         elif inst.name in WRITE_PACKET:
             buf = info.wr_buf.name
+            report(f'Using buffer {buf} to send response')
             # TODO: maybe it is too soon to convert instructions to the code
             if info.wr_buf.size_cursor is None:
                 write_size = '<UNKNOWN WRITE BUF SIZE>'
@@ -85,13 +87,15 @@ def _do_pass(inst, info, more):
     lvl, ctx, parent_list = more.unpack()
     new_children = []
 
-    if inst.bpf_ignore is True:
-        return None
+    # if inst.bpf_ignore is True:
+    #     debug(MODULE_TAG, 'remove instruction:', inst)
+    #     return None
 
     with cb_ref.new_ref(ctx, parent_list):
         # Process current instruction
         inst = _process_current_inst(inst, info, more)
         if inst is None:
+            debug(MODULE_TAG, 'remove instruction:', inst)
             return None
 
         # Continue deeper
@@ -108,6 +112,7 @@ def _do_pass(inst, info, more):
                 new_child.append(new_inst)
             if not is_list:
                 if len(new_child) < 1:
+                    debug(MODULE_TAG, 'remove instruction:', inst)
                     return None
                 assert len(new_child) == 1, f'expect to receive one object (count = {len(new_child)})'
                 new_child = new_child[-1]

@@ -5,7 +5,7 @@ from log import debug, error, report
 
 # TODO: How to make sure that `read` is the read system-call and not a simple
 # function?
-READ_PACKET = ['async_read_some', 'read']
+READ_PACKET = ['async_read_some', 'read', 'recvfrom']
 WRITE_PACKET = ['async_write', 'async_write_some', 'write']
 
 # TODO: is it formally correct to ignore a function? We should ignore a
