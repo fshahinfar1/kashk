@@ -32,7 +32,7 @@ class TestCase(BasicTest):
         # Generate the code and show it for debuging
         # text, _ = gen_code(bpf, self.info)
         # print(text)
-        show_insts([bpf])
+        # show_insts([bpf])
 
         # Tests
         failure_paths = get_number_of_failure_paths()

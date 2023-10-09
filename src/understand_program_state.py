@@ -71,6 +71,7 @@ def generate_decleration_for(cursor):
         x = x.get_declaration()
         return generate_decleration_for(x)
     else:
+        report_on_cursor(cursor)
         error('Unexpected! ' + str(cursor.type.kind))
 
     return decl

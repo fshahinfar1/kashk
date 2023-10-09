@@ -14,9 +14,13 @@ class TestCase(BasicTest):
         bpf = Block(BODY)
         bpf.extend_inst(insts)
 
+        show_insts(bpf)
+
         ann = bpf.children[0]
+        print(ann.msg)
         assert ann.kind == ANNOTATION_INST
         assert ann.msg == 'hello'
+        assert ann.ann_kind == Annotation.ANN_SKIP
         print('Parsing Annotation Test: Okay')
 
 

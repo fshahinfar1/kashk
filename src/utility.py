@@ -285,7 +285,7 @@ def skip_unexposed_stmt(cursor):
     while (ptr.kind == clang.CursorKind.UNEXPOSED_STMT or
             ptr.kind == clang.CursorKind.UNEXPOSED_EXPR):
         children = list(ptr.get_children())
-        # assert len(children) == 1
+        assert len(children) == 1
         ptr = children[0]
     return ptr
 

@@ -110,6 +110,25 @@ def __has_read(cursor):
     return False
 
 
+def _create_annotation_inst(value_cursor_children):
+    def _get_field(field_cursor):
+        tmp = list(field_cursor.get_children())
+        key = skip_unexposed_stmt(tmp[0])
+        val = skip_unexposed_stmt(tmp[1])
+        return key.spelling, val.spelling
+
+
+    assert len(value_cursor_children) == 2
+    msg_field, ann_msg = _get_field(value_cursor_children[0])
+    kind_field, ann_kind = _get_field(value_cursor_children[1])
+    # debug(msg_field, ann_msg)
+    # debug(kind_field, ann_kind)
+
+    assert msg_field == Annotation.MESSAGE_FIELD_NAME
+    assert kind_field == Annotation.KIND_FIELD_NAME
+    return Annotation(ann_msg, ann_kind)
+
+
 def _process_switch_case(c, info):
     children = c.get_children()
     cond = next(children)
@@ -418,11 +437,7 @@ def __convert_cursor_to_inst(c, info):
         while len(value_cursor_children) == 1:
             value_cursor_children = list(value_cursor_children[0].get_children())
         if type_cursor.type.spelling == Annotation.ANNOTATION_TYPE_NAME:
-            assert len(value_cursor_children) == 2
-            mem_ref = skip_unexposed_stmt(value_cursor_children[0])
-            msg =  skip_unexposed_stmt(value_cursor_children[1])
-            assert mem_ref.spelling == Annotation.MESSAGE_FIELD_NAME
-            return Annotation(msg.spelling)
+            return _create_annotation_inst(value_cursor_children)
         else:
             error('TODO:')
             report_on_cursor(c)

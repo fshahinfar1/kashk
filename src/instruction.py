@@ -674,9 +674,17 @@ class ToUserspace(Instruction):
 class Annotation(Instruction):
     ANNOTATION_TYPE_NAME = 'struct __annotation'
     MESSAGE_FIELD_NAME = 'message'
-    def __init__(self, msg=None):
+    KIND_FIELD_NAME = 'kind'
+
+    ANN_SKIP = 'ANN_SKIP'
+    ANN_FUNC_PTR = 'ANN_FUNC_PTR'
+
+    def __init__(self, msg, ann_kind):
         super().__init__()
+        assert len(msg) > 2
+        assert ann_kind in (Annotation.ANN_SKIP, Annotation.ANN_FUNC_PTR)
         self.msg = msg[1:-1]
+        self.ann_kind = ann_kind
         self.kind = ANNOTATION_INST
 
     def __str__(self):

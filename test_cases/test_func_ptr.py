@@ -28,7 +28,7 @@ class TestCase(BasicTest):
         assert ref.is_func_ptr() == True, 'The reference was not recognized as function pointer'
 
         funcs = find_elems_of_kind(insts, clang.CursorKind.CALL_EXPR)
-        assert len(funcs)== 3, 'Three are three function calls in the code'
+        assert len(funcs)== 4, f'There are 4 function calls in the code (found {len(funcs)})'
 
         fnptr = funcs[0]
         assert len(fnptr.args) == 2, 'The function should have two arguments'

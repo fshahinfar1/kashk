@@ -10,6 +10,8 @@ int main(int argc, char *argv[])
 	int a = 100;
 	int b = 200;
 	int c = 300;
+	/* void (*cb)(void); */
+	/* cb = f; */
 
 	if (a % 3 == 1) {
 		__ANNOTATE_SKIP
@@ -32,6 +34,11 @@ int main(int argc, char *argv[])
 				__ANNOTATE_SKIP
 				c *= 3;
 			} else {
+				__ANNOTATE_FUNC_PTR_IS("cb", "f");
+				/* we are not using func ptr. just checking
+				 * that other types of annotation does not
+				 * cause ToUserspace instructions if not needed
+				 * */
 				f();
 			}
 	}
