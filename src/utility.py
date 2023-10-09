@@ -160,6 +160,21 @@ def visualize_ast(cursor):
             q.append((child, l+1))
 
 
+def get_token_from_source_code(c):
+    if c.location.file:
+        # Do we know the source file?
+        fname = c.location.file.name
+        if os.path.isfile(fname):
+            with open(fname) as f:
+                l = f.readlines()[c.location.line-1]
+                l = l.rstrip()
+                token = l[c.location.column-1:]
+                end_index = min(filter(lambda x: x > 0, [token.find(' '), token.find('\t'), token.find(';'), token.find(')'), token.find('}')]))
+                token = token[:end_index]
+                return token
+    return '<token not found>'
+
+
 def report_on_cursor(c):
     """
     print some information about the cursor:

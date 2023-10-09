@@ -3,7 +3,7 @@ from contextlib import contextmanager
 import clang.cindex as clang
 
 from log import error
-from utility import get_code, report_on_cursor, visualize_ast, skip_unexposed_stmt
+from utility import get_code, report_on_cursor, visualize_ast, skip_unexposed_stmt, get_token_from_source_code
 from data_structure import *
 from instruction import *
 from prune import (should_process_this_cursor, should_ignore_cursor, READ_PACKET, WRITE_PACKET)
@@ -304,7 +304,9 @@ def __convert_cursor_to_inst(c, info):
             token_text = next(c.get_tokens()).spelling
         except StopIteration:
             # Weirdly there are no token!
-            token_text = '<token not found>'
+            # TODO: Let's try a hack, then I might spend sometime figuring out
+            # what is happnening here.
+            token_text = get_token_from_source_code(c)
         inst = Literal(token_text, c.kind)
         return inst
     elif c.kind == clang.CursorKind.CONTINUE_STMT:
