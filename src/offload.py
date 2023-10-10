@@ -289,10 +289,10 @@ def gen_bpf_code(bpf, info, out_bpf):
     bpf = reduce_params_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
+    # Mark which type or func definitions should be placed in generated code
     debug('Mark Functions used in BPF')
     mark_used_funcs(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
-
 
     # TODO: split the code between parser and verdict
     debug('[Parser/Verdict Split Code]')

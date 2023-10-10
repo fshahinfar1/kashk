@@ -44,22 +44,23 @@ def _process_current_inst(inst, info, more):
         return _check_if_ref_is_global_state(inst, info)
     elif inst.kind == clang.CursorKind.VAR_DECL:
         # Handle read buffer transformation
-        if inst.name == info.rd_buf.name:
-            # The previouse passes should have seperated the initialization
-            # from declaration
-            assert inst.has_children() is False
-            new_inst = VarDecl(None)
-            new_inst.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
-            new_inst.name = inst.name
-            e = info.sym_tbl.insert_entry(inst.name, new_inst.type, new_inst.kind, None)
-            e.is_bpf_ctx = True
-            # replace this instruction
-            return new_inst
+        # if inst.name == info.rd_buf.name:
+        #     # The previouse passes should have seperated the initialization
+        #     # from declaration
+        #     assert inst.has_children() is False
+        #     new_inst = VarDecl(None)
+        #     new_inst.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+        #     new_inst.name = inst.name
+        #     e = info.sym_tbl.insert_entry(inst.name, new_inst.type, new_inst.kind, None)
+        #     e.is_bpf_ctx = True
+        #     # replace this instruction
+        #     return new_inst
+        pass
     elif inst.kind == clang.CursorKind.CALL_EXPR:
         if inst.name in READ_PACKET:
-            report('Assigning packet buffer to var:', info.rd_buf.name)
+            report('Assigning packet buffer to var:', inst.rd_buf.name)
             # Assign packet pointer on a previouse line
-            text = bpf_get_data(info.rd_buf.name)
+            text = bpf_get_data(inst.rd_buf.name)
             assign_inst = Literal(text, CODE_LITERAL)
             blk = cb_ref.get(BODY)
             blk.append(assign_inst)

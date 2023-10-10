@@ -32,22 +32,11 @@ def _get_all_read(block):
     return result
 
 
-def _mark_read_insts(bpf, info):
-    reads = _get_all_read(bpf)
-    if len(reads) == 0:
-        return
-    if len(reads) > 1:
-        error('Multiple read function was found!')
-        return
-
-    r = reads[0]
+def _do_mark_read(r, info):
     args = list(r.get_arguments())
     buf_arg = None
     buf_sz = None
 
-    # TODO: maybe creating a abstraciont here help with adding support for
-    # other IO frameworks
-    # How buffer and size of the buffer is passed to the IO function
     func_name = r.name
     if func_name == 'async_read_some':
         buf_arg = skip_unexposed_stmt(args[0])
@@ -59,65 +48,19 @@ def _mark_read_insts(bpf, info):
         buf_arg = skip_unexposed_stmt(args[1])
         buf_sz = skip_unexposed_stmt(args[2])
 
-    #if buf_arg.kind == clang.CursorKind.CALL_EXPR:
-    #    args = list(buf_arg.get_arguments())
-    #    # TODO: create a mapping from Ref instructions and The variable decleration
-    #    assert False, 'Buf def is not accessible from Instruction class'
-    #    buf_def = buf_arg.get_definition()
-    #    info.rd_buf = PacketBuffer(buf_def)
-    #    if len(args) == 2:
-    #        buf_sz = args[1]
-    #        info.rd_buf.size_cursor = gather_instructions_from(buf_def, info)
-    #    else:
-    #        # TODO: I need to some how know the size and I might not know
-    #        # it! I can try to find the underlying array. But what if it is
-    #        # not an array?
-    #        error('I need to know the buffer size')
-    #        info.rd_buf.size_cursor = [Literal('2048', clang.CursorKind.INTEGER_LITERAL)]
-    #else:
-    #    assert False
-    #    # if the buffer is assigned before and is not a function call
-    #    # TODO: This portion of the code is removing the original
-    #    # definition of the buffer. I need to reimplement it
-    #    buf_def = buf_arg.get_definition()
-    #    remove_def = buf_def
-    #    info.remove_cursor.add(remove_def.get_usr())
-    #    report_on_cursor(buf_def)
-        
-    #    if buf_def.kind == clang.CursorKind.CALL_EXPR:
-    #        buf_def = next(buf_def.get_children())
-    #        args = list(buf_def.get_arguments())
-    #        buf_def = args[0].get_definition()
-    #        buf_sz = args[1]
-    #        info.rd_buf = PacketBuffer(buf_def)
-    #        info.rd_buf.size_cursor = gather_instructions_from(buf_sz, info)
-    #    else:
-    #        #TODO: this is awful
-    #        info.rd_buf = PacketBuffer(buf_def)
-    #        if buf_sz is None:
-    #            children = list(buf_def.get_children())
-    #            if len(children) > 0:
-    #                init = children[0]
-    #                if init.kind == clang.CursorKind.CALL_EXPR:
-    #                    args = list(init.get_arguments())
-    #                    buf_def = args[0].get_definition()
-    #                    buf_sz = args[1]
-    #                    info.rd_buf = PacketBuffer(buf_def)
-    #                    info.rd_buf.size_cursor = gather_instructions_from(buf_sz, info)
-    #                else:
-    #                    raise Exception('')
-    #            else:
-    #                raise Exception('')
-    #        else:
-    #            info.rd_buf.size_cursor = gather_instructions_from(buf_sz, info)
+    pkt_buf = PacketBuffer(None)
+    pkt_buf.size_cursor, _ = gen_code([buf_sz], info)
+    pkt_buf.name, _ = gen_code([buf_arg], info)
+    r.rd_buf = pkt_buf
+    debug('Read buffer:', pkt_buf.name, pkt_buf.size_cursor, r)
+    print(r, id(r))
 
-    info.rd_buf.size_cursor, _ = gen_code([buf_sz], info)
-    info.rd_buf.namae, _ = gen_code([buf_arg], info)
-    debug('Read buffer:', info.rd_buf.name, info.rd_buf.size_cursor)
 
-    if info.rd_buf is None:
-        error('Failed to find the packet buffer')
-        return
+def _mark_read_insts(bpf, info):
+    reads = _get_all_read(bpf)
+    for r in reads:
+        _do_mark_read(r, info)
+
 
 def _mark_write_insts(bpf, info):
     return

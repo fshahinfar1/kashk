@@ -14,7 +14,7 @@ class Info:
         from bpf import SK_SKB_PROG
         from user import UserProg
         self.entry_func_name = None
-        self.rd_buf = PacketBuffer(None)
+        # self.rd_buf = PacketBuffer(None)
         self.wr_buf = PacketBuffer(None)
         self.prog = SK_SKB_PROG()
         self.sym_tbl = SymbolTable()

@@ -139,6 +139,8 @@ class Call(Instruction):
                 if ref_type.kind == clang.TypeKind.POINTER:
                     self.is_func_ptr = True
 
+        self.rd_buf = None
+
     def __str__(self):
         return f'<Call {self.name} ({self.args})>'
 
@@ -167,6 +169,7 @@ class Call(Instruction):
         new.is_method = self.is_method
         new.is_operator = self.is_operator
         new.bpf_ignore = self.bpf_ignore
+        new.rd_buf = self.rd_buf
         return new
 
 
