@@ -252,7 +252,7 @@ class MyType:
 
     def is_record(self):
         return self.kind == clang.TypeKind.RECORD
-    
+
     def is_func_proto(self):
         return self.kind == clang.TypeKind.FUNCTIONPROTO
 
@@ -269,6 +269,10 @@ class MyType:
 class TypeDefinition:
     def __init__(self, name):
         self.name = name
+        self.is_used_in_bpf_code = False
+
+    def get_name(self):
+        return self.name
 
     def __hash__(self):
         return self.name.__hash__()
@@ -313,10 +317,13 @@ class Record(TypeDefinition):
     def get_c_code(self):
         return '\n'+generate_struct_with_fields(self.name, self.fields)
 
+    def get_name(self):
+        return f'struct {self.name}'
+
     def update_symbol_table(self, sym_tbl):
         struct_name = self.name
         T = MyType()
-        T.spelling = f'struct {struct_name}'
+        T.spelling = self.get_name()
         T.kind = clang.TypeKind.RECORD
         scope_key = f'class_{T.spelling}'
         sym_tbl.insert_entry(scope_key, T, clang.CursorKind.CLASS_DECL, None)
@@ -334,8 +341,6 @@ class Record(TypeDefinition):
 
     def __repr__(self):
         return f'<Record {self.name} >'
-
-
 
 
 class Function(TypeDefinition):
@@ -372,7 +377,8 @@ class Function(TypeDefinition):
             raise Exception(f'Function is already defined ({self.name})')
         directory[self.name] = self
 
-        self.is_used_in_bpf_code = False
+    def get_name(self):
+        return f'func {self.name}'
 
     def clone(self, directory):
         return self.clone2(self.name, directory)
@@ -394,6 +400,10 @@ class Function(TypeDefinition):
 
     def is_empty(self):
         return not self.body.has_children()
+
+    def get_arguments(self):
+        return list(self.args)
+
 
 SKB_STRUCT_TYPE = 1000
 SKB_PTR_TYPE = 1001

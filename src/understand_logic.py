@@ -252,8 +252,8 @@ def __convert_cursor_to_inst(c, info):
         res = gather_instructions_from(next(children), info, context=ARG)
         if res:
             return res[0]
-        report_on_cursor(c)
-        debug(res)
+        # report_on_cursor(c)
+        # debug(res)
         error('I am removing an instruction why?')
         return None
     elif c.kind == clang.CursorKind.VAR_DECL:
