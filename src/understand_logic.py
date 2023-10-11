@@ -3,7 +3,7 @@ from contextlib import contextmanager
 import clang.cindex as clang
 
 from log import error, debug
-from utility import get_code, report_on_cursor, visualize_ast, skip_unexposed_stmt, get_token_from_source_code
+from utility import get_code, report_on_cursor, visualize_ast, skip_unexposed_stmt, get_token_from_source_code, token_to_str
 from data_structure import *
 from instruction import *
 from prune import (should_process_this_cursor, should_ignore_cursor, READ_PACKET, WRITE_PACKET)
@@ -127,6 +127,48 @@ def _create_annotation_inst(value_cursor_children):
     assert msg_field == Annotation.MESSAGE_FIELD_NAME
     assert kind_field == Annotation.KIND_FIELD_NAME
     return Annotation(ann_msg, ann_kind)
+
+
+def _make_for_loop(cursor, info):
+    # For loop syntax: for(init, cond, post) body
+    children = list(cursor.get_children())
+    children.reverse()
+
+    # I try to parse the For loop my self
+    tokens = token_to_str(cursor.get_tokens())
+    pbegin = tokens.index('(')
+    pend   = tokens.index(')')
+    parenthesis = tokens[pbegin+1:pend]
+    actual_children = parenthesis.split(';')
+
+    tmp_list = []
+    # Init, Cond, Post
+    for ptr in actual_children:
+        if ptr:
+            tmp_list.append(children.pop())
+        else:
+            tmp_list.append(None)
+    # Body
+    if children:
+        tmp_list.append(children.pop())
+    else:
+        tmp_list.append(None)
+    init, cond, post, body = tmp_list
+
+
+    # assert len(children) == 4
+    inst = ForLoop()
+    # inst.cursor = c
+    inst.cursor = None # TODO: do I need the reference?
+    if init:
+        inst.pre.extend_inst(gather_instructions_from( init, info, context=ARG))
+    if cond:
+        inst.cond.extend_inst(gather_instructions_from(cond, info, context=ARG))
+    if post:
+        inst.post.extend_inst(gather_instructions_from(post, info, context=ARG))
+    if body:
+        inst.body.extend_inst(gather_instructions_from(body, info, context=BODY))
+    return inst
 
 
 def _process_switch_case(c, info):
@@ -356,15 +398,11 @@ def __convert_cursor_to_inst(c, info):
         inst.body.extend_inst(gather_instructions_under(body, info, context=BODY))
         return inst
     elif c.kind == clang.CursorKind.FOR_STMT:
-        children = list(c.get_children())
         # TODO: it will not work when parts of for-loop instruction is omitted. I should fix it.
-        assert len(children) == 4
-        inst = ForLoop()
-        inst.cursor = c
-        inst.pre.extend_inst(gather_instructions_from(children[0], info, context=ARG))
-        inst.cond.extend_inst(gather_instructions_from(children[1], info, context=ARG))
-        inst.post.extend_inst(gather_instructions_from(children[2], info, context=ARG))
-        inst.body.extend_inst(gather_instructions_from(children[3], info, context=BODY))
+        # For loop syntax: for(init, cond, post) body
+        # each part of this for loop construct can be omitied, but libclang is
+        # not telling me which part is missing, here is a hack.
+        inst = _make_for_loop(c, info)
         return inst
     elif c.kind == clang.CursorKind.SWITCH_STMT:
         inst = _process_switch_case(c, info)

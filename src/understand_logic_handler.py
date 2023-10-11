@@ -181,6 +181,7 @@ def understand_call_expr(c, info):
 
     if inst.name not in Function.func_cursor:
         func_decl = c.referenced
+        assert func_decl is not None, 'Failed to parse: did not found the cursor to the function decleration/definition'
         if not func_decl.is_definition():
             tmp = func_decl.get_definition()
             if tmp:

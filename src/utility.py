@@ -159,6 +159,9 @@ def visualize_ast(cursor):
         for child in children:
             q.append((child, l+1))
 
+def token_to_str(tkns):
+    return ''.join(list(map(lambda t: t.spelling, tkns)))
+
 
 def get_token_from_source_code(c):
     if c.location.file:
