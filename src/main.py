@@ -56,6 +56,7 @@ def main():
 
     ctx = InputOutputContext()
     ctx.set_input(input_file)
+    ctx.other_source_files = args.sources
     if out_user:
         ctx.set_user_output(out_user)
     if args.out_bpf:

@@ -1,5 +1,5 @@
 from dfs import DFSPass
-from log import debug, error
+from log import debug, error, report
 from prune import should_process_this_cursor
 from utility import report_on_cursor, PRIMITIVE_TYPES
 
@@ -65,7 +65,7 @@ def pass_over_global_variables(cursor, info):
         if c.kind == clang.CursorKind.VAR_DECL:
             T = MyType.from_cursor_type(c.type)
             info.sym_tbl.insert_entry(c.spelling, T, c.kind, c)
-        if c.kind == clang.CursorKind.TRANSLATION_UNIT:
+        elif c.kind == clang.CursorKind.TRANSLATION_UNIT:
             d.go_deep()
 
 
@@ -83,22 +83,7 @@ def __function_decl(cursor, info):
         __collect_information_about_func(cursor, info)
 
 
-def build_sym_table(cursor, info):
-    """
-    Go through all the declarations of class, struct, function, fields, and
-    variables.  Create scope for class and functions and add the fields or
-    variables to the correct scope.
-
-    This function does not explore the body of functions. This is postponed for
-    later.
-    """
-    # Define the field of BPF context
-    info.prog.set_bpf_context_struct_sym_tbl(info.sym_tbl)
-    pass_over_global_variables(cursor, info)
-    info.sym_tbl.current_scope = info.sym_tbl.global_scope
-
-    info.sym_tbl.scope_mapping['__global__'] = info.sym_tbl.current_scope
-
+def __pass_over_source_file(cursor, info):
     unnamed_struct_coutner = 0
     d = DFSPass(cursor)
     # d: dfs object
@@ -107,17 +92,6 @@ def build_sym_table(cursor, info):
     for c, l in d:
         if c.kind == clang.CursorKind.FUNCTION_DECL:
             __function_decl(c, info)
-            # if not c.is_definition():
-            #     tmp = c.get_definition()
-            #     if not tmp:
-            #         # Does not have a definition for this function (private)
-            #         __function_decl(c, info)
-            #     else:
-            #         # Process the definition instead of decleration
-            #         __function_decl(tmp, info)
-            # else:
-            #     # This cursor is to the definition and not the declaration of the function
-            #     __function_decl(c, info)
             continue
 
         if not (should_process_this_cursor(c) or c.kind == clang.CursorKind.TRANSLATION_UNIT):
@@ -128,6 +102,9 @@ def build_sym_table(cursor, info):
                 continue
 
             scope_key = f'class_{c.spelling}'
+            if info.sym_tbl.lookup(scope_key) is not None:
+                # report(f'The class {scope_key} is declared multiple times, ignoring')
+                continue
             T = MyType.from_cursor_type(c.type)
             info.sym_tbl.insert_entry(scope_key, T, c.kind, None)
 
@@ -150,6 +127,9 @@ def build_sym_table(cursor, info):
                 remember_unnamed_struct_name[c.get_usr()] = scope_key
             else:
                 scope_key = f'class_struct {c.spelling}'
+            if info.sym_tbl.lookup(scope_key) is not None:
+                # report(f'The struct {scope_key} is declared multiple time, ignoring')
+                continue
             T = MyType.from_cursor_type(c.type)
             info.sym_tbl.insert_entry(scope_key, T, c.kind, c)
             with info.sym_tbl.new_scope() as scope:
@@ -197,3 +177,30 @@ def build_sym_table(cursor, info):
             continue
 
         d.go_deep()
+
+
+def process_source_file(cursor, info):
+    """
+    Go through all the declarations of class, struct, function, fields, and
+    variables.  Create scope for class and functions and add the fields or
+    variables to the correct scope.
+
+    This function does not explore the body of functions. This is postponed for
+    later.
+    """
+    info.sym_tbl.current_scope = info.sym_tbl.global_scope
+    pass_over_global_variables(cursor, info)
+    __pass_over_source_file(cursor, info)
+
+
+def build_sym_table(cursor, info):
+    """
+    Boot strap the symbol table
+    @param cursor: the main file AST
+    """
+    # Define the field of BPF context
+    info.prog.set_bpf_context_struct_sym_tbl(info.sym_tbl)
+
+    info.sym_tbl.current_scope = info.sym_tbl.global_scope
+    info.sym_tbl.scope_mapping['__global__'] = info.sym_tbl.current_scope
+    process_source_file(cursor, info)

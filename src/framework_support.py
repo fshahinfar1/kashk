@@ -12,6 +12,7 @@ class InputOutputContext:
         self.entry_func = ''
         self.input_framework = None
         self.cflags = ''
+        self.other_source_files = []
 
     def set_input(self, path):
         self.input_file = path

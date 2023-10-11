@@ -7,7 +7,7 @@ from instruction import *
 from utility import (parse_file, find_elem, add_state_decl_to_bpf,
         report_user_program_graph, draw_tree, show_insts)
 from find_ev_loop import find_request_processing_logic
-from sym_table_gen import build_sym_table
+from sym_table_gen import build_sym_table, process_source_file
 from understand_program_state import extract_state, get_state_for
 from understand_logic import (get_all_read, get_all_send,
         gather_instructions_from)
@@ -54,6 +54,16 @@ def _print_code(prog, info):
     debug('code:\n', text, '\n---', sep='')
 
 
+def load_other_sources(io_ctx, info):
+    # This is the AST generated with Clang
+    others = []
+    for path in io_ctx.other_source_files:
+        report('Load:', path)
+        _, _, other_cursor = parse_file(path, io_ctx.cflags)
+        others.append(other_cursor)
+        process_source_file(other_cursor, info)
+
+
 # TODO: make a framework agnostic interface, allow for porting to other
 # functions
 def generate_offload(io_ctx):
@@ -69,13 +79,15 @@ def generate_offload(io_ctx):
     info.entry_func_name = entry_func_name
     info.io_ctx = io_ctx
 
-    # This is the AST generated with Clang
     index, tu, cursor = parse_file(file_path, io_ctx.cflags)
 
     # Collect information about classes, functions, variables, ...
     build_sym_table(cursor, info)
 
     boot_starp_global_state(cursor, info)
+
+    # Load other source files
+    load_other_sources(io_ctx, info)
 
     # Find the entry function
     entry_func = None
