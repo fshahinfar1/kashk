@@ -1,6 +1,7 @@
 import os
 import clang.cindex as clang
 import subprocess
+import time
 
 from log import error, debug, report
 
@@ -58,11 +59,15 @@ def parse_file(file_path, args):
 
     # Do preprocessing, the libclang is not doing well with macros
     tmp = ' '.join(compiler_args)
-    # cmd = f'clang -E {tmp} {file_path}'
-    # prepfile = '/tmp/kashk_preprocessed_file' + ext
-    # with open(prepfile, 'w') as f:
-    #     subprocess.run(cmd, shell=True, stdin=subprocess.DEVNULL, stdout=f)
-    prepfile = file_path
+    use_pre_processing = False
+    if use_pre_processing:
+        cmd = f'clang -E {tmp} {file_path}'
+        ts = int(time.time())
+        prepfile = f'/tmp/kashk_preprocessed_file_{ts}' + ext
+        with open(prepfile, 'w') as f:
+            subprocess.run(cmd, shell=True, stdin=subprocess.DEVNULL, stdout=f)
+    else:
+        prepfile = file_path
     index = clang.Index.create()
     tu = index.parse(prepfile, args=compiler_args)
     if tu.diagnostics:
@@ -194,7 +199,11 @@ def report_on_cursor(c):
         fname = c.location.file.name
         if os.path.isfile(fname):
             with open(fname) as f:
-                l = f.readlines()[c.location.line-1]
+                lines = f.readlines()
+                # debug(c.location.line-1, len(lines))
+                # debug(c.location.file.name)
+                assert c.location.line > 0 and c.location.line <= len(lines)
+                l = lines[c.location.line-1]
                 l = l.rstrip()
                 debug(l)
                 debug(' ' * (c.location.column -1) + '^')

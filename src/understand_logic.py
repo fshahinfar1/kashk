@@ -3,11 +3,13 @@ from contextlib import contextmanager
 import clang.cindex as clang
 
 from log import error, debug
-from utility import get_code, report_on_cursor, visualize_ast, skip_unexposed_stmt, get_token_from_source_code, token_to_str
+from utility import get_code, report_on_cursor, visualize_ast, skip_unexposed_stmt, get_token_from_source_code
 from data_structure import *
 from instruction import *
 from prune import (should_process_this_cursor, should_ignore_cursor, READ_PACKET, WRITE_PACKET)
 from understand_program_state import get_state_for
+
+from parser.for_loop import parse_for_loop_stmt
 
 from dfs import DFSPass
 
@@ -128,35 +130,8 @@ def _create_annotation_inst(value_cursor_children):
     assert kind_field == Annotation.KIND_FIELD_NAME
     return Annotation(ann_msg, ann_kind)
 
-
 def _make_for_loop(cursor, info):
-    # For loop syntax: for(init, cond, post) body
-    children = list(cursor.get_children())
-    children.reverse()
-
-    # I try to parse the For loop my self
-    tokens = token_to_str(cursor.get_tokens())
-    pbegin = tokens.index('(')
-    pend   = tokens.index(')')
-    parenthesis = tokens[pbegin+1:pend]
-    actual_children = parenthesis.split(';')
-
-    tmp_list = []
-    # Init, Cond, Post
-    for ptr in actual_children:
-        if ptr:
-            tmp_list.append(children.pop())
-        else:
-            tmp_list.append(None)
-    # Body
-    if children:
-        tmp_list.append(children.pop())
-    else:
-        tmp_list.append(None)
-    init, cond, post, body = tmp_list
-
-
-    # assert len(children) == 4
+    init, cond, post, body = parse_for_loop_stmt(cursor)
     inst = ForLoop()
     # inst.cursor = c
     inst.cursor = None # TODO: do I need the reference?

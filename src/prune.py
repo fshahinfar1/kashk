@@ -65,14 +65,25 @@ def should_ignore_cursor(cursor):
     this function is used to decide if the cursor should be removed from all processing.
     The mentioned function decides if the cursor belongs to user-space program.
     """
+    from instruction import UnaryOp
     if __is_ignored_function(cursor):
         return True
+
     if cursor.kind == clang.CursorKind.UNARY_OPERATOR:
-        count_token = len(list(cursor.get_tokens()))
+        tokens = [t.spelling for t in cursor.get_tokens()]
+        count_token = len(tokens)
         if count_token < 2:
             error('Unary operator with less than 2 tokens will fail to convert to UnaryOp object. It was ignored!')
             return True
-    if cursor.kind == clang.CursorKind.BINARY_OPERATOR:
+        # Basically check if we can find the unary operator
+        candid = tokens[0]
+        if candid not in UnaryOp.OPS:
+            for candid in tokens:
+                if candid in UnaryOp.OPS:
+                    break
+            else:
+                return True
+    elif cursor.kind in (clang.CursorKind.BINARY_OPERATOR, clang.CursorKind.COMPOUND_ASSIGNMENT_OPERATOR):
         count_token = len(list(cursor.get_tokens()))
         # report_on_cursor(cursor)
         # children = list(cursor.get_children())
@@ -96,3 +107,5 @@ def should_ignore_cursor(cursor):
         if lhs_tokens >= tokens:
             error('Binary operator which we can not find the operator for')
             return True
+
+    return False

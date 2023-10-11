@@ -71,5 +71,8 @@ int main(int argc, char *argv[])
 
 	for (;;);
 
+	/* This for loop is testing detection of paranthesis and semicolons */
+	for(char*p=strtok_r(list,";,",&b);p!=NULL;p=strtok_r(NULL,";,",&b)){ a++; }
+
 	return 0;
 }

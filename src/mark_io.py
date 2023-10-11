@@ -53,7 +53,6 @@ def _do_mark_read(r, info):
     pkt_buf.name, _ = gen_code([buf_arg], info)
     r.rd_buf = pkt_buf
     debug('Read buffer:', pkt_buf.name, pkt_buf.size_cursor, r)
-    print(r, id(r))
 
 
 def _mark_read_insts(bpf, info):
