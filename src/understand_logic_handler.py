@@ -86,6 +86,35 @@ def __get_func_args(inst, info):
     return args
 
 
+def _remember_func_cursor(inst, c):
+    if inst.is_operator:
+        return
+    # Remember the function definition cursor for later generating the Function
+    # data structure
+    know_previous_def_of_func = False
+    if inst.name in Function.func_cursor:
+        func_def_cursor = Function.func_cursor[inst.name]
+        know_previous_def_of_func = func_def_cursor.is_definition()
+    func_decl = c.referenced
+    assert func_decl is not None, 'Failed to parse: did not found the cursor to the function decleration/definition'
+    if not func_decl.is_definition():
+        tmp = func_decl.get_definition()
+        if tmp:
+            func_decl = tmp
+    if know_previous_def_of_func:
+        if func_decl.is_definition():
+            if func_decl == func_def_cursor:
+                # This is the same definition we already know about
+                pass
+            else:
+                error(MODULE_TAG, f'Multiple definition for function {inst.name} is found!')
+        else:
+            # We already know a definition and do not care about this cursor.
+            pass
+    else:
+        Function.func_cursor[inst.name] = func_decl
+
+
 def understand_call_expr(c, info):
     tmp_func_name = c.spelling
 
@@ -98,18 +127,7 @@ def understand_call_expr(c, info):
     inst.name = __get_func_name(inst, info)
     inst.args = __get_func_args(inst, info)
 
-    if inst.name not in Function.func_cursor:
-        func_decl = c.referenced
-        assert func_decl is not None, 'Failed to parse: did not found the cursor to the function decleration/definition'
-        if not func_decl.is_definition():
-            tmp = func_decl.get_definition()
-            if tmp:
-                func_decl = tmp
-        Function.func_cursor[inst.name] = func_decl
-
-    # check if function is defined
-    # if (not inst.is_operator) and (inst.name not in Function.directory):
-    #     __add_func_definition(inst, info)
+    _remember_func_cursor(inst, c)
     return inst
 
 
@@ -168,8 +186,11 @@ def create_func_objs(info):
     processed = set([info.entry_func_name, ])
     while True:
         keys = set(Function.func_cursor.keys())
-        if keys == processed:
+        # if keys == processed:
+        #     break
+        if len(processed) >= len(keys):
             break
+        # print(len(processed), '/', len(keys))
         for name in keys:
             if name in processed:
                 continue

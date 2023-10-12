@@ -52,9 +52,6 @@ def __collect_information_about_func(cursor, info):
 
     # TODO: Do I need to process the body of each functions?
     # body = children[-1]
-    if cursor.is_definition and should_process_this_cursor(cursor):
-        Function.func_cursor[cursor.spelling] = cursor
-
 
 def pass_over_global_variables(cursor, info):
     """
@@ -71,6 +68,14 @@ def pass_over_global_variables(cursor, info):
 
 def __function_decl(cursor, info):
     assert cursor.kind == clang.CursorKind.FUNCTION_DECL
+
+    if cursor.is_definition() and should_process_this_cursor(cursor):
+        key = cursor.spelling
+        if key in Function.func_cursor:
+            error(MODULE_TAG, f'Multiple implementation of {key}')
+        Function.func_cursor[key] = cursor
+        debug('Found function:', key)
+
     scope_key = f'{cursor.spelling}'
     if scope_key in info.sym_tbl.scope_mapping:
         # debug(MODULE_TAG, f'function {scope_key} has once been declared')
@@ -90,6 +95,9 @@ def __pass_over_source_file(cursor, info):
     # c: cursor object
     # l: level (int)
     for c, l in d:
+        # NOTE: I want to create a structure even for functions that are not in
+        # libraries. That is why it is before `should_process_this_cursor`
+        # check 
         if c.kind == clang.CursorKind.FUNCTION_DECL:
             __function_decl(c, info)
             continue

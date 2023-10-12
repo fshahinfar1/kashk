@@ -1,6 +1,10 @@
 entry: event_handler
 main: /home/farbod/auto_bpf_offload/auto_bpf_offload_case_study/src/memcached/memcached.c
 sources: [
+    /home/farbod/auto_bpf_offload/auto_bpf_offload_case_study/src/memcached/proto_bin.c,
+    /home/farbod/auto_bpf_offload/auto_bpf_offload_case_study/src/memcached/proto_text.c,
+]
+_sources: [
     /home/farbod/auto_bpf_offload/auto_bpf_offload_case_study/src/memcached/assoc.c,
     /home/farbod/auto_bpf_offload/auto_bpf_offload_case_study/src/memcached/authfile.c,
     /home/farbod/auto_bpf_offload/auto_bpf_offload_case_study/src/memcached/base64.c,
