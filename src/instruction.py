@@ -35,7 +35,9 @@ def _generate_marked_children(groups, context):
 
 
 class Instruction:
-    MAY_NOT_OVERLOAD = (clang.CursorKind.BREAK_STMT, clang.CursorKind.CONTINUE_STMT, clang.CursorKind.RETURN_STMT)
+    MAY_NOT_OVERLOAD = (clang.CursorKind.BREAK_STMT,
+            clang.CursorKind.CONTINUE_STMT, clang.CursorKind.RETURN_STMT,
+            clang.CursorKind.GOTO_STMT, clang.CursorKind.LABEL_STMT)
     def __init__(self):
         self.kind = None
         self.bpf_ignore = False
@@ -683,11 +685,13 @@ class Annotation(Instruction):
 
     ANN_SKIP = 'ANN_SKIP'
     ANN_FUNC_PTR = 'ANN_FUNC_PTR'
+    ANN_CACHE_BEGIN = 'ANN_CACHE_BEGIN'
+    ANN_CACHE_END = 'ANN_CACHE_END'
 
     def __init__(self, msg, ann_kind):
         super().__init__()
         assert len(msg) > 2
-        assert ann_kind in (Annotation.ANN_SKIP, Annotation.ANN_FUNC_PTR)
+        assert ann_kind in (Annotation.ANN_SKIP, Annotation.ANN_FUNC_PTR, Annotation.ANN_CACHE_BEGIN, Annotation.ANN_CACHE_END)
         self.msg = msg[1:-1]
         self.ann_kind = ann_kind
         self.kind = ANNOTATION_INST

@@ -357,6 +357,16 @@ def __convert_cursor_to_inst(c, info, _state):
         inst = Instruction()
         inst.kind = c.kind
         return inst
+    elif c.kind == clang.CursorKind.LABEL_STMT:
+        inst = Instruction()
+        inst.kind = c.kind
+        inst.label = c.spelling
+    elif c.kind == clang.CursorKind.GOTO_STMT:
+        label = next(c.get_children())
+        inst = Instruction()
+        inst.kind = c.kind
+        inst.label = label.spelling
+        return inst
     elif c.kind == clang.CursorKind.IF_STMT:
         children = list(c.get_children())
         cond = gather_instructions_from(children[0], info, context=ARG)

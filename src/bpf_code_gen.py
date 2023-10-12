@@ -283,17 +283,18 @@ def handle_to_userspace(inst, info, more):
 
 
 # Put semi-colon and go to next line after these nodes
-NEED_SEMI_COLON = set((clang.CursorKind.CALL_EXPR, clang.CursorKind.VAR_DECL,
+NEED_SEMI_COLON = (clang.CursorKind.CALL_EXPR, clang.CursorKind.VAR_DECL,
     clang.CursorKind.BINARY_OPERATOR, clang.CursorKind.CONTINUE_STMT,
     clang.CursorKind.DO_STMT, clang.CursorKind.RETURN_STMT,
     clang.CursorKind.CONTINUE_STMT, clang.CursorKind.BREAK_STMT,
-    clang.CursorKind.CXX_THROW_EXPR, clang.CursorKind.UNARY_OPERATOR,))
+    clang.CursorKind.CXX_THROW_EXPR, clang.CursorKind.UNARY_OPERATOR,
+    clang.CursorKind.GOTO_STMT)
 
 # Go to next line after these nodes
 GOTO_NEXT_LINE = (clang.CursorKind.IF_STMT, clang.CursorKind.FOR_STMT,
         clang.CursorKind.SWITCH_STMT, clang.CursorKind.CASE_STMT,
         clang.CursorKind.DEFAULT_STMT, CODE_LITERAL, TO_USERSPACE_INST,
-        clang.CursorKind.WHILE_STMT)
+        clang.CursorKind.WHILE_STMT, clang.CursorKind.LABEL_STMT,)
 
 NO_MODIFICATION = 0
 REPLACE_READ = 1
@@ -319,6 +320,8 @@ jump_table = {
         clang.CursorKind.MACRO_INSTANTIATION: handle_literal,
         CODE_LITERAL: handle_literal,
         # Control FLow
+        clang.CursorKind.LABEL_STMT: lambda x,y,z: indent('{x.label}:', z[0]),
+        clang.CursorKind.GOTO_STMT: lambda x,y,z: indent('goto {x.label}', z[0]),
         clang.CursorKind.IF_STMT: handle_if_stmt,
         clang.CursorKind.DO_STMT: handle_do_stmt,
         clang.CursorKind.WHILE_STMT: handle_while_stmt,

@@ -74,7 +74,6 @@ def __function_decl(cursor, info):
         if key in Function.func_cursor:
             error(MODULE_TAG, f'Multiple implementation of {key}')
         Function.func_cursor[key] = cursor
-        debug('Found function:', key)
 
     scope_key = f'{cursor.spelling}'
     if scope_key in info.sym_tbl.scope_mapping:
