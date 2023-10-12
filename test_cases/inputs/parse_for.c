@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 
 int main(int argc, char *argv[])
 {
@@ -72,6 +73,8 @@ int main(int argc, char *argv[])
 	for (;;);
 
 	/* This for loop is testing detection of paranthesis and semicolons */
+	char *list = "hello;,world;,::)";
+	char *b = NULL;
 	for(char*p=strtok_r(list,";,",&b);p!=NULL;p=strtok_r(NULL,";,",&b)){ a++; }
 
 	return 0;

@@ -145,16 +145,16 @@ def _do_pass(inst, info, more):
 
 
 def _do_feasibility_analisys(inst, info, more):
-    global current_function
     global cb_ref
     global fail_ref
-    current_function = more.get('func')
     cb_ref = CodeBlockRef()
     fail_ref = CodeBlockRef()
 
-    with cb_ref.new_ref(PARENT_INST, None):
-        with fail_ref.new_ref(FAILED, False):
-            return _do_pass(inst, info, more)
+    func = more.get('func', None)
+    with remember_func(func):
+        with cb_ref.new_ref(PARENT_INST, None):
+            with fail_ref.new_ref(FAILED, False):
+                return _do_pass(inst, info, more)
 
 
 def feasibilty_analysis_pass(inst, info, more):
@@ -175,7 +175,6 @@ def feasibilty_analysis_pass(inst, info, more):
         obj = PassObject()
         obj.func = func
         _do_feasibility_analisys(func.body, info, obj)
-        # debug(func.return_type, func.name, func.may_fail, func.may_succeed, func.body.children)
         assert func.may_fail or func.may_succeed, f'After this processing we should have decide if function can fail or not (func: {func.name})'
 
     res = mark_user_boundary_pass(res, info, PassObject())

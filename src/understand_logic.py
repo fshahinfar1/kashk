@@ -15,8 +15,27 @@ from dfs import DFSPass
 
 MODULE_TAG = '[Understand Pass]'
 
+class _State:
+    """
+    Holding state on global variables introduce bugs when running different
+    instance of computing recursively. This is my attempt to put the state on
+    an object and pass the object along the function calls.
+    """
+    def __init__(self):
+        self.cb_ref = CodeBlockRef()
+        self.code_for_bpf = True
 
-cb_ref = CodeBlockRef()
+    def get_global_for_bpf(self):
+        return self.code_for_bpf
+
+    @contextmanager
+    def set_global_for_bpf(val):
+        tmp = self.code_for_bpf
+        self.code_for_bpf = val
+        try:
+            yield None
+        finally:
+            self.code_for_bpf = tmp
 
 
 def get_variable_declaration_before_elem(cursor, target_cursor, info):
@@ -210,7 +229,7 @@ def _process_switch_case(c, info):
         inst.body.add_inst(case_inst)
     return inst
 
-def __convert_cursor_to_inst(c, info):
+def __convert_cursor_to_inst(c, info, _state):
     if c.kind == clang.CursorKind.CALL_EXPR:
         return understand_call_expr(c, info)
     elif (c.kind == clang.CursorKind.BINARY_OPERATOR
@@ -443,7 +462,7 @@ def __convert_cursor_to_inst(c, info):
         children = list(c.get_children())
         if len(children) == 1:
             child = children[0]
-            return  __convert_cursor_to_inst(child, info)
+            return  __convert_cursor_to_inst(child, info, _state)
         else:
             error('TODO:')
             report_on_cursor(c)
@@ -471,28 +490,14 @@ def __convert_cursor_to_inst(c, info):
         return None
 
 
-code_for_bpf = True
-def get_global_for_bpf():
-    return code_for_bpf
-
-
-@contextmanager
-def set_global_for_bpf(val):
-    global code_for_bpf
-    tmp = code_for_bpf
-    code_for_bpf = val
-    try:
-        yield None
-    finally:
-        code_for_bpf = tmp
-
-
-def gather_instructions_from(cursor, info, context=BODY):
+def gather_instructions_from(cursor, info, context=BODY, _state=None):
     """
     Convert the cursor to a instruction
     """
+    if _state is None:
+        _state = _State()
     ops = []
-    cb_ref.push(context, ops)
+    _state.cb_ref.push(context, ops)
     d = DFSPass(cursor)
     for c, lvl in d:
         # debug('  ' * lvl, c.kind, c.spelling)
@@ -501,8 +506,8 @@ def gather_instructions_from(cursor, info, context=BODY):
             return [Literal(f'/*<placeholder {txt}>*/', CODE_LITERAL)]
 
         if not should_process_this_cursor(c):
-            with set_global_for_bpf(False):
-                inst = __convert_cursor_to_inst(c, info)
+            with _state.set_global_for_bpf(False):
+                inst = __convert_cursor_to_inst(c, info, _state)
                 if inst:
                     inst.bpf_ignore = True
                     ops.append(inst)
@@ -526,11 +531,12 @@ def gather_instructions_from(cursor, info, context=BODY):
         # TODO: the info = None is a case I introduced when hacking the
         # get_owner helper function. It should be avoided. It is bad code.
         if info is not None and c.get_usr() in info.remove_cursor:
-            with set_global_for_bpf(False):
-                inst = __convert_cursor_to_inst(c, info)
+            assert 0, 'This id dead'
+            with _state.set_global_for_bpf(False):
+                inst = __convert_cursor_to_inst(c, info, _state)
                 inst.bpf_ignore = True
         else:
-            inst = __convert_cursor_to_inst(c, info)
+            inst = __convert_cursor_to_inst(c, info, _state)
 
 
         # TODO: handling the IO frameworks needs a bit of thought
@@ -539,11 +545,11 @@ def gather_instructions_from(cursor, info, context=BODY):
 
         if inst:
             ops.append(inst)
-    cb_ref.pop()
+    _state.cb_ref.pop()
     return ops
 
 
-def gather_instructions_under(cursor, info, context):
+def gather_instructions_under(cursor, info, context, _state=None):
     """
     Get the list of instruction in side a block of code.
     (Expecting the cursor to be a block of code)
@@ -551,7 +557,7 @@ def gather_instructions_under(cursor, info, context):
     # Gather instructions in this list
     ops = []
     for c in cursor.get_children():
-        insts = gather_instructions_from(c, info, context)
+        insts = gather_instructions_from(c, info, context, _state)
         ops.extend(insts)
 
     return ops

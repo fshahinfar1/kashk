@@ -28,7 +28,7 @@ def parse_args_yaml():
     args = parser.parse_args()
     try:
         with open(args.yaml_file, 'r') as f:
-            config = yaml.load(f)
+            config = yaml.load(f, Loader=yaml.FullLoader)
     except Exception as e:
         error('Failed to load yaml file')
         error(e)

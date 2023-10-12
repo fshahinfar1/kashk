@@ -4,8 +4,7 @@ from log import error, debug, report
 from prune import READ_PACKET, WRITE_PACKET, COROUTINE_FUNC_NAME
 from data_structure import *
 from instruction import *
-from understand_logic import (gather_instructions_from,
-        gather_instructions_under, cb_ref, get_global_for_bpf)
+from understand_logic import gather_instructions_from, gather_instructions_under
 from sym_table import *
 
 from prune import should_process_this_cursor
@@ -87,86 +86,6 @@ def __get_func_args(inst, info):
     return args
 
 
-def __add_func_definition(inst, info):
-    assert False, 'Should not use this'
-    if not info:
-        return
-    scope = info.sym_tbl.scope_mapping.get(inst.name)
-    if not scope:
-        if inst.is_func_ptr:
-            report(f'We do not have a scope for function pointer {inst.name} but allowed the creation of Function structure! (Am I breaking assumptions?)')
-            scope = None
-        else:
-            error(MODULE_TAG, 'The scope for the function', inst.name, 'was not found')
-            return
-
-    f = Function(inst.name, inst.func_ptr)
-    f.is_method = inst.is_method
-    if f.is_method:
-        if inst.owner:
-            method_obj, _ = gen_code(inst.owner[0], info)
-
-            T = MyType()
-            T.spelling = f'struct {method_obj.type.spelling} *'
-            T.kind = clang.TypeKind.POINTER
-            T.under_type = MyType()
-            T.under_type.spelling = f'struct {method_obj.type.spelling}'
-            T.under_type.kind = clang.TypeKind.RECORD
-
-            ref = StateObject(None)
-            ref.name = 'self'
-            ref.kind = clang.CursorKind.PARM_DECL
-            ref.type =  T.spelling
-            ref.is_pointer = True
-            ref.type_ref = T
-        else:
-            # Use the current class as the type
-            cls_sym = info.sym_tbl.lookup('__class__')
-
-            cls_type = MyType()
-            cls_type.spelling = 'struct {cls_sym.name}'
-            cls_type.kind = clang.TypeKind.RECORD
-            T = MyType.make_pointer(cls_type)
-
-            ref = StateObject(None)
-            ref.name = 'self'
-            ref.kind = clang.CursorKind.PARM_DECL
-            ref.type = T.spelling
-            ref.is_pointer = True
-            ref.type_ref = T
-
-        f.args = [ref] + f.args
-
-    # Recursively analize the function body
-    c = inst.func_ptr
-    body = None
-    if c is not None and c.is_definition():
-        children = list(c.get_children())
-        body = children[-1]
-        while body.kind == clang.CursorKind.UNEXPOSED_STMT:
-            body = next(body.get_children())
-        # assert (body.kind == clang.CursorKind.COMPOUND_STMT)
-        if body.kind != clang.CursorKind.COMPOUND_STMT:
-            # did not found the body
-            body = None
-
-    if body:
-        # Switch scope
-        old_scope = info.sym_tbl.current_scope
-        info.sym_tbl.current_scope = scope
-
-        # Add parameters to the function scope
-        for a in f.args:
-            info.sym_tbl.insert_entry(a.name, a.type_ref, a.kind, a)
-
-        # Process function body recursively
-        body = gather_instructions_under(body, info, BODY)
-        f.body.extend_inst(body)
-        info.sym_tbl.current_scope = old_scope
-
-        info.prog.add_declaration(f)
-
-
 def understand_call_expr(c, info):
     tmp_func_name = c.spelling
 
@@ -196,10 +115,6 @@ def understand_call_expr(c, info):
 
 def __add_func_definition2(name, cursor, info):
     assert info is not None
-    scope = info.sym_tbl.scope_mapping.get(name)
-    if not scope:
-        error(MODULE_TAG, 'The scope for the function', name, 'was not found')
-        return
 
     f = Function(name, cursor)
     is_operator = name.startswith('operator')
@@ -208,6 +123,10 @@ def __add_func_definition2(name, cursor, info):
     if not is_operator and fn_def and fn_def.kind == clang.CursorKind.CXX_METHOD:
         is_method = True
     f.is_method = is_method
+
+    if is_operator:
+        # I am not messing up with operators now
+        return
 
     if f.is_method:
         raise Exception('Re implement passing the class object to the function')
@@ -220,10 +139,16 @@ def __add_func_definition2(name, cursor, info):
         body = skip_unexposed_stmt(body)
         if body.kind != clang.CursorKind.COMPOUND_STMT:
             # did not found the body
-            error(f'Did not found the body for function: {f.name}')
+            # error(f'Did not found the body for function: {f.name}')
             body = None
 
     if body:
+        scope = info.sym_tbl.scope_mapping.get(name)
+        if not scope:
+            report_on_cursor(cursor)
+            error(MODULE_TAG, 'The scope for the function', name, 'was not found')
+            return
+
         # Switch scope
         old_scope = info.sym_tbl.current_scope
         info.sym_tbl.current_scope = scope
@@ -237,11 +162,9 @@ def __add_func_definition2(name, cursor, info):
         f.body.extend_inst(body)
         info.sym_tbl.current_scope = old_scope
 
-        info.prog.add_declaration(f)
-
 
 def create_func_objs(info):
-    processed = set()
+    processed = set([info.entry_func_name, ])
     while True:
         keys = set(Function.func_cursor.keys())
         if keys == processed:

@@ -1,5 +1,7 @@
 #! /bin/bash
 
+DEBUG=0
+
 # If there is a virtual environment directory, enable it
 if [ -d ./venv/ ]; then
 	source ./venv/bin/activate
@@ -32,7 +34,11 @@ run_with_args() {
 
 run_with_yaml() {
 	YAML="$CURDIR/mem_config.yaml"
-	python3 $SCRIPT $YAML
+	if [ $DEBUG -eq 1 ]; then
+		python3 -m pdb $SCRIPT $YAML
+	else
+		python3 $SCRIPT $YAML
+	fi
 }
 
 

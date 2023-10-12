@@ -11,7 +11,7 @@ from sym_table_gen import build_sym_table
 from understand_logic import gather_instructions_under
 from understand_logic_handler import create_func_objs
 
-from data_structure import Info
+from data_structure import Info, Function
 from instruction import BODY
 
 class BasicTest:
