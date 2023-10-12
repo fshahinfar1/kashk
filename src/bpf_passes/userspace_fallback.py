@@ -240,7 +240,7 @@ def _do_pass(inst, info, more):
                         new_child.extend(a.box)
 
                     if i.kind == TO_USERSPACE_INST:
-                        debug(MODULE_TAG, 'Found to Userspace trim the code')
+                        # debug(MODULE_TAG, 'Found to Userspace trim the code')
                         break
             else:
                 obj = PassObject.pack(lvl+1, tag, parent_list)

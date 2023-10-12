@@ -15,13 +15,17 @@ def _do_pass(inst, info, more):
         if inst.kind == clang.CursorKind.CALL_EXPR:
             func = inst.get_function_def()
             if func:
-                func.is_used_in_bpf_code = True
+                if not func.is_empty():
+                    # Only include functions that have concrete implementation
+                    func.is_used_in_bpf_code = True
+                    info.prog.declarations.append(func)
 
                 # Check param types and mark their definition useful
                 for arg in func.get_arguments():
                     decl = _find_type_decl(arg.type, info)
                     if decl:
                         decl.is_used_in_bpf_code = True
+                        info.prog.declarations.append(decl)
 
                 # Continue processing the code reachable inside the function
                 _do_pass(func.body, info, None)
@@ -31,12 +35,13 @@ def _do_pass(inst, info, more):
             decl = _find_type_decl(type_name, info)
             if decl:
                 decl.is_used_in_bpf_code = True
+                info.prog.declarations.append(decl)
                 continue
         d.go_deep()
 
 def mark_used_funcs(bpf, info, more):
     _do_pass(bpf, info, None)
 
-    for decl in info.prog.declarations:
-        print(decl)
+    # for decl in info.prog.declarations:
+    #     print(decl)
 

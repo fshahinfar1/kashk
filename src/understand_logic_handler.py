@@ -123,6 +123,7 @@ def __add_func_definition2(name, cursor, info):
     if not is_operator and fn_def and fn_def.kind == clang.CursorKind.CXX_METHOD:
         is_method = True
     f.is_method = is_method
+    f.is_operator = is_operator
 
     if is_operator:
         # I am not messing up with operators now

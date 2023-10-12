@@ -29,7 +29,7 @@ class _State:
         return self.code_for_bpf
 
     @contextmanager
-    def set_global_for_bpf(val):
+    def set_global_for_bpf(self, val):
         tmp = self.code_for_bpf
         self.code_for_bpf = val
         try:
@@ -528,15 +528,7 @@ def gather_instructions_from(cursor, info, context=BODY, _state=None):
             d.enque(children[0], lvl+1)
             continue
 
-        # TODO: the info = None is a case I introduced when hacking the
-        # get_owner helper function. It should be avoided. It is bad code.
-        if info is not None and c.get_usr() in info.remove_cursor:
-            assert 0, 'This id dead'
-            with _state.set_global_for_bpf(False):
-                inst = __convert_cursor_to_inst(c, info, _state)
-                inst.bpf_ignore = True
-        else:
-            inst = __convert_cursor_to_inst(c, info, _state)
+        inst = __convert_cursor_to_inst(c, info, _state)
 
 
         # TODO: handling the IO frameworks needs a bit of thought

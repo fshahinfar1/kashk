@@ -36,6 +36,7 @@ def _make_sure_void_func_return(func, info):
     report('Add return statement to the end of', func.name)
 
 def _move_function_out(inst, info, more):
+    return_type = None
     if inst.is_func_ptr:
         ref = inst.owner[0]
         ref_type = ref.type

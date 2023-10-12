@@ -105,6 +105,10 @@ def _do_pass(inst, info, more):
     new_children = []
     failed = fail_ref.get(FAILED)
 
+    # NOTE: make sure this if is out of the for block (You have messed up once) :)
+    if current_function and not failed and inst.kind == clang.CursorKind.RETURN_STMT:
+        current_function.may_succeed = True
+
     if failed or inst.bpf_ignore is True:
         return clone_pass(inst, info, PassObject())
 
@@ -135,10 +139,6 @@ def _do_pass(inst, info, more):
                 # debug(MODULE_TAG, 'propagate failure: ', inst.kind, inst)
 
             new_children.append(new_child)
-
-        # NOTE: make sure this if is out of the for block (You have messed up once) :)
-        if current_function and not failed and inst.kind == clang.CursorKind.RETURN_STMT:
-            current_function.may_succeed = True
 
     new_inst = inst.clone(new_children)
     return new_inst
@@ -175,6 +175,9 @@ def feasibilty_analysis_pass(inst, info, more):
         obj = PassObject()
         obj.func = func
         _do_feasibility_analisys(func.body, info, obj)
+        # debug(func.name, func.body.children)
+        # if not(func.may_fail or func.may_succeed):
+        #     debug('bpf ignore:', func.body.children[0].bpf_ignore)
         assert func.may_fail or func.may_succeed, f'After this processing we should have decide if function can fail or not (func: {func.name})'
 
     res = mark_user_boundary_pass(res, info, PassObject())

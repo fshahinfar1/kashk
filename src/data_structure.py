@@ -362,6 +362,7 @@ class Function(TypeDefinition):
 
         self.body = Block(BODY)
         self.is_method = False
+        self.is_operator = False
         self.may_have_context_ptr = False
         self.may_fail = False
         self.may_succeed = False
