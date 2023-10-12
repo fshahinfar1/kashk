@@ -84,10 +84,10 @@ def generate_offload(io_ctx):
     # Collect information about classes, functions, variables, ...
     build_sym_table(cursor, info)
 
-    boot_starp_global_state(cursor, info)
-
     # Load other source files
     load_other_sources(io_ctx, info)
+
+    boot_starp_global_state(cursor, info)
 
     # Find the entry function
     entry_func = None
