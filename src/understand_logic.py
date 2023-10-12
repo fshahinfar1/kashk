@@ -321,8 +321,8 @@ def __convert_cursor_to_inst(c, info, _state):
 
         # Check if there is a type dependencies which we need to define
         _, decls = get_state_for(c)
-        for d in decls:
-            info.prog.add_declaration(d)
+        # for d in decls:
+        #     info.prog.add_declaration(d)
 
         return inst
     elif c.kind == clang.CursorKind.MEMBER_REF_EXPR:

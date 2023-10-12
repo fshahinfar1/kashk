@@ -15,7 +15,7 @@ def _do_pass(inst, info, more):
         if inst.kind == clang.CursorKind.CALL_EXPR:
             func = inst.get_function_def()
             if func:
-                if not func.is_empty():
+                if not func.is_empty() and not func.is_used_in_bpf_code:
                     # Only include functions that have concrete implementation
                     func.is_used_in_bpf_code = True
                     info.prog.declarations.append(func)
@@ -23,7 +23,7 @@ def _do_pass(inst, info, more):
                 # Check param types and mark their definition useful
                 for arg in func.get_arguments():
                     decl = _find_type_decl(arg.type, info)
-                    if decl:
+                    if decl and not decl.is_used_in_bpf_code:
                         decl.is_used_in_bpf_code = True
                         info.prog.declarations.append(decl)
 
@@ -33,7 +33,7 @@ def _do_pass(inst, info, more):
         elif inst.kind == clang.CursorKind.VAR_DECL:
             type_name = inst.type.spelling
             decl = _find_type_decl(type_name, info)
-            if decl:
+            if decl and not decl.is_used_in_bpf_code:
                 decl.is_used_in_bpf_code = True
                 info.prog.declarations.append(decl)
                 continue

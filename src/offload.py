@@ -102,13 +102,14 @@ def generate_offload(io_ctx):
         error('Did not found the entry function')
         return
 
-    # TODO: move the following block of code to some where more appropriate
-    # The arguments to the entry function is part of the connection state
-    from_entry_params = [get_state_for(arg) for arg in entry_func.get_arguments()]
-    for states, decls in from_entry_params:
-        add_state_decl_to_bpf(info.prog, states, decls)
-        for state in states:
-            e = info.sym_tbl.global_scope.insert_entry(state.name, state.type_ref, clang.CursorKind.PARM_DECL, None)
+    # # TODO: move the following block of code to some where more appropriate
+    # # The arguments to the entry function is part of the connection state
+    # from_entry_params = [get_state_for(arg) for arg in entry_func.get_arguments()]
+    # for states, decls in from_entry_params:
+    #     add_state_decl_to_bpf(info.prog, states, decls)
+    #     for state in states:
+    #         e = info.sym_tbl.global_scope.insert_entry(state.name, state.type_ref, clang.CursorKind.PARM_DECL, None)
+
     # debug(MODULE_TAG, from_entry_params)
     # remove the symbols related to the parameters of entry function from its scope (fixing the shadowing effect)
     to_remove = []
@@ -344,22 +345,22 @@ def boot_starp_global_state(cursor, info):
         e.name = 'sock_ctx->state.conn'
         # -----------------------------
 
-        # The fields and its dependencies
-        ref = find_elem(cursor, 'TCPConnection')[0]
-        # states, decls = extract_state(tcp_conn_entry.ref)
-        states, decls = extract_state(ref)
+        # # The fields and its dependencies
+        # ref = find_elem(cursor, 'TCPConnection')[0]
+        # # states, decls = extract_state(tcp_conn_entry.ref)
+        # states, decls = extract_state(ref)
 
         # The input argument is of this type
-        tcp_conn_struct = Record('TCPConnection', states)
-        decls.append(tcp_conn_struct)
+        # tcp_conn_struct = Record('TCPConnection', states)
+        # decls.append(tcp_conn_struct)
 
         # The global state has following field
-        field = StateObject(tcp_conn_entry.ref)
-        field.name = 'conn'
-        field.type = 'TCPConnection'
-        field.kind = clang.TypeKind.RECORD
-        field.type_ref = MyType()
-        field.type_ref.spelling = 'struct TCPConnection'
-        field.type_ref.kind = field.kind
+        # field = StateObject(tcp_conn_entry.ref)
+        # field.name = 'conn'
+        # field.type = 'TCPConnection'
+        # field.kind = clang.TypeKind.RECORD
+        # field.type_ref = MyType()
+        # field.type_ref.spelling = 'struct TCPConnection'
+        # field.type_ref.kind = field.kind
 
-        add_state_decl_to_bpf(info.prog, [field], decls)
+        # add_state_decl_to_bpf(info.prog, [field], decls)
