@@ -36,6 +36,7 @@ from user_passes.create_fallback import create_fallback_pass
 
 
 MODULE_TAG = '[Gen Offload]'
+BPF_MAIN = 'BPF_MAIN_SCOPE'
 
 
 def run_pass_on_all_functions(pass_fn, main_inst, info, skip_if=lambda x: False):
@@ -73,7 +74,8 @@ def generate_offload(io_ctx):
     # Load other source files
     load_other_sources(io_ctx, info)
     # Select the main scope
-    scope = info.sym_tbl.scope_mapping[info.io_ctx.entry_func]
+    scope = Scope(info.sym_tbl.global_scope)
+    info.sym_tbl.scope_mapping[BPF_MAIN] = scope
     info.sym_tbl.current_scope = scope
     # Find the entry function
     main = get_entry_code(cursor, info)

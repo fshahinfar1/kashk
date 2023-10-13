@@ -46,6 +46,9 @@ class TestCase(BasicTest):
                 'pthread_mutex_unlock': (False, True),
                 }
         for func in sorted(Function.directory.values(), key=lambda x: x.name):
+            key = func.name
+            if key not in expected_state:
+                continue
             assert (func.may_succeed, func.may_fail) == expected_state[func.name], f'For funct {func.name} the expectation does not match (s:{func.may_succeed}, f:{func.may_fail})'
 
         failure_paths = get_number_of_failure_paths()

@@ -155,9 +155,6 @@ def __add_func_definition2(name, cursor, info):
 
     scope = info.sym_tbl.scope_mapping.get(name)
     if scope is not None:
-        # report_on_cursor(cursor)
-        # error(MODULE_TAG, 'The scope for the function', name, 'was not found')
-
         # Add parameters to the function scope
         for a in f.args:
             scope.insert_entry(a.name, a.type_ref, a.kind, a)
@@ -173,7 +170,8 @@ def __add_func_definition2(name, cursor, info):
             # error(f'Did not found the body for function: {f.name}')
             body = None
 
-    if body and scope is not None:
+    if body and scope is not None and should_process_this_cursor(cursor):
+        # NOTE: The irrelevant functions does not need to have body :)
         # This function has body but let's not evaluate it. (Lazy evaluation)
         ev = FunctionBodyEvaluator(body, info, f)
         f.body = ev
