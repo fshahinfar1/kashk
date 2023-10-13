@@ -1,6 +1,7 @@
 import clang.cindex as clang
 from utility import generate_struct_with_fields, indent
 from data_structure import MyType, BASE_TYPES
+from instruction import Block, BODY, Literal, CODE_LITERAL
 from log import debug
 from bpf_code_gen import gen_code
 
@@ -25,6 +26,9 @@ class BPF_PROG:
     def gen_code(self, info):
         raise Exception('Not implemented!')
 
+    def set_code(self, code):
+        raise Exception('Not implemented!')
+
 
 class XDP_PROG(BPF_PROG):
     def __init__(self):
@@ -40,6 +44,9 @@ class XDP_PROG(BPF_PROG):
             U32 = BASE_TYPES[clang.TypeKind.UINT]
             sym_tbl.insert_entry('data', U32, clang.CursorKind.FIELD_DECL, None)
             sym_tbl.insert_entry('data_end', U32, clang.CursorKind.FIELD_DECL, None)
+
+    def set_code(self, code):
+        self.main_code = code
 
     def gen_code(self, info):
         code,_ = gen_code(self.main_code, info)
@@ -59,14 +66,18 @@ class SK_SKB_PROG(BPF_PROG):
     def __init__(self):
         super().__init__()
         self.connection_state = []
-        self.parser_code = []
-        self.verdict_code = []
+        self.parser_code = None
+        self.verdict_code = None
         self.headers += [
                 # headers
                 '#include <sys/types.h>',
                 '#include <sys/socket.h>',
                 '#include <linux/tcp.h>',
                 ]
+
+        bpf_parser = Block(BODY)
+        bpf_parser.add_inst(Literal('return skb->len;', CODE_LITERAL))
+        self.parser_code = bpf_parser
 
     def set_bpf_context_struct_sym_tbl(self, sym_tbl):
         struct_name = '__sk_buff'
@@ -84,6 +95,9 @@ class SK_SKB_PROG(BPF_PROG):
             sym_tbl.insert_entry('data', U32, clang.CursorKind.FIELD_DECL, None)
             sym_tbl.insert_entry('data_end', U32, clang.CursorKind.FIELD_DECL, None)
             sym_tbl.insert_entry('len', U32, clang.CursorKind.FIELD_DECL, None)
+
+    def set_code(self, code):
+        self.verdict_code = code
 
     def add_connection_state(self, state):
         self.connection_state.append(state)

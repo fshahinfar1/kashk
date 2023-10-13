@@ -265,10 +265,7 @@ def gen_bpf_code(bpf, info, out_bpf):
 
     # TODO: split the code between parser and verdict
     debug('[Parser/Verdict Split Code]')
-    bpf_parser = Block(BODY)
-    bpf_parser.add_inst(Literal('return skb->len;', CODE_LITERAL))
-    info.prog.parser_code = bpf_parser
-    info.prog.verdict_code = bpf
+    info.prog.set_code(bpf)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Write the code we have generated
