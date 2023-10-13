@@ -55,7 +55,7 @@ def main():
 
     ctx = InputOutputContext()
     ctx.bpf_hook = args.hook
-    ctx.set_input(ags.input_file)
+    ctx.set_input(args.file)
     ctx.other_source_files = args.sources
     if args.out_user:
         ctx.set_user_output(args.out_user)

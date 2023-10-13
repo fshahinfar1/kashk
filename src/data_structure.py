@@ -18,7 +18,7 @@ class Info:
         if io_ctx.bpf_hook == 'sk_skb':
             info.prog = SK_SKB_PROG()
         elif io_ctx.bpf_hook == 'xdp':
-            info.prog = XDP()
+            info.prog = XDP_PROG()
         else:
             raise Exception(f'Unknown BPF hook ({io_ctx.bpf_hook})')
         info.io_ctx = io_ctx

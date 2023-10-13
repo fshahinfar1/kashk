@@ -54,19 +54,6 @@ def get_variable_declaration_before_elem(cursor, target_cursor, info):
     return variables
 
 
-def find_event_loop(cursor):
-    d = DFSPass(cursor)
-    for c, _ in d:
-        if c.kind in (clang.CursorKind.WHILE_STMT, clang.CursorKind.DO_STMT,
-                clang.CursorKind.FOR_STMT):
-            # A loop found
-            if __has_read(c):
-                # This is the event loop
-                return c
-        d.go_deep()
-    return None
-
-
 def get_all_read(block):
     """
     Get all the read instructions under the cursor

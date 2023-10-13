@@ -6,7 +6,7 @@ from data_structure import *
 from instruction import *
 from utility import (parse_file, find_elem, add_state_decl_to_bpf,
         report_user_program_graph, draw_tree, show_insts)
-from find_ev_loop import find_request_processing_logic
+from find_ev_loop import get_entry_code
 from sym_table_gen import build_sym_table, process_source_file
 from understand_program_state import extract_state, get_state_for
 from understand_logic import (get_all_read, get_all_send,
@@ -63,18 +63,6 @@ def load_other_sources(io_ctx, info):
         others.append(other_cursor)
         process_source_file(other_cursor, info)
 
-
-def _get_entry_code(cursor, info):
-    list_entry_functions = list(filter(lambda e: e.kind == clang.CursorKind.FUNCTION_DECL and e.is_definition(), find_elem(cursor, info.io_ctx.entry_func)))
-    assert len(list_entry_functions)  > 0, 'Did not found the entry function'
-    assert len(list_entry_functions) == 1, 'Found multiple definition of entry functions'
-    entry_func = list_entry_functions[0]
-    children = list(entry_func.get_children())
-    last_child = children[-1]
-    assert last_child.kind == clang.CursorKind.COMPOUND_STMT, 'The entry function does not have an implementation body!'
-    body_of_loop = find_request_processing_logic(entry_func, info)
-
-
 # TODO: make a framework agnostic interface, allow for porting to other
 # functions
 def generate_offload(io_ctx):
@@ -89,11 +77,11 @@ def generate_offload(io_ctx):
     scope = info.sym_tbl.scope_mapping[info.io_ctx.entry_func]
     info.sym_tbl.current_scope = scope
     # Find the entry function
-    main = _get_entry_code(cursor, info)
+    main = get_entry_code(cursor, info)
 
     # Start the passes
     debug('First pass on the AST (initializing...)')
-    insts = gather_instructions_from(body_of_loop, info, BODY)
+    insts = gather_instructions_from(main, info, BODY)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     debug('Gather Infromation About Functions')
