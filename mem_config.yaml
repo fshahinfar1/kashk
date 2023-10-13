@@ -1,5 +1,6 @@
 entry: event_handler
 main: /home/farbod/auto_bpf_offload/auto_bpf_offload_case_study/src/memcached/memcached.c
+hook: xdp
 sources: [
     /home/farbod/auto_bpf_offload/auto_bpf_offload_case_study/src/memcached/proto_bin.c,
     /home/farbod/auto_bpf_offload/auto_bpf_offload_case_study/src/memcached/proto_text.c,

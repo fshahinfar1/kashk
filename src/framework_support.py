@@ -13,6 +13,7 @@ class InputOutputContext:
         self.input_framework = None
         self.cflags = ''
         self.other_source_files = []
+        self.bpf_hook = '_no_set_'
 
     def set_input(self, path):
         self.input_file = path

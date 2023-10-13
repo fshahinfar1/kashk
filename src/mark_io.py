@@ -102,7 +102,6 @@ def _mark_write_insts(bpf, info):
         else:
             buf_def = buf_arg.get_definition()
             remove_def = buf_def
-            # info.remove_cursor.add(remove_def.get_usr())
             if buf_def.kind == clang.CursorKind.CALL_EXPR:
                 buf_def = next(buf_def.get_children())
                 args = list(buf_def.get_arguments())

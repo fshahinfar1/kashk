@@ -113,8 +113,7 @@ class UserProg:
         Function.directory = self.func_dir
         # Switch to the entry function scope
         user_old_scope = self.sym_tbl.current_scope
-        entry_name = info.entry_func_name
-        entry_name = entry_name.replace('::', '_')
+        entry_name = info.io_ctx.entry_func
         scope = info.sym_tbl.scope_mapping[entry_name]
         info.sym_tbl.current_scope = scope
         try:

@@ -64,64 +64,32 @@ def load_other_sources(io_ctx, info):
         process_source_file(other_cursor, info)
 
 
+def _get_entry_code(cursor, info):
+    list_entry_functions = list(filter(lambda e: e.kind == clang.CursorKind.FUNCTION_DECL and e.is_definition(), find_elem(cursor, info.io_ctx.entry_func)))
+    assert len(list_entry_functions)  > 0, 'Did not found the entry function'
+    assert len(list_entry_functions) == 1, 'Found multiple definition of entry functions'
+    entry_func = list_entry_functions[0]
+    children = list(entry_func.get_children())
+    last_child = children[-1]
+    assert last_child.kind == clang.CursorKind.COMPOUND_STMT, 'The entry function does not have an implementation body!'
+    body_of_loop = find_request_processing_logic(entry_func, info)
+
+
 # TODO: make a framework agnostic interface, allow for porting to other
 # functions
 def generate_offload(io_ctx):
-    # TODO: this is the legacy way, update the code to use the context
-    file_path = io_ctx.input_file
-    entry_func_name = io_ctx.entry_func
-    out_bpf = io_ctx.bpf_out_file
-    out_user = io_ctx.user_out_file
-
-    # Keep track of which variable name is what, what types has been defined
-    # and other information learned about the program
-    info = Info()
-    info.entry_func_name = entry_func_name
-    info.io_ctx = io_ctx
-
-    index, tu, cursor = parse_file(file_path, io_ctx.cflags)
-
-    # Collect information about classes, functions, variables, ...
+    info = Info.from_io_ctx(io_ctx)
+    # Parse the main file
+    index, tu, cursor = parse_file(info.io_ctx.input_file, io_ctx.cflags)
+    # Parse other files. Collect information about classes, functions, variables, ...
     build_sym_table(cursor, info)
-
     # Load other source files
     load_other_sources(io_ctx, info)
-
-    boot_starp_global_state(cursor, info)
-
+    # Select the main scope
+    scope = info.sym_tbl.scope_mapping[info.io_ctx.entry_func]
+    info.sym_tbl.current_scope = scope
     # Find the entry function
-    entry_func = None
-    for e in find_elem(cursor, entry_func_name):
-        if e.kind == clang.CursorKind.FUNCTION_DECL:
-            children = list(e.get_children())
-            last_child = children[-1]
-            if last_child.kind == clang.CursorKind.COMPOUND_STMT:
-                entry_func = e
-                break
-    if entry_func is None:
-        error('Did not found the entry function')
-        return
-
-    # # TODO: move the following block of code to some where more appropriate
-    # # The arguments to the entry function is part of the connection state
-    # from_entry_params = [get_state_for(arg) for arg in entry_func.get_arguments()]
-    # for states, decls in from_entry_params:
-    #     add_state_decl_to_bpf(info.prog, states, decls)
-    #     for state in states:
-    #         e = info.sym_tbl.global_scope.insert_entry(state.name, state.type_ref, clang.CursorKind.PARM_DECL, None)
-
-    # debug(MODULE_TAG, from_entry_params)
-    # remove the symbols related to the parameters of entry function from its scope (fixing the shadowing effect)
-    to_remove = []
-    entry_func_name = entry_func_name.replace('::', '_')
-    scope = info.sym_tbl.scope_mapping[entry_func_name]
-    for k, v in scope.symbols.items():
-        if v.kind == clang.CursorKind.PARM_DECL:
-            to_remove.append(k)
-    for k in to_remove:
-        scope.delete(k)
-
-    body_of_loop = find_request_processing_logic(entry_func, info)
+    main = _get_entry_code(cursor, info)
 
     # Start the passes
     debug('First pass on the AST (initializing...)')
@@ -188,10 +156,10 @@ def generate_offload(io_ctx):
 
     # TODO: right now the order of generating the userspace and then BPF is important
     if not info.user_prog.graph.is_empty():
-        gen_user_code(user, info, out_user)
+        gen_user_code(user, info, io_ctx.out_user)
     else:
         report("No user space program was generated. The tool has offloaded everything to BPF.")
-    gen_bpf_code(bpf, info, out_bpf)
+    gen_bpf_code(bpf, info, io_ctx.out_bpf)
 
 
 def dfs_over_deps_vars(root):
@@ -321,46 +289,3 @@ def gen_bpf_code(bpf, info, out_bpf):
     with open(out_bpf, 'w') as f:
         f.write(text)
     debug('~~~~~~~~~~~~~~~~~~~~~')
-
-
-def boot_starp_global_state(cursor, info):
-    """
-    This function prepares the initial scope for processing phase. In the
-    processing phase we go throught the instructions and understand the program
-    logic. The understanding is used for further transformation to BPF program.
-    """
-    # Set the scope to the Server::handle_connection
-    entry_name = info.entry_func_name
-    entry_name = entry_name.replace('::', '_')
-    scope = info.sym_tbl.scope_mapping[entry_name]
-    info.sym_tbl.current_scope = scope
-
-    # TODO: what is happening here. Do I need this? I think this is because I
-    # was avoiding analysing the parameters of the entry function.
-    tcp_conn_entry = info.sym_tbl.lookup('class_TCPConnection')
-    if tcp_conn_entry:
-        e = info.sym_tbl.global_scope.insert_entry('conn', tcp_conn_entry.type, clang.CursorKind.PARM_DECL, None)
-        # Override what the clang thinks
-        e.is_pointer = False
-        e.name = 'sock_ctx->state.conn'
-        # -----------------------------
-
-        # # The fields and its dependencies
-        # ref = find_elem(cursor, 'TCPConnection')[0]
-        # # states, decls = extract_state(tcp_conn_entry.ref)
-        # states, decls = extract_state(ref)
-
-        # The input argument is of this type
-        # tcp_conn_struct = Record('TCPConnection', states)
-        # decls.append(tcp_conn_struct)
-
-        # The global state has following field
-        # field = StateObject(tcp_conn_entry.ref)
-        # field.name = 'conn'
-        # field.type = 'TCPConnection'
-        # field.kind = clang.TypeKind.RECORD
-        # field.type_ref = MyType()
-        # field.type_ref.spelling = 'struct TCPConnection'
-        # field.type_ref.kind = field.kind
-
-        # add_state_decl_to_bpf(info.prog, [field], decls)

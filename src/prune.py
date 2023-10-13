@@ -84,6 +84,7 @@ def should_ignore_cursor(cursor):
             else:
                 return True
     elif cursor.kind in (clang.CursorKind.BINARY_OPERATOR, clang.CursorKind.COMPOUND_ASSIGNMENT_OPERATOR):
+        children = list(cursor.get_children())
         count_token = len(list(cursor.get_tokens()))
         # report_on_cursor(cursor)
         # children = list(cursor.get_children())

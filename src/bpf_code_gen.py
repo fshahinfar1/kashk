@@ -432,8 +432,6 @@ def __generate_code_type_definition(inst, info):
 def __generate_global_shared_state(info):
     fields = []
     for x in info.sym_tbl.shared_scope.symbols.values():
-        if x.name not in info.global_accessed_variables:
-            continue
         o = StateObject(x.ref)
         fields.append(o)
     # If there are any global state, declare the shared_map

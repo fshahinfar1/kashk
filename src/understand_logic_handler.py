@@ -183,7 +183,7 @@ def __add_func_definition2(name, cursor, info):
 
 
 def create_func_objs(info):
-    processed = set([info.entry_func_name, ])
+    processed = set([info.io_ctx.entry_func, ])
     while True:
         keys = set(Function.func_cursor.keys())
         # if keys == processed:

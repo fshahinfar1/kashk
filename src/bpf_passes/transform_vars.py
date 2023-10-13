@@ -18,8 +18,6 @@ def _check_if_ref_is_global_state(inst, info):
     sym, scope = info.sym_tbl.lookup2(inst.name)
     is_shared = scope == info.sym_tbl.shared_scope
     if is_shared:
-        # Keep track of used global variables
-        info.global_accessed_variables.add(inst.name)
         # TODO: what if a variable named shared is already defined but it is
         # not our variable?
         sym = info.sym_tbl.lookup('shared')

@@ -10,42 +10,29 @@ class Info:
     """
     Represents the general understanding of the program
     """
-    def __init__(self):
-        from bpf import SK_SKB_PROG
-        from user import UserProg
-        self.entry_func_name = None
-        # self.rd_buf = PacketBuffer(None)
-        self.wr_buf = PacketBuffer(None)
-        self.prog = SK_SKB_PROG()
-        self.sym_tbl = SymbolTable()
-        # Keep track of global variables that where actually accessed. This
-        # helps with generating the BPF map shared across connections.
-        self.global_accessed_variables = set()
 
+    @classmethod
+    def from_io_ctx(cls, io_ctx):
+        from bpf import SK_SKB_PROG, XDP_PROG
+        info = Info()
+        if io_ctx.bpf_hook == 'sk_skb':
+            info.prog = SK_SKB_PROG()
+        elif io_ctx.bpf_hook == 'xdp':
+            info.prog = XDP()
+        else:
+            raise Exception(f'Unknown BPF hook ({io_ctx.bpf_hook})')
+        info.io_ctx = io_ctx
+        return info
+
+    def __init__(self):
+        from user import UserProg
+        # TODO: I should remove write buffer (similar to read buffer)
+        self.wr_buf = PacketBuffer(None)
+        self.prog = None
+        self.sym_tbl = SymbolTable()
         # Keep track of information about the userspace program
         self.user_prog = UserProg()
-
-        # TODO: the use of this set is very limited maybe I could do something
-        # better
-        self.remove_cursor = set()
-
-        # TODO: this has not been used yet! what I was thinking and why I added this?
-        self.processed = ProcessedBook()
-
-
-class ProcessedBook:
-    def __init__(self):
-        self.book = {}
-
-    def remember(self, key, name):
-        if key not in self.book:
-            self.book[key] = set()
-        self.book[key].add(name)
-
-    def check(self, key, name):
-        if key in self.book:
-            return name in self.book[key]
-        return False
+        self.io_ctx = None
 
 
 class PacketBuffer:
@@ -414,6 +401,7 @@ def prepare_base_types():
             clang.TypeKind.SCHAR: 'char',
             clang.TypeKind.VOID: 'void',
             clang.TypeKind.INT: 'int',
+            clang.TypeKind.UINT: 'unsigned int',
             }
 
     for kind, name in kind_name_map.items():

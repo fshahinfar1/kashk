@@ -13,29 +13,30 @@ from understand_logic_handler import create_func_objs
 
 from data_structure import Info, Function
 from instruction import BODY
+from framework_support import InputOutputContext
+from bpf import SK_SKB_PROG
 
 class BasicTest:
-    def __init__(self, file_path, entry_func_name, compiler_args=''):
-        self.file_path = file_path
-        self.entry_func_name = entry_func_name
-        self.compiler_args = compiler_args
-        self.info = None
+    def __init__(self, file_path, entry_func_name, compiler_args='', hook='sk_skb'):
+        io_ctx = InputOutputContext()
+        io_ctx.set_input(file_path)
+        io_ctx.set_entry_func(entry_func_name)
+        io_ctx.set_cflags(compiler_args)
+        io_ctx.bpf_hook = hook 
+        self.info = Info.from_io_ctx(io_ctx)
 
     def run_test(self):
-        # Create info object
-        self.info = Info()
-        self.info.entry_func_name = self.entry_func_name
         # This is the AST generated with Clang
-        index, tu, cursor = parse_file(self.file_path, self.compiler_args)
+        index, tu, cursor = parse_file(self.info.io_ctx.input_file, self.info.io_ctx.cflags)
         # Collect information about classes, functions, variables, ...
         build_sym_table(cursor, self.info)
         # Find the entry function
-        entry_func = find_elem(cursor, self.entry_func_name)[0]
+        entry_func = find_elem(cursor, self.info.io_ctx.entry_func)[0]
         if entry_func is None:
             error('Did not found the entry function')
             return
 
-        with self.info.sym_tbl.with_func_scope(self.entry_func_name):
+        with self.info.sym_tbl.with_func_scope(self.info.io_ctx.entry_func):
             # Gather the instructions
             body_of_loop = list(entry_func.get_children())[-1]
             assert body_of_loop.kind == clang.CursorKind.COMPOUND_STMT
