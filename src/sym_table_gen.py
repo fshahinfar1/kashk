@@ -207,7 +207,6 @@ def build_sym_table(cursor, info):
     """
     # Define the field of BPF context
     info.prog.set_bpf_context_struct_sym_tbl(info.sym_tbl)
-
     info.sym_tbl.current_scope = info.sym_tbl.global_scope
     info.sym_tbl.scope_mapping['__global__'] = info.sym_tbl.current_scope
     process_source_file(cursor, info)

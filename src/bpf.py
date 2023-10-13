@@ -1,7 +1,8 @@
 import clang.cindex as clang
-from utility import generate_struct_with_fields
+from utility import generate_struct_with_fields, indent
 from data_structure import MyType, BASE_TYPES
 from log import debug
+from bpf_code_gen import gen_code
 
 
 class BPF_PROG:
@@ -21,6 +22,9 @@ class BPF_PROG:
     def set_bpf_context_struct_sym_tbl(self, sym_tbl):
         raise Exception('Not implemented!')
 
+    def gen_code(self, info):
+        raise Exception('Not implemented!')
+
 
 class XDP_PROG(BPF_PROG):
     def __init__(self):
@@ -36,6 +40,19 @@ class XDP_PROG(BPF_PROG):
             U32 = BASE_TYPES[clang.TypeKind.UINT]
             sym_tbl.insert_entry('data', U32, clang.CursorKind.FIELD_DECL, None)
             sym_tbl.insert_entry('data_end', U32, clang.CursorKind.FIELD_DECL, None)
+
+    def gen_code(self, info):
+        code,_ = gen_code(self.main_code, info)
+        code = indent(code, 1)
+
+        text = f'''
+SEC('xdp')
+int xdp_prog(struct xdp_md *xdp)
+{{
+{code}
+}}
+'''
+        return text
 
 
 class SK_SKB_PROG(BPF_PROG):
@@ -121,3 +138,12 @@ if (!sock_ctx) {
                 + ['}']
                 )
 
+    def gen_code(self, info):
+        per_conn = info.prog._per_connection_state()
+        parser_code, _ = gen_code(self.parser_code, info)
+        parser_code = indent(parser_code, 1)
+        verdict_code, _ = gen_code(self.verdict_code, info)
+        verdict_code = (self._pull_packet_data() + self._load_connection_state() + verdict_code)
+        verdict_code = indent(verdict_code, 1)
+
+        return '\n'.join(info.prog._parser_prog([per_conn] + [''] + [parser_code]) + [''] + info.prog._verdict_prog([verdict_code]))

@@ -144,10 +144,10 @@ def generate_offload(io_ctx):
 
     # TODO: right now the order of generating the userspace and then BPF is important
     if not info.user_prog.graph.is_empty():
-        gen_user_code(user, info, io_ctx.out_user)
+        gen_user_code(user, info, io_ctx.user_out_file)
     else:
         report("No user space program was generated. The tool has offloaded everything to BPF.")
-    gen_bpf_code(bpf, info, io_ctx.out_bpf)
+    gen_bpf_code(bpf, info, io_ctx.bpf_out_file)
 
 
 def dfs_over_deps_vars(root):

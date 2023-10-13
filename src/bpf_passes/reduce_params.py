@@ -87,13 +87,8 @@ def _function_check_param_reduc(inst, func, info, more):
         ex_obj.name = EXTRA_PARAM_NAME
         ex_obj.type = f'struct {change.struct_name} *'
         ex_obj.is_pointer = True
-        T2 = MyType()
-        T2.spelling = f'struct {change.struct_name}'
-        T2.kind = clang.TypeKind.RECORD
-        T = MyType()
-        T.spelling = ex_obj.type
-        T.under_type = T2
-        T.kind = clang.TypeKind.POINTER
+        T2 = MyType.make_simple(ex_obj.type, clang.TypeKind.RECORD)
+        T = MyType.make_pointer(T2)
         ex_obj.type_ref = T
         func.args.append(ex_obj)
         sym = SymbolTableEntry(ex_obj.name, T, clang.CursorKind.PARM_DECL, None)

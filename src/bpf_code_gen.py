@@ -8,6 +8,8 @@ from prune import READ_PACKET, WRITE_PACKET
 from template import (memcpy_internal_defs, license_text,
         load_shared_object_code, shared_map_decl)
 
+MODULE_TAG = '[BPF Code Gen]'
+
 
 def check_if_shared_obj_is_loaded(info):
     shared_sym = info.sym_tbl.lookup('shared')
@@ -432,7 +434,13 @@ def __generate_code_type_definition(inst, info):
 def __generate_global_shared_state(info):
     fields = []
     for x in info.sym_tbl.shared_scope.symbols.values():
-        o = StateObject(x.ref)
+        # debug(MODULE_TAG, x)
+        o = StateObject(None)
+        o.name = x.name
+        o.type = x.type.spelling
+        o.type_ref = x.type
+        o.is_pointer = o.type_ref.is_pointer()
+
         fields.append(o)
     # If there are any global state, declare the shared_map
     if fields:
@@ -458,22 +466,13 @@ def generate_bpf_prog(info):
     func_declarations, _ = gen_code(func_decs, info, context=ARG)
     declarations = (non_func_declarations + '\n' + func_declarations)
 
-    parser_code, _ = gen_code(info.prog.parser_code, info)
-    parser_code = indent(parser_code, 1)
-    verdict_code, _ = gen_code(info.prog.verdict_code, info)
-    verdict_code = (info.prog._pull_packet_data()
-            + info.prog._load_connection_state() + verdict_code)
-    verdict_code = indent(verdict_code, 1)
-
+    bpf_code = info.prog.gen_code(info)
     code = ([]
             + info.prog.headers
             + ['typedef char bool;', memcpy_internal_defs()]
             + [declarations]
-            + info.prog._per_connection_state()
             + ['']
-            + info.prog._parser_prog([parser_code])
-            + ['']
-            + info.prog._verdict_prog([verdict_code])
+            + [bpf_code]
             + ['']
             + [license_text(info.prog.license),]
             )

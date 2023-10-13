@@ -118,23 +118,55 @@ def __has_read(cursor):
     return False
 
 
+def _get_init_field(field_cursor):
+    """
+    This is a helper for parsing the struct initializer fields
+    { .f1 = v1, .f2 = v2, ... };
+    """
+    tmp = list(field_cursor.get_children())
+    if len(tmp) == 0:
+        # val = gather_instructions_from(field_cursor, None)[0]
+        # val_str = val
+        key_str = ''
+        val_str = field_cursor.spelling
+    elif len(tmp) == 1:
+        # val = skip_unexposed_stmt(tmp[0])
+        # val = gather_instructions_from(val, None)[0]
+        # val_str = val
+        key_str = ''
+        val_str = skip_unexposed_stmt(tmp[0]).spelling
+    elif len(tmp) >= 2:
+        key = list(map(skip_unexposed_stmt, tmp[0:-1]))
+        # val = gather_instructions_from(skip_unexposed_stmt(tmp[-1]), None)[0]
+        # val_str = val
+        key_str = '.'.join(k.spelling for k in key)
+        val_str = skip_unexposed_stmt(tmp[-1]).spelling
+    else:
+        debug(tmp)
+        debug('first child:')
+        report_on_cursor(tmp[0])
+        report_on_cursor(tmp[1])
+        report_on_cursor(tmp[2])
+        debug('0000000')
+        raise Exception('Not expected!')
+    return key_str, val_str
+
+
 def _create_annotation_inst(value_cursor_children):
-    def _get_field(field_cursor):
-        tmp = list(field_cursor.get_children())
-        key = skip_unexposed_stmt(tmp[0])
-        val = skip_unexposed_stmt(tmp[1])
-        return key.spelling, val.spelling
-
-
     assert len(value_cursor_children) == 2
-    msg_field, ann_msg = _get_field(value_cursor_children[0])
-    kind_field, ann_kind = _get_field(value_cursor_children[1])
+    msg_field, ann_msg = _get_init_field(value_cursor_children[0])
+    # msg_field = msg_field.name
+    # ann_msg = ann_msg.text
+    kind_field, ann_kind = _get_init_field(value_cursor_children[1])
+    # kind_field = kind_field.name
+    # ann_kind = ann_kind.name
     # debug(msg_field, ann_msg)
     # debug(kind_field, ann_kind)
 
     assert msg_field == Annotation.MESSAGE_FIELD_NAME
     assert kind_field == Annotation.KIND_FIELD_NAME
     return Annotation(ann_msg, ann_kind)
+
 
 def _make_for_loop(cursor, info):
     init, cond, post, body = parse_for_loop_stmt(cursor)
@@ -215,6 +247,7 @@ def _process_switch_case(c, info):
         case_inst.body.extend_inst(inst_list)
         inst.body.add_inst(case_inst)
     return inst
+
 
 def __convert_cursor_to_inst(c, info, _state):
     if c.kind == clang.CursorKind.CALL_EXPR:
@@ -481,6 +514,16 @@ def __convert_cursor_to_inst(c, info, _state):
             error('TODO:')
             report_on_cursor(c)
             return None
+    elif c.kind == clang.CursorKind.INIT_LIST_EXPR:
+        # It will be a list of tuples. The first t.0 is field name t.1 is its value.
+        # The t.0 may be None.
+        # report_on_cursor(c)
+        children = [_get_init_field(child) for child in c.get_children()]
+        inst = Instruction()
+        inst.kind = c.kind
+        inst.list = children
+        # debug(MODULE_TAG, 'INIT_LIST:', inst.list)
+        return inst
     else:
         error('TODO:')
         report_on_cursor(c)

@@ -84,6 +84,7 @@ def extract_state(cursor):
     states = []
     decl = []
     for c in cursor.type.get_fields():
+        assert c is not None
         obj = StateObject(c)
         if c.type.kind in (clang.TypeKind.RECORD, clang.TypeKind.ELABORATED):
             # Check that the field is not a ASIO type
@@ -105,6 +106,7 @@ def get_state_for(cursor):
     states = []
     decl = []
 
+    assert cursor is not None
     obj = StateObject(cursor)
     states.append(obj)
     decl = generate_decleration_for(cursor)
