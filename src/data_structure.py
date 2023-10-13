@@ -420,7 +420,9 @@ class Function(TypeDefinition):
         return f'// [[ definition of function {self.name} ]]'
 
     def is_empty(self):
-        return not self.body.has_children()
+        if isinstance(self._body, FunctionBodyEvaluator):
+            return False
+        return not self._body.has_children()
 
     def get_arguments(self):
         return list(self.args)

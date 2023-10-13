@@ -37,7 +37,7 @@ def _generate_marked_children(groups, context):
 class Instruction:
     MAY_NOT_OVERLOAD = (clang.CursorKind.BREAK_STMT,
             clang.CursorKind.CONTINUE_STMT, clang.CursorKind.RETURN_STMT,
-            clang.CursorKind.GOTO_STMT, clang.CursorKind.LABEL_STMT)
+            clang.CursorKind.GOTO_STMT, clang.CursorKind.LABEL_STMT, clang.CursorKind.INIT_LIST_EXPR)
     def __init__(self):
         self.kind = None
         self.bpf_ignore = False

@@ -33,7 +33,7 @@ def _make_sure_void_func_return(func, info):
     ret_inst.kind = clang.CursorKind.RETURN_STMT
     ret_inst.body = []
     func.body.add_inst(ret_inst)
-    report('Add return statement to the end of', func.name)
+    # report('Add return statement to the end of', func.name)
 
 def _move_function_out(inst, info, more):
     return_type = None

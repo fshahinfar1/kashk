@@ -8,7 +8,6 @@ from utility import (parse_file, find_elem, add_state_decl_to_bpf,
         report_user_program_graph, draw_tree, show_insts)
 from find_ev_loop import get_entry_code
 from sym_table_gen import build_sym_table, process_source_file
-from understand_program_state import extract_state, get_state_for
 from understand_logic import (get_all_read, get_all_send,
         gather_instructions_from)
 from understand_logic_handler import create_func_objs
@@ -88,7 +87,7 @@ def generate_offload(io_ctx):
     create_func_objs(info)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
-    # Add the entry function to the per connection map ? 
+    # Add the entry function to the per connection map ?
     entry_func = Function.directory[info.io_ctx.entry_func]
     for arg in entry_func.get_arguments():
         # TODO: global scope is shared_scope
@@ -130,9 +129,9 @@ def generate_offload(io_ctx):
 
     # Create the userspace program graph
     select_user_pass(bpf, info, PassObject())
-    tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
+    # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
     # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)) + str(x.path_ids))
-    debug(tree)
+    # debug(tree)
     # root = info.user_prog.graph
     # code = root.paths.code
     # debug(id(root), root.children, code)
@@ -196,8 +195,8 @@ def gen_user_code(user, info, out_user):
 
         # Look at var deps
         debug(MODULE_TAG, 'Tree of variable dependencies')
-        tree = draw_tree(info.user_prog.graph, fn=lambda x: str(x.paths.var_deps))
-        debug(tree)
+        # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(x.paths.var_deps))
+        # debug(tree)
         # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
         # debug(MODULE_TAG, info.user_prog.graph.paths.var_deps)
         # debug(tree)

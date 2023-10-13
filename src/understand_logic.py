@@ -7,7 +7,6 @@ from utility import get_code, report_on_cursor, visualize_ast, skip_unexposed_st
 from data_structure import *
 from instruction import *
 from prune import (should_process_this_cursor, should_ignore_cursor, READ_PACKET, WRITE_PACKET)
-from understand_program_state import get_state_for
 
 from parser.for_loop import parse_for_loop_stmt
 
@@ -338,12 +337,6 @@ def __convert_cursor_to_inst(c, info, _state):
         if info.sym_tbl.lookup(c.spelling) is not None:
             error(f'{MODULE_TAG} Shadowing variables are not supported and can cause issues! ({c.spelling})')
         info.sym_tbl.insert_entry(inst.name, inst.type, inst.kind, None)
-
-        # Check if there is a type dependencies which we need to define
-        _, decls = get_state_for(c)
-        # for d in decls:
-        #     info.prog.add_declaration(d)
-
         return inst
     elif c.kind == clang.CursorKind.MEMBER_REF_EXPR:
         inst = Ref(c)
