@@ -1,5 +1,6 @@
 import clang.cindex as clang
 from dfs import DFSPass
+from log import *
 
 # TODO: what if a name of a struct is changed using a typedef ?
 
@@ -7,6 +8,7 @@ def _find_type_decl(name, info):
     for decl in info.prog.declarations:
         if decl.get_name() == name:
             return decl
+    debug(f'did not found type: {name}')
     return None
 
 def _do_pass(inst, info, more):

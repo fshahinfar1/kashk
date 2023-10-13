@@ -37,7 +37,8 @@ run_with_yaml() {
 	if [ $DEBUG -eq 1 ]; then
 		python3 -m pdb $SCRIPT $YAML
 	else
-		python3 $SCRIPT $YAML
+		# python3 $SCRIPT $YAML
+		scalene --cpu --memory --html --outfile ./index.html --- $SCRIPT $YAML
 	fi
 }
 

@@ -66,14 +66,35 @@ def pass_over_global_variables(cursor, info):
             d.go_deep()
 
 
+def _remember_func_for_further_proc(cursor, info):
+    # Check if we have insert an entry for this function before
+    key = cursor.spelling
+    know_previous_def_of_func = False
+    if key in Function.func_cursor:
+        func_def_cursor = Function.func_cursor[key]
+        know_previous_def_of_func = func_def_cursor.is_definition()
+    func_decl = cursor
+    if not func_decl.is_definition():
+        tmp = func_decl.get_definition()
+        if tmp:
+            func_decl = tmp
+    if know_previous_def_of_func:
+        if func_decl.is_definition():
+            if func_decl == func_def_cursor:
+                # This is the same definition we already know about
+                pass
+            else:
+                error(MODULE_TAG, f'Multiple definition for function {key} is found!')
+        else:
+            # We already know a definition and do not care about this cursor.
+            pass
+    else:
+        Function.func_cursor[key] = func_decl
+
+
 def __function_decl(cursor, info):
     assert cursor.kind == clang.CursorKind.FUNCTION_DECL
-
-    if cursor.is_definition() and should_process_this_cursor(cursor):
-        key = cursor.spelling
-        if key in Function.func_cursor:
-            error(MODULE_TAG, f'Multiple implementation of {key}')
-        Function.func_cursor[key] = cursor
+    _remember_func_for_further_proc(cursor, info)
 
     scope_key = f'{cursor.spelling}'
     if scope_key in info.sym_tbl.scope_mapping:
@@ -96,7 +117,7 @@ def __pass_over_source_file(cursor, info):
     for c, l in d:
         # NOTE: I want to create a structure even for functions that are not in
         # libraries. That is why it is before `should_process_this_cursor`
-        # check 
+        # check
         if c.kind == clang.CursorKind.FUNCTION_DECL:
             __function_decl(c, info)
             continue

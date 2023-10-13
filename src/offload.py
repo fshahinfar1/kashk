@@ -88,6 +88,14 @@ def generate_offload(io_ctx):
     create_func_objs(info)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
+    # Add the entry function to the per connection map ? 
+    entry_func = Function.directory[info.io_ctx.entry_func]
+    for arg in entry_func.get_arguments():
+        # TODO: global scope is shared_scope
+        # the global_scope is the per connection scope
+        # This is crazy. Why did I not fix this before. I should correct it
+        info.sym_tbl.shared_scope.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
+
     # We have our own AST now, continue processing ...
     bpf = Block(BODY)
     bpf.extend_inst(insts)

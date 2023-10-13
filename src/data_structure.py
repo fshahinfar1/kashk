@@ -330,6 +330,28 @@ class Record(TypeDefinition):
         return f'<Record {self.name} >'
 
 
+class FunctionBodyEvaluator:
+    def __init__(self, body, info, f):
+        """
+        @param body --> cursor to the body of the function
+        @param info --> info object
+        @param f    --> function structure
+        """
+        self.info = info
+        self.body = body
+        self.f    = f
+
+    def __call__(self):
+        from instruction import Block, BODY
+        from understand_logic import gather_instructions_under
+        # Switch scope
+        with self.info.sym_tbl.with_func_scope(self.f.name):
+            # Process function body recursively
+            body = gather_instructions_under(self.body, self.info, BODY)
+            blk = Block(BODY)
+            blk.children = body
+            return blk
+
 class Function(TypeDefinition):
     func_cursor = {}
     # TODO: I need to seperate the directory for BPF and Userspace program
@@ -347,7 +369,7 @@ class Function(TypeDefinition):
             self.args = []
             self.return_type = None
 
-        self.body = Block(BODY)
+        self._body = Block(BODY)
         self.is_method = False
         self.is_operator = False
         self.may_have_context_ptr = False
@@ -364,6 +386,17 @@ class Function(TypeDefinition):
             debug(directory)
             raise Exception(f'Function is already defined ({self.name})')
         directory[self.name] = self
+
+    @property
+    def body(self):
+        if callable(self._body):
+            # Lazy evaluation of the body
+            self._body = self._body()
+        return self._body
+
+    @body.setter
+    def body(self, v):
+        self._body  = v
 
     def get_name(self):
         return f'func {self.name}'

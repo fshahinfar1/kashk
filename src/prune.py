@@ -1,6 +1,7 @@
 import clang.cindex as clang
 from utility import report_on_cursor
 from log import debug, error, report
+from instruction import UnaryOp
 
 
 # TODO: How to make sure that `read` is the read system-call and not a simple
@@ -65,11 +66,9 @@ def should_ignore_cursor(cursor):
     this function is used to decide if the cursor should be removed from all processing.
     The mentioned function decides if the cursor belongs to user-space program.
     """
-    from instruction import UnaryOp
     if __is_ignored_function(cursor):
         return True
-
-    if cursor.kind == clang.CursorKind.UNARY_OPERATOR:
+    elif cursor.kind == clang.CursorKind.UNARY_OPERATOR:
         tokens = [t.spelling for t in cursor.get_tokens()]
         count_token = len(tokens)
         if count_token < 2:
@@ -85,7 +84,13 @@ def should_ignore_cursor(cursor):
                 return True
     elif cursor.kind in (clang.CursorKind.BINARY_OPERATOR, clang.CursorKind.COMPOUND_ASSIGNMENT_OPERATOR):
         children = list(cursor.get_children())
-        count_token = len(list(cursor.get_tokens()))
+        tokens = list(cursor.get_tokens())
+        count_token = len(tokens)
+
+        # s = cursor.extent.start.offset
+        # e = cursor.extent.end.offset
+        # diff = e - s
+
         # report_on_cursor(cursor)
         # children = list(cursor.get_children())
         # report_on_cursor(children[0])
@@ -95,7 +100,11 @@ def should_ignore_cursor(cursor):
         #     x = list(x[0].get_children())
         # print(count_token)
         if count_token == 0:
-            error('Binary operator with zero tokens, this will fail to convert to BinOp so it was ignored!')
+            # print(diff)
+            # print('zero:', cursor.extent.start, cursor.extent.end)
+            # print(tokens)
+
+            # error('Binary operator with zero tokens, this will fail to convert to BinOp so it was ignored!')
             # report_on_cursor(cursor)
             # This was observed to be a assert statement, errno == ..., what other statement does it include?
             return True
@@ -106,7 +115,7 @@ def should_ignore_cursor(cursor):
         # First token after lhs
         tokens = len(list(cursor.get_tokens()))
         if lhs_tokens >= tokens:
-            error('Binary operator which we can not find the operator for')
+            # error('Binary operator which we can not find the operator for')
             return True
 
     return False

@@ -36,9 +36,9 @@ class XDP_PROG(BPF_PROG):
 
     def set_bpf_context_struct_sym_tbl(self, sym_tbl):
         struct_name = 'xdp'
-        T = MyType.make_simple(struct_name, clang.TypeKind.RECORD)
+        T = MyType.make_simple('xdp_md', clang.TypeKind.RECORD)
         scope_key = f'class_{T.spelling}'
-        sym_tbl.insert_entry(scope_key, T, clang.CursorKind.CLASS_DECL, None)
+        sym_tbl.insert_entry(struct_name, T, clang.CursorKind.CLASS_DECL, None)
         with sym_tbl.new_scope() as scope:
             sym_tbl.scope_mapping[scope_key] = scope
             U32 = BASE_TYPES[clang.TypeKind.UINT]
