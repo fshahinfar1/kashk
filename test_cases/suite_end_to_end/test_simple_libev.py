@@ -1,5 +1,6 @@
 import os
 import sys
+import clang.cindex as clang
 
 curdir = os.path.abspath(os.path.dirname(__file__))
 root_dir = os.path.join(curdir, '..')
@@ -9,6 +10,7 @@ sys.path.insert(0, src_dir)
 
 from framework_support import InputOutputContext
 from offload import generate_offload
+from utility import find_elems_of_kind
 
 def main():
     input_file = os.path.join(root_dir, 'inputs/end_to_end/simple_libev_xdp.c')
@@ -33,6 +35,7 @@ def main():
     print('---------------------------------------')
 
     # TODO: run tests on info or out file
+
 
 if __name__ == '__main__':
     main()

@@ -122,18 +122,18 @@ def handle_member_ref_expr(inst, info, more):
     else:
         # This object is not for this class
         links = []
-        for obj in inst.owner:
-            text, _ = gen_code([obj], info)
-            links.append(text)
-
-            if obj.kind == clang.CursorKind.CALL_EXPR:
-                func = obj.get_function_def()
-                assert func is not None
-                type = func.return_type
-            else:
-                type = obj.type
-            link = '->' if type.is_pointer() else '.'
-            links.append(link)
+        # recursivly go through the owner list
+        obj = inst.owner[0]
+        text, _ = gen_code([obj], info)
+        links.append(text)
+        if obj.kind == clang.CursorKind.CALL_EXPR:
+            func = obj.get_function_def()
+            assert func is not None
+            type = func.return_type
+        else:
+            type = obj.type
+        link = '->' if type.is_pointer() else '.'
+        links.append(link)
         links.append(inst.name)
         text = ''.join(links)
     text = indent(text, lvl)

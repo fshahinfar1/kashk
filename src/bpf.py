@@ -14,7 +14,7 @@ class BPF_PROG:
                 '#include <bpf/bpf_helpers.h>',
                 '#include <bpf/bpf_endian.h>',
                 ]
-        self.main_code = []
+        self.main_code = None
         self.license = 'GPL'
 
     def add_declaration(self, text):
