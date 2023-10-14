@@ -6,8 +6,8 @@ from instruction import UnaryOp
 
 # TODO: How to make sure that `read` is the read system-call and not a simple
 # function?
-READ_PACKET = ['async_read_some', 'read', 'recvfrom']
-WRITE_PACKET = ['async_write', 'async_write_some', 'write']
+READ_PACKET = ['async_read_some', 'read', 'recvfrom', 'recvmsg']
+WRITE_PACKET = ['async_write', 'async_write_some', 'write', 'send', 'sendmsg']
 COROUTINE_FUNC_NAME = ('await_resume', 'await_transform', 'await_ready', 'await_suspend')
 
 # TODO: is it formally correct to ignore a function? We should ignore a

@@ -68,13 +68,13 @@ def _process_current_inst(inst, info, more):
             inst = Literal(text, CODE_LITERAL)
             return inst
         elif inst.name in WRITE_PACKET:
-            buf = info.wr_buf.name
+            buf = inst.wr_buf.name
             report(f'Using buffer {buf} to send response')
             # TODO: maybe it is too soon to convert instructions to the code
-            if info.wr_buf.size_cursor is None:
+            if inst.wr_buf.size_cursor is None:
                 write_size = '<UNKNOWN WRITE BUF SIZE>'
             else:
-                write_size, _ = gen_code(info.wr_buf.size_cursor, info, context=ARG)
+                write_size, _ = gen_code(inst.wr_buf.size_cursor, info, context=ARG)
             text = send_response_template(buf, write_size)
             inst = Literal(text, CODE_LITERAL)
             return inst

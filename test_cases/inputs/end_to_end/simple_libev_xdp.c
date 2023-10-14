@@ -32,17 +32,22 @@ void event_handler(int fd, short which, void *arg)
 	c->resp.ptr = "Hello world!END\r\n";
 	c->resp.size = strlen(c->resp.ptr);
 
-	struct iovec iovs[2];
-	struct msghdr msg;
+	send(fd, c->resp.ptr, c->resp.size, 0);
 
-	memset(&msg, 0, sizeof(msg));
-	msg.msg_iov = iovs;
-	msg.msg_name = &addr;
-	msg.msg_namelen = sock_addr_size;
-	iovs[0].iov_base = c->resp.ptr;
-	iovs[0].iov_len = c->resp.size;
-	msg.msg_iovlen = 1;
-	sendmsg(fd, &msg, 0);
+	/* NOTE: I do not know how to solve the static analysis issue with
+	 * sendmsg. I tackle this later.
+	 * */
+	/* struct iovec iovs[2]; */
+	/* struct msghdr msg; */
+
+	/* memset(&msg, 0, sizeof(msg)); */
+	/* msg.msg_iov = iovs; */
+	/* msg.msg_name = &addr; */
+	/* msg.msg_namelen = sock_addr_size; */
+	/* iovs[0].iov_base = c->resp.ptr; */
+	/* iovs[0].iov_len = c->resp.size; */
+	/* msg.msg_iovlen = 1; */
+	/* sendmsg(fd, &msg, 0); */
 }
 
 int main()

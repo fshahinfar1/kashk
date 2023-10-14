@@ -26,8 +26,6 @@ class Info:
 
     def __init__(self):
         from user import UserProg
-        # TODO: I should remove write buffer (similar to read buffer)
-        self.wr_buf = PacketBuffer(None)
         self.prog = None
         self.sym_tbl = SymbolTable()
         # Keep track of information about the userspace program

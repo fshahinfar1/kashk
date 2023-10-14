@@ -103,17 +103,17 @@ def find_elem(cursor, func_name):
     return candid
 
 
-def find_elems_of_kind(cursor, kind):
+def find_elems_of_kind(cursor, kind, filter_fn=lambda e: True):
     matches = []
     if isinstance(cursor, list):
         for c in cursor:
-            partial_res = find_elems_of_kind(c, kind)
+            partial_res = find_elems_of_kind(c, kind, filter_fn)
             matches += partial_res
     else:
-        if cursor.kind == kind:
+        if cursor.kind == kind and filter_fn(cursor):
             matches.append(cursor)
         for child in cursor.get_children():
-            partial_res = find_elems_of_kind(child, kind)
+            partial_res = find_elems_of_kind(child, kind, filter_fn)
             matches += partial_res
     return matches
 

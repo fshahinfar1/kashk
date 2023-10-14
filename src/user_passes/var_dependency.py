@@ -47,9 +47,6 @@ def _should_not_share_variable(inst, sym, info):
         return True
     if 'asio::' in sym.type.spelling:
         return True
-    # TODO: I should not share the packet buffer
-    # if sym.name == info.rd_buf.name or sym.name == info.wr_buf.name:
-    #     return True
     return False
 
 
