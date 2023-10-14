@@ -1,4 +1,10 @@
 import os
+import sys
+
+curdir = os.path.abspath(os.path.dirname(__file__))
+root_dir = os.path.join(curdir, '..')
+sys.path.insert(0, root_dir)
+
 from basic_test_structure import BasicTest, current_file_dir
 
 from bpf_code_gen import gen_code
@@ -6,6 +12,8 @@ from utility import show_insts, find_elems_of_kind
 from data_structure import *
 from instruction import *
 from sym_table import *
+
+
 
 
 class TestCase(BasicTest):
@@ -38,7 +46,7 @@ class TestCase(BasicTest):
 
 
 if __name__ == '__main__':
-    input_files_dir = os.path.join(current_file_dir, './inputs/')
+    input_files_dir = os.path.join(curdir, '../inputs/')
     file_path = os.path.join(input_files_dir, 'switch_case.c')
     entry_func_name = 'main'
     compiler_args = ''

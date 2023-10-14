@@ -1,4 +1,9 @@
 import os
+import sys
+
+curdir = os.path.abspath(os.path.dirname(__file__))
+root_dir = os.path.join(curdir, '..')
+sys.path.insert(0, root_dir)
 from basic_test_structure import BasicTest, current_file_dir
 
 from bpf_code_gen import gen_code

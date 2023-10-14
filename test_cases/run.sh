@@ -40,4 +40,9 @@ main() {
 	echo Number of failed test: $failures
 }
 
-main | tee /tmp/kashk_test_report.txt
+py_main() {
+	CURDIR=$(dirname $0)
+	python3 $CURDIR/script.py
+}
+
+py_main | tee /tmp/kashk_test_report.txt
