@@ -12,6 +12,7 @@ from framework_support import InputOutputContext
 from offload import generate_offload
 from utility import find_elems_of_kind
 
+
 def main():
     input_file = os.path.join(root_dir, 'inputs/end_to_end/simple_libev_xdp.c')
     entry_func = 'event_handler'

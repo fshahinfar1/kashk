@@ -1,6 +1,7 @@
 import clang.cindex as clang
 
 from instruction import *
+from dfs import DFSPass
 
 
 top_block_stack = []
@@ -10,11 +11,17 @@ LOOP = 3
 
 
 SK_DROP = Literal('SK_DROP', clang.CursorKind.MACRO_INSTANTIATION)
+XDP_DROP = Literal('XDP_DROP', clang.CursorKind.MACRO_INSTANTIATION)
 
-def _return_drop_inst():
+def _return_drop_inst(info):
     ret_inst = Instruction()
     ret_inst.kind = clang.CursorKind.RETURN_STMT
-    ret_inst.body = [SK_DROP.clone([]),]
+    if info.io_ctx.bpf_hook == info.io_ctx.__class__.HOOK_SK_SKB:
+        ret_inst.body = [SK_DROP.clone([]),]
+    elif info.io_ctx.bpf_hook == info.io_ctx.__class__.HOOK_XDP:
+        ret_inst.body = [XDP_DROP.clone([]),]
+    else:
+        raise Exception('Unexpected bpf hook')
     return ret_inst
 
 
@@ -24,17 +31,17 @@ def _do_pass(inst, info, more):
     need_pop = False
     if inst.kind == clang.CursorKind.RETURN_STMT:
         # Returing from the event loop
-        return _return_drop_inst()
+        return _return_drop_inst(info)
     elif inst.kind == clang.CursorKind.CONTINUE_STMT:
         top_index = len(top_block_stack)
         while top_block_stack[top_index] == SWITCH:
             # continue is ignored in switch statements
             top_index -= 1
         if top_block_stack[top_index] == EV_LOOP:
-            return _return_drop_inst()
+            return _return_drop_inst(info)
     elif inst.kind == clang.CursorKind.BREAK_STMT:
         if top_block_stack[-1] == EV_LOOP:
-            return _return_drop_inst()
+            return _return_drop_inst(info)
     elif inst.kind == clang.CursorKind.SWITCH_STMT:
         top_block_stack.append(SWITCH)
         need_pop = True
@@ -49,8 +56,8 @@ def _do_pass(inst, info, more):
         is_list = isinstance(child, list)
         if not is_list:
             child = [child,]
-        
-        new_child = [] 
+
+        new_child = []
         for i in child:
             new_inst = _do_pass(i, info, None)
             if new_inst is None:
@@ -72,9 +79,37 @@ def _do_pass(inst, info, more):
     return new_inst
 
 
+def _has_unterminated_path(inst, info):
+    d = DFSPass(inst)
+    for inst, lvl in d:
+        if inst.kind == clang.CursorKind.RETURN_STMT:
+            return False
+        elif inst.kind == clang.CursorKind.CALL_EXPR:
+            # Check if we are transmitting the packet
+            if inst.wr_buf is not None:
+                return False
+        elif inst.kind == clang.CursorKind.IF_STMT:
+            c1 = _has_unterminated_path(inst.body, info)
+            c2 = _has_unterminated_path(inst.other_body, info)
+            if c1 and c2:
+                return False
+        elif inst.kind == clang.CursorKind.SWITCH_STMT:
+            for case in inst.body:
+                c = _has_unterminated_path(case, info)
+                if not c:
+                    break
+            else:
+                # All of the cases termintated
+                return False
+        d.go_deep()
+    return True
+
+
 def loop_end_pass(inst, info, more):
     assert isinstance(inst, Block) and inst.tag == BODY
     top_block_stack.append(EV_LOOP)
     res = _do_pass(inst, info, more)
-    res.add_inst(_return_drop_inst())
+
+    if _has_unterminated_path(res, info):
+        res.add_inst(_return_drop_inst(info))
     return res

@@ -424,16 +424,6 @@ def __convert_cursor_to_inst(c, info, _state):
     elif c.kind == clang.CursorKind.SWITCH_STMT:
         inst = _process_switch_case(c, info)
         return inst
-        # children = list(c.get_children())
-        # assert len(children) == 2
-        # cond = gather_instructions_from(children[0], info, context=ARG)
-        # body = gather_instructions_under(children[1], info, BODY)
-
-        # inst = ControlFlowInst()
-        # inst.kind = c.kind
-        # inst.cond.extend_inst(cond)
-        # inst.body.extend_inst(body)
-        # return inst
     elif c.kind == clang.CursorKind.CASE_STMT:
         report_on_cursor(c)
         assert False, 'This path is discontinued. The switch statement should generate everything'
