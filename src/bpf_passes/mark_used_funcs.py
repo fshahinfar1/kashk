@@ -40,9 +40,10 @@ def _add_type_to_declarations(T, info):
     if decls is None:
         return
     for decl in decls:
+        if decl.name in _has_processed:
+            continue
         decl.is_used_in_bpf_code = True
         info.prog.declarations.append(decl)
-        assert decl.name not in _has_processed
         _has_processed.add(decl.name)
 
 

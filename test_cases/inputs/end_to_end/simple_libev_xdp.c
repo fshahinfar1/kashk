@@ -53,3 +53,14 @@ int main()
 	event_handler(0, 0, &c);
 	return 0;
 }
+
+void _prepare_event_handler_args(void)
+{
+	/* This is telling me how to prepare the event handler */
+	int fd = 0;
+	short which = 0;
+	struct conn _c;
+	_c.rsize = 1024;
+	_c.rbuf = malloc(_c.rsize);
+	void *arg = &_c;
+}

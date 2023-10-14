@@ -1,7 +1,7 @@
 import clang.cindex as clang
 
 from log import error, debug, report
-from utility import skip_unexposed_stmt, add_state_decl_to_bpf, get_body_of_the_loop, report_on_cursor, find_elem
+from utility import skip_unexposed_stmt, get_body_of_the_loop, report_on_cursor, find_elem
 from sym_table import SymbolTableEntry
 from dfs import DFSPass
 

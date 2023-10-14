@@ -22,8 +22,15 @@ def main():
     ctx.set_bpf_output('/tmp/test_bpf.c')
     ctx.set_entry_func(entry_func)
     ctx.set_cflags('')
+    ctx.input_framework = InputOutputContext.INPUT_C_LIBEVENT
 
     info = generate_offload(ctx)
+
+    # Report the generated BPF code
+    print('Generated BPF Code:')
+    with open(ctx.bpf_out_file, 'r') as f:
+        print(f.read())
+    print('---------------------------------------')
 
     # TODO: run tests on info or out file
 

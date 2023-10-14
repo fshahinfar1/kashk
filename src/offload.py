@@ -1,23 +1,21 @@
 import clang.cindex as clang
 from pprint import pformat
 
+from framework_support import InputOutputContext
 from log import *
 from data_structure import *
 from instruction import *
-from utility import (parse_file, find_elem, add_state_decl_to_bpf,
-        report_user_program_graph, draw_tree, show_insts)
+from utility import (parse_file, find_elem, report_user_program_graph, draw_tree, show_insts)
 from find_ev_loop import get_entry_code
 from sym_table import Scope
 from sym_table_gen import build_sym_table, process_source_file
-from understand_logic import (get_all_read, get_all_send,
-        gather_instructions_from)
+from understand_logic import  gather_instructions_from
 from understand_logic_handler import create_func_objs
-
-from mark_io import mark_io
 
 from bpf_code_gen import generate_bpf_prog, gen_code
 from user import generate_user_prog
 
+from passes.mark_io import mark_io
 from passes.pass_obj import PassObject
 from passes.clone import clone_pass
 from passes.linear_code import linear_code_pass
@@ -43,6 +41,33 @@ BPF_MAIN = 'BPF_MAIN_SCOPE'
 def _print_code(prog, info):
     text, _ =  gen_code(prog, info)
     debug('code:\n', text, '\n---', sep='')
+
+
+def _prepare_event_handler_args(cursor, info):
+    if info.io_ctx.bpf_hook == InputOutputContext.HOOK_XDP:
+        # Find a special function in the main file
+        list_elem = find_elem(cursor, '_prepare_event_handler_args')
+        assert len(list_elem) == 1, 'Need to find one and only one implementation of this function'
+        func = list_elem[0]
+        assert func.kind == clang.CursorKind.FUNCTION_DECL
+        assert func.is_definition()
+        body = list(func.get_children())[-1]
+        assert body.kind == clang.CursorKind.COMPOUND_STMT
+        insts = gather_instructions_from(body, info, BODY)
+        return insts
+    elif info.io_ctx.bpf_hook == InputOutputContext.HOOK_SK_SKB:
+        # Add the entry function to the per connection map ?
+        entry_func = Function.directory[info.io_ctx.entry_func]
+        for arg in entry_func.get_arguments():
+            # TODO: global scope is shared_scope
+            # the global_scope is the per connection scope
+            # This is crazy. Why did I not fix this before. I should correct it
+
+            # NOTE: the arguments of the event handler function are put on a map for future access (connection context)
+            assert not arg.type_ref.is_pointer(), 'Putting a pointer on the shared map is incorrect'
+            info.sym_tbl.shared_scope.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
+    # No instructions to be added
+    return []
 
 
 def load_other_sources(io_ctx, info):
@@ -78,16 +103,12 @@ def generate_offload(io_ctx):
     create_func_objs(info)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
-    # Add the entry function to the per connection map ?
-    entry_func = Function.directory[info.io_ctx.entry_func]
-    for arg in entry_func.get_arguments():
-        # TODO: global scope is shared_scope
-        # the global_scope is the per connection scope
-        # This is crazy. Why did I not fix this before. I should correct it
-        info.sym_tbl.shared_scope.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
+    # Prepare the event handler arguments
+    prepare_insts = _prepare_event_handler_args(cursor, info)
 
     # We have our own AST now, continue processing ...
     bpf = Block(BODY)
+    bpf.extend_inst(prepare_insts)
     bpf.extend_inst(insts)
 
     # Mark which type or func definitions should be placed in generated code
@@ -223,7 +244,9 @@ def gen_user_code(user, info, out_user):
             info.user_prog.declarations.append(meta)
 
         # Generate the user code in the context of userspace program
-        text = generate_user_prog(info)
+        # TODO: I have disabled this part just for testing
+        return
+        # text = generate_user_prog(info)
         debug('~~~~~~~~~~~~~~~~~~~~~')
 
     with open(out_user, 'w') as f:

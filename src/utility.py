@@ -317,13 +317,6 @@ def skip_unexposed_stmt(cursor):
     return ptr
 
 
-def add_state_decl_to_bpf(prog, states, decls):
-    for s in states:
-        prog.add_connection_state(s)
-    for d in decls:
-        prog.add_declaration(d)
-
-
 def draw_tree(root, fn=lambda x: str(len(x.children))):
     delimeter = ' '
     v_space = 2

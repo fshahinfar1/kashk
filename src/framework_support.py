@@ -4,6 +4,10 @@ import os
 class InputOutputContext:
     INPUT_CPP_ASIO20 = 0
     INPUT_C_EPOLL = 1
+    INPUT_C_LIBEVENT = 2
+
+    HOOK_XDP = 'xdp'
+    HOOK_SK_SKB = 'sk_skb'
 
     def __init__(self):
         self.input_file = ''
@@ -23,10 +27,8 @@ class InputOutputContext:
             _, in_file_ext = os.path.splitext(self.input_file)
             if in_file_ext == '.c':
                 self.user_out_file = '/tmp/user.c'
-                self.input_framework = InputOutputContext.INPUT_C_EPOLL
             else:
                 self.user_out_file = '/tmp/user.cpp'
-                self.input_framework = InputOutputContext.INPUT_CPP_ASIO20
         return self
 
     def set_user_output(self, path):
