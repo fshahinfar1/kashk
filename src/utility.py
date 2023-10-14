@@ -31,6 +31,14 @@ clang.TypeKind.LONGDOUBLE,
 clang.TypeKind.VOID,
 ]
 
+def try_get_definition(cursor):
+    if cursor.is_definition():
+        return cursor
+    tmp = cursor.get_definition()
+    if tmp is None:
+        return cursor
+    return tmp
+
 def implies(q, p):
     return not q or p
 

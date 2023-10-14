@@ -1,7 +1,7 @@
 from dfs import DFSPass
 from log import debug, error, report
 from prune import should_process_this_cursor
-from utility import report_on_cursor, PRIMITIVE_TYPES
+from utility import report_on_cursor, PRIMITIVE_TYPES, try_get_definition
 
 from data_structure import Function
 
@@ -122,13 +122,7 @@ def __pass_over_source_file(cursor, info):
             __function_decl(c, info)
             continue
 
-        if not (should_process_this_cursor(c) or c.kind == clang.CursorKind.TRANSLATION_UNIT):
-            continue
-
         if c.kind == clang.CursorKind.CLASS_DECL:
-            if not c.is_definition():
-                continue
-
             scope_key = f'class_{c.spelling}'
             if info.sym_tbl.lookup(scope_key) is not None:
                 # report(f'The class {scope_key} is declared multiple times, ignoring')
@@ -136,9 +130,10 @@ def __pass_over_source_file(cursor, info):
             T = MyType.from_cursor_type(c.type)
             info.sym_tbl.insert_entry(scope_key, T, c.kind, None)
 
-            with info.sym_tbl.new_scope() as scope:
-                info.sym_tbl.scope_mapping[scope_key] = scope
-                __collect_information_about_class(c, info)
+            if c.is_definition():
+                with info.sym_tbl.new_scope() as scope:
+                    info.sym_tbl.scope_mapping[scope_key] = scope
+                    __collect_information_about_class(c, info)
             continue
         elif c.kind == clang.CursorKind.VAR_DECL and l > 1:
             # If it is a variable decleration and it is not a global variable
@@ -146,8 +141,7 @@ def __pass_over_source_file(cursor, info):
             info.sym_tbl.insert_entry(c.spelling, T, c.kind, None)
             continue
         elif c.kind == clang.CursorKind.STRUCT_DECL:
-            if not c.is_definition():
-                continue
+            c = try_get_definition(c)
             if not c.spelling:
                 # An unnamed struct
                 scope_key = f'class_struct unnamed_{unnamed_struct_coutner}'
@@ -160,9 +154,10 @@ def __pass_over_source_file(cursor, info):
                 continue
             T = MyType.from_cursor_type(c.type)
             info.sym_tbl.insert_entry(scope_key, T, c.kind, c)
-            with info.sym_tbl.new_scope() as scope:
-                info.sym_tbl.scope_mapping[scope_key] = scope
-                __collect_information_about_class(c, info)
+            if c.is_definition():
+                with info.sym_tbl.new_scope() as scope:
+                    info.sym_tbl.scope_mapping[scope_key] = scope
+                    __collect_information_about_class(c, info)
             continue
         elif c.kind == clang.CursorKind.TYPEDEF_DECL:
             # Typedef is handled in multiple cases

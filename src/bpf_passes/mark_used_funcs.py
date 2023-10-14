@@ -1,9 +1,9 @@
 import clang.cindex as clang
 from dfs import DFSPass
 from log import *
-from utility import PRIMITIVE_TYPES
+from utility import PRIMITIVE_TYPES, get_actual_type
 
-from understand_program_state import get_state_for
+from understand_program_state import generate_decleration_for
 
 # TODO: what if a name of a struct is changed using a typedef ?
 
@@ -12,33 +12,21 @@ def _find_type_decl(name, info):
     entry = info.sym_tbl.global_scope.lookup(scope_key)
     if entry is None:
         debug(f'did not found type: {name}')
-        return None
+        # debug(list(info.sym_tbl.global_scope.symbols.keys()))
+        return []
     cursor = entry.ref
     assert cursor is not None
-    state, decls = get_state_for(cursor)
+    decls = generate_decleration_for(cursor)
     return decls
-
-
-def _get_underlying_type(T):
-    while T.is_pointer() or T.is_array():
-        if T.is_pointer():
-            T = T.get_pointee()
-        elif T.is_array():
-            T = T.element_type
-    if T.is_func_proto():
-        return None
-    return T
 
 
 _has_processed = set()
 def _add_type_to_declarations(T, info):
-    T = _get_underlying_type(T)
+    T = get_actual_type(T)
     if T is None or T.kind in PRIMITIVE_TYPES or T.spelling in _has_processed:
         return
     type_name = T.spelling
     decls = _find_type_decl(type_name, info)
-    if decls is None:
-        return
     for decl in decls:
         if decl.name in _has_processed:
             continue

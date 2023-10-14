@@ -21,9 +21,6 @@ def generate_decleration_for(cursor):
     return a list of strings having codes for defining the types needed.
     """
 
-    if not should_process_this_cursor(cursor):
-        return []
-
     T = get_actual_type(cursor.type)
 
     if T.kind in PRIMITIVE_TYPES:
