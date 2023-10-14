@@ -33,7 +33,7 @@ def _get_underlying_type(T):
 _has_processed = set()
 def _add_type_to_declarations(T, info):
     T = _get_underlying_type(T)
-    if T is None or T in PRIMITIVE_TYPES or T.spelling in _has_processed:
+    if T is None or T.kind in PRIMITIVE_TYPES or T.spelling in _has_processed:
         return
     type_name = T.spelling
     decls = _find_type_decl(type_name, info)

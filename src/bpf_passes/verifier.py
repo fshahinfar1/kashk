@@ -39,7 +39,14 @@ def is_value_from_bpf_ctx(inst, info, R=None):
             return True
     elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
         # TODO: what if there are multiple member access?
-        owner = inst.owner[-1].name
+        owner = inst.owner[-1]
+        if isinstance(owner, ArrayAccess):
+            # TODO: is it possible that there are nested array accesses?
+            assert len(owner.array_ref.children) == 1
+            owner = owner.array_ref.children[0]
+        assert isinstance(owner,Ref)
+        # owner name is
+        owner = owner.name
         sym = info.sym_tbl.lookup(owner)
         if not sym:
             error(MODULE_TAG, f'did not found the symbol object for {owner}')

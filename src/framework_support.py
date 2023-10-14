@@ -37,7 +37,7 @@ class InputOutputContext:
         self.entry_func = name
         return self
 
-    def set_obpf_output(self, path):
+    def set_bpf_output(self, path):
         self.bpf_out_file = path
         return self
 

@@ -122,4 +122,8 @@ def _do_pass(inst, info, more):
 
 
 def transform_vars_pass(inst, info, more):
-    return _do_pass(inst, info, more)
+    res = _do_pass(inst, info, more)
+    for func in Function.directory.values():
+        if func.is_used_in_bpf_code:
+            _do_pass(func.body, info, PassObject())
+    return res

@@ -7,6 +7,7 @@ from instruction import *
 from utility import (parse_file, find_elem, add_state_decl_to_bpf,
         report_user_program_graph, draw_tree, show_insts)
 from find_ev_loop import get_entry_code
+from sym_table import Scope
 from sym_table_gen import build_sym_table, process_source_file
 from understand_logic import (get_all_read, get_all_send,
         gather_instructions_from)
@@ -39,16 +40,6 @@ MODULE_TAG = '[Gen Offload]'
 BPF_MAIN = 'BPF_MAIN_SCOPE'
 
 
-def run_pass_on_all_functions(pass_fn, main_inst, info, skip_if=lambda x: False):
-    ret = pass_fn(main_inst, info, PassObject())
-    for f in Function.directory.values():
-        if f.is_empty() or skip_if(f):
-            continue
-        with info.sym_tbl.with_func_scope(f.name):
-            f.body = pass_fn(f.body, info, PassObject())
-    return ret
-
-
 def _print_code(prog, info):
     text, _ =  gen_code(prog, info)
     debug('code:\n', text, '\n---', sep='')
@@ -63,8 +54,6 @@ def load_other_sources(io_ctx, info):
         others.append(other_cursor)
         process_source_file(other_cursor, info)
 
-# TODO: make a framework agnostic interface, allow for porting to other
-# functions
 def generate_offload(io_ctx):
     info = Info.from_io_ctx(io_ctx)
     # Parse the main file
@@ -100,6 +89,11 @@ def generate_offload(io_ctx):
     # We have our own AST now, continue processing ...
     bpf = Block(BODY)
     bpf.extend_inst(insts)
+
+    # Mark which type or func definitions should be placed in generated code
+    debug('Mark Functions used in BPF')
+    mark_used_funcs(bpf, info, PassObject())
+    debug('~~~~~~~~~~~~~~~~~~~~~')
 
     debug('Mark Read/Write Inst & Buf')
     mark_io(bpf, info)
@@ -157,6 +151,7 @@ def generate_offload(io_ctx):
     else:
         report("No user space program was generated. The tool has offloaded everything to BPF.")
     gen_bpf_code(bpf, info, io_ctx.bpf_out_file)
+    return info
 
 
 def dfs_over_deps_vars(root):
@@ -243,7 +238,7 @@ def gen_bpf_code(bpf, info, out_bpf):
 
     # Transform access to variables and read/write buffers.
     debug('Transform Vars')
-    bpf = run_pass_on_all_functions(transform_vars_pass, bpf, info)
+    bpf = transform_vars_pass(bpf, info, PassObject())
     # code, _ = gen_code(bpf, info)
     # print(code)
     # show_insts([bpf])
@@ -265,11 +260,6 @@ def gen_bpf_code(bpf, info, out_bpf):
     # Reduce number of parameters
     debug('Reduce Params')
     bpf = reduce_params_pass(bpf, info, PassObject())
-    debug('~~~~~~~~~~~~~~~~~~~~~')
-
-    # Mark which type or func definitions should be placed in generated code
-    debug('Mark Functions used in BPF')
-    mark_used_funcs(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # TODO: split the code between parser and verdict

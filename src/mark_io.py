@@ -137,4 +137,5 @@ def mark_io(bpf, info):
     _do_pass(bpf, info)
     # ... and all the other functions
     for func in Function.directory.values():
-        _do_pass(func.body, info)
+        if func.is_used_in_bpf_code:
+            _do_pass(func.body, info)
