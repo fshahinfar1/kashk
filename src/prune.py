@@ -88,27 +88,7 @@ def should_ignore_cursor(cursor):
         children = list(cursor.get_children())
         tokens = list(cursor.get_tokens())
         count_token = len(tokens)
-
-        # s = cursor.extent.start.offset
-        # e = cursor.extent.end.offset
-        # diff = e - s
-
-        # report_on_cursor(cursor)
-        # children = list(cursor.get_children())
-        # report_on_cursor(children[0])
-        # x = list(children[0].get_children())
-        # while x:
-        #     report_on_cursor(x[0])
-        #     x = list(x[0].get_children())
-        # print(count_token)
         if count_token == 0:
-            # print(diff)
-            # print('zero:', cursor.extent.start, cursor.extent.end)
-            # print(tokens)
-
-            # error('Binary operator with zero tokens, this will fail to convert to BinOp so it was ignored!')
-            # report_on_cursor(cursor)
-            # This was observed to be a assert statement, errno == ..., what other statement does it include?
             return True
 
         # Basically check if we can find the binary operator

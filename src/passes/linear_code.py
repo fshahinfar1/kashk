@@ -49,7 +49,7 @@ def _move_function_out(inst, info, more):
     else:
         func = inst.get_function_def()
         if not func:
-            error(MODULE_TAG, 'can not move a function that do not know the definition: ', inst.name)
+            debug(MODULE_TAG, 'can not move a function that do not know the definition: ', inst.name)
             return inst
         return_type = func.return_type
 

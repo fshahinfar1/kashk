@@ -98,13 +98,6 @@ class Call(Instruction):
         self.name = cursor.spelling
 
         self.func_ptr = None
-        # self.func_ptr = cursor.referenced
-        # assert cursor.referenced is not None
-        # if not self.func_ptr.is_definition():
-        #     tmp = self.func_ptr.get_definition()
-        #     if tmp is not None:
-        #         # it would be nice if we have a pointer to definition instead of declaration
-        #         cursor.func_ptr = tmp
 
         self.args = []
         # The last element of owner should be an object accesible from
@@ -186,7 +179,6 @@ class VarDecl(Instruction):
             # implementing things
             self.cursor = c
             self.state_obj = StateObject(c)
-
             self.type = MyType.from_cursor_type(c.type)
             self.name = c.spelling
         else:

@@ -66,6 +66,6 @@ void _prepare_event_handler_args(void)
 	short which = 0;
 	struct conn _c;
 	_c.rsize = 1024;
-	_c.rbuf = malloc(_c.rsize);
+	_c.rbuf = malloc(1024);
 	void *arg = &_c;
 }

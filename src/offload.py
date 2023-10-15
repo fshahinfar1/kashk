@@ -228,7 +228,6 @@ def gen_user_code(user, info, out_user):
             state_obj = StateObject(None)
             state_obj.name = 'failure_number'
             state_obj.type_ref = BASE_TYPES[clang.TypeKind.INT]
-            state_obj.type = state_obj.type_ref.spelling
             fields = [state_obj,]
             for var in x['vars']:
                 # debug(MODULE_TAG, 'bpf/user-shared:', f'{var.name}:{var.type.spelling}')
@@ -236,7 +235,6 @@ def gen_user_code(user, info, out_user):
                 T = var.type.clone()
                 state_obj = StateObject(None)
                 state_obj.name = var.name
-                state_obj.type = T.spelling
                 state_obj.type_ref = T
                 fields.append(state_obj)
             path_id = x['path_id']

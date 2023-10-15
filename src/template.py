@@ -176,3 +176,32 @@ if (((void *)(__u64)skb->data + sizeof({type_name}))  > (void *)(__u64)skb->data
     code += '\n'.join(store) + '\n'
     tmp = Literal(code, CODE_LITERAL)
     return tmp
+
+
+def define_bpf_map(map_name, map_type, key_type, val_type, entries):
+    return Literal(f'''struct {{
+  __uint(type,  {map_type});
+  __type(key,   {key_type});
+  __type(value, {val_type});
+  __uint(max_entries, {entries});
+}} {map_name} SEC(".maps")
+''', CODE_LITERAL)
+
+
+def define_bpf_arr_map(map_name, val_type, entries):
+    return define_bpf_map(map_name, 'BPF_MAP_TYPE_ARRAY', 'unsigned int', val_type, entries)
+
+
+def malloc_lookup(name):
+    text = f'''
+{{
+  struct {name} *tmp = NULL;
+  int zero = 0;
+  tmp = bpf_map_lookup_elem(&{name}_map, &zero);
+  if (tmp == NULL) {{
+    return ;
+  }}
+  tmp->data
+}}
+'''
+    return Literal(text, CODE_LITERAL)

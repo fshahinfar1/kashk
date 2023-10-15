@@ -4,6 +4,23 @@ from log import error, debug, report
 from utility import skip_unexposed_stmt, get_body_of_the_loop, report_on_cursor, find_elem
 from sym_table import SymbolTableEntry
 from dfs import DFSPass
+from prune import READ_PACKET
+
+
+def __has_read(cursor):
+    q = [cursor]
+    # Outside the connection polling loop
+    while q:
+        c = q.pop()
+        if c.kind == clang.CursorKind.CALL_EXPR:
+            if c.spelling in READ_PACKET:
+                return True
+
+
+        # Continue deeper
+        for child in reversed(list(c.get_children())):
+            q.append(child)
+    return False
 
 
 def find_event_loop(cursor):

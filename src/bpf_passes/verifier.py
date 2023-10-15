@@ -173,7 +173,6 @@ def _handle_call(inst, info, more):
             # Add skb as the last parameter of this function
             skb_obj = StateObject(None)
             skb_obj.name = 'skb'
-            skb_obj.type = T.spelling
             skb_obj.is_pointer = True
             func.args.append(skb_obj)
             # This is added to the scope of function being called

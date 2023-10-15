@@ -1,8 +1,7 @@
 import clang.cindex as clang
-from log import error, debug
+from log import error, debug, report
 from bpf_code_gen import gen_code
-from template import (prepare_shared_state_var, bpf_get_data,
-        send_response_template)
+from template import prepare_shared_state_var, bpf_get_data, send_response_template, define_bpf_arr_map, malloc_lookup
 from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS
 
 from data_structure import *
@@ -13,12 +12,48 @@ from passes.pass_obj import PassObject
 MODULE_TAG = '[Transform Vars Pass]'
 cb_ref = CodeBlockRef()
 
+_malloc_map_counter = 0
+def _get_malloc_name():
+    global _malloc_map_counter
+    _malloc_map_counter += 1
+    return f'malloc_{_malloc_map_counter}'
 
 def _known_function_substitution(inst, info):
     if inst.name == 'strlen':
         inst.name = 'bpf_strlen'
+        # Mark the function used
+        func = inst.get_function_def()
+        assert func is not None
+        func.is_used_in_bpf_code = True
+        info.prog.declarations.append(func)
         # TODO: Also do a check if the return value is valid (check the size limit)
         return inst
+    elif inst.name == 'malloc':
+        map_value_size,_ = gen_code([inst.args[0]], info)
+        name = _get_malloc_name()
+        map_name = name + '_map'
+
+        # Define structure which will be the value of the malloc map
+        field = StateObject(None)
+        field.name = 'data'
+        field.type_ref = MyType.make_array('_unset_type_name_', BASE_TYPES[clang.TypeKind.SCHAR], map_value_size)
+        value_type = Record(name, [field])
+        value_type.is_used_in_bpf_code = True
+        info.prog.add_declaration(value_type)
+        report('Declare', value_type, 'as malloc object')
+
+        # Define the map
+        m = define_bpf_arr_map(map_name, f'struct {name}', 1)
+        info.prog.add_declaration(m)
+        report('Declare map', m, 'for malloc')
+
+        # Look the malloc map
+        lookup_inst = malloc_lookup(name)
+
+        return lookup_inst
+        # Add the instructions
+        # blk = cb_ref.get(BODY)
+        # code.append(lookup_inst)
     error(f'Know function {inst.name} is not implemented yet')
     return inst
 
@@ -49,7 +84,7 @@ def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.DECL_REF_EXPR:
         return _check_if_ref_is_global_state(inst, info)
     elif inst.kind == clang.CursorKind.VAR_DECL:
-        # TODO: I might want to remove some variable declerations here
+        # TODO: I might want to remove some variable declarations here
         # e.g., ones related to reading/writing responses
         pass
     elif inst.kind == clang.CursorKind.CALL_EXPR:

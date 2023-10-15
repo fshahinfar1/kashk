@@ -28,13 +28,15 @@ def __collect_information_about_class(cursor, info):
             T = MyType.from_cursor_type(c.type)
             info.sym_tbl.insert_entry(c.spelling, T, c.kind, None)
         elif c.kind == clang.CursorKind.CXX_METHOD:
-            method_name = f'{class_name}_{c.spelling}'
-            T = MyType.from_cursor_type(c.result_type)
-            info.sym_tbl.insert_entry(method_name, T, c.kind, None)
+            # TODO: I do not care about methods now
+            continue
+            # method_name = f'{class_name}_{c.spelling}'
+            # T = MyType.from_cursor_type(c.result_type)
+            # info.sym_tbl.insert_entry(method_name, T, c.kind, None)
 
-            with info.sym_tbl.new_scope() as scope:
-                info.sym_tbl.scope_mapping[method_name] = scope
-                __collect_information_about_func(c, info)
+            # with info.sym_tbl.new_scope() as scope:
+            #     info.sym_tbl.scope_mapping[method_name] = scope
+            #     __collect_information_about_func(c, info)
 
 
 def __collect_information_about_func(cursor, info):

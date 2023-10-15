@@ -41,6 +41,13 @@ def remember_func(func):
         current_function = tmp
 
 
+def _check_if_known_func_condition_is_met(inst, info):
+    if inst.name == 'malloc':
+        arg = inst.args[0]
+        return arg.kind == clang.CursorKind.INTEGER_LITERAL
+    return True
+
+
 _have_processed = None
 def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.CALL_EXPR:
@@ -56,7 +63,12 @@ def _process_current_inst(inst, info, more):
             if func.may_succeed:
                 # This is the case of KNOWN functions like memcpy
                 failed = fail_ref.get(FAILED)
-                return inst, failed
+                if failed:
+                    # When does this case happen?
+                    return inst, failed
+                else:
+                    sat = _check_if_known_func_condition_is_met(inst, info)
+                    return inst, not sat
             fail_ref.set(FAILED, YES)
             return inst, YES
 

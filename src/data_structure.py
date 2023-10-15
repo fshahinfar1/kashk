@@ -89,15 +89,17 @@ class StateObject:
         if c:
             self.cursor = c
             self.name = c.spelling
-            self.type = c.type.spelling
             self.kind = c.type.kind
             self.type_ref = MyType.from_cursor_type(c.type)
         else:
             self.cursor = None
             self.name = None
-            self.type = None
             self.kind = None
             self.type_ref = None
+
+    @property
+    def type(self):
+        return self.type_ref.spelling
 
     @property
     def is_pointer(self):
@@ -107,7 +109,6 @@ class StateObject:
     def clone(self):
         new = StateObject(self.cursor)
         new.name = self.name
-        new.type = self.type
         new.kind = self.kind
         new.type_ref = self.type_ref
         return new
@@ -127,7 +128,6 @@ class StateObject:
             if sub_T.is_array():
                 sub_var = StateObject(None)
                 sub_var.type_ref = self.type_ref.element_type
-                sub_var.type = sub_var.type_ref.spelling
                 sub_var.name = self.name
                 tmp = sub_var.get_c_code() # recursion
                 assert tmp[-1] == ';'

@@ -101,22 +101,6 @@ def get_all_send(cursor):
     return result
 
 
-def __has_read(cursor):
-    q = [cursor]
-    # Outside the connection polling loop
-    while q:
-        c = q.pop()
-        if c.kind == clang.CursorKind.CALL_EXPR:
-            if c.spelling in READ_PACKET:
-                return True
-
-
-        # Continue deeper
-        for child in reversed(list(c.get_children())):
-            q.append(child)
-    return False
-
-
 def _get_init_field(field_cursor):
     """
     This is a helper for parsing the struct initializer fields

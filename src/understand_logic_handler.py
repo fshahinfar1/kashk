@@ -201,25 +201,27 @@ def add_known_func_objs(info):
     strlen.is_method = False
     # Directly use the same arguments as original strlen
     orig = Function.directory['strlen']
-    strlen.args = orig.get_arguments()
+    arg1 = StateObject(None)
+    arg1.name = 'str'
+    arg1.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+    strlen.args = [arg1,]
+    strlen.return_type = BASE_TYPES[clang.TypeKind.UINT]
+    strlen.may_succeed = True
 
     scope = Scope(info.sym_tbl.global_scope)
     info.sym_tbl.scope_mapping[strlen.name] = scope
     for a in strlen.args:
         scope.insert_entry(a.name, a.type_ref, a.kind, None)
     code = '''
-static inline
-unsigned int strlen_bpf (const char * str) {
-  int len;
-  len = 0;
-  int i;
-  for(i = 0; i < 256; (i)++) {
-    if (str[i] == '\0') {
-      return (len);
-    }
-    (len)++;
-  }
-  return ((unsigned int)(-(1)));
+int len;
+len = 0;
+int i;
+for(i = 0; i < 256; (i)++) {
+if (str[i] == '\\0') {
+  return (len);
 }
-    '''
-    strlen.body = Literal(code, CODE_LITERAL)
+(len)++;
+}
+return ((unsigned int)(-(1)));
+'''
+    strlen.body.add_inst(Literal(code, CODE_LITERAL))

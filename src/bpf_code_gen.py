@@ -437,7 +437,6 @@ def __generate_global_shared_state(info):
         # debug(MODULE_TAG, x)
         o = StateObject(None)
         o.name = x.name
-        o.type = x.type.spelling
         o.type_ref = x.type
 
         fields.append(o)

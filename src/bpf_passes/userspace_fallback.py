@@ -55,7 +55,6 @@ def _handle_function_may_fail(inst, func, info, more):
         flag_obj.name = flag_ref.name
         flag_obj.is_pointer = True
         T = flag_ref.type
-        flag_obj.type = T.spelling
         flag_obj.type_ref = T
 
         if not func.receives_fail_flag:

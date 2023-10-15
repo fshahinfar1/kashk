@@ -85,9 +85,7 @@ def _function_check_param_reduc(inst, func, info, more):
         # Add a new parameter to the function
         ex_obj = StateObject(None)
         ex_obj.name = EXTRA_PARAM_NAME
-        ex_obj.type = f'struct {change.struct_name} *'
-        ex_obj.is_pointer = True
-        T2 = MyType.make_simple(ex_obj.type, clang.TypeKind.RECORD)
+        T2 = MyType.make_simple(f'struct {change.struct_name}', clang.TypeKind.RECORD)
         T = MyType.make_pointer(T2)
         ex_obj.type_ref = T
         func.args.append(ex_obj)
