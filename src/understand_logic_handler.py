@@ -193,3 +193,33 @@ def create_func_objs(info):
             cursor = Function.func_cursor[name]
             __add_func_definition2(name, cursor, info)
         processed.update(keys)
+
+
+def add_known_func_objs(info):
+    strlen = Function('bpf_strlen', None)
+    strlen.is_operator = False
+    strlen.is_method = False
+    # Directly use the same arguments as original strlen
+    orig = Function.directory['strlen']
+    strlen.args = orig.get_arguments()
+
+    scope = Scope(info.sym_tbl.global_scope)
+    info.sym_tbl.scope_mapping[strlen.name] = scope
+    for a in strlen.args:
+        scope.insert_entry(a.name, a.type_ref, a.kind, None)
+    code = '''
+static inline
+unsigned int strlen_bpf (const char * str) {
+  int len;
+  len = 0;
+  int i;
+  for(i = 0; i < 256; (i)++) {
+    if (str[i] == '\0') {
+      return (len);
+    }
+    (len)++;
+  }
+  return ((unsigned int)(-(1)));
+}
+    '''
+    strlen.body = Literal(code, CODE_LITERAL)

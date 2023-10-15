@@ -439,7 +439,6 @@ def __generate_global_shared_state(info):
         o.name = x.name
         o.type = x.type.spelling
         o.type_ref = x.type
-        o.is_pointer = o.type_ref.is_pointer()
 
         fields.append(o)
     # If there are any global state, declare the shared_map

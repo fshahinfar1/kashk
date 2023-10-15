@@ -91,15 +91,18 @@ class StateObject:
             self.name = c.spelling
             self.type = c.type.spelling
             self.kind = c.type.kind
-            self.is_pointer = c.type.kind == clang.TypeKind.POINTER
             self.type_ref = MyType.from_cursor_type(c.type)
         else:
             self.cursor = None
             self.name = None
             self.type = None
             self.kind = None
-            self.is_pointer = False
             self.type_ref = None
+
+    @property
+    def is_pointer(self):
+        assert isinstance(self.type, MyType)
+        return self.type.is_pointer()
 
     def clone(self):
         new = StateObject(self.cursor)

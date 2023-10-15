@@ -10,7 +10,7 @@ from find_ev_loop import get_entry_code
 from sym_table import Scope
 from sym_table_gen import build_sym_table, process_source_file
 from understand_logic import  gather_instructions_from
-from understand_logic_handler import create_func_objs
+from understand_logic_handler import create_func_objs, add_known_func_objs
 
 from bpf_code_gen import generate_bpf_prog, gen_code
 from user import generate_user_prog
@@ -101,6 +101,7 @@ def generate_offload(io_ctx):
 
     debug('Gather Infromation About Functions')
     create_func_objs(info)
+    add_known_func_objs(info)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Prepare the event handler arguments

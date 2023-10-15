@@ -39,7 +39,7 @@ def is_function_call_feasible(inst, info):
         error(f'Do not have function struct for {inst.name}')
         return False
     if func.is_empty():
-        if inst.name in (*KNOWN_FUNCS, *READ_PACKET, *WRITE_PACKET):
+        if inst.name in (KNOWN_FUNCS + READ_PACKET + WRITE_PACKET):
             # It is fine
             return True
         func.may_fail = True

@@ -3,7 +3,7 @@ from log import error, debug
 from bpf_code_gen import gen_code
 from template import (prepare_shared_state_var, bpf_get_data,
         send_response_template)
-from prune import READ_PACKET, WRITE_PACKET
+from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS
 
 from data_structure import *
 from instruction import *
@@ -13,6 +13,14 @@ from passes.pass_obj import PassObject
 MODULE_TAG = '[Transform Vars Pass]'
 cb_ref = CodeBlockRef()
 
+
+def _known_function_substitution(inst, info):
+    if inst.name == 'strlen':
+        inst.name = 'bpf_strlen'
+        # TODO: Also do a check if the return value is valid (check the size limit)
+        return inst
+    error(f'Know function {inst.name} is not implemented yet')
+    return inst
 
 def _check_if_ref_is_global_state(inst, info):
     sym, scope = info.sym_tbl.lookup2(inst.name)
@@ -41,18 +49,8 @@ def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.DECL_REF_EXPR:
         return _check_if_ref_is_global_state(inst, info)
     elif inst.kind == clang.CursorKind.VAR_DECL:
-        # Handle read buffer transformation
-        # if inst.name == info.rd_buf.name:
-        #     # The previouse passes should have seperated the initialization
-        #     # from declaration
-        #     assert inst.has_children() is False
-        #     new_inst = VarDecl(None)
-        #     new_inst.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
-        #     new_inst.name = inst.name
-        #     e = info.sym_tbl.insert_entry(inst.name, new_inst.type, new_inst.kind, None)
-        #     e.is_bpf_ctx = True
-        #     # replace this instruction
-        #     return new_inst
+        # TODO: I might want to remove some variable declerations here
+        # e.g., ones related to reading/writing responses
         pass
     elif inst.kind == clang.CursorKind.CALL_EXPR:
         if inst.name in READ_PACKET:
@@ -78,17 +76,15 @@ def _process_current_inst(inst, info, more):
             text = send_response_template(buf, write_size)
             inst = Literal(text, CODE_LITERAL)
             return inst
-
+        elif inst.name in KNOWN_FUNCS:
+            # Use known implementations of famous functions
+            return _known_function_substitution(inst, info)
     return inst
 
 
 def _do_pass(inst, info, more):
     lvl, ctx, parent_list = more.unpack()
     new_children = []
-
-    # if inst.bpf_ignore is True:
-    #     debug(MODULE_TAG, 'remove instruction:', inst)
-    #     return None
 
     with cb_ref.new_ref(ctx, parent_list):
         # Process current instruction
