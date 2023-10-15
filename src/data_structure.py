@@ -103,8 +103,8 @@ class StateObject:
 
     @property
     def is_pointer(self):
-        assert isinstance(self.type, MyType)
-        return self.type.is_pointer()
+        assert isinstance(self.type_ref, MyType)
+        return self.type_ref.is_pointer()
 
     def clone(self):
         new = StateObject(self.cursor)

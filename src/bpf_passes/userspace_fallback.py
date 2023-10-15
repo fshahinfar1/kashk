@@ -53,7 +53,6 @@ def _handle_function_may_fail(inst, func, info, more):
         ## we need to pass a flag
         flag_obj = StateObject(None)
         flag_obj.name = flag_ref.name
-        flag_obj.is_pointer = True
         T = flag_ref.type
         flag_obj.type_ref = T
 

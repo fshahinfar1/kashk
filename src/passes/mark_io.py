@@ -4,6 +4,7 @@ BPF supported instructions
 """
 
 from data_structure import *
+from instruction import Literal, CODE_LITERAL
 from dfs import DFSPass
 from utility import skip_unexposed_stmt, find_elems_of_kind
 from prune import READ_PACKET, WRITE_PACKET, COROUTINE_FUNC_NAME
@@ -64,7 +65,9 @@ def _do_mark_write(w, info):
         buf_arg = skip_unexposed_stmt(args[1])
         buf_sz = skip_unexposed_stmt(args[2])
     elif func_name == 'sendmsg':
-        raise Exception('it is not implemented yet')
+        error('sendmsg is not supported yet')
+        buf_arg = Literal('<buf>', CODE_LITERAL)
+        buf_sz = Literal('1024', clang.CursorKind.INTEGER_LITERAL)
 
     pkt_buf = PacketBuffer(None)
     pkt_buf.size_cursor, _ = gen_code([buf_sz], info)

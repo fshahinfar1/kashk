@@ -47,6 +47,8 @@ def _prepare_event_handler_args(cursor, info):
     if info.io_ctx.bpf_hook == InputOutputContext.HOOK_XDP:
         # Find a special function in the main file
         list_elem = find_elem(cursor, '_prepare_event_handler_args')
+        if list_elem is None:
+            return []
         assert len(list_elem) == 1, 'Need to find one and only one implementation of this function'
         func = list_elem[0]
         assert func.kind == clang.CursorKind.FUNCTION_DECL
