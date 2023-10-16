@@ -77,7 +77,6 @@ def _function_check_param_reduc(inst, func, info, more):
             # TODO: do I need to maintain the symbol of this parameter?
             # I am passing a struct which might have a field that
             # points to the BPF context.
-            print(param.name,func.name)
             assert func_scope.lookup(param.name) is not None
             sym = func_scope.delete(param.name)
             change.add_param(param)

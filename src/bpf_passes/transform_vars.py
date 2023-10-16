@@ -48,7 +48,7 @@ def _known_function_substitution(inst, info):
         report('Declare map', m, 'for malloc')
 
         # Look the malloc map
-        lookup_inst, ref = malloc_lookup(name)
+        lookup_inst, ref = malloc_lookup(name, info)
         blk = cb_ref.get(BODY)
         blk.append(lookup_inst)
         return ref

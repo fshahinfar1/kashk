@@ -178,10 +178,13 @@ def define_bpf_arr_map(map_name, val_type, entries):
     return define_bpf_map(map_name, 'BPF_MAP_TYPE_ARRAY', 'unsigned int', val_type, entries)
 
 
-def malloc_lookup(name):
+def malloc_lookup(name, info):
     tmp_name = get_tmp_var_name()
     type_name = f'struct {name}'
     T = MyType.make_pointer(MyType.make_simple(type_name, clang.TypeKind.RECORD))
+
+    # Add var decl to symbol table
+    info.sym_tbl.insert_entry(tmp_name, T, clang.CursorKind.VAR_DECL, None)
 
     text = f'''
 {T.spelling} {tmp_name} = NULL;
