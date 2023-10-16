@@ -4,6 +4,7 @@ import clang.cindex as clang
 from log import error, debug, report
 from data_structure import *
 from instruction import *
+from utility import get_tmp_var_name
 
 from bpf_code_gen import gen_code
 from passes.pass_obj import PassObject
@@ -16,13 +17,6 @@ cb_ref = CodeBlockRef()
 # TODO: this is a hack, I should use a stack to associate a mapping for each
 # scope. I am Lazy:) (issue is more time constraint than lazy)
 func_ptr_mapping = {}
-
-tmp_num = 100
-def _get_tmp_var_name():
-    global tmp_num
-    name = f'_tmp_{tmp_num}'
-    tmp_num += 1
-    return name
 
 def _make_sure_void_func_return(func, info):
     last_inst = func.body.children[-1]
@@ -59,7 +53,7 @@ def _move_function_out(inst, info, more):
     assert blk is not None
 
     if return_type.spelling != 'void':
-        tmp_var_name = _get_tmp_var_name()
+        tmp_var_name = get_tmp_var_name()
         # Declare tmp
         T = return_type
         assert isinstance(T, MyType)

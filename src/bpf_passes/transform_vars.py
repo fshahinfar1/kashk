@@ -1,7 +1,7 @@
 import clang.cindex as clang
 from log import error, debug, report
 from bpf_code_gen import gen_code
-from template import prepare_shared_state_var, send_response_template, define_bpf_arr_map, malloc_lookup
+from template import prepare_shared_state_var, define_bpf_arr_map, malloc_lookup
 from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS
 
 from data_structure import *
@@ -48,12 +48,10 @@ def _known_function_substitution(inst, info):
         report('Declare map', m, 'for malloc')
 
         # Look the malloc map
-        lookup_inst = malloc_lookup(name)
-
-        return lookup_inst
-        # Add the instructions
-        # blk = cb_ref.get(BODY)
-        # code.append(lookup_inst)
+        lookup_inst, ref = malloc_lookup(name)
+        blk = cb_ref.get(BODY)
+        blk.append(lookup_inst)
+        return ref
     error(f'Know function {inst.name} is not implemented yet')
     return inst
 
@@ -108,8 +106,7 @@ def _process_current_inst(inst, info, more):
                 write_size = '<UNKNOWN WRITE BUF SIZE>'
             else:
                 write_size, _ = gen_code(inst.wr_buf.size_cursor, info, context=ARG)
-            text = send_response_template(buf, write_size)
-            inst = Literal(text, CODE_LITERAL)
+            inst = info.prog.send(buf, write_size)
             return inst
         elif inst.name in KNOWN_FUNCS:
             # Use known implementations of famous functions

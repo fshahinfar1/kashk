@@ -1,4 +1,6 @@
 from instruction import *
+from data_structure import *
+from utility import get_tmp_var_name
 
 VOID_PTR = 'void *'
 
@@ -117,18 +119,6 @@ def load_shared_object_code():
 }
 '''
 
-def send_response_template(buf, write_size, skb='skb'):
-    code = [
-        f'__adjust_skb_size({skb}, {write_size});',
-        f'if (((void *)(__u64){skb}->data + {write_size})  > (void *)(__u64){skb}->data_end) {{',
-        f'  return SK_DROP;',
-        '}',
-        f'memcpy((void *)(__u64){skb}->data, {buf}, {write_size});',
-        f'return bpf_sk_redirect_map({skb}, &sock_map, sock_ctx->sock_map_index, 0);',
-        ]
-    text = '\n'.join(code)
-    return text
-
 
 def shared_map_decl():
     return '''struct {
@@ -189,15 +179,31 @@ def define_bpf_arr_map(map_name, val_type, entries):
 
 
 def malloc_lookup(name):
+    tmp_name = get_tmp_var_name()
+    type_name = f'struct {name}'
+    T = MyType.make_pointer(MyType.make_simple(type_name, clang.TypeKind.RECORD))
+
     text = f'''
+{T.spelling} {tmp_name} = NULL;
 {{
-  struct {name} *tmp = NULL;
   int zero = 0;
-  tmp = bpf_map_lookup_elem(&{name}_map, &zero);
-  if (tmp == NULL) {{
+  {tmp_name} = bpf_map_lookup_elem(&{name}_map, &zero);
+  if ({tmp_name} == NULL) {{
     return ;
   }}
-  tmp->data
 }}
 '''
-    return Literal(text, CODE_LITERAL)
+    lookup_inst = Literal(text, CODE_LITERAL)
+
+    #Inst: tmp->data
+    owner = Ref(None)
+    owner.name = tmp_name
+    owner.type = T
+    owner.kind = clang.CursorKind.DECL_REF_EXPR
+    ref = Ref(None)
+    ref.name = 'data'
+    ref.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+    ref.kind = clang.CursorKind.MEMBER_REF_EXPR
+    ref.owner.append(owner)
+
+    return lookup_inst, ref

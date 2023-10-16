@@ -394,3 +394,11 @@ def report_user_program_graph(info):
         debug('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
         q.append(0)
         q.extend(reversed(node.children))
+
+
+tmp_num = 100
+def get_tmp_var_name():
+    global tmp_num
+    name = f'_tmp_{tmp_num}'
+    tmp_num += 1
+    return name

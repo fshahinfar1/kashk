@@ -35,6 +35,12 @@ class BPF_PROG:
     def get_pkt_size(info):
         raise Exception('Not implemented!')
 
+    def add_args_to_scope(self, scope):
+        raise Exception('Not implemented!')
+
+    def send(self, buf, write_size):
+        raise Exception('Not implemented!')
+
 
 class XDP_PROG(BPF_PROG):
 
@@ -45,7 +51,7 @@ class XDP_PROG(BPF_PROG):
         struct_name = 'xdp'
         T = MyType.make_simple('xdp_md', clang.TypeKind.RECORD)
         scope_key = f'class_{T.spelling}'
-        sym_tbl.insert_entry(struct_name, T, clang.CursorKind.CLASS_DECL, None)
+        sym_tbl.global_scope.insert_entry(struct_name, T, clang.CursorKind.CLASS_DECL, None)
         with sym_tbl.new_scope() as scope:
             sym_tbl.scope_mapping[scope_key] = scope
             U32 = BASE_TYPES[clang.TypeKind.UINT]
@@ -60,7 +66,7 @@ class XDP_PROG(BPF_PROG):
         code = indent(code, 1)
 
         text = f'''
-SEC('xdp')
+SEC("xdp")
 int xdp_prog(struct xdp_md *xdp)
 {{
 {code}
@@ -88,6 +94,25 @@ int xdp_prog(struct xdp_md *xdp)
 
     def get_pkt_size(info):
         return Literal(f'((__u64)xdp->data_end - (__u64)xdp->data)', CODE_LITERAL)
+
+    def add_args_to_scope(self, scope):
+        T = MyType.make_pointer(MyType.make_simple('xdp_md', clang.TypeKind.RECORD))
+        scope.insert_entry('xdp', T, clang.CursorKind.PARM_DECL, None)
+
+    def send(self, buf, write_size):
+        code = f'''
+{{
+  int delta = {write_size} - ((__u64)xdp->data_end - (__u64)xdp->data);
+  bpf_xdp_adjust_tail(xdp, delta);
+}}
+if (((void *)(__u64)xdp->data + {write_size}) > (void *)(__u64)xdp->data_end) {{
+  return SK_DROP;
+}}
+memcpy((void *)(__u64)xdp->data, {buf}, {write_size});
+return XDP_PASS;
+'''
+        inst = Literal(code, CODE_LITERAL)
+        return inst
 
 
 class SK_SKB_PROG(BPF_PROG):
@@ -195,3 +220,21 @@ if (!sock_ctx) {
 
     def get_pkt_size(info):
         return Literal(f'skb->len', CODE_LITERAL)
+
+    def add_args_to_scope(self, scope):
+        T = MyType.make_pointer(MyType.make_simple('__sk_skb', clang.TypeKind.RECORD))
+        scope.insert_entry('skb', T, clang.CursorKind.PARM_DECL, None)
+
+    def send(self, buf, write_size):
+        skb = 'skb'
+        code = [
+            f'__adjust_skb_size({skb}, {write_size});',
+            f'if (((void *)(__u64){skb}->data + {write_size})  > (void *)(__u64){skb}->data_end) {{',
+            f'  return SK_DROP;',
+            '}',
+            f'memcpy((void *)(__u64){skb}->data, {buf}, {write_size});',
+            f'return bpf_sk_redirect_map({skb}, &sock_map, sock_ctx->sock_map_index, 0);',
+            ]
+        text = '\n'.join(code)
+        inst = Literal(text, CODE_LITERAL)
+        return inst
