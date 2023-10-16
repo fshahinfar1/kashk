@@ -11,6 +11,7 @@ from passes.pass_obj import PassObject
 
 MODULE_TAG = '[Transform Vars Pass]'
 cb_ref = CodeBlockRef()
+current_function = None
 
 _malloc_map_counter = 0
 def _get_malloc_name():
@@ -48,7 +49,13 @@ def _known_function_substitution(inst, info):
         report('Declare map', m, 'for malloc')
 
         # Look the malloc map
-        lookup_inst, ref = malloc_lookup(name, info)
+        if current_function is None:
+            return_val = 'XDP_DROP'
+        elif current_function.return_type.spelling == 'void':
+            return_val = ''
+        else:
+            return_val = f'({current_function.return_type.spelling})0'
+        lookup_inst, ref = malloc_lookup(name, info, return_val)
         blk = cb_ref.get(BODY)
         blk.append(lookup_inst)
         return ref
@@ -150,8 +157,11 @@ def _do_pass(inst, info, more):
 
 
 def transform_vars_pass(inst, info, more):
+    global current_function
+    current_function = None
     res = _do_pass(inst, info, more)
     for func in Function.directory.values():
         if func.is_used_in_bpf_code:
+            current_function = func
             _do_pass(func.body, info, PassObject())
     return res

@@ -178,7 +178,7 @@ def define_bpf_arr_map(map_name, val_type, entries):
     return define_bpf_map(map_name, 'BPF_MAP_TYPE_ARRAY', 'unsigned int', val_type, entries)
 
 
-def malloc_lookup(name, info):
+def malloc_lookup(name, info, return_val):
     tmp_name = get_tmp_var_name()
     type_name = f'struct {name}'
     T = MyType.make_pointer(MyType.make_simple(type_name, clang.TypeKind.RECORD))
@@ -192,7 +192,7 @@ def malloc_lookup(name, info):
   int zero = 0;
   {tmp_name} = bpf_map_lookup_elem(&{name}_map, &zero);
   if ({tmp_name} == NULL) {{
-    return ;
+    return {return_val};
   }}
 }}
 '''
