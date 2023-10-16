@@ -13,6 +13,9 @@ class BPF_PROG:
                 '#include <linux/bpf.h>',
                 '#include <bpf/bpf_helpers.h>',
                 '#include <bpf/bpf_endian.h>',
+                '#include <sys/types.h>',
+                '#include <sys/socket.h>',
+                '#include <linux/in.h>',
                 ]
         self.main_code = None
         self.license = 'GPL'
@@ -123,8 +126,6 @@ class SK_SKB_PROG(BPF_PROG):
         self.verdict_code = None
         self.headers += [
                 # headers
-                '#include <sys/types.h>',
-                '#include <sys/socket.h>',
                 '#include <linux/tcp.h>',
                 ]
 

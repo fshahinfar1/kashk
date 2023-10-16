@@ -2,6 +2,7 @@ import clang.cindex as clang
 from dfs import DFSPass
 from log import *
 from utility import PRIMITIVE_TYPES, get_actual_type
+from prune import should_process_this_cursor
 
 from understand_program_state import generate_decleration_for
 
@@ -14,6 +15,8 @@ def _find_type_decl_class(name, info):
         # debug(list(info.sym_tbl.global_scope.symbols.keys()))
         return []
     cursor = entry.ref
+    if not should_process_this_cursor(cursor):
+        return []
     assert cursor is not None
     decls = generate_decleration_for(cursor)
     return decls
@@ -22,16 +25,16 @@ def _find_type_decl(name, info):
     tmp = _find_type_decl_class(name, info)
     if tmp:
         return tmp
-
-    entry = info.sym_tbl.global_scope.lookup(name)
-    if entry is None:
-        debug(f'did not found type: {name}')
-        return []
-    cursor = entry.ref
-    assert cursor is not None
-    decls = generate_decleration_for(cursor)
-    # debug(name, decls)
-    return decls
+    return []
+    # entry = info.sym_tbl.global_scope.lookup(name)
+    # if entry is None:
+    #     debug(f'did not found type: {name}')
+    #     return []
+    # cursor = entry.ref
+    # assert cursor is not None
+    # decls = generate_decleration_for(cursor)
+    # # debug(name, decls)
+    # return decls
 
 _has_processed = set()
 def _add_type_to_declarations(T, info):

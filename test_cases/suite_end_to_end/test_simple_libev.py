@@ -47,7 +47,6 @@ def main():
     proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     ret = proc.returncode
     assert ret == 0, f'The generated source code should compile (ret code: {ret})'
-    print('here')
 
 
 if __name__ == '__main__':

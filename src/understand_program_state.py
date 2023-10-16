@@ -28,7 +28,16 @@ def generate_decleration_for(cursor):
 
     if cursor.kind == clang.CursorKind.TYPEDEF_DECL:
         decl = Elaborate(cursor)
-        return [decl]
+        children = cursor.get_children()
+        decls = []
+        # for child in children:
+        #     if child.kind != clang.CursorKind.TYPE_REF:
+        #         continue
+        #     child = child.referenced
+        #     d = generate_decleration_for(child)
+        #     decls.extend(d)
+        decls.append(decl)
+        return decls
 
 
     c = T.get_declaration()
