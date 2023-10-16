@@ -3,10 +3,6 @@ from instruction import *
 VOID_PTR = 'void *'
 
 
-def bpf_get_data(buf, skb='skb'):
-    return f'{buf} = (void *)(__u64){skb}->data;\n'
-
-
 def bpf_ctx_bound_check(ref, index, data_end):
     _if = ControlFlowInst()
     _if.kind = clang.CursorKind.IF_STMT

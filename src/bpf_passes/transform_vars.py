@@ -1,7 +1,7 @@
 import clang.cindex as clang
 from log import error, debug, report
 from bpf_code_gen import gen_code
-from template import prepare_shared_state_var, bpf_get_data, send_response_template, define_bpf_arr_map, malloc_lookup
+from template import prepare_shared_state_var, send_response_template, define_bpf_arr_map, malloc_lookup
 from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS
 
 from data_structure import *
@@ -91,14 +91,14 @@ def _process_current_inst(inst, info, more):
         if inst.name in READ_PACKET:
             report('Assigning packet buffer to var:', inst.rd_buf.name)
             # Assign packet pointer on a previouse line
-            text = bpf_get_data(inst.rd_buf.name)
-            assign_inst = Literal(text, CODE_LITERAL)
+            lhs = Literal(inst.rd_buf.name, CODE_LITERAL)
+            rhs = info.prog.get_pkt_buf()
+            assign_inst = BinOp.build_op(lhs, '=', rhs)
             blk = cb_ref.get(BODY)
             blk.append(assign_inst)
             # TODO: what if `skb` is not defined in this scope?
             # Set the return value
-            text = f'skb->len'
-            inst = Literal(text, CODE_LITERAL)
+            inst = info.prog.get_pkt_size()
             return inst
         elif inst.name in WRITE_PACKET:
             buf = inst.wr_buf.name

@@ -1,7 +1,7 @@
 import clang.cindex as clang
 from utility import generate_struct_with_fields, indent
 from data_structure import MyType, BASE_TYPES
-from instruction import Block, BODY, Literal, CODE_LITERAL
+from instruction import *
 from log import debug
 from bpf_code_gen import gen_code
 
@@ -29,8 +29,15 @@ class BPF_PROG:
     def set_code(self, code):
         raise Exception('Not implemented!')
 
+    def get_pkt_buf(self):
+        raise Exception('Not implemented!')
+
+    def get_pkt_size(info):
+        raise Exception('Not implemented!')
+
 
 class XDP_PROG(BPF_PROG):
+
     def __init__(self):
         super().__init__()
 
@@ -60,6 +67,27 @@ int xdp_prog(struct xdp_md *xdp)
 }}
 '''
         return text
+
+    def get_pkt_buf(self):
+        xdp = Ref(None, clang.CursorKind.DECL_REF_EXPR)
+        xdp.name = 'xdp'
+        xdp.type = MyType.make_pointer(MyType.make_simple('xdp_md', clang.TypeKind.RECORD))
+
+        ref = Ref(None, clang.CursorKind.MEMBER_REF_EXPR)
+        ref.name = 'data'
+        ref.type = BASE_TYPES[clang.TypeKind.UINT]
+        ref.owner.append(xdp)
+
+        cast1 = Cast()
+        cast1.castee.add_inst(ref)
+        cast1.cast_type = BASE_TYPES[clang.TypeKind.ULONGLONG]
+        cast2 = Cast()
+        cast2.castee.add_inst(cast1)
+        cast2.cast_type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+        return cast2
+
+    def get_pkt_size(info):
+        return Literal(f'((__u64)xdp->data_end - (__u64)xdp->data)', CODE_LITERAL)
 
 
 class SK_SKB_PROG(BPF_PROG):
@@ -161,3 +189,9 @@ if (!sock_ctx) {
         verdict_code = indent(verdict_code, 1)
 
         return '\n'.join(info.prog._parser_prog([per_conn] + [''] + [parser_code]) + [''] + info.prog._verdict_prog([verdict_code]))
+
+    def get_pkt_buf(self):
+        return f'(void *)(__u64)skb->data;\n'
+
+    def get_pkt_size(info):
+        return Literal(f'skb->len', CODE_LITERAL)

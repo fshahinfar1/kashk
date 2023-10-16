@@ -438,6 +438,8 @@ def prepare_base_types():
             clang.TypeKind.VOID: 'void',
             clang.TypeKind.INT: 'int',
             clang.TypeKind.UINT: 'unsigned int',
+            clang.TypeKind.ULONG: 'unsigned long',
+            clang.TypeKind.ULONGLONG: 'unsigned long long',
             }
 
     for kind, name in kind_name_map.items():
