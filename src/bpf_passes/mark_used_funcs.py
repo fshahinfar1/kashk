@@ -7,11 +7,10 @@ from understand_program_state import generate_decleration_for
 
 # TODO: what if a name of a struct is changed using a typedef ?
 
-def _find_type_decl(name, info):
+def _find_type_decl_class(name, info):
     scope_key = f'class_{name}'
     entry = info.sym_tbl.global_scope.lookup(scope_key)
     if entry is None:
-        debug(f'did not found type: {name}')
         # debug(list(info.sym_tbl.global_scope.symbols.keys()))
         return []
     cursor = entry.ref
@@ -19,6 +18,19 @@ def _find_type_decl(name, info):
     decls = generate_decleration_for(cursor)
     return decls
 
+def _find_type_decl(name, info):
+    tmp = _find_type_decl_class(name, info)
+    if tmp:
+        return tmp
+
+    entry = info.sym_tbl.global_scope.lookup(name)
+    if entry is None:
+        debug(f'did not found type: {name}')
+    cursor = entry.ref
+    assert cursor is not None
+    decls = generate_decleration_for(cursor)
+    # debug(name, decls)
+    return decls
 
 _has_processed = set()
 def _add_type_to_declarations(T, info):

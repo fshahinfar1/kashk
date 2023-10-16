@@ -428,7 +428,8 @@ def __generate_code_type_definition(inst, info):
         text = f'{inst.return_type.spelling} {inst.name} ({text_args}) {{\n{body}\n}}\n\n'
         return text
     else:
-        return inst.get_c_code()
+        text = inst.get_c_code()
+        return text
 
 
 def __generate_global_shared_state(info):

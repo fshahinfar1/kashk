@@ -164,26 +164,7 @@ def __pass_over_source_file(cursor, info):
         elif c.kind == clang.CursorKind.TYPEDEF_DECL:
             # Typedef is handled in multiple cases
             under_type = c.underlying_typedef_type
-            if under_type.kind == clang.TypeKind.POINTER:
-                # It is defining a pointer type (possibly a function pointer)
-                # TODO: do I need to know something about this? (probably)
-                continue
-            elif under_type.kind == clang.TypeKind.TYPEDEF:
-                # TODO: udpate the symbol table ?
-                continue
-            elif under_type.kind == clang.TypeKind.ELABORATED:
-                # TODO: remember that this type is same as the struct/union/enum/...
-                continue
-            elif under_type.kind in PRIMITIVE_TYPES:
-                # TODO: udpate the symbol table ?
-                continue
-            elif under_type.kind == clang.TypeKind.FUNCTIONPROTO:
-                # TODO: udpate the symbol table ?
-                continue
-            elif under_type.kind == clang.TypeKind.CONSTANTARRAY:
-                # TODO: udpate the symbol table ?
-                continue
-            elif "it is defining an anonymous type":
+            if under_type.kind == clang.TypeKind.RECORD:
                 scope_key = f'class_{c.spelling}'
                 x = c.underlying_typedef_type
                 x = x.get_declaration()
@@ -199,6 +180,12 @@ def __pass_over_source_file(cursor, info):
                 info.sym_tbl.insert_entry(scope_key, T, c.kind, c)
                 equiv_sym = info.sym_tbl.lookup(equivalent_scope_key)
                 info.sym_tbl.insert(equiv_sym)
+            else:
+                key = c.spelling
+                assert key
+                T = MyType.from_cursor_type(c.type)
+                info.sym_tbl.global_scope.insert_entry(key, T, c.kind, c)
+                # debug('Elaborate Type:', key)
             continue
 
         d.go_deep()

@@ -7,7 +7,7 @@ from utility import (find_elem, get_code, generate_struct_with_fields,
 from bpf import SK_SKB_PROG
 from data_structure import *
 
-from prune import should_process_this_cursor, get_namespace_of_cursor
+from prune import get_namespace_of_cursor
 
 
 MODULE_TAG = '[Program State]'
@@ -25,6 +25,11 @@ def generate_decleration_for(cursor):
 
     if T.kind in PRIMITIVE_TYPES:
         return []
+
+    if cursor.kind == clang.CursorKind.TYPEDEF_DECL:
+        decl = Elaborate(cursor)
+        return [decl]
+
 
     c = T.get_declaration()
     if c is None:

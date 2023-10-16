@@ -286,7 +286,7 @@ class Elaborate(TypeDefinition):
 
     def get_c_code(self):
         d = get_code(self.cursor)
-        return '\n'+d
+        return '\n'+ d + ';'
 
     def __repr__(self):
         return f'<Elaborate {self.name} >'
