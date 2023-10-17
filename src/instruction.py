@@ -685,13 +685,14 @@ class Annotation(Instruction):
 
     ANN_SKIP = 'ANN_SKIP'
     ANN_FUNC_PTR = 'ANN_FUNC_PTR'
+    ANN_CACNE_DEFINE = 'ANN_CACNE_DEFINE'
     ANN_CACHE_BEGIN = 'ANN_CACHE_BEGIN'
     ANN_CACHE_END = 'ANN_CACHE_END'
 
     def __init__(self, msg, ann_kind):
         super().__init__()
         assert len(msg) > 2
-        assert ann_kind in (Annotation.ANN_SKIP, Annotation.ANN_FUNC_PTR, Annotation.ANN_CACHE_BEGIN, Annotation.ANN_CACHE_END)
+        assert ann_kind in (Annotation.ANN_SKIP, Annotation.ANN_FUNC_PTR, Annotation.ANN_CACNE_DEFINE, Annotation.ANN_CACHE_BEGIN, Annotation.ANN_CACHE_END)
         # self.msg = msg[1:-1]
         self.msg = eval(msg)
         self.ann_kind = ann_kind

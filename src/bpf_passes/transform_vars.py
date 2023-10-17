@@ -106,9 +106,17 @@ def _check_if_ref_is_global_state(inst, info):
 
 
 def _process_annotation(inst, info):
-    if inst.ann_kind == Annotation.ANN_CACHE_END:
+    if inst.ann_kind == Annotation.ANN_CACNE_DEFINE:
+        conf = json.loads(inst.msg)
+        map_name = conf['id'] + '_map'
+        val_type = conf['value_type']
+        m = define_bpf_arr_map(map_name, val_type, 1)
+        info.prog.add_declaration(m)
+        report('Declare map', m, 'for malloc')
+    elif inst.ann_kind == Annotation.ANN_CACHE_END:
+        # Nothing to do
         pass
-    if inst.ann_kind == Annotation.ANN_CACHE_BEGIN:
+    elif inst.ann_kind == Annotation.ANN_CACHE_BEGIN:
         conf = json.loads(inst.msg)
 
         # Gather instructions between BEGIN & END

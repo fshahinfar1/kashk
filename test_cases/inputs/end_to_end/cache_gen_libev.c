@@ -22,9 +22,6 @@ struct conn {
 	struct resp resp;
 };
 
-/*                      id,           key_kind,   key_t, key_size, value_kind, value_t,            value_size */
-__ANNOTATE_DEFINE_CACHE("main_cache", BYTE_ARRAY, "char", "0",       STRUCT,   "struct cached_resp", "1028")
-
 /* This is the function we want to memoize.
  *
  * Since the body of the function is not provided it would fail fallback to
@@ -34,6 +31,10 @@ char *lookup_hashtable(char *key, int size);
 
 void event_handler(int fd, short which, void *arg)
 {
+
+	/*                      id,           key_kind,   key_t, key_size, value_kind, value_t,            value_size */
+	__ANNOTATE_DEFINE_CACHE("main_cache", BYTE_ARRAY, "char", "0",       STRUCT,   "struct resp", "1028")
+
 	int size;
 	struct conn *c = arg;
 	struct sockaddr_in addr;
