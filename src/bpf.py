@@ -126,7 +126,7 @@ int xdp_prog(struct xdp_md *xdp)
             memcpy = 'bpf_memcpy'
             func = Function.directory[memcpy]
             func.is_used_in_bpf_code = True
-            info.prog.add_declaration(func)
+            info.prog.declarations.insert(0, func)
 
         write_size,_ = gen_code([write_size], info, ARG)
         code = f'''
@@ -279,7 +279,7 @@ if (!sock_ctx) {
             memcpy = 'bpf_memcpy'
             func = Function.directory[memcpy]
             func.is_used_in_bpf_code = True
-            info.prog.add_declaration(func)
+            info.prog.declarations.insert(0, func)
 
         write_size,_ = gen_code(write_size, info)
         skb = 'skb'

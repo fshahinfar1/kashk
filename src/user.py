@@ -190,6 +190,7 @@ __b[__size] = '\\0';
 __m = (struct {meta.name} *)__b;
 """
     else:
+        debug('Framework:', info.io_ctx.input_framework)
         raise Exception(MODULE_TAG, 'Unexpected IO Framework!')
 
 

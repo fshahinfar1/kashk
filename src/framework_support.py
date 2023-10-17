@@ -45,3 +45,11 @@ class InputOutputContext:
 
     def set_cflags(self, flags):
         self.cflags = flags
+
+    def set_framework(self, name):
+        if name == 'libev':
+            self.input_framework = InputOutputContext.INPUT_C_LIBEVENT
+        elif name == 'poll':
+            self.input_framework = InputOutputContext.INPUT_C_EPOLL
+        elif name == 'asio':
+            self.input_framework = InputOutputContext.INPUT_CPP_ASIO20

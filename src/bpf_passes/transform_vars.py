@@ -50,7 +50,7 @@ def _known_function_substitution(inst, info):
         func = inst.get_function_def()
         assert func is not None
         func.is_used_in_bpf_code = True
-        info.prog.declarations.append(func)
+        info.prog.declarations.insert(0, func)
         # TODO: Also do a check if the return value is valid (check the size limit)
         return inst
     elif inst.name == 'malloc':
@@ -206,7 +206,7 @@ def _process_annotation(inst, info):
         # Mark the hash function used
         func = Function.directory['__fnv_hash']
         func.is_used_in_bpf_code = True
-        info.prog.add_declaration(func)
+        info.prog.declarations.insert(0, func)
 
         blk.extend(lookup)
         # new_inst = Block(BODY)
@@ -316,5 +316,6 @@ def transform_vars_pass(inst, info, more):
     for func in Function.directory.values():
         if func.is_used_in_bpf_code:
             current_function = func
-            _do_pass(func.body, info, PassObject())
+            tmp = _do_pass(func.body, info, PassObject())
+            func.body = tmp
     return res

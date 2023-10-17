@@ -16,6 +16,7 @@ def parse_args():
     parser.add_argument('file', help='path to the source file containing the main loop')
     parser.add_argument('func', help='name of the entry function')
     parser.add_argument('hook', help='which bpf hook is it targeting?')
+    parser.add_argument('framework', help='which event handling library is used?')
     parser.add_argument('--sources', nargs='*', help='other c files which provide the functions and data-structures')
     parser.add_argument('--out-bpf', help='store generated BPF program in this file', default=None)
     parser.add_argument('--out-user', help='store generated socket program in this file', default=None)
@@ -41,6 +42,7 @@ def parse_args_yaml():
     obj.file = config['main']
     obj.func = config['entry']
     obj.hook = config['hook']
+    obj.framework = config['framework']
     obj.sources = config.get('sources', [])
     obj.out_bpf = config.get('out_bpf')
     obj.out_user = config.get('out_user')
@@ -63,6 +65,7 @@ def main():
         ctx.set_bpf_output(args.out_bpf)
     ctx.set_entry_func(args.func)
     ctx.set_cflags(args.cflags)
+    ctx.set_framework(args.framework)
 
     generate_offload(ctx)
 
