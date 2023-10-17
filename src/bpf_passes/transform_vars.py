@@ -36,6 +36,18 @@ def _get_fail_ret_val():
     else:
         return f'({current_function.return_type.spelling})0'
 
+# TODO: why I have to return functions! What am I doing? :)
+def _get_ret_inst():
+    ret = Instruction()
+    ret.kind = clang.CursorKind.RETURN_STMT
+    if current_function is None:
+        ret.body = [Literal('XDP_DROP', CODE_LITERAL)]
+    elif current_function.return_type.spelling != 'void':
+        ret.body = [Literal(f'({current_function.return_type.spelling})0', CODE_LITERAL)]
+    else:
+        ret.body = []
+    return ret
+
 
 _malloc_map_counter = 0
 def _get_malloc_name():
@@ -251,11 +263,36 @@ def _process_current_inst(inst, info, more):
             else:
                 # write_size, _ = gen_code(inst.wr_buf.size_cursor, info, context=ARG)
                 write_size = inst.wr_buf.size_cursor
-            inst = info.prog.send(buf, write_size, info)
+
+            if current_function is None:
+                # On the main BPF program. feel free to return the verdict value
+                inst = info.prog.send(buf, write_size, info)
+            else:
+                # On a function which is not the main. Do not return
+                copy_inst = info.prog.send(buf, write_size, info, ret=False, failure=_get_fail_ret_val())
+                # set the flag
+                flag_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
+                flag_ref.name = SEND_FLAG_NAME
+                flag_ref.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+                deref = UnaryOp(None)
+                deref.child.add_inst(flag_ref)
+                deref.op = '*'
+                one = Literal('1', clang.CursorKind.INTEGER_LITERAL)
+                set_flag = BinOp.build_op(deref, '=', one)
+
+                # add it to the body
+                blk = cb_ref.get(BODY)
+                blk.append(copy_inst)
+                blk.append(set_flag)
+                # Return from this point to the BPF main
+                inst = _get_ret_inst()
             return inst
         elif inst.name in KNOWN_FUNCS:
             # Use known implementations of famous functions
             return _known_function_substitution(inst, info)
+        else:
+            # TODO: check if the function being invoked needs to receive any flag and pass.
+            pass
     elif inst.kind == ANNOTATION_INST:
         return _process_annotation(inst, info)
     return inst
@@ -308,7 +345,7 @@ def _check_func_receives_all_the_flags(func, info):
     """
     Check if function receives flags it need through its arguments
     """
-    if func.calls_recv and (func.change_applied & Function.CTX_FLAG == 0):
+    if (func.calls_send or func.calls_recv) and (func.change_applied & Function.CTX_FLAG == 0):
         # Add the BPF context to its arguemt
         arg = StateObject(None)
         arg.name = info.prog.ctx
@@ -359,7 +396,6 @@ def transform_vars_pass(inst, info, more):
         if func.is_used_in_bpf_code:
             current_function = func
             _check_func_receives_all_the_flags(func, info)
-            tmp = _do_pass(func.body, info, PassObject())
-            func.body = tmp
+            func.body = _do_pass(func.body, info, PassObject())
             current_function = None
     return res

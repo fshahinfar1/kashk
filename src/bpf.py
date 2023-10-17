@@ -119,7 +119,8 @@ int xdp_prog(struct xdp_md *xdp)
         T = MyType.make_pointer(MyType.make_simple('xdp_md', clang.TypeKind.RECORD))
         scope.insert_entry('xdp', T, clang.CursorKind.PARM_DECL, None)
 
-    def send(self, buf, write_size, info):
+    def send(self, buf, write_size, info, ret=True, failure='XDP_DROP'):
+        #TODO: The arguments of this function are crayz ???
         is_size_integer = write_size.kind == clang.CursorKind.INTEGER_LITERAL
         if is_size_integer:
             memcpy = 'memcpy'
@@ -137,11 +138,12 @@ int xdp_prog(struct xdp_md *xdp)
   bpf_xdp_adjust_tail(xdp, delta);
 }}
 if (((void *)(__u64)xdp->data + {write_size}) > (void *)(__u64)xdp->data_end) {{
-  return SK_DROP;
+    return {failure};
 }}
 {memcpy}((void *)(__u64)xdp->data, {buf}, {write_size});
-return XDP_TX;
 '''
+        if ret is True:
+            code += '\nreturn XDP_TX;'
         inst = Literal(code, CODE_LITERAL)
         return inst
 
@@ -272,7 +274,7 @@ if (!sock_ctx) {
         T = self.ctx_type
         scope.insert_entry('skb', T, clang.CursorKind.PARM_DECL, None)
 
-    def send(self, buf, write_size, info):
+    def send(self, buf, write_size, info, ret=True, failure='XDP_DROP'):
         is_size_integer = write_size.kind == clang.CursorKind.INTEGER_LITERAL
         if is_size_integer:
             memcpy = 'memcpy'
