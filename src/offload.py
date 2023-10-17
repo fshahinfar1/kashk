@@ -242,13 +242,15 @@ def gen_user_code(user, info, out_user):
                 fields.append(state_obj)
             path_id = x['path_id']
             meta = Record(f'meta_{path_id}', fields)
+            meta.is_used_in_bpf_code = True
             info.prog.add_declaration(meta)
             info.user_prog.declarations.append(meta)
 
         # Generate the user code in the context of userspace program
         # TODO: I have disabled this part just for testing
-        return
-        # text = generate_user_prog(info)
+        # return
+
+        text = generate_user_prog(info)
         debug('~~~~~~~~~~~~~~~~~~~~~')
 
     with open(out_user, 'w') as f:

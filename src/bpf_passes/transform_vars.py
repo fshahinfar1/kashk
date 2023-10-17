@@ -1,8 +1,10 @@
+import json
 import clang.cindex as clang
 from log import error, debug, report
 from bpf_code_gen import gen_code
 from template import prepare_shared_state_var, define_bpf_arr_map, malloc_lookup
 from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS
+from utility import get_tmp_var_name
 
 from data_structure import *
 from instruction import *
@@ -11,7 +13,25 @@ from passes.pass_obj import PassObject
 
 MODULE_TAG = '[Transform Vars Pass]'
 cb_ref = CodeBlockRef()
+parent_block = CodeBlockRef()
 current_function = None
+# Skip until the cache END
+skip_to_end = None
+
+
+def _set_skip(val):
+    global skip_to_end
+    skip_to_end = val
+
+
+def _get_fail_ret_val():
+    if current_function is None:
+        return 'XDP_DROP'
+    elif current_function.return_type.spelling == 'void':
+        return ''
+    else:
+        return f'({current_function.return_type.spelling})0'
+
 
 _malloc_map_counter = 0
 def _get_malloc_name():
@@ -19,7 +39,11 @@ def _get_malloc_name():
     _malloc_map_counter += 1
     return f'malloc_{_malloc_map_counter}'
 
+
 def _known_function_substitution(inst, info):
+    """
+    Replace some famous functions with implementations that work in BPF
+    """
     if inst.name == 'strlen':
         inst.name = 'bpf_strlen'
         # Mark the function used
@@ -49,18 +73,14 @@ def _known_function_substitution(inst, info):
         report('Declare map', m, 'for malloc')
 
         # Look the malloc map
-        if current_function is None:
-            return_val = 'XDP_DROP'
-        elif current_function.return_type.spelling == 'void':
-            return_val = ''
-        else:
-            return_val = f'({current_function.return_type.spelling})0'
+        return_val = _get_fail_ret_val()
         lookup_inst, ref = malloc_lookup(name, info, return_val)
         blk = cb_ref.get(BODY)
         blk.append(lookup_inst)
         return ref
     error(f'Know function {inst.name} is not implemented yet')
     return inst
+
 
 def _check_if_ref_is_global_state(inst, info):
     sym, scope = info.sym_tbl.lookup2(inst.name)
@@ -83,6 +103,108 @@ def _check_if_ref_is_global_state(inst, info):
             # inner scope.
             info.sym_tbl.insert_entry('shared', T, None, None)
     return inst
+
+
+def _process_annotation(inst, info):
+    if inst.ann_kind == Annotation.ANN_CACHE_END:
+        pass
+    if inst.ann_kind == Annotation.ANN_CACHE_BEGIN:
+        conf = json.loads(inst.msg)
+
+        # Gather instructions between BEGIN & END
+        begin = False
+        on_miss = []
+        blk = cb_ref.get(BODY)
+        parent_node = parent_block.get(BODY)
+        parent_children = parent_node.get_children()
+        # debug('Block:', parent_children)
+        for child in parent_children:
+            if child == inst:
+                # debug('*** Start gathering')
+                begin = True
+                continue
+            if child.kind == ANNOTATION_INST and child.ann_kind == Annotation.ANN_CACHE_END:
+                end_conf = json.loads(inst.msg)
+                assert end_conf['id'] == conf['id'], 'The begining and end cache id should match'
+                # Notify the DFS to skip until the CACHE END
+                _set_skip(child)
+                # debug('*** Stop gathering')
+                break
+            if not begin:
+                continue
+            # debug('   Gather:', child)
+            on_miss.append(child)
+
+        # Perform Lookup (Define instructions that are needed for lookup)
+        map_name = conf['id'] + '_map'
+        index_name = get_tmp_var_name()
+        val_ptr = get_tmp_var_name()
+
+        lookup = []
+        hash_call = Call(None)
+        hash_call.name = '__fnv_hash'
+        arg1 = Literal(conf['key'], CODE_LITERAL)
+        arg2 = Literal(conf['key_size'], CODE_LITERAL)
+        hash_call.args.extend([arg1, arg2])
+
+        decl_index = VarDecl(None)
+        decl_index.name = index_name
+        decl_index.type = BASE_TYPES[clang.TypeKind.INT]
+        decl_index.init.add_inst(hash_call)
+        lookup.append(decl_index)
+
+        map_lookup_call = Call(None)
+        map_lookup_call.name = 'bpf_map_lookup_elem'
+        arg1 = Literal(f'&{map_name}', CODE_LITERAL)
+        arg2 = Literal(f'&{index_name}', CODE_LITERAL)
+        map_lookup_call.args.extend([arg1, arg2])
+
+        decl_val_ptr = VarDecl(None)
+        decl_val_ptr.name = val_ptr
+        decl_val_ptr.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+        decl_val_ptr.init.add_inst(map_lookup_call)
+        lookup.append(decl_val_ptr)
+
+        val_ref = Ref(None)
+        val_ref.name = val_ptr
+        val_ref.kind = clang.CursorKind.DECL_REF_EXPR
+        val_ref.type = decl_val_ptr.type
+        cond = BinOp.build_op(val_ref, '==', Literal('NULL', clang.CursorKind.INTEGER_LITERAL))
+        check_miss = ControlFlowInst.build_if_inst(cond)
+        # when miss
+        check_miss.body.extend_inst(on_miss)
+        # when hit
+        actual_val = Literal(conf['value_ref'], CODE_LITERAL)
+        assign_ref = BinOp.build_op(actual_val, '=', val_ref)
+        check_miss.other_body.add_inst(assign_ref)
+        lookup.append(check_miss)
+
+        # This should be the result of above instructions
+        f'''
+        int {index_name} = __fnv_hash({conf['key']}, {conf['key_size']});
+        void *{val_ptr}  = bpf_map_lookup_elem(&{map_name}, &{index_name});
+        if ({val_ptr} == NULL) {{
+          {on_miss} <--- This is where cache miss is handled
+        }} else {{
+          {conf['value_ref']} = {val_ptr};
+        }}
+        '''
+
+        # debug(MODULE_TAG, 'instruction for cache miss:', on_miss)
+
+        # Mark the hash function used
+        func = Function.directory['__fnv_hash']
+        func.is_used_in_bpf_code = True
+        info.prog.add_declaration(func)
+
+        blk.extend(lookup)
+        # new_inst = Block(BODY)
+        # new_inst.extend_inst(lookup)
+        # Replace annotation with the block of instruction we have here
+        # return new_inst
+
+    # Remove annotation
+    return None
 
 
 def _process_current_inst(inst, info, more):
@@ -118,6 +240,8 @@ def _process_current_inst(inst, info, more):
         elif inst.name in KNOWN_FUNCS:
             # Use known implementations of famous functions
             return _known_function_substitution(inst, info)
+    elif inst.kind == ANNOTATION_INST:
+        return _process_annotation(inst, info)
     return inst
 
 
@@ -129,29 +253,37 @@ def _do_pass(inst, info, more):
         # Process current instruction
         inst = _process_current_inst(inst, info, more)
         if inst is None:
-            debug(MODULE_TAG, 'remove instruction:', inst)
+            # debug(MODULE_TAG, 'remove instruction:', inst)
             return None
-
         # Continue deeper
+        gather = False
         for child, tag in inst.get_children_context_marked():
             is_list = isinstance(child, list)
             if not is_list:
                 child = [child]
             new_child = []
-            for i in child:
-                obj = PassObject.pack(lvl+1, tag, new_child)
-                new_inst = _do_pass(i, info, obj)
-                if new_inst is None:
-                    continue
-                new_child.append(new_inst)
+
+            # TODO: is there no other/better way for doing BFS in middle of DFS?
+            with parent_block.new_ref(tag, inst):
+                for i in child:
+                    # Check if we are skipping
+                    if skip_to_end is not None:
+                        if skip_to_end == i:
+                            _set_skip(None)
+                        continue
+
+                    obj = PassObject.pack(lvl+1, tag, new_child)
+                    new_inst = _do_pass(i, info, obj)
+                    if new_inst is None:
+                        continue
+                    new_child.append(new_inst)
             if not is_list:
                 if len(new_child) < 1:
-                    debug(MODULE_TAG, 'remove instruction:', inst)
+                    # debug(MODULE_TAG, 'remove instruction:', inst)
                     return None
                 assert len(new_child) == 1, f'expect to receive one object (count = {len(new_child)})'
                 new_child = new_child[-1]
             new_children.append(new_child)
-
     new_inst = inst.clone(new_children)
     return new_inst
 

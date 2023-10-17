@@ -175,7 +175,7 @@ try {{
 }}
 __m = (struct {meta.name} *)__buf;
 """
-    elif info.io_ctx.input_framework == InputOutputContext.INPUT_C_EPOLL:
+    elif info.io_ctx.input_framework in (InputOutputContext.INPUT_C_EPOLL, InputOutputContext.INPUT_C_LIBEVENT):
         return f"""
 struct {meta.name} *__m;
 const size_t __size = sizeof(struct {meta.name}) + 1;

@@ -16,10 +16,9 @@ from utility import find_elems_of_kind
 
 
 def main():
-    # others = ['multiple_file_other_source.c']
-    others = ['multiple_file_other_source.c']
+    others = []
     others = list(map(lambda x: os.path.join(root_dir,'inputs/end_to_end/', x), others))
-    input_file = os.path.join(root_dir, 'inputs/end_to_end/', 'multiple_source_p1_libev_xdp.c')
+    input_file = os.path.join(root_dir, 'inputs/end_to_end/', 'cache_gen_libev.c')
     entry_func = 'event_handler'
     bpf_out = '/tmp/test_bpf.c'
 
@@ -36,12 +35,16 @@ def main():
     info = generate_offload(ctx)
 
     # Report the generated BPF code
-    # print('Generated BPF Code:')
-    # with open(ctx.bpf_out_file, 'r') as f:
-    #     print(f.read())
-    # print('---------------------------------------')
+    print('Generated BPF Code:')
+    with open(ctx.bpf_out_file, 'r') as f:
+        print(f.read())
+    print('---------------------------------------')
+    print('Generated User Code:')
+    with open(ctx.user_out_file, 'r') as f:
+        print(f.read())
+    print('---------------------------------------')
 
-    assert info.user_prog.graph.is_empty(), 'All the code should be offloaded to BPF'
+    #bpf_out_file print(info.user_prog.graph.paths.code.children)
     compile_script = os.path.join(script_dir, 'compile_bpf_source.sh')
     cmd = ['/bin/bash', compile_script, bpf_out]
     proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

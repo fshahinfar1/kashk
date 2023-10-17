@@ -196,6 +196,7 @@ def create_func_objs(info):
 
 
 def add_known_func_objs(info):
+    # STRLEN
     strlen = Function('bpf_strlen', None)
     strlen.is_operator = False
     strlen.is_method = False
@@ -225,3 +226,28 @@ if (str[i] == '\\0') {
 return ((unsigned int)(-(1)));
 '''
     strlen.body.add_inst(Literal(code, CODE_LITERAL))
+
+
+    # FNV_HASH
+    fnv_hash = Function('__fnv_hash', None)
+    fnv_hash.is_operator = False
+    fnv_hash.is_method = False
+
+    arg1 = StateObject(None)
+    arg1.name = 'key'
+    arg1.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+    arg2 = StateObject(None)
+    arg2.name = 'size'
+    arg2.type_ref = BASE_TYPES[clang.TypeKind.INT]
+    fnv_hash.args = [arg1, arg2]
+    fnv_hash.return_type = BASE_TYPES[clang.TypeKind.INT]
+    fnv_hash.may_succeed = True
+
+    scope = Scope(info.sym_tbl.global_scope)
+    info.sym_tbl.scope_mapping[fnv_hash.name] = scope
+    for a in fnv_hash.args:
+        scope.insert_entry(a.name, a.type_ref, a.kind, None)
+    code = '''
+return 0;
+'''
+    fnv_hash.body.add_inst(Literal(code, CODE_LITERAL))

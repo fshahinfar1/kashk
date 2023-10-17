@@ -95,7 +95,10 @@ class Call(Instruction):
 
         self.cursor = cursor
         self.kind = clang.CursorKind.CALL_EXPR
-        self.name = cursor.spelling
+        if cursor is None:
+            self.name = '_not_set_'
+        else:
+            self.name = cursor.spelling
 
         self.func_ptr = None
 
@@ -111,28 +114,31 @@ class Call(Instruction):
         else:
             self.is_operator = False
 
-        fn_def = cursor.get_definition()
-        # debug(self.name, 'def:', fn_def, fn_def.kind)
-        if not self.is_operator and fn_def and fn_def.kind == clang.CursorKind.CXX_METHOD:
-            self.is_method = True
-        else:
+        if cursor is None:
             self.is_method = False
+        else:
+            fn_def = cursor.get_definition()
+            # debug(self.name, 'def:', fn_def, fn_def.kind)
+            if not self.is_operator and fn_def and fn_def.kind == clang.CursorKind.CXX_METHOD:
+                self.is_method = True
+            else:
+                self.is_method = False
 
-        children = list(cursor.get_children())
-        count_args = len(list(cursor.get_arguments()))
-        count_children = len(children)
-        if not self.is_operator and count_children > 0 and count_children > count_args:
-            assert count_children - count_args == 1, 'Expect only one extra element more than arguments in the list of chlidren'
-            mem = children[0]
-            self.owner = get_owner(mem)
+            children = list(cursor.get_children())
+            count_args = len(list(cursor.get_arguments()))
+            count_children = len(children)
+            if not self.is_operator and count_children > 0 and count_children > count_args:
+                assert count_children - count_args == 1, 'Expect only one extra element more than arguments in the list of chlidren'
+                mem = children[0]
+                self.owner = get_owner(mem)
 
-            if self.owner:
-                ref = self.owner[0]
-                ref_type = ref.type
-                while ref_type.kind == clang.TypeKind.TYPEDEF:
-                    ref_type = ref_type.under_type
-                if ref_type.kind == clang.TypeKind.POINTER:
-                    self.is_func_ptr = True
+                if self.owner:
+                    ref = self.owner[0]
+                    ref_type = ref.type
+                    while ref_type.kind == clang.TypeKind.TYPEDEF:
+                        ref_type = ref_type.under_type
+                    if ref_type.kind == clang.TypeKind.POINTER:
+                        self.is_func_ptr = True
 
         self.rd_buf = None
         self.wr_buf = None
@@ -686,12 +692,13 @@ class Annotation(Instruction):
         super().__init__()
         assert len(msg) > 2
         assert ann_kind in (Annotation.ANN_SKIP, Annotation.ANN_FUNC_PTR, Annotation.ANN_CACHE_BEGIN, Annotation.ANN_CACHE_END)
-        self.msg = msg[1:-1]
+        # self.msg = msg[1:-1]
+        self.msg = eval(msg)
         self.ann_kind = ann_kind
         self.kind = ANNOTATION_INST
 
     def __str__(self):
-        return f'<Annotation `{self.msg}\' >'
+        return f'<Annotation `{self.ann_kind}\' >'
 
     def clone(self, _):
         # TODO: Do not need to clone :) ?! (it is goofy)
