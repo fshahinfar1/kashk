@@ -35,14 +35,14 @@ def main():
     info = generate_offload(ctx)
 
     # Report the generated BPF code
-    print('Generated BPF Code:')
-    with open(ctx.bpf_out_file, 'r') as f:
-        print(f.read())
-    print('---------------------------------------')
-    print('Generated User Code:')
-    with open(ctx.user_out_file, 'r') as f:
-        print(f.read())
-    print('---------------------------------------')
+    # print('Generated BPF Code:')
+    # with open(ctx.bpf_out_file, 'r') as f:
+    #     print(f.read())
+    # print('---------------------------------------')
+    # print('Generated User Code:')
+    # with open(ctx.user_out_file, 'r') as f:
+    #     print(f.read())
+    # print('---------------------------------------')
 
     #bpf_out_file print(info.user_prog.graph.paths.code.children)
     compile_script = os.path.join(script_dir, 'compile_bpf_source.sh')

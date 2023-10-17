@@ -113,7 +113,7 @@ def _handle_function_may_fail(inst, func, info, more):
             for failure_number in func.path_ids:
                 # TODO: change declaration to a dictionary instead of array
                 meta = info.user_prog.declarations[failure_number-1]
-                prepare_meta_code = prepare_meta_data(failure_number, meta)
+                prepare_meta_code = prepare_meta_data(failure_number, meta, info.prog)
 
                 # Check the failure number
                 int_literal = Literal(str(failure_number), clang.CursorKind.INTEGER_LITERAL)
@@ -198,7 +198,7 @@ def _process_current_inst(inst, info, more):
         # Found a split point on the BPF entry function
         failure_number = inst.path_id
         meta = info.user_prog.declarations[failure_number - 1]
-        prepare_pkt = prepare_meta_data(failure_number, meta)
+        prepare_pkt = prepare_meta_data(failure_number, meta, info.prog)
         blk = cb_ref.get(BODY)
         blk.append(prepare_pkt)
     return inst

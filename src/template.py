@@ -145,15 +145,17 @@ if (!shared) {
     return new_inst
 
 
-def prepare_meta_data(failure_number, meta_declaration):
+def prepare_meta_data(failure_number, meta_declaration, prog):
     # TODO: use the Instruction object instead of hard coded strings
     type_name = f'struct {meta_declaration.name}'
+    adjust_inst = prog.adjust_pkt(f'sizeof({type_name})')
+    ctx = prog.ctx
     code = f'''
-__adjust_skb_size(skb, sizeof({type_name}));
-if (((void *)(__u64)skb->data + sizeof({type_name}))  > (void *)(__u64)skb->data_end) {{
-  return SK_DROP;
+{adjust_inst}
+if (((void *)(__u64){ctx}->data + sizeof({type_name}))  > (void *)(__u64){ctx}->data_end) {{
+  return {prog.get_drop()};
 }}
-{type_name} *__m = (void *)(__u64)skb->data;
+{type_name} *__m = (void *)(__u64){ctx}->data;
 '''
     # TODO: I need to know the failure number and failure structure
     store = [f'__m->failure_number = {failure_number};', ]

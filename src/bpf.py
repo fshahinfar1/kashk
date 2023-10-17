@@ -19,6 +19,7 @@ class BPF_PROG:
                 ]
         self.main_code = None
         self.license = 'GPL'
+        self.ctx = 'ctx'
 
     def add_declaration(self, text):
         self.declarations.append(text)
@@ -44,11 +45,25 @@ class BPF_PROG:
     def send(self, buf, write_size):
         raise Exception('Not implemented!')
 
+    def adjust_pkt(self, final_size):
+        raise Exception('Not implemented!');
+
+    def get_drop(self):
+        raise Exception('Not implemented!')
+
+    def get_pass(self):
+        raise Exception('Not implemented!')
+
+    def get_send(self):
+        raise Exception('Not implemented!')
+
+
 
 class XDP_PROG(BPF_PROG):
 
     def __init__(self):
         super().__init__()
+        self.ctx = 'xdp'
 
     def set_bpf_context_struct_sym_tbl(self, sym_tbl):
         struct_name = 'xdp'
@@ -112,10 +127,27 @@ if (((void *)(__u64)xdp->data + {write_size}) > (void *)(__u64)xdp->data_end) {{
   return SK_DROP;
 }}
 memcpy((void *)(__u64)xdp->data, {buf}, {write_size});
-return XDP_PASS;
+return XDP_TX;
 '''
         inst = Literal(code, CODE_LITERAL)
         return inst
+
+    def adjust_pkt(self, final_size):
+        return f'''
+{{
+  int delta = {final_size} - ((__u64)xdp->data_end - (__u64)xdp->data);
+  bpf_xdp_adjust_tail(xdp, delta);
+}}
+'''
+
+    def get_drop(self):
+        return 'XDP_DROP'
+
+    def get_pass(self):
+        return 'XDP_PASS'
+
+    def get_send(self):
+        return 'XDP_TX'
 
 
 class SK_SKB_PROG(BPF_PROG):
@@ -132,6 +164,7 @@ class SK_SKB_PROG(BPF_PROG):
         bpf_parser = Block(BODY)
         bpf_parser.add_inst(Literal('return skb->len;', CODE_LITERAL))
         self.parser_code = bpf_parser
+        self.ctx = 'skb'
 
     def set_bpf_context_struct_sym_tbl(self, sym_tbl):
         struct_name = '__sk_buff'
@@ -239,3 +272,15 @@ if (!sock_ctx) {
         text = '\n'.join(code)
         inst = Literal(text, CODE_LITERAL)
         return inst
+
+    def adjust_pkt(self, final_size):
+        return f'__adjust_skb_size(skb, {final_size});'
+
+    def get_drop(self):
+        return 'SK_DROP'
+
+    def get_pass(self):
+        return 'SK_PASS'
+
+    def get_send(self):
+        raise Exception('not implemented')
