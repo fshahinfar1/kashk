@@ -2,14 +2,18 @@
 set -e
 set -x
 
-SOURCE=$1
-BINARY=bpf.o
-OUTPUT_DIR_BPF=/tmp
-
 CC=clang
 LLC=llc
-BINARY="$OUTPUT_DIR_BPF/bpf.o"
+OUTPUT_DIR_BPF=/tmp
 LL_FILE="$OUTPUT_DIR_BPF/bpf.ll"
+
+SOURCE=$1
+if [ $# -ge 2 ]; then
+	BINARY=$2
+else
+	BINARY="$OUTPUT_DIR_BPF/bpf.o"
+fi
+
 $CC $INCLUDES \
 	-target bpf \
 	-S \

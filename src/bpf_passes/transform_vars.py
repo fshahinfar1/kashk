@@ -187,6 +187,9 @@ def _process_annotation(inst, info):
         check_miss.other_body.add_inst(assign_ref)
         lookup.append(check_miss)
 
+        # TODO: I need to also run the transform_vars pass on the block of code
+        # handling the cache miss (Will implement it later)
+
         # This should be the result of above instructions
         f'''
         int {index_name} = __fnv_hash({conf['key']}, {conf['key_size']});
@@ -240,10 +243,11 @@ def _process_current_inst(inst, info, more):
             report(f'Using buffer {buf} to send response')
             # TODO: maybe it is too soon to convert instructions to the code
             if inst.wr_buf.size_cursor is None:
-                write_size = '<UNKNOWN WRITE BUF SIZE>'
+                write_size = Literal('<UNKNOWN WRITE BUF SIZE>', CODE_LITERAL)
             else:
-                write_size, _ = gen_code(inst.wr_buf.size_cursor, info, context=ARG)
-            inst = info.prog.send(buf, write_size)
+                # write_size, _ = gen_code(inst.wr_buf.size_cursor, info, context=ARG)
+                write_size = inst.wr_buf.size_cursor
+            inst = info.prog.send(buf, write_size, info)
             return inst
         elif inst.name in KNOWN_FUNCS:
             # Use known implementations of famous functions
@@ -297,6 +301,15 @@ def _do_pass(inst, info, more):
 
 
 def transform_vars_pass(inst, info, more):
+    """
+    Transformations in this pass
+
+    * Global variables
+    * Read/Recv instruction
+    * Write/Send instructions
+    * Known function substitution
+    * Cache Generation
+    """
     global current_function
     current_function = None
     res = _do_pass(inst, info, more)

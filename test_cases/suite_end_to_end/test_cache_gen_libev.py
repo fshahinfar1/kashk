@@ -45,11 +45,18 @@ def main():
     # print('---------------------------------------')
 
     #bpf_out_file print(info.user_prog.graph.paths.code.children)
+    bpf_bin_out = '/tmp/test_bpf.o'
     compile_script = os.path.join(script_dir, 'compile_bpf_source.sh')
-    cmd = ['/bin/bash', compile_script, bpf_out]
+    cmd = ['/bin/bash', compile_script, bpf_out, bpf_bin_out]
     proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     ret = proc.returncode
     assert ret == 0, f'The generated source code should compile (ret code: {ret})'
+
+    load_script = os.path.join(script_dir, 'load.sh')
+    cmd = ['/bin/bash', load_script, bpf_bin_out]
+    proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    ret = proc.returncode
+    assert ret == 0, f'The BPF program should pass the verifier'
 
 
 if __name__ == '__main__':

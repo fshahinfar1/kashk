@@ -70,7 +70,7 @@ def _do_mark_write(w, info):
         buf_sz = Literal('1024', clang.CursorKind.INTEGER_LITERAL)
 
     pkt_buf = PacketBuffer(None)
-    pkt_buf.size_cursor, _ = gen_code([buf_sz], info)
+    pkt_buf.size_cursor = buf_sz
     pkt_buf.name, _ = gen_code([buf_arg], info)
     w.wr_buf = pkt_buf
     debug('Write buffer:', pkt_buf.name, pkt_buf.size_cursor, w)

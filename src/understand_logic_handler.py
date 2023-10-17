@@ -251,3 +251,35 @@ return ((unsigned int)(-(1)));
 return 0;
 '''
     fnv_hash.body.add_inst(Literal(code, CODE_LITERAL))
+
+    # MEMCPY
+    memcpy = Function('bpf_memcpy', None)
+    memcpy.is_operator = False
+    memcpy.is_method = False
+
+    arg1 = StateObject(None)
+    arg1.name = 'dest'
+    arg1.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+    arg2 = StateObject(None)
+    arg2.name = 'src'
+    arg2.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+    arg3 = StateObject(None)
+    arg3.name = 'n'
+    arg3.type_ref = BASE_TYPES[clang.TypeKind.UINT]
+    memcpy.args = [arg1, arg2, arg3]
+    memcpy.return_type = BASE_TYPES[clang.TypeKind.VOID]
+    memcpy.may_succeed = True
+
+    scope = Scope(info.sym_tbl.global_scope)
+    info.sym_tbl.scope_mapping[memcpy.name] = scope
+    for a in memcpy.args:
+        scope.insert_entry(a.name, a.type_ref, a.kind, None)
+    code = '''
+for (__u32 i = 0; i < 256; i++) {
+  dest[i] = src[i];
+  if (i == n - 1) {
+    break;
+  }
+}
+'''
+    memcpy.body.add_inst(Literal(code, CODE_LITERAL))

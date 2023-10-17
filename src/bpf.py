@@ -42,7 +42,7 @@ class BPF_PROG:
     def add_args_to_scope(self, scope):
         raise Exception('Not implemented!')
 
-    def send(self, buf, write_size):
+    def send(self, buf, write_size, info):
         raise Exception('Not implemented!')
 
     def adjust_pkt(self, final_size):
@@ -117,7 +117,18 @@ int xdp_prog(struct xdp_md *xdp)
         T = MyType.make_pointer(MyType.make_simple('xdp_md', clang.TypeKind.RECORD))
         scope.insert_entry('xdp', T, clang.CursorKind.PARM_DECL, None)
 
-    def send(self, buf, write_size):
+    def send(self, buf, write_size, info):
+        is_size_integer = write_size.kind == clang.CursorKind.INTEGER_LITERAL
+        if is_size_integer:
+            memcpy = 'memcpy'
+        else:
+            # TODO: I need to check that BPF MEMCPY succeeds
+            memcpy = 'bpf_memcpy'
+            func = Function.directory[memcpy]
+            func.is_used_in_bpf_code = True
+            info.prog.add_declaration(func)
+
+        write_size,_ = gen_code([write_size], info, ARG)
         code = f'''
 {{
   int delta = {write_size} - ((__u64)xdp->data_end - (__u64)xdp->data);
@@ -126,7 +137,7 @@ int xdp_prog(struct xdp_md *xdp)
 if (((void *)(__u64)xdp->data + {write_size}) > (void *)(__u64)xdp->data_end) {{
   return SK_DROP;
 }}
-memcpy((void *)(__u64)xdp->data, {buf}, {write_size});
+{memcpy}((void *)(__u64)xdp->data, {buf}, {write_size});
 return XDP_TX;
 '''
         inst = Literal(code, CODE_LITERAL)
@@ -259,14 +270,25 @@ if (!sock_ctx) {
         T = MyType.make_pointer(MyType.make_simple('__sk_skb', clang.TypeKind.RECORD))
         scope.insert_entry('skb', T, clang.CursorKind.PARM_DECL, None)
 
-    def send(self, buf, write_size):
+    def send(self, buf, write_size, info):
+        is_size_integer = write_size.kind == clang.CursorKind.INTEGER_LITERAL
+        if is_size_integer:
+            memcpy = 'memcpy'
+        else:
+            # TODO: I need to check that BPF MEMCPY succeeds
+            memcpy = 'bpf_memcpy'
+            func = Function.directory[memcpy]
+            func.is_used_in_bpf_code = True
+            info.prog.add_declaration(func)
+
+        write_size,_ = gen_code(write_size, info)
         skb = 'skb'
         code = [
             f'__adjust_skb_size({skb}, {write_size});',
             f'if (((void *)(__u64){skb}->data + {write_size})  > (void *)(__u64){skb}->data_end) {{',
             f'  return SK_DROP;',
             '}',
-            f'memcpy((void *)(__u64){skb}->data, {buf}, {write_size});',
+            f'{memcpy}((void *)(__u64){skb}->data, {buf}, {write_size});',
             f'return bpf_sk_redirect_map({skb}, &sock_map, sock_ctx->sock_map_index, 0);',
             ]
         text = '\n'.join(code)
