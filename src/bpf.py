@@ -20,6 +20,7 @@ class BPF_PROG:
         self.main_code = None
         self.license = 'GPL'
         self.ctx = 'ctx'
+        self.ctx_type = MyType()
 
     def add_declaration(self, text):
         self.declarations.append(text)
@@ -64,10 +65,11 @@ class XDP_PROG(BPF_PROG):
     def __init__(self):
         super().__init__()
         self.ctx = 'xdp'
+        self.ctx_type = MyType.make_pointer(MyType.make_simple('struct xdp_md', clang.TypeKind.RECORD))
 
     def set_bpf_context_struct_sym_tbl(self, sym_tbl):
         struct_name = 'xdp'
-        T = MyType.make_simple('xdp_md', clang.TypeKind.RECORD)
+        T = self.ctx_type.under_type
         scope_key = f'class_{T.spelling}'
         sym_tbl.global_scope.insert_entry(struct_name, T, clang.CursorKind.CLASS_DECL, None)
         with sym_tbl.new_scope() as scope:
@@ -95,7 +97,7 @@ int xdp_prog(struct xdp_md *xdp)
     def get_pkt_buf(self):
         xdp = Ref(None, clang.CursorKind.DECL_REF_EXPR)
         xdp.name = 'xdp'
-        xdp.type = MyType.make_pointer(MyType.make_simple('xdp_md', clang.TypeKind.RECORD))
+        xdp.type = self.ctx_type
 
         ref = Ref(None, clang.CursorKind.MEMBER_REF_EXPR)
         ref.name = 'data'
@@ -176,10 +178,10 @@ class SK_SKB_PROG(BPF_PROG):
         bpf_parser.add_inst(Literal('return skb->len;', CODE_LITERAL))
         self.parser_code = bpf_parser
         self.ctx = 'skb'
+        self.ctx_type = MyType.make_pointer(MyType.make_simple('struct __sk_skb', clang.TypeKind.RECORD))
 
     def set_bpf_context_struct_sym_tbl(self, sym_tbl):
-        struct_name = '__sk_buff'
-        T = MyType.make_simple(struct_name, clang.TypeKind.RECORD)
+        T = self.ctx_type.under_type
         scope_key = f'class_{T.spelling}'
         sym_tbl.insert_entry(scope_key, T, clang.CursorKind.CLASS_DECL, None)
         with sym_tbl.new_scope() as scope:
@@ -267,7 +269,7 @@ if (!sock_ctx) {
         return Literal(f'skb->len', CODE_LITERAL)
 
     def add_args_to_scope(self, scope):
-        T = MyType.make_pointer(MyType.make_simple('__sk_skb', clang.TypeKind.RECORD))
+        T = self.ctx_type
         scope.insert_entry('skb', T, clang.CursorKind.PARM_DECL, None)
 
     def send(self, buf, write_size, info):

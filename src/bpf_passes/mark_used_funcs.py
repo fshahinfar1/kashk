@@ -60,7 +60,7 @@ def _do_pass(inst, info, more):
                 if not func.is_empty() and not func.is_used_in_bpf_code:
                     # Only include functions that have concrete implementation
                     func.is_used_in_bpf_code = True
-                    info.prog.declarations.append(func)
+                    info.prog.declarations.insert(0, func)
 
                 # Check param types and mark their definition useful
                 for arg in func.get_arguments():

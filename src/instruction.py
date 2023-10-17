@@ -142,6 +142,8 @@ class Call(Instruction):
 
         self.rd_buf = None
         self.wr_buf = None
+        # Mark which arguments are added to the code
+        self.change_applied = 0
 
     def __str__(self):
         return f'<Call {self.name} ({self.args})>'

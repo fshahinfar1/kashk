@@ -3,6 +3,8 @@ The goal of this module is to map socket programs read/write/... operations to
 BPF supported instructions
 """
 
+from contextlib import contextmanager
+
 from data_structure import *
 from instruction import Literal, CODE_LITERAL
 from dfs import DFSPass
@@ -10,7 +12,21 @@ from utility import skip_unexposed_stmt, find_elems_of_kind
 from prune import READ_PACKET, WRITE_PACKET, COROUTINE_FUNC_NAME
 from bpf_code_gen import gen_code
 
+
 MODULE_TAG = '[IO]'
+current_function = None
+has_processed = set()
+
+
+@contextmanager
+def _set_current_func(func):
+    global current_function
+    tmp = current_function
+    current_function = func
+    try:
+        yield None
+    finally:
+        current_function = tmp
 
 
 def _do_mark_read(r, info):
@@ -43,6 +59,8 @@ def _do_mark_read(r, info):
 def _mark_read_insts(bpf, info):
     # reads = _get_all_read(bpf)
     reads = find_elems_of_kind(bpf, clang.CursorKind.CALL_EXPR, lambda i: i.name in READ_PACKET)
+    if reads and current_function:
+        current_function.calls_recv = True
     for r in reads:
         _do_mark_read(r, info)
 
@@ -78,6 +96,8 @@ def _do_mark_write(w, info):
 
 def _mark_write_insts(bpf, info):
     writes = find_elems_of_kind(bpf, clang.CursorKind.CALL_EXPR, lambda i: i.name in WRITE_PACKET)
+    if writes and current_function:
+        current_function.calls_send = True
     for w in writes:
         _do_mark_write(w, info)
 
@@ -85,12 +105,28 @@ def _mark_write_insts(bpf, info):
 def _do_pass(bpf, info):
     _mark_read_insts(bpf, info)
     _mark_write_insts(bpf, info)
+    # Check if this function invokes any function that might call recv/write
+    calls = find_elems_of_kind(bpf, clang.CursorKind.CALL_EXPR)
+    for call in calls:
+        func = call.get_function_def()
+        if func is None:
+            continue
+        if not func.is_empty() and func.name not in has_processed:
+            with _set_current_func(func):
+                _do_pass(func.body, info)
+                has_processed.add(func.name)
+        if current_function is not None:
+            current_function.calls_recv = current_function.calls_recv or func.calls_recv
+            current_function.calls_send = current_function.calls_send or func.calls_send
 
 
 def mark_io(bpf, info):
+    assert len(has_processed) == 0, 'This pass should only be invoked once'
     # Apply it on the main body ...
     _do_pass(bpf, info)
     # ... and all the other functions
     for func in Function.directory.values():
-        if func.is_used_in_bpf_code:
-            _do_pass(func.body, info)
+        if func.is_used_in_bpf_code and func.name not in has_processed:
+            with _set_current_func(func):
+                _do_pass(func.body, info)
+                has_processed.add(func.name)

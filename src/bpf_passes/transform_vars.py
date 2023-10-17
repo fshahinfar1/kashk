@@ -12,6 +12,10 @@ from passes.pass_obj import PassObject
 
 
 MODULE_TAG = '[Transform Vars Pass]'
+
+SEND_FLAG_NAME = '__send_flag'
+FAIL_FLAG_NAME = '__fail_flag'
+
 cb_ref = CodeBlockRef()
 parent_block = CodeBlockRef()
 current_function = None
@@ -300,6 +304,44 @@ def _do_pass(inst, info, more):
     return new_inst
 
 
+def _check_func_receives_all_the_flags(func, info):
+    """
+    Check if function receives flags it need through its arguments
+    """
+    if func.calls_recv and (func.change_applied & Function.CTX_FLAG == 0):
+        # Add the BPF context to its arguemt
+        arg = StateObject(None)
+        arg.name = info.prog.ctx
+        arg.type_ref = info.prog.ctx_type
+        func.args.append(arg)
+        func.change_applied |= Function.CTX_FLAG
+        scope = info.sym_tbl.scope_mapping.get(func.name)
+        assert scope is not None
+        scope.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
+
+    if func.calls_send and (func.change_applied & Function.SEND_FLAG == 0):
+        # Add the send flag
+        arg = StateObject(None)
+        arg.name = SEND_FLAG_NAME
+        arg.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+        func.args.append(arg)
+        func.change_applied |= Function.SEND_FLAG
+        scope = info.sym_tbl.scope_mapping.get(func.name)
+        assert scope is not None
+        scope.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
+
+    if func.may_succeed and func.may_fail and (func.change_applied & Function.FAIL_FLAG == 0):
+        arg = StateObject(None)
+        arg.name = FAIL_FLAG_NAME
+        arg.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+        func.args.append(arg)
+        func.change_applied |= Function.FAIL_FLAG
+        scope = info.sym_tbl.scope_mapping.get(func.name)
+        assert scope is not None
+        scope.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
+
+
+
 def transform_vars_pass(inst, info, more):
     """
     Transformations in this pass
@@ -316,6 +358,8 @@ def transform_vars_pass(inst, info, more):
     for func in Function.directory.values():
         if func.is_used_in_bpf_code:
             current_function = func
+            _check_func_receives_all_the_flags(func, info)
             tmp = _do_pass(func.body, info, PassObject())
             func.body = tmp
+            current_function = None
     return res

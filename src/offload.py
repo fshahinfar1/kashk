@@ -122,6 +122,9 @@ def generate_offload(io_ctx):
 
     debug('Mark Read/Write Inst & Buf')
     mark_io(bpf, info)
+    # for f in Function.directory.values():
+    #     if f.is_used_in_bpf_code:
+    #         debug(f.name, 'send:', f.calls_send, 'recv:', f.calls_recv)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     ## Simplify Code

@@ -354,6 +354,10 @@ class FunctionBodyEvaluator:
             return blk
 
 class Function(TypeDefinition):
+    CTX_FLAG  = 1 << 0
+    SEND_FLAG = 1 << 1
+    FAIL_FLAG = 1 << 2
+
     func_cursor = {}
     # TODO: I need to seperate the directory for BPF and Userspace program
     directory = {}
@@ -376,10 +380,15 @@ class Function(TypeDefinition):
         self.may_have_context_ptr = False
         self.may_fail = False
         self.may_succeed = False
+        self.calls_send = False
+        self.calls_recv = False
 
         self.path_ids = []
         self.receives_fail_flag = False
         self.last_arg_is_auto_gen = False
+
+        # What operations has alread been applied (bitset)
+        self.change_applied = 0
 
         if directory is None:
             directory = Function.directory
