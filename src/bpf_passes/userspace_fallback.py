@@ -12,13 +12,13 @@ from passes.pass_obj import PassObject
 
 from bpf_code_gen import gen_code
 
+from bpf_passes.transform_vars import FAIL_FLAG_NAME
+
 
 MODULE_TAG = '[Fallback Pass]'
 
 current_function = None
 cb_ref = CodeBlockRef()
-
-FLAG_PARAM_NAME = '__fail_flag'
 
 
 class After:
@@ -43,7 +43,7 @@ def _handle_function_may_fail(inst, func, info, more):
     blk = cb_ref.get(BODY)
 
     flag_ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
-    flag_ref.name = FLAG_PARAM_NAME
+    flag_ref.name = FAIL_FLAG_NAME
     flag_ref.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
 
     before_func_call = []
@@ -56,21 +56,11 @@ def _handle_function_may_fail(inst, func, info, more):
         T = flag_ref.type
         flag_obj.type_ref = T
 
-        if not func.receives_fail_flag:
-            # Check that we only update the signature once
-            # Update the signature of the function
-            func.args.append(flag_obj)
-            func.receives_fail_flag = True
-
-            # Update the flag to the symbol table for the function scope
-            scope = info.sym_tbl.scope_mapping.get(inst.name)
-            assert scope is not None
-            entry = SymbolTableEntry(flag_obj.name, T, clang.CursorKind.PARM_DECL, None)
-            scope.insert(entry)
+        assert (func.change_applied & Function.FAIL_FLAG) != 0, f'The fail flag should alread be added to the function definition (func:{func.name})'
 
         # Pass the flag when invoking the function
         # First check if we need to allocate the flag on the stack memory
-        sym = info.sym_tbl.lookup(FLAG_PARAM_NAME)
+        sym = info.sym_tbl.lookup(FAIL_FLAG_NAME)
         is_on_the_stack = sym is not None
         if not is_on_the_stack:
             # declare a local variable
@@ -107,7 +97,7 @@ def _handle_function_may_fail(inst, func, info, more):
             prev_failure_case = None
 
             failure_flag_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
-            failure_flag_ref.name = FLAG_PARAM_NAME
+            failure_flag_ref.name = FAIL_FLAG_NAME
             failure_flag_ref.type = BASE_TYPES[clang.TypeKind.SCHAR]
 
             for failure_number in func.path_ids:

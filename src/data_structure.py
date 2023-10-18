@@ -384,7 +384,6 @@ class Function(TypeDefinition):
         self.calls_recv = False
 
         self.path_ids = []
-        self.receives_fail_flag = False
         self.last_arg_is_auto_gen = False
 
         # What operations has alread been applied (bitset)

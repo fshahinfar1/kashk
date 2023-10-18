@@ -276,6 +276,14 @@ class ControlFlowInst(Instruction):
 class UnaryOp(Instruction):
     OPS = ('!', '-', '++', '--', '&', '*', 'sizeof', '__extension__', '~')
 
+    @classmethod
+    def build(cls, op, inst):
+        assert op in UnaryOp.OPS
+        u = UnaryOp(None)
+        u.op = op
+        u.child.add_inst(inst)
+        return u
+
     def __init__(self, cursor):
         super().__init__()
 
