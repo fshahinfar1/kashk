@@ -309,6 +309,7 @@ def _process_current_inst(inst, info, more):
                     decl = VarDecl(None)
                     decl.name = SEND_FLAG_NAME
                     decl.type = BASE_TYPES[clang.TypeKind.SCHAR]
+                    decl.init.add_inst(Literal('0', clang.CursorKind.INTEGER_LITERAL))
                     blk = cb_ref.get(BODY)
                     blk.append(decl)
                     info.sym_tbl.insert_entry(decl.name, decl.type, decl.kind, None)

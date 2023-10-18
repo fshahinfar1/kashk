@@ -3,7 +3,7 @@ from log import error, debug
 from data_structure import *
 from instruction import *
 from sym_table import SymbolTableEntry
-from utility import indent
+from utility import indent, get_tmp_var_name, show_insts
 from bpf_code_gen import gen_code
 from passes.pass_obj import PassObject
 
@@ -25,11 +25,6 @@ def remember_change_ctx(func):
     finally:
         current_change_ctx = tmp
 
-_var_counter = 0
-def _get_a_var_name():
-    global _var_counter
-    _var_counter += 1
-    return f'__ex{_var_counter}'
 
 class _Change:
     """
@@ -72,7 +67,7 @@ def _function_check_param_reduc(inst, func, info, more):
 
         # Move some parameters to a struct
         count_extra = (count_args - PARAMETER_LIMIT) + 1
-        debug('Reduce parameters of', func.name, 'original args:', func.args)
+        # debug('Reduce parameters of', func.name, 'original args:', func.args)
         for i in range(count_extra):
             param = func.args.pop()
             # TODO: do I need to maintain the symbol of this parameter?
@@ -121,13 +116,14 @@ def _handle_call(inst, info, more):
     count_extra = len(change.list_of_params)
     if not count_extra:
         # No change to the invocation of the function
+        # debug(MODULE_TAG, inst.name, 'was not changed!')
         return inst
 
     # Create an instance of struct which should be passed to the function
     extra_args = [inst.args.pop() for i in range(count_extra)]
     decl = VarDecl(None)
     decl.type = MyType.make_simple(change.struct_name, clang.TypeKind.RECORD)
-    decl.name = _get_a_var_name()
+    decl.name = get_tmp_var_name()
     # TODO: How to implement a struct initialization?
     tmp = []
     for field, var in zip(change.list_of_params, extra_args):
@@ -155,6 +151,7 @@ def _handle_call(inst, info, more):
 def _handle_ref(inst, info, more):
     if current_change_ctx is None:
         # This is the body of BPF program
+        # debug(MODULE_TAG, 'No change context')
         return inst
 
     top_lvl_var_name = inst.name
@@ -174,11 +171,13 @@ def _handle_ref(inst, info, more):
         ex_ref.name = EXTRA_PARAM_NAME
         ex_ref.kind = clang.CursorKind.DECL_REF_EXPR
         tmp_T = MyType.make_simple('struct {struct_name}', clang.TypeKind.RECORD)
-        ex_ref.type = MyType.make_pointer(tmp_T) 
+        ex_ref.type = MyType.make_pointer(tmp_T)
 
         new_inst.owner.append(ex_ref)
         new_inst.kind = clang.CursorKind.MEMBER_REF_EXPR
+        # debug(MODULE_TAG, 'updated!', new_inst, new_inst.owner)
         return new_inst
+    # debug(MODULE_TAG, 'should not update')
     return inst
 
 
@@ -187,6 +186,7 @@ def _process_current_inst(inst, info, more):
         return _handle_call(inst, info, more)
     elif inst.kind in (clang.CursorKind.DECL_REF_EXPR,
                 clang.CursorKind.MEMBER_REF_EXPR):
+        # debug(MODULE_TAG, 'handle ref:', inst)
         return _handle_ref(inst, info, more)
     return inst
 

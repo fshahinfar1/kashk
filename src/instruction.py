@@ -79,7 +79,11 @@ class Instruction:
         new = Instruction()
         # new.kind = self.kind
         for name, val in vars(self).items():
+            if isinstance(val, list):
+                val = val[:]
             setattr(new, name, val)
+        if children:
+            new.body = children[0]
         return new
 
     def __str__(self):
@@ -552,8 +556,7 @@ class Ref(Instruction):
         new = Ref(self.cursor, self.kind)
         new.name = self.name
         new.type = self.type
-        clone_owner = list(self.owner)
-        new.owner = clone_owner
+        new.owner  = list(self.owner)
         new.bpf_ignore = self.bpf_ignore
         return new
 
