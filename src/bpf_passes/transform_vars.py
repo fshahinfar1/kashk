@@ -292,7 +292,40 @@ def _process_current_inst(inst, info, more):
             return _known_function_substitution(inst, info)
         else:
             # TODO: check if the function being invoked needs to receive any flag and pass.
-            pass
+            func = inst.get_function_def()
+            if not func:
+                return inst
+            if (func.calls_recv  or func.calls_send) and (inst.change_applied & Function.CTX_FLAG == 0):
+                inst.change_applied |= Function.CTX_FLAG
+                ctx_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
+                ctx_ref.name = info.prog.ctx
+                ctx_ref.type = info.prog.ctx_type
+                inst.args.append(ctx_ref)
+
+            if func.calls_send and (inst.change_applied & Function.SEND_FLAG == 0):
+                inst.change_applied |= Function.SEND_FLAG
+                if current_function is None:
+                    # Allocate the flag on the stack and pass a poitner
+                    decl = VarDecl(None)
+                    decl.name = SEND_FLAG_NAME
+                    decl.type = BASE_TYPES[clang.TypeKind.SCHAR]
+                    blk = cb_ref.get(BODY)
+                    blk.append(decl)
+
+                    flag_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
+                    flag_ref.name = SEND_FLAG_NAME
+                    flag_ref.type = BASE_TYPES[clang.TypeKind.SCHAR]
+
+                    ref = UnaryOp(None)
+                    ref.child.add_inst(flag_ref)
+                    ref.op = '&'
+                    inst.args.append(ref)
+                else:
+                    # Just pass the reference
+                    flag_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
+                    flag_ref.name = SEND_FLAG_NAME
+                    flag_ref.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+                    inst.args.append(flag_ref)
     elif inst.kind == ANNOTATION_INST:
         return _process_annotation(inst, info)
     return inst
