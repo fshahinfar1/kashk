@@ -9,7 +9,7 @@ sys.path.insert(0, code_under_test_dir)
 from utility import parse_file, find_elem
 from sym_table_gen import build_sym_table
 from understand_logic import gather_instructions_under
-from understand_logic_handler import create_func_objs
+from understand_logic_handler import create_func_objs, add_known_func_objs
 
 from data_structure import Info, Function
 from instruction import BODY
@@ -46,6 +46,7 @@ class BasicTest:
         # Convert cursors to instruction objects
         insts = gather_instructions_under(main, self.info, BODY)
         create_func_objs(self.info)
+        add_known_func_objs(self.info)
         self.test(insts)
 
     def test(self, insts):

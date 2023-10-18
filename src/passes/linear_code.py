@@ -114,19 +114,19 @@ def _separate_var_decl_and_init(inst, info, more):
 def _process_current_inst(inst, info, more):
     ctx = more.ctx
 
-    if inst.kind == ANNOTATION_INST:
-        if inst.ann_kind == Annotation.ANN_FUNC_PTR:
-            ptr, actual = inst.msg.split(Annotation.FUNC_PTR_DELIMITER)
-            func_ptr_mapping[ptr] = actual
+    # if inst.kind == ANNOTATION_INST:
+    #     if inst.ann_kind == Annotation.ANN_FUNC_PTR:
+    #         ptr, actual = inst.msg.split(Annotation.FUNC_PTR_DELIMITER)
+    #         func_ptr_mapping[ptr] = actual
 
     if inst.kind == clang.CursorKind.CALL_EXPR:
-        if inst.is_func_ptr:
-            actual = func_ptr_mapping.get(inst.name)
-            if actual is not None:
-                # bind function pointer to an actual function
-                report(f'Function {inst.name} is replaced with {actual}')
-                inst.name = actual
-                inst.is_func_ptr = False
+        # if inst.is_func_ptr:
+        #     actual = func_ptr_mapping.get(inst.name)
+        #     if actual is not None:
+        #         # bind function pointer to an actual function
+        #         report(f'Function {inst.name} is replaced with {actual}')
+        #         inst.name = actual
+        #         inst.is_func_ptr = False
 
         # TODO: shoud it not be RHS ??
         if ctx in (ARG, LHS):
@@ -176,10 +176,9 @@ def linear_code_pass(inst, info, more):
     # Make sure all the void functions are terminated with Return instructions
     # Other functions must return something so the compiler should complain.
     for func in Function.directory.values():
-        body = _do_pass(func.body, info, PassObject())
-        assert body is not None
-        func.body = body
+        if not func.is_used_in_bpf_code:
+            continue
+        func.body = _do_pass(func.body, info, PassObject())
         if not func.is_empty() and func.return_type.spelling == 'void':
             _make_sure_void_func_return(func, info)
     return res
-

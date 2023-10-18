@@ -6,6 +6,9 @@ from prune import should_process_this_cursor
 
 from understand_program_state import generate_decleration_for
 
+
+MODULE_TAG = '[Mark Used Func]'
+
 # TODO: what if a name of a struct is changed using a typedef ?
 
 def _find_type_decl_class(name, info):
@@ -61,6 +64,7 @@ def _do_pass(inst, info, more):
                     # Only include functions that have concrete implementation
                     func.is_used_in_bpf_code = True
                     info.prog.declarations.insert(0, func)
+                    report(MODULE_TAG, 'Function:', func.name)
 
                 # Check param types and mark their definition useful
                 for arg in func.get_arguments():

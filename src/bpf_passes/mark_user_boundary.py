@@ -57,7 +57,7 @@ def _process_current_inst(inst, info, more):
             # TODO: calling function pointers are not support for now. But I should add the support
             error(MODULE_TAG, 'calling function pointers are not support for now')
             return inst, YES
-        assert func.may_fail or func.may_succeed, 'The information about function failures should be processed before this step'
+        assert func.may_fail or func.may_succeed, f'The information about function failures should be processed before this step (func: {func.name})'
 
         if func.is_empty():
             if func.may_succeed:

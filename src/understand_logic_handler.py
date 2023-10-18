@@ -197,23 +197,24 @@ def create_func_objs(info):
 
 def add_known_func_objs(info):
     # STRLEN
-    strlen = Function('bpf_strlen', None)
-    strlen.is_operator = False
-    strlen.is_method = False
-    # Directly use the same arguments as original strlen
-    orig = Function.directory['strlen']
-    arg1 = StateObject(None)
-    arg1.name = 'str'
-    arg1.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
-    strlen.args = [arg1,]
-    strlen.return_type = BASE_TYPES[clang.TypeKind.UINT]
-    strlen.may_succeed = True
+    orig = Function.directory.get('strlen')
+    if orig is not None:
+        strlen = Function('bpf_strlen', None)
+        strlen.is_operator = False
+        strlen.is_method = False
+        # Directly use the same arguments as original strlen
+        arg1 = StateObject(None)
+        arg1.name = 'str'
+        arg1.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+        strlen.args = [arg1,]
+        strlen.return_type = BASE_TYPES[clang.TypeKind.UINT]
+        strlen.may_succeed = True
 
-    scope = Scope(info.sym_tbl.global_scope)
-    info.sym_tbl.scope_mapping[strlen.name] = scope
-    for a in strlen.args:
-        scope.insert_entry(a.name, a.type_ref, a.kind, None)
-    code = '''
+        scope = Scope(info.sym_tbl.global_scope)
+        info.sym_tbl.scope_mapping[strlen.name] = scope
+        for a in strlen.args:
+            scope.insert_entry(a.name, a.type_ref, a.kind, None)
+        code = '''
 int len;
 len = 0;
 int i;
@@ -225,7 +226,7 @@ if (str[i] == '\\0') {
 }
 return ((unsigned int)(-(1)));
 '''
-    strlen.body.add_inst(Literal(code, CODE_LITERAL))
+        strlen.body.add_inst(Literal(code, CODE_LITERAL))
 
 
     # FNV_HASH

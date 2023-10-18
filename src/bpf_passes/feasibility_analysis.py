@@ -105,7 +105,6 @@ def _do_pass(inst, info, more):
     new_children = []
     failed = fail_ref.get(FAILED)
 
-    # NOTE: make sure this if is out of the for block (You have messed up once) :)
     if current_function and not failed and inst.kind == clang.CursorKind.RETURN_STMT:
         current_function.may_succeed = True
 
@@ -171,6 +170,9 @@ def feasibilty_analysis_pass(inst, info, more):
             else:
                 func.may_fail = True
                 func.may_succeed = False
+            continue
+        if not func.is_used_in_bpf_code:
+            # It is not used why do I care?
             continue
         obj = PassObject()
         obj.func = func

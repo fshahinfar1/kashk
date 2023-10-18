@@ -15,6 +15,8 @@ from understand_logic_handler import create_func_objs, add_known_func_objs
 from bpf_code_gen import generate_bpf_prog, gen_code
 from user import generate_user_prog
 
+from passes.mark_used_funcs import mark_used_funcs
+from passes.replace_func_ptr import replace_func_pointers
 from passes.mark_io import mark_io
 from passes.pass_obj import PassObject
 from passes.clone import clone_pass
@@ -26,7 +28,6 @@ from bpf_passes.transform_vars import transform_vars_pass
 from bpf_passes.userspace_fallback import userspace_fallback_pass
 from bpf_passes.verifier import verifier_pass
 from bpf_passes.reduce_params import reduce_params_pass
-from bpf_passes.mark_used_funcs import mark_used_funcs
 
 from user_passes.select_user import select_user_pass
 from user_passes.number_fallback_graph import number_fallback_graph_pass
@@ -118,6 +119,10 @@ def generate_offload(io_ctx):
     # Mark which type or func definitions should be placed in generated code
     debug('Mark Functions used in BPF')
     mark_used_funcs(bpf, info, PassObject())
+    debug('~~~~~~~~~~~~~~~~~~~~~')
+
+    debug('Replace Function Pointers')
+    replace_func_pointers(bpf, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     debug('Mark Read/Write Inst & Buf')
