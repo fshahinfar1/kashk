@@ -194,6 +194,8 @@ def dfs_over_deps_vars(root):
     @param root: a node of the User Program Graph
     @returns a list of set of variables dependencies along with the failure number
     """
+    # TODO: have another look at this implementation. It seems to have issue of
+    # including some paths multiple times
     this_node_deps = root.paths.var_deps
 
     if len(root.children) == 0:
@@ -202,10 +204,14 @@ def dfs_over_deps_vars(root):
         assert len(root.path_ids) == 1, f'Expected the leaf to have one failure number. But it has more/less (list: {root.path_ids})'
         return [{'vars': list(this_node_deps), 'path_id': root.path_ids[0]}]
 
+    have_it = set()
     results = []
     for child in root.children:
         mid_res = dfs_over_deps_vars(child)
         for r in mid_res:
+            if r['path_id'] in have_it:
+                continue
+            have_it.add(r['path_id'])
             r['vars'].extend(this_node_deps)
             results.append(r)
     return results
@@ -224,7 +230,7 @@ def gen_user_code(user, info, out_user):
         # report_user_program_graph(info)
 
         # Look at var deps
-        debug(MODULE_TAG, 'Tree of variable dependencies')
+        # debug(MODULE_TAG, 'Tree of variable dependencies')
         # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(x.paths.var_deps))
         # debug(tree)
         # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
@@ -233,7 +239,7 @@ def gen_user_code(user, info, out_user):
         # ----
 
         meta_structs = dfs_over_deps_vars(info.user_prog.graph)
-        debug(MODULE_TAG, 'Metadata structures:', pformat(meta_structs))
+        # debug(MODULE_TAG, 'Metadata structures:', pformat(meta_structs))
 
         for x in meta_structs:
             state_obj = StateObject(None)
@@ -253,6 +259,11 @@ def gen_user_code(user, info, out_user):
             meta.is_used_in_bpf_code = True
             info.prog.add_declaration(meta)
             info.user_prog.declarations.append(meta)
+
+            __scope = info.sym_tbl.current_scope
+            info.sym_tbl.current_scope = info.sym_tbl.global_scope
+            meta.update_symbol_table(info.sym_tbl)
+            info.sym_tbl.current_scope = __scope
 
         # Generate the user code in the context of userspace program
         # TODO: I have disabled this part just for testing
@@ -298,12 +309,13 @@ def gen_bpf_code(bpf, info, out_bpf):
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     debug('[2nd] Mark Functions used in BPF')
-    for func in Function.directory.values():
-        func.is_used_in_bpf_code = False
-    info.prog.declarations = list(filter(lambda x: not isinstance(x, Function), info.prog.declarations))
-    obj = PassObject()
-    obj.func_only = True
-    mark_used_funcs(bpf, info, obj)
+    report("This pass was omited because it was buggy!")
+    # for func in Function.directory.values():
+    #     func.is_used_in_bpf_code = False
+    # info.prog.declarations = list(filter(lambda x: not isinstance(x, Function), info.prog.declarations))
+    # obj = PassObject()
+    # obj.func_only = True
+    # mark_used_funcs(bpf, info, obj)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # TODO: split the code between parser and verdict

@@ -103,6 +103,10 @@ def _known_function_substitution(inst, info):
     elif inst.name in ('ntohs', 'ntohl', 'htons', 'htonl'):
         inst.name = 'bpf_'+inst.name
         return inst
+    elif inst.name == 'htonll':
+        inst.name = 'bpf_cpu_to_be64'
+    elif inst.name == 'ntohll':
+        inst.name = 'bpf_be64_to_cpu'
     error(f'Know function {inst.name} is not implemented yet')
     return inst
 
