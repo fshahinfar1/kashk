@@ -188,8 +188,12 @@ def malloc_lookup(name, info, return_val):
     # Add var decl to symbol table
     info.sym_tbl.insert_entry(tmp_name, T, clang.CursorKind.VAR_DECL, None)
 
+    var_decl = VarDecl(None)
+    var_decl.name = tmp_name
+    var_decl.type = T
+    var_decl.init.add_inst(Literal('NULL', clang.CursorKind.INTEGER_LITERAL))
+
     text = f'''
-{T.spelling} {tmp_name} = NULL;
 {{
   int zero = 0;
   {tmp_name} = bpf_map_lookup_elem(&{name}_map, &zero);
@@ -211,4 +215,4 @@ def malloc_lookup(name, info, return_val):
     ref.kind = clang.CursorKind.MEMBER_REF_EXPR
     ref.owner.append(owner)
 
-    return lookup_inst, ref
+    return [var_decl, lookup_inst], ref

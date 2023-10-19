@@ -297,6 +297,15 @@ def gen_bpf_code(bpf, info, out_bpf):
     bpf = reduce_params_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
+    debug('[2nd] Mark Functions used in BPF')
+    for func in Function.directory.values():
+        func.is_used_in_bpf_code = False
+    info.prog.declarations = list(filter(lambda x: not isinstance(x, Function), info.prog.declarations))
+    obj = PassObject()
+    obj.func_only = True
+    mark_used_funcs(bpf, info, obj)
+    debug('~~~~~~~~~~~~~~~~~~~~~')
+
     # TODO: split the code between parser and verdict
     debug('[Parser/Verdict Split Code]')
     info.prog.set_code(bpf)

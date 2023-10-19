@@ -81,6 +81,11 @@ def _known_function_substitution(inst, info):
         value_type = Record(name, [field])
         value_type.is_used_in_bpf_code = True
         info.prog.add_declaration(value_type)
+
+        __scope = info.sym_tbl.current_scope
+        info.sym_tbl.current_scope = info.sym_tbl.global_scope
+        value_type.update_symbol_table(info.sym_tbl)
+        info.sym_tbl.current_scope = __scope
         report('Declare', value_type, 'as malloc object')
 
         # Define the map
@@ -92,8 +97,12 @@ def _known_function_substitution(inst, info):
         return_val = _get_fail_ret_val()
         lookup_inst, ref = malloc_lookup(name, info, return_val)
         blk = cb_ref.get(BODY)
-        blk.append(lookup_inst)
+        for tmp_inst in lookup_inst:
+            blk.append(tmp_inst)
         return ref
+    elif inst.name in ('ntohs', 'ntohl', 'htons', 'htonl'):
+        inst.name = 'bpf_'+inst.name
+        return inst
     error(f'Know function {inst.name} is not implemented yet')
     return inst
 
@@ -409,7 +418,7 @@ def _check_func_receives_all_the_flags(func, info):
         scope = info.sym_tbl.scope_mapping.get(func.name)
         assert scope is not None
         scope.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
-        debug('add param:', FAIL_FLAG_NAME, 'to', func.name)
+        # debug('add param:', FAIL_FLAG_NAME, 'to', func.name)
 
 
 def transform_vars_pass(inst, info, more):

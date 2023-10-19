@@ -1,4 +1,5 @@
 from dfs import DFSPass
+from log import debug
 from instruction import *
 from data_structure import *
 
@@ -16,6 +17,7 @@ def _do_pass(bpf, info):
             if inst.ann_kind == Annotation.ANN_FUNC_PTR:
                 ptr, actual = inst.msg.split(Annotation.FUNC_PTR_DELIMITER)
                 func_ptr_mapping[ptr] = actual
+                debug(MODULE_TAG, ptr, '-->', actual)
         elif inst.kind == clang.CursorKind.CALL_EXPR:
             if inst.is_func_ptr:
                 actual = func_ptr_mapping.get(inst.name)
@@ -41,3 +43,6 @@ def _do_pass(bpf, info):
 
 def replace_func_pointers(bpf, info, more):
     _do_pass(bpf, info)
+    for func in Function.directory.values():
+        if func.is_used_in_bpf_code:
+            _do_pass(func.body, info)

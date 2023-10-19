@@ -8,6 +8,7 @@ from understand_program_state import generate_decleration_for
 
 
 MODULE_TAG = '[Mark Used Func]'
+_has_processed = None
 
 # TODO: what if a name of a struct is changed using a typedef ?
 
@@ -15,14 +16,16 @@ def _find_type_decl_class(name, info):
     scope_key = f'class_{name}'
     entry = info.sym_tbl.global_scope.lookup(scope_key)
     if entry is None:
+        # debug(f'did not found type: {name}')
         # debug(list(info.sym_tbl.global_scope.symbols.keys()))
         return []
     cursor = entry.ref
-    if not should_process_this_cursor(cursor):
+    if cursor is None or not should_process_this_cursor(cursor):
         return []
     assert cursor is not None
     decls = generate_decleration_for(cursor)
     return decls
+
 
 def _find_type_decl(name, info):
     tmp = _find_type_decl_class(name, info)
@@ -39,7 +42,7 @@ def _find_type_decl(name, info):
     # # debug(name, decls)
     # return decls
 
-_has_processed = set()
+
 def _add_type_to_declarations(T, info):
     T = get_actual_type(T)
     if T is None or T.kind in PRIMITIVE_TYPES or T.spelling in _has_processed:
@@ -64,17 +67,27 @@ def _do_pass(inst, info, more):
                     # Only include functions that have concrete implementation
                     func.is_used_in_bpf_code = True
                     info.prog.declarations.insert(0, func)
-                    report(MODULE_TAG, 'Function:', func.name)
+                    # report(MODULE_TAG, 'Function:', func.name)
 
-                # Check param types and mark their definition useful
-                for arg in func.get_arguments():
-                    _add_type_to_declarations(arg.type_ref, info)
+                if not flag:
+                    # Check param types and mark their definition useful
+                    for arg in func.get_arguments():
+                        _add_type_to_declarations(arg.type_ref, info)
                 # Continue processing the code reachable inside the function
                 _do_pass(func.body, info, None)
             continue
         elif inst.kind == clang.CursorKind.VAR_DECL:
-            _add_type_to_declarations(inst.type, info)
+            if not flag:
+                _add_type_to_declarations(inst.type, info)
         d.go_deep()
 
+flag = None
 def mark_used_funcs(bpf, info, more):
+    global flag
+    global _has_processed
+    _has_processed = set()
+    if more and more.get('func_only'):
+        flag = True
+    else:
+        flag = False
     _do_pass(bpf, info, None)
