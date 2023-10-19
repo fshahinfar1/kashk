@@ -622,6 +622,11 @@ class Block(Instruction):
         self.kind = BLOCK_OF_CODE
         self.tag = tag
         self.children = []
+        # TODO: it is not used yet, the idea is to also annotate block of codes
+        # which fail so we can know which jumps will fail and which would not.
+        # If all branches fail then we should not continue the code. Helps to
+        # remove dead code.
+        self.fails = False
 
     def __str__(self):
         return f'<Block>'

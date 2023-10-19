@@ -4,7 +4,7 @@ hook: xdp
 framework: libev
 sources: [
     /home/farbod/auto_bpf_offload/auto_bpf_offload_case_study/src/memcached/proto_bin.c,
-    /home/farbod/auto_bpf_offload/auto_bpf_offload_case_study/src/memcached/proto_text.c,
+    # /home/farbod/auto_bpf_offload/auto_bpf_offload_case_study/src/memcached/proto_text.c,
 ]
 _sources: [
     /home/farbod/auto_bpf_offload/auto_bpf_offload_case_study/src/memcached/assoc.c,

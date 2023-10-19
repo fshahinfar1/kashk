@@ -256,16 +256,28 @@ def _process_current_inst(inst, info, more):
         pass
     elif inst.kind == clang.CursorKind.CALL_EXPR:
         if inst.name in READ_PACKET:
+            blk = cb_ref.get(BODY)
+            # blk.append(assign_inst)
+
+            # NOTE: I can assign the pointer but then the buffer size won't be right? <-- should be looked at as an optimization?
             report('Assigning packet buffer to var:', inst.rd_buf.name)
-            # Assign packet pointer on a previouse line
+            # # Assign packet pointer on a previouse line
+            # lhs = Literal(inst.rd_buf.name, CODE_LITERAL)
+            # rhs = info.prog.get_pkt_buf()
+            # assign_inst = BinOp.build_op(lhs, '=', rhs)
+            # # TODO: what if `skb` is not defined in this scope?
+            # # Set the return value
+            # inst = info.prog.get_pkt_size()
+
+            # Copy data from XDP to Buffer
             lhs = Literal(inst.rd_buf.name, CODE_LITERAL)
             rhs = info.prog.get_pkt_buf()
-            assign_inst = BinOp.build_op(lhs, '=', rhs)
-            blk = cb_ref.get(BODY)
-            blk.append(assign_inst)
-            # TODO: what if `skb` is not defined in this scope?
-            # Set the return value
-            inst = info.prog.get_pkt_size()
+            sz  = info.prog.get_pkt_size()
+            cpy = Call(None)
+            cpy.name = 'bpf_memcpy'
+            cpy.args = [lhs, rhs, sz]
+            blk.append(cpy)
+            inst = sz
             return inst
         elif inst.name in WRITE_PACKET:
             buf = inst.wr_buf.name
