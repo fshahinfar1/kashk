@@ -10,6 +10,8 @@ enum {
 	ANN_CACNE_DEFINE,
 	ANN_CACHE_BEGIN,
 	ANN_CACHE_END,
+	ANN_EXCLUDE_BEGIN,
+	ANN_EXCLUDE_END,
 };
 #define __ANNOTATE(_m, _k) (struct __annotation){ \
 	.message = _m, \
@@ -51,5 +53,9 @@ enum {
 		"}", ANN_CACHE_BEGIN)
 
 #define __ANNOTATE_END_CACHE(id) __ANNOTATE("{id:\"" id "\"}", ANN_CACHE_END)
+
+
+#define __ANNOTATE_EXCLUDE_BEGIN __ANNOTATE("EXCLUDE_BEGIN", ANN_EXCLUDE_BEGIN)
+#define __ANNOTATE_EXCLUDE_END __ANNOTATE("EXCLUDE_END", ANN_EXCLUDE_END)
 
 #endif

@@ -122,7 +122,7 @@ def generate_offload(io_ctx):
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     debug('Replace Function Pointers')
-    replace_func_pointers(bpf, info, None)
+    bpf = replace_func_pointers(bpf, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     debug('Mark Read/Write Inst & Buf')

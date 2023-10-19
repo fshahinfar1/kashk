@@ -443,10 +443,15 @@ BASE_TYPES = {}
 def prepare_base_types():
     kind_name_map = {
             clang.TypeKind.SCHAR: 'char',
+            clang.TypeKind.UCHAR: 'unsigned char',
             clang.TypeKind.VOID: 'void',
+            clang.TypeKind.SHORT: 'short',
+            clang.TypeKind.USHORT: 'unsigned short',
             clang.TypeKind.INT: 'int',
             clang.TypeKind.UINT: 'unsigned int',
+            clang.TypeKind.LONG: 'long',
             clang.TypeKind.ULONG: 'unsigned long',
+            clang.TypeKind.LONGLONG: 'long long',
             clang.TypeKind.ULONGLONG: 'unsigned long long',
             }
 

@@ -266,7 +266,7 @@ return 0;
     arg2.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
     arg3 = StateObject(None)
     arg3.name = 'n'
-    arg3.type_ref = BASE_TYPES[clang.TypeKind.UINT]
+    arg3.type_ref = BASE_TYPES[clang.TypeKind.USHORT]
     memcpy.args = [arg1, arg2, arg3]
     memcpy.return_type = BASE_TYPES[clang.TypeKind.VOID]
     memcpy.may_succeed = True

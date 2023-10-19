@@ -174,11 +174,13 @@ class Call(Instruction):
         # new.args  = list(self.args)
         new.args  = children
         new.owner = list(self.owner)
+        new.is_func_ptr = self.is_func_ptr
         new.is_method = self.is_method
         new.is_operator = self.is_operator
         new.bpf_ignore = self.bpf_ignore
         new.rd_buf = self.rd_buf
         new.wr_buf = self.wr_buf
+        new.change_applied = self.change_applied
         return new
 
 
@@ -701,16 +703,21 @@ class Annotation(Instruction):
 
     FUNC_PTR_DELIMITER = '-->'
 
-    ANN_SKIP = 'ANN_SKIP'
-    ANN_FUNC_PTR = 'ANN_FUNC_PTR'
-    ANN_CACNE_DEFINE = 'ANN_CACNE_DEFINE'
-    ANN_CACHE_BEGIN = 'ANN_CACHE_BEGIN'
-    ANN_CACHE_END = 'ANN_CACHE_END'
+    ANN_SKIP          = 'ANN_SKIP'
+    ANN_FUNC_PTR      = 'ANN_FUNC_PTR'
+    ANN_CACNE_DEFINE  = 'ANN_CACNE_DEFINE'
+    ANN_CACHE_BEGIN   = 'ANN_CACHE_BEGIN'
+    ANN_CACHE_END     = 'ANN_CACHE_END'
+    ANN_EXCLUDE_BEGIN = 'ANN_EXCLUDE_BEGIN'
+    ANN_EXCLUDE_END   = 'ANN_EXCLUDE_END'
 
     def __init__(self, msg, ann_kind):
         super().__init__()
         assert len(msg) > 2
-        assert ann_kind in (Annotation.ANN_SKIP, Annotation.ANN_FUNC_PTR, Annotation.ANN_CACNE_DEFINE, Annotation.ANN_CACHE_BEGIN, Annotation.ANN_CACHE_END)
+        assert ann_kind in (Annotation.ANN_SKIP, Annotation.ANN_FUNC_PTR,
+                Annotation.ANN_CACNE_DEFINE, Annotation.ANN_CACHE_BEGIN,
+                Annotation.ANN_CACHE_END, Annotation.ANN_EXCLUDE_BEGIN,
+                Annotation.ANN_EXCLUDE_END)
         # self.msg = msg[1:-1]
         self.msg = eval(msg)
         self.ann_kind = ann_kind
