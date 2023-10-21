@@ -180,6 +180,11 @@ def define_bpf_arr_map(map_name, val_type, entries):
     return define_bpf_map(map_name, 'BPF_MAP_TYPE_ARRAY', 'unsigned int', val_type, entries)
 
 
+def define_bpf_hash_map(map_name, key_type, val_type, entries):
+    return define_bpf_map(map_name, 'BPF_MAP_TYPE_HASH', key_type, val_type, entries)
+
+
+
 def malloc_lookup(name, info, return_val):
     tmp_name = get_tmp_var_name()
     type_name = f'struct {name}'

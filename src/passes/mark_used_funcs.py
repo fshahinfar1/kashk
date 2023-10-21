@@ -8,7 +8,7 @@ from understand_program_state import generate_decleration_for
 
 
 MODULE_TAG = '[Mark Used Func]'
-_has_processed = None
+_has_processed = set()
 
 # TODO: what if a name of a struct is changed using a typedef ?
 
@@ -50,7 +50,7 @@ def _add_type_to_declarations(T, info):
     type_name = T.spelling
     decls = _find_type_decl(type_name, info)
     for decl in decls:
-        if decl.name in _has_processed:
+        if decl.is_used_in_bpf_code or decl.name in _has_processed:
             continue
         decl.is_used_in_bpf_code = True
         info.prog.declarations.append(decl)
@@ -84,8 +84,8 @@ def _do_pass(inst, info, more):
 flag = None
 def mark_used_funcs(bpf, info, more):
     global flag
-    global _has_processed
-    _has_processed = set()
+    # global _has_processed
+    # _has_processed = set()
     if more and more.get('func_only'):
         flag = True
     else:

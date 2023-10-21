@@ -10,6 +10,8 @@ enum {
 	ANN_CACNE_DEFINE,
 	ANN_CACHE_BEGIN,
 	ANN_CACHE_END,
+	ANN_CACHE_BEGIN_UPDATE,
+	ANN_CACHE_END_UPDATE,
 	ANN_EXCLUDE_BEGIN,
 	ANN_EXCLUDE_END,
 };
@@ -52,7 +54,25 @@ enum {
 			JSON_FIELD("value_ref", value_ref) \
 		"}", ANN_CACHE_BEGIN)
 
-#define __ANNOTATE_END_CACHE(id) __ANNOTATE("{id:\"" id "\"}", ANN_CACHE_END)
+#define __ANNOTATE_END_CACHE(id, code) __ANNOTATE("{" \
+		JSON_FIELD_MID("id", id) \
+		JSON_FIELD("code", code) \
+		"}", ANN_CACHE_END)
+
+#define __ANNOTATE_BEGIN_UPDATE_CACHE(id, key, key_size, value, value_size) \
+	__ANNOTATE("{" \
+			JSON_FIELD_MID("id", id) \
+			JSON_FIELD_MID("key", key) \
+			JSON_FIELD_MID("key_size", key_size) \
+			JSON_FIELD_MID("value", value) \
+			JSON_FIELD("value_size", value_size) \
+			"}", ANN_CACHE_BEGIN_UPDATE)
+
+#define __ANNOTATE_END_UPDATE_CACHE(id, code) __ANNOTATE("{" \
+		JSON_FIELD_MID("id", id) \
+		JSON_FIELD("code", code) \
+		"}", ANN_CACHE_END_UPDATE)
+
 
 
 #define __ANNOTATE_EXCLUDE_BEGIN __ANNOTATE("EXCLUDE_BEGIN", ANN_EXCLUDE_BEGIN)

@@ -185,6 +185,13 @@ class Call(Instruction):
 
 
 class VarDecl(Instruction):
+    @classmethod
+    def build(cls, name, T):
+        obj = VarDecl(None)
+        obj.name = name
+        obj.type = T
+        return obj
+
     def __init__(self, c):
         super().__init__()
         if c is not None:
@@ -711,13 +718,17 @@ class Annotation(Instruction):
     ANN_EXCLUDE_BEGIN = 'ANN_EXCLUDE_BEGIN'
     ANN_EXCLUDE_END   = 'ANN_EXCLUDE_END'
 
+    ANN_CACHE_BEGIN_UPDATE = 'ANN_CACHE_BEGIN_UPDATE'
+    ANN_CACHE_END_UPDATE   = 'ANN_CACHE_END_UPDATE'
+
     def __init__(self, msg, ann_kind):
         super().__init__()
         assert len(msg) > 2
         assert ann_kind in (Annotation.ANN_SKIP, Annotation.ANN_FUNC_PTR,
                 Annotation.ANN_CACNE_DEFINE, Annotation.ANN_CACHE_BEGIN,
                 Annotation.ANN_CACHE_END, Annotation.ANN_EXCLUDE_BEGIN,
-                Annotation.ANN_EXCLUDE_END)
+                Annotation.ANN_EXCLUDE_END, Annotation.ANN_CACHE_BEGIN_UPDATE,
+                Annotation.ANN_CACHE_END_UPDATE)
         # self.msg = msg[1:-1]
         self.msg = eval(msg)
         self.ann_kind = ann_kind

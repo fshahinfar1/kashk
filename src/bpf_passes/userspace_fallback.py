@@ -19,6 +19,7 @@ MODULE_TAG = '[Fallback Pass]'
 
 current_function = None
 cb_ref = CodeBlockRef()
+_has_processed = set()
 
 
 class After:
@@ -51,6 +52,12 @@ def _handle_function_may_fail(inst, func, info, more):
 
     if func.may_succeed:
         ## we need to pass a flag
+
+        if inst.change_applied & Function.FAIL_FLAG != 0:
+            # Nothing to do
+            return inst
+        inst.change_applied |= Function.FAIL_FLAG
+
         flag_obj = StateObject(None)
         flag_obj.name = flag_ref.name
         T = flag_ref.type
@@ -117,18 +124,20 @@ def _handle_function_may_fail(inst, func, info, more):
                 else:
                     first_failure_case = if_inst
                 prev_failure_case = if_inst
-            # The code that should run when there is a failure
             return_stmt = first_failure_case
+            flag_ref = failure_flag_ref
 
-            int_literal = Literal('0', clang.CursorKind.INTEGER_LITERAL)
-            cond = BinOp.build_op(failure_flag_ref, '!=', int_literal)
-            if_inst = ControlFlowInst.build_if_inst(cond)
-            if_inst.body.add_inst(return_stmt)
-            after_func_call.append(if_inst)
+
+        # The code that should run when there is a failure
+        int_literal = Literal('0', clang.CursorKind.INTEGER_LITERAL)
+        cond = BinOp.build_op(flag_ref, '!=', int_literal)
+        if_inst = ControlFlowInst.build_if_inst(cond)
+        if_inst.body.add_inst(return_stmt)
+        after_func_call.append(if_inst)
 
         # Analyse the called function.
         with remember_func(func):
-            with info.sym_tbl.with_func_scope(inst.name):
+            with info.sym_tbl.with_func_scope(func.name):
                 modified = _do_pass(func.body, info, PassObject())
         assert modified is not None
         func.body = modified
@@ -164,11 +173,11 @@ def _handle_function_may_fail(inst, func, info, more):
 
         # Also take a look at the body of the called function. We may want to
         # remove everything after failure point.
-        with remember_func(func):
-            with info.sym_tbl.with_func_scope(inst.name):
-                modified = _do_pass(func.body, info, PassObject())
-        assert modified is not None
-        func.body = modified
+        if func.name not in _has_processed:
+            with remember_func(func):
+                with info.sym_tbl.with_func_scope(func.name):
+                    func.body = _do_pass(func.body, info, PassObject())
+            _has_processed.add(func.name)
 
     blk.extend(before_func_call)
     blk.append(After(after_func_call))
@@ -184,13 +193,22 @@ def _process_current_inst(inst, info, more):
         if func and not func.is_empty() and func.may_fail:
             # debug(MODULE_TAG, func, func.may_succeed, func.may_fail)
             return _handle_function_may_fail(inst, func, info, more)
-    elif inst.kind == TO_USERSPACE_INST and current_function is None:
-        # Found a split point on the BPF entry function
-        failure_number = inst.path_id
-        meta = info.user_prog.declarations[failure_number - 1]
-        prepare_pkt = prepare_meta_data(failure_number, meta, info.prog)
+    elif inst.kind == TO_USERSPACE_INST:
         blk = cb_ref.get(BODY)
-        blk.append(prepare_pkt)
+        failure_number = inst.path_id
+        if current_function is None:
+            # Found a split point on the BPF entry function
+            meta = info.user_prog.declarations[failure_number - 1]
+            prepare_pkt = prepare_meta_data(failure_number, meta, info.prog)
+            blk.append(prepare_pkt)
+        else:
+            ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
+            ref.name = FAIL_FLAG_NAME
+            ref.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+            deref = UnaryOp.build('*', ref)
+            int_inst = Literal(str(failure_number), clang.CursorKind.INTEGER_LITERAL)
+            set_failuer = BinOp.build_op(deref, '=', int_inst)
+            blk.append(set_failuer)
     return inst
 
 
@@ -224,7 +242,7 @@ def _do_pass(inst, info, more):
                     while new_child and isinstance(new_child[-1], After):
                         after.append(new_child.pop())
                     new_child.append(new_inst)
-                    for a in after:
+                    for a in reversed(after):
                         new_child.extend(a.box)
 
                     if i.kind == TO_USERSPACE_INST:

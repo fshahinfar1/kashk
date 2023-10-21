@@ -2,7 +2,8 @@ import json
 import clang.cindex as clang
 from log import error, debug, report
 from bpf_code_gen import gen_code
-from template import prepare_shared_state_var, define_bpf_arr_map, malloc_lookup
+from template import (prepare_shared_state_var, define_bpf_arr_map,
+        define_bpf_hash_map, malloc_lookup)
 from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS
 from utility import get_tmp_var_name
 
@@ -21,6 +22,8 @@ parent_block = CodeBlockRef()
 current_function = None
 # Skip until the cache END
 skip_to_end = None
+
+map_definitions = {}
 
 
 def _set_skip(val):
@@ -134,114 +137,180 @@ def _check_if_ref_is_global_state(inst, info):
     return inst
 
 
+def _generate_cache_lookup(inst, info):
+    assert inst.kind == ANNOTATION_INST
+    assert inst.ann_kind == Annotation.ANN_CACHE_BEGIN
+    conf = json.loads(inst.msg)
+    map_id = conf['id']
+    print(map_definitions)
+    assert map_id in map_definitions
+    map_def = map_definitions[map_id]
+
+    # Gather instructions between BEGIN & END
+    begin = False
+    on_miss = []
+    blk = cb_ref.get(BODY)
+    parent_node = parent_block.get(BODY)
+    parent_children = parent_node.get_children()
+    # debug('Block:', parent_children)
+    found_end_annotation = False
+    end_conf = None
+    for child in parent_children:
+        if child == inst:
+            # debug('*** Start gathering')
+            begin = True
+            continue
+        if child.kind == ANNOTATION_INST and child.ann_kind == Annotation.ANN_CACHE_END:
+            end_conf = json.loads(child.msg)
+            assert end_conf['id'] == map_id, 'The begining and end cache id should match'
+            # Notify the DFS to skip until the CACHE END
+            _set_skip(child)
+            found_end_annotation = True
+            # debug('*** Stop gathering')
+            break
+        if not begin:
+            continue
+        # debug('   Gather:', child)
+        on_miss.append(child)
+    assert found_end_annotation, 'The end of cache block should be specified'
+    assert isinstance(end_conf, dict), 'Make sure the end_conf was found'
+
+    # Perform Lookup (Define instructions that are needed for lookup)
+    map_name = map_id + '_map'
+    index_name = get_tmp_var_name()
+    val_ptr = get_tmp_var_name()
+
+    lookup = []
+    hash_call = Call(None)
+    hash_call.name = '__fnv_hash'
+    arg1 = Literal(conf['key'], CODE_LITERAL)
+    arg2 = Literal(conf['key_size'], CODE_LITERAL)
+    hash_call.args.extend([arg1, arg2])
+
+    decl_index = VarDecl(None)
+    decl_index.name = index_name
+    decl_index.type = BASE_TYPES[clang.TypeKind.INT]
+    decl_index.init.add_inst(hash_call)
+    lookup.append(decl_index)
+
+    map_lookup_call = Call(None)
+    map_lookup_call.name = 'bpf_map_lookup_elem'
+    arg1 = Literal(f'&{map_name}', CODE_LITERAL)
+    arg2 = Literal(f'&{index_name}', CODE_LITERAL)
+    map_lookup_call.args.extend([arg1, arg2])
+
+    decl_val_ptr = VarDecl(None)
+    decl_val_ptr.name = val_ptr
+    # decl_val_ptr.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+    decl_val_ptr.type = MyType.make_pointer(MyType.make_simple(map_def['value_type'], clang.TypeKind.RECORD))
+    decl_val_ptr.init.add_inst(map_lookup_call)
+    lookup.append(decl_val_ptr)
+
+    val_ref = Ref(None)
+    val_ref.name = val_ptr
+    val_ref.kind = clang.CursorKind.DECL_REF_EXPR
+    val_ref.type = decl_val_ptr.type
+    cond = BinOp.build_op(val_ref, '==', Literal('NULL', clang.CursorKind.INTEGER_LITERAL))
+    check_miss = ControlFlowInst.build_if_inst(cond)
+    # when miss
+    check_miss.body.extend_inst(on_miss)
+    # when hit
+    # actual_val = Literal(conf['value_ref'], CODE_LITERAL)
+    # assign_ref = BinOp.build_op(actual_val, '=', val_ref)
+    # check_miss.other_body.add_inst(assign_ref)
+    template_code = end_conf['code']
+    template_code = template_code.replace('%p', val_ref.name)
+    template_code_inst = Literal(template_code, CODE_LITERAL)
+    check_miss.other_body.add_inst(template_code_inst)
+    lookup.append(check_miss)
+
+    # TODO: I need to also run the transform_vars pass on the block of code
+    # handling the cache miss (Will implement it later)
+
+    # This should be the result of above instructions
+    f'''
+    int {index_name} = __fnv_hash({conf['key']}, {conf['key_size']});
+    void *{val_ptr}  = bpf_map_lookup_elem(&{map_name}, &{index_name});
+    if ({val_ptr} == NULL) {{
+      {on_miss} <--- This is where cache miss is handled
+    }} else {{
+      # instruction defined in CACHE_END
+      # conf['value_ref'] = val_ptr;
+    }}
+    '''
+
+    # debug(MODULE_TAG, 'instruction for cache miss:', on_miss)
+
+    # Mark the hash function used
+    func = Function.directory['__fnv_hash']
+    func.is_used_in_bpf_code = True
+    info.prog.declarations.insert(0, func)
+
+    blk.extend(lookup)
+    # new_inst = Block(BODY)
+    # new_inst.extend_inst(lookup)
+    # Replace annotation with the block of instruction we have here
+    # return new_inst
+
+    # Remove annotation
+    return None
+
+
+def _generate_cache_update(inst, info):
+    assert inst.kind == ANNOTATION_INST
+    assert inst.ann_kind == Annotation.ANN_CACHE_BEGIN_UPDATE
+    conf = json.loads(inst.msg)
+    insts = []
+    map_name = conf['id'] + '_map'
+    index_name = get_tmp_var_name()
+    key = Literal(conf['key'], CODE_LITERAL)
+    key_size = Literal(conf['key_size'], CODE_LITERAL)
+    value = Literal(conf['value'], CODE_LITERAL)
+    value_size = Literal(conf['value_size'], clang.CursorKind.INTEGER_LITERAL)
+
+    hash_call = Call(None)
+    hash_call.name = '__fnv_hash'
+    hash_call.args.extend([key, key_size])
+
+    decl_index = VarDecl.build(index_name, BASE_TYPES[clang.TypeKind.INT])
+    decl_index.init.add_inst(hash_call)
+    insts.append(decl_index)
+
+    map_update_call = Call(None)
+    map_update_call.name = 'bpf_map_update_elem'
+    arg1 = Literal(f'&{map_name}', CODE_LITERAL)
+    arg2 = Literal(f'&{index_name}', CODE_LITERAL)
+    arg3 = value
+    arg4 = Literal('BPF_ANY', CODE_LITERAL)
+    map_update_call.args.extend([arg1, arg2, arg3, arg4])
+    # TODO: do I need to check update_elem return code?
+    insts.append(map_update_call)
+
+    blk = cb_ref.get(BODY)
+    blk.extend(insts)
+    return None
+
+
 def _process_annotation(inst, info):
     if inst.ann_kind == Annotation.ANN_CACNE_DEFINE:
         conf = json.loads(inst.msg)
-        map_name = conf['id'] + '_map'
+        map_id   = conf['id']
+        map_name = map_id  + '_map'
         val_type = conf['value_type']
-        m = define_bpf_arr_map(map_name, val_type, 1)
+        m = define_bpf_hash_map(map_name, 'unsigned int', val_type, 1024)
         info.prog.add_declaration(m)
+        map_definitions[map_id] = conf
         report('Declare map', m, 'for malloc')
     elif inst.ann_kind == Annotation.ANN_CACHE_END:
         # Nothing to do
         pass
     elif inst.ann_kind == Annotation.ANN_CACHE_BEGIN:
-        conf = json.loads(inst.msg)
-
-        # Gather instructions between BEGIN & END
-        begin = False
-        on_miss = []
-        blk = cb_ref.get(BODY)
-        parent_node = parent_block.get(BODY)
-        parent_children = parent_node.get_children()
-        # debug('Block:', parent_children)
-        for child in parent_children:
-            if child == inst:
-                # debug('*** Start gathering')
-                begin = True
-                continue
-            if child.kind == ANNOTATION_INST and child.ann_kind == Annotation.ANN_CACHE_END:
-                end_conf = json.loads(inst.msg)
-                assert end_conf['id'] == conf['id'], 'The begining and end cache id should match'
-                # Notify the DFS to skip until the CACHE END
-                _set_skip(child)
-                # debug('*** Stop gathering')
-                break
-            if not begin:
-                continue
-            # debug('   Gather:', child)
-            on_miss.append(child)
-
-        # Perform Lookup (Define instructions that are needed for lookup)
-        map_name = conf['id'] + '_map'
-        index_name = get_tmp_var_name()
-        val_ptr = get_tmp_var_name()
-
-        lookup = []
-        hash_call = Call(None)
-        hash_call.name = '__fnv_hash'
-        arg1 = Literal(conf['key'], CODE_LITERAL)
-        arg2 = Literal(conf['key_size'], CODE_LITERAL)
-        hash_call.args.extend([arg1, arg2])
-
-        decl_index = VarDecl(None)
-        decl_index.name = index_name
-        decl_index.type = BASE_TYPES[clang.TypeKind.INT]
-        decl_index.init.add_inst(hash_call)
-        lookup.append(decl_index)
-
-        map_lookup_call = Call(None)
-        map_lookup_call.name = 'bpf_map_lookup_elem'
-        arg1 = Literal(f'&{map_name}', CODE_LITERAL)
-        arg2 = Literal(f'&{index_name}', CODE_LITERAL)
-        map_lookup_call.args.extend([arg1, arg2])
-
-        decl_val_ptr = VarDecl(None)
-        decl_val_ptr.name = val_ptr
-        decl_val_ptr.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
-        decl_val_ptr.init.add_inst(map_lookup_call)
-        lookup.append(decl_val_ptr)
-
-        val_ref = Ref(None)
-        val_ref.name = val_ptr
-        val_ref.kind = clang.CursorKind.DECL_REF_EXPR
-        val_ref.type = decl_val_ptr.type
-        cond = BinOp.build_op(val_ref, '==', Literal('NULL', clang.CursorKind.INTEGER_LITERAL))
-        check_miss = ControlFlowInst.build_if_inst(cond)
-        # when miss
-        check_miss.body.extend_inst(on_miss)
-        # when hit
-        actual_val = Literal(conf['value_ref'], CODE_LITERAL)
-        assign_ref = BinOp.build_op(actual_val, '=', val_ref)
-        check_miss.other_body.add_inst(assign_ref)
-        lookup.append(check_miss)
-
-        # TODO: I need to also run the transform_vars pass on the block of code
-        # handling the cache miss (Will implement it later)
-
-        # This should be the result of above instructions
-        f'''
-        int {index_name} = __fnv_hash({conf['key']}, {conf['key_size']});
-        void *{val_ptr}  = bpf_map_lookup_elem(&{map_name}, &{index_name});
-        if ({val_ptr} == NULL) {{
-          {on_miss} <--- This is where cache miss is handled
-        }} else {{
-          {conf['value_ref']} = {val_ptr};
-        }}
-        '''
-
-        # debug(MODULE_TAG, 'instruction for cache miss:', on_miss)
-
-        # Mark the hash function used
-        func = Function.directory['__fnv_hash']
-        func.is_used_in_bpf_code = True
-        info.prog.declarations.insert(0, func)
-
-        blk.extend(lookup)
-        # new_inst = Block(BODY)
-        # new_inst.extend_inst(lookup)
-        # Replace annotation with the block of instruction we have here
-        # return new_inst
+        return _generate_cache_lookup(inst, info)
+    elif inst.ann_kind == Annotation.ANN_CACHE_BEGIN_UPDATE:
+        return _generate_cache_update(inst, info)
+    elif inst.ann_kind == Annotation.ANN_CACHE_END_UPDATE:
+        # TODO: do I want to have some code after update ??
+        pass
 
     # Remove annotation
     return None
@@ -277,6 +346,13 @@ def _process_current_inst(inst, info, more):
             cpy.name = 'bpf_memcpy'
             cpy.args = [lhs, rhs, sz]
             blk.append(cpy)
+
+            # Mark memcpy as used
+            func = cpy.get_function_def()
+            assert func is not None
+            func.is_used_in_bpf_code = True
+            info.prog.declarations.insert(0, func)
+
             inst = sz
             return inst
         elif inst.name in WRITE_PACKET:
