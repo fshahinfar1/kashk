@@ -315,7 +315,7 @@ def gen_bpf_code(bpf, info, out_bpf):
     # info.prog.declarations = list(filter(lambda x: not isinstance(x, Function), info.prog.declarations))
     # obj = PassObject()
     # obj.func_only = True
-    mark_used_funcs(bpf, info, None)
+    # mark_used_funcs(bpf, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # TODO: split the code between parser and verdict

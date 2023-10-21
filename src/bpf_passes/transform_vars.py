@@ -22,8 +22,8 @@ parent_block = CodeBlockRef()
 current_function = None
 # Skip until the cache END
 skip_to_end = None
-
 map_definitions = {}
+declare_at_top_of_func = []
 
 
 def _set_skip(val):
@@ -142,7 +142,6 @@ def _generate_cache_lookup(inst, info):
     assert inst.ann_kind == Annotation.ANN_CACHE_BEGIN
     conf = json.loads(inst.msg)
     map_id = conf['id']
-    print(map_definitions)
     assert map_id in map_definitions
     map_def = map_definitions[map_id]
 
@@ -181,17 +180,26 @@ def _generate_cache_lookup(inst, info):
     val_ptr = get_tmp_var_name()
 
     lookup = []
+    # Call hash function
     hash_call = Call(None)
     hash_call.name = '__fnv_hash'
     arg1 = Literal(conf['key'], CODE_LITERAL)
     arg2 = Literal(conf['key_size'], CODE_LITERAL)
     hash_call.args.extend([arg1, arg2])
 
+    # Declare variable which hold the hash value
     decl_index = VarDecl(None)
     decl_index.name = index_name
     decl_index.type = BASE_TYPES[clang.TypeKind.INT]
-    decl_index.init.add_inst(hash_call)
-    lookup.append(decl_index)
+    # decl_index.init.add_inst(hash_call)
+    declare_at_top_of_func.append(decl_index)
+
+    # Assign hash value to the variable
+    ref_index = Ref(None, clang.CursorKind.DECL_REF_EXPR)
+    ref_index.name = decl_index.name
+    ref_index.type = decl_index.type
+    ref_assign     = BinOp.build_op(ref_index, '=', hash_call)
+    lookup.append(ref_assign)
 
     map_lookup_call = Call(None)
     map_lookup_call.name = 'bpf_map_lookup_elem'
@@ -199,17 +207,23 @@ def _generate_cache_lookup(inst, info):
     arg2 = Literal(f'&{index_name}', CODE_LITERAL)
     map_lookup_call.args.extend([arg1, arg2])
 
+    # Declare the variable which hold the lookup result
     decl_val_ptr = VarDecl(None)
     decl_val_ptr.name = val_ptr
     # decl_val_ptr.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
     decl_val_ptr.type = MyType.make_pointer(MyType.make_simple(map_def['value_type'], clang.TypeKind.RECORD))
-    decl_val_ptr.init.add_inst(map_lookup_call)
-    lookup.append(decl_val_ptr)
+    # decl_val_ptr.init.add_inst(map_lookup_call)
+    declare_at_top_of_func.append(decl_val_ptr)
 
+    # Assign lookup result to the variable
     val_ref = Ref(None)
     val_ref.name = val_ptr
     val_ref.kind = clang.CursorKind.DECL_REF_EXPR
     val_ref.type = decl_val_ptr.type
+    ref_assign = BinOp.build_op(val_ref, '=', map_lookup_call)
+    lookup.append(ref_assign)
+
+    # Check if the value is valid
     cond = BinOp.build_op(val_ref, '==', Literal('NULL', clang.CursorKind.INTEGER_LITERAL))
     check_miss = ControlFlowInst.build_if_inst(cond)
     # when miss
@@ -298,6 +312,19 @@ def _process_annotation(inst, info):
         map_name = map_id  + '_map'
         val_type = conf['value_type']
         m = define_bpf_hash_map(map_name, 'unsigned int', val_type, 1024)
+
+        # check if value was defined before
+        for d in info.prog.declarations:
+            if isinstance(d, TypeDefinition) and d.name == val_type:
+                # Found the type
+                break
+        else:
+            # The value type is not declared yet
+            from passes.mark_used_funcs import _add_type_to_declarations
+            T = MyType.make_simple(val_type, clang.TypeKind.RECORD)
+            _add_type_to_declarations(T, info)
+
+
         info.prog.add_declaration(m)
         map_definitions[map_id] = conf
         report('Declare map', m, 'for malloc')
@@ -526,10 +553,20 @@ def transform_vars_pass(inst, info, more):
     global current_function
     current_function = None
     res = _do_pass(inst, info, more)
+    if declare_at_top_of_func:
+        for inst in declare_at_top_of_func:
+            res.children.insert(0, inst)
+    declare_at_top_of_func.clear()
+
     for func in Function.directory.values():
         if func.is_used_in_bpf_code:
             current_function = func
-            _check_func_receives_all_the_flags(func, info)
-            func.body = _do_pass(func.body, info, PassObject())
+            with info.sym_tbl.with_func_scope(current_function.name):
+                _check_func_receives_all_the_flags(func, info)
+                func.body = _do_pass(func.body, info, PassObject())
+                if declare_at_top_of_func:
+                    for inst in declare_at_top_of_func:
+                        func.body.children.insert(0, inst)
+                declare_at_top_of_func.clear()
             current_function = None
     return res
