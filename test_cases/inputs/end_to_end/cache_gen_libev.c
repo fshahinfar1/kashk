@@ -73,7 +73,7 @@ void event_handler(int fd, short which, void *arg)
 			/* Get request */
 			__ANNOTATE_BEGIN_CACHE("main_cache", "key", "key_len", "val")
 			lookup_hashtable(key, key_len, (void **)&val, &val_len);
-			__ANNOTATE_END_CACHE("main_cache", "val = &%p->data; val_len = %p->size;")
+			__ANNOTATE_END_CACHE("main_cache", "val = (char *)%p->data; val_len = %p->size;")
 			if (val == NULL) {
 				strncpy(c->rbuf, "Miss END\r\n", 10);
 				sendto(fd, c->rbuf, 10, 0, (struct sockaddr *)&addr, sock_addr_size);

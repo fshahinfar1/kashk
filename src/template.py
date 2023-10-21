@@ -148,19 +148,21 @@ if (!shared) {
 def prepare_meta_data(failure_number, meta_declaration, prog):
     # TODO: use the Instruction object instead of hard coded strings
     type_name = f'struct {meta_declaration.name}'
-    adjust_inst = prog.adjust_pkt(f'sizeof({type_name})')
+    T = MyType.make_simple(type_name, clang.TypeKind.RECORD)
+    meta_var_name = get_tmp_var_name()
+    adjust_inst = prog.adjust_pkt(f'sizeof({T.spelling})')
     ctx = prog.ctx
     code = f'''
 {adjust_inst}
-if (((void *)(__u64){ctx}->data + sizeof({type_name}))  > (void *)(__u64){ctx}->data_end) {{
+if (((void *)(__u64){ctx}->data + sizeof({T.spelling}))  > (void *)(__u64){ctx}->data_end) {{
   return {prog.get_drop()};
 }}
-{type_name} *__m = (void *)(__u64){ctx}->data;
+{T.spelling} *{meta_var_name} = (void *)(__u64){ctx}->data;
 '''
     # TODO: I need to know the failure number and failure structure
-    store = [f'__m->failure_number = {failure_number};', ]
+    store = [f'{meta_var_name}->failure_number = {failure_number};', ]
     for f in meta_declaration.fields[1:]:
-        store.append(f'__m->{f.name} = {f.name};')
+        store.append(f'{meta_var_name}->{f.name} = {f.name};')
     code += '\n'.join(store) + '\n'
     tmp = Literal(code, CODE_LITERAL)
     return tmp
