@@ -356,7 +356,7 @@ class UnaryOp(Instruction):
 
 class BinOp(Instruction):
     REL_OP = ('>', '>=', '<', '<=', '==', '!=')
-    ARITH_OP = ('+', '-', '*', '/')
+    ARITH_OP = ('+', '-', '*', '/', '%')
     ASSIGN_OP = ('=', '+=', '-=', '*=', '/=', '<<=', '>>=', '&=', '|=')
     BIT_OP = ('&', '|', '<<', '>>')
     ALL_OP = tuple(itertools.chain(REL_OP, ARITH_OP, ASSIGN_OP, BIT_OP))

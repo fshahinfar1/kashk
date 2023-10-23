@@ -273,7 +273,7 @@ def handle_return_stmt(inst, info, more):
 def handle_to_userspace(inst, info, more):
     lvl = more[0]
     if inst.is_bpf_main:
-        tmp_stmt = 'return SK_PASS;'
+        tmp_stmt = f'return {info.prog.get_pass()};'
     elif inst.return_type.spelling == 'void':
         tmp_stmt = 'return;'
     else:

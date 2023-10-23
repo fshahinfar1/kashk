@@ -59,19 +59,27 @@ def _get_malloc_name():
     return f'malloc_{_malloc_map_counter}'
 
 
+def _rename_func_to_a_known_one(inst, info, target_name):
+    inst.name = target_name
+    # Mark the function used
+    func = inst.get_function_def()
+    assert func is not None
+    if func.is_used_in_bpf_code:
+        # debug(MODULE_TAG, 'Func was declared before', func.name)
+        return inst
+    func.is_used_in_bpf_code = True
+    info.prog.declarations.insert(0, func)
+    # debug(MODULE_TAG, 'Add func:', func.name)
+    return inst
+
 def _known_function_substitution(inst, info):
     """
     Replace some famous functions with implementations that work in BPF
     """
     if inst.name == 'strlen':
-        inst.name = 'bpf_strlen'
-        # Mark the function used
-        func = inst.get_function_def()
-        assert func is not None
-        func.is_used_in_bpf_code = True
-        info.prog.declarations.insert(0, func)
-        # TODO: Also do a check if the return value is valid (check the size limit)
-        return inst
+        return _rename_func_to_a_known_one(inst, info, 'bpf_strlen')
+    elif inst.name == 'strncpy':
+        return _rename_func_to_a_known_one(inst, info, 'bpf_strncpy')
     elif inst.name == 'malloc':
         map_value_size,_ = gen_code([inst.args[0]], info)
         name = _get_malloc_name()
@@ -108,8 +116,10 @@ def _known_function_substitution(inst, info):
         return inst
     elif inst.name == 'htonll':
         inst.name = 'bpf_cpu_to_be64'
+        return inst
     elif inst.name == 'ntohll':
         inst.name = 'bpf_be64_to_cpu'
+        return inst
     error(f'Know function {inst.name} is not implemented yet')
     return inst
 
@@ -187,18 +197,20 @@ def _generate_cache_lookup(inst, info):
     arg2 = Literal(conf['key_size'], CODE_LITERAL)
     hash_call.args.extend([arg1, arg2])
 
+    limit_inst = Literal(map_def['entries'], clang.CursorKind.INTEGER_LITERAL)
+    modulo_inst = BinOp.build_op(hash_call, '%', limit_inst)
+
     # Declare variable which hold the hash value
     decl_index = VarDecl(None)
     decl_index.name = index_name
     decl_index.type = BASE_TYPES[clang.TypeKind.INT]
-    # decl_index.init.add_inst(hash_call)
     declare_at_top_of_func.append(decl_index)
 
     # Assign hash value to the variable
     ref_index = Ref(None, clang.CursorKind.DECL_REF_EXPR)
     ref_index.name = decl_index.name
     ref_index.type = decl_index.type
-    ref_assign     = BinOp.build_op(ref_index, '=', hash_call)
+    ref_assign     = BinOp.build_op(ref_index, '=', modulo_inst)
     lookup.append(ref_assign)
 
     map_lookup_call = Call(None)
@@ -257,8 +269,10 @@ def _generate_cache_lookup(inst, info):
 
     # Mark the hash function used
     func = Function.directory['__fnv_hash']
-    func.is_used_in_bpf_code = True
-    info.prog.declarations.insert(0, func)
+    if not func.is_used_in_bpf_code:
+        func.is_used_in_bpf_code = True
+        info.prog.declarations.insert(0, func)
+        debug(MODULE_TAG, 'Add func', func.name)
 
     blk.extend(lookup)
     # new_inst = Block(BODY)
@@ -311,7 +325,10 @@ def _process_annotation(inst, info):
         map_id   = conf['id']
         map_name = map_id  + '_map'
         val_type = conf['value_type']
-        m = define_bpf_hash_map(map_name, 'unsigned int', val_type, 1024)
+        # TODO: get the map size from the annotation
+        conf['entries'] = '1024'
+        entries = conf['entries']
+        m = define_bpf_arr_map(map_name, val_type, entries)
 
         # check if value was defined before
         for d in info.prog.declarations:
@@ -369,16 +386,21 @@ def _process_current_inst(inst, info, more):
             lhs = Literal(inst.rd_buf.name, CODE_LITERAL)
             rhs = info.prog.get_pkt_buf()
             sz  = info.prog.get_pkt_size()
+            # TODO: check if context is used
+            dst_end = Literal('<not set>', CODE_LITERAL)
+            src_end = Literal('<not set>', CODE_LITERAL)
             cpy = Call(None)
             cpy.name = 'bpf_memcpy'
-            cpy.args = [lhs, rhs, sz]
+            cpy.args = [lhs, rhs, sz, dst_end, src_end]
             blk.append(cpy)
 
             # Mark memcpy as used
             func = cpy.get_function_def()
             assert func is not None
-            func.is_used_in_bpf_code = True
-            info.prog.declarations.insert(0, func)
+            if not func.is_used_in_bpf_code:
+                func.is_used_in_bpf_code = True
+                info.prog.declarations.insert(0, func)
+                # debug(MODULE_TAG, 'Add func', func.name)
 
             inst = sz
             return inst

@@ -197,24 +197,22 @@ def create_func_objs(info):
 
 def add_known_func_objs(info):
     # STRLEN
-    orig = Function.directory.get('strlen')
-    if orig is not None:
-        strlen = Function('bpf_strlen', None)
-        strlen.is_operator = False
-        strlen.is_method = False
-        # Directly use the same arguments as original strlen
-        arg1 = StateObject(None)
-        arg1.name = 'str'
-        arg1.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
-        strlen.args = [arg1,]
-        strlen.return_type = BASE_TYPES[clang.TypeKind.UINT]
-        strlen.may_succeed = True
+    strlen = Function('bpf_strlen', None)
+    strlen.is_operator = False
+    strlen.is_method = False
+    # Directly use the same arguments as original strlen
+    arg1 = StateObject(None)
+    arg1.name = 'str'
+    arg1.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+    strlen.args = [arg1,]
+    strlen.return_type = BASE_TYPES[clang.TypeKind.UINT]
+    strlen.may_succeed = True
 
-        scope = Scope(info.sym_tbl.global_scope)
-        info.sym_tbl.scope_mapping[strlen.name] = scope
-        for a in strlen.args:
-            scope.insert_entry(a.name, a.type_ref, a.kind, None)
-        code = '''
+    scope = Scope(info.sym_tbl.global_scope)
+    info.sym_tbl.scope_mapping[strlen.name] = scope
+    for a in strlen.args:
+        scope.insert_entry(a.name, a.type_ref, a.kind, None)
+    code = '''
 int len;
 len = 0;
 int i;
@@ -226,8 +224,39 @@ if (str[i] == '\\0') {
 }
 return ((unsigned int)(-(1)));
 '''
-        strlen.body.add_inst(Literal(code, CODE_LITERAL))
+    strlen.body.add_inst(Literal(code, CODE_LITERAL))
 
+    # STRNCPY
+    strcpy = Function('bpf_strncpy', None)
+    strcpy.is_operator = False
+    strcpy.is_method = False
+    # Directly use the same arguments as original strlen
+    arg1 = StateObject(None)
+    arg1.name = 'dest'
+    arg1.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+    arg2 = StateObject(None)
+    arg2.name = 'src'
+    arg2.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+    arg3 = StateObject(None)
+    arg3.name = 'n'
+    arg3.type_ref = BASE_TYPES[clang.TypeKind.UINT]
+    strcpy.args = [arg1,arg2,arg3]
+    strcpy.return_type = BASE_TYPES[clang.TypeKind.VOID]
+    strcpy.may_succeed = True
+
+    scope = Scope(info.sym_tbl.global_scope)
+    info.sym_tbl.scope_mapping[strcpy.name] = scope
+    for a in strcpy.args:
+        scope.insert_entry(a.name, a.type_ref, a.kind, None)
+    code = '''
+for (unsigned short i = 0; i < 256; i++) {
+  dest[i] = src[i];
+  if (src[i] == '\\0' || i >= n - 1) {
+    break;
+  }
+}
+'''
+    strcpy.body.add_inst(Literal(code, CODE_LITERAL))
 
     # FNV_HASH
     fnv_hash = Function('__fnv_hash', None)
@@ -267,7 +296,13 @@ return 0;
     arg3 = StateObject(None)
     arg3.name = 'n'
     arg3.type_ref = BASE_TYPES[clang.TypeKind.USHORT]
-    memcpy.args = [arg1, arg2, arg3]
+    arg4 = StateObject(None)
+    arg4.name = 'end_dest'
+    arg4.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+    arg5 = StateObject(None)
+    arg5.name = 'end_src'
+    arg5.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+    memcpy.args = [arg1, arg2, arg3, arg4, arg5]
     memcpy.return_type = BASE_TYPES[clang.TypeKind.VOID]
     memcpy.may_succeed = True
 
@@ -276,9 +311,12 @@ return 0;
     for a in memcpy.args:
         scope.insert_entry(a.name, a.type_ref, a.kind, None)
     code = '''
-for (__u32 i = 0; i < 256; i++) {
+if (n == 0) return;
+for (unsigned short i = 0; i < 256; i++) {
+  if ((void *)(dest + i + 1) > end_dest) break;
+  if ((void *)(src  + i + 1) > end_src ) break;
   dest[i] = src[i];
-  if (i == n - 1) {
+  if (i >= n - 1) {
     break;
   }
 }

@@ -6,9 +6,12 @@ from log import debug
 from bpf_code_gen import gen_code
 
 
+MODULE_TAG = '[BPF Prog]'
+
+
 class BPF_PROG:
     def __init__(self):
-        self.declarations = []
+        self.declarations = [Literal(' #define PKT_OFFSET_MASK 0xfff;', CODE_LITERAL),]
         self.headers = [
                 '#include <linux/bpf.h>',
                 '#include <bpf/bpf_helpers.h>',
@@ -128,20 +131,25 @@ int xdp_prog(struct xdp_md *xdp)
             # TODO: I need to check that BPF MEMCPY succeeds
             memcpy = 'bpf_memcpy'
             func = Function.directory[memcpy]
-            func.is_used_in_bpf_code = True
-            info.prog.declarations.insert(0, func)
+            if not func.is_used_in_bpf_code:
+                func.is_used_in_bpf_code = True
+                info.prog.declarations.insert(0, func)
 
         write_size,_ = gen_code([write_size], info, ARG)
         code = f'''
 {{
-  int delta = {write_size} - ((__u64)xdp->data_end - (__u64)xdp->data);
+  int delta = {write_size} - (unsigned short)((unsigned long long)xdp->data_end - (unsigned long long)xdp->data);
   bpf_xdp_adjust_tail(xdp, delta);
 }}
 if (((void *)(__u64)xdp->data + {write_size}) > (void *)(__u64)xdp->data_end) {{
     return {failure};
 }}
-{memcpy}((void *)(__u64)xdp->data, {buf}, {write_size});
 '''
+
+        if memcpy == 'memcpy':
+            code += f'\n{memcpy}((void *)(unsigned long long)xdp->data, {buf}, {write_size});'
+        else:
+            code += f'\n{memcpy}((void *)(unsigned long long)xdp->data, {buf}, {write_size}, (void *)(unsigned long long)xdp->data_end, <not set>);'
         if ret is True:
             code += '\nreturn XDP_TX;'
         inst = Literal(code, CODE_LITERAL)
@@ -274,7 +282,7 @@ if (!sock_ctx) {
         T = self.ctx_type
         scope.insert_entry('skb', T, clang.CursorKind.PARM_DECL, None)
 
-    def send(self, buf, write_size, info, ret=True, failure='XDP_DROP'):
+    def send(self, buf, write_size, info, ret=True, failure='SK_DROP'):
         is_size_integer = write_size.kind == clang.CursorKind.INTEGER_LITERAL
         if is_size_integer:
             memcpy = 'memcpy'
@@ -282,8 +290,10 @@ if (!sock_ctx) {
             # TODO: I need to check that BPF MEMCPY succeeds
             memcpy = 'bpf_memcpy'
             func = Function.directory[memcpy]
-            func.is_used_in_bpf_code = True
-            info.prog.declarations.insert(0, func)
+            if not func.is_used_in_bpf_code:
+                debug(MODULE_TAG, 'Add bpf_memcpy to declarations')
+                func.is_used_in_bpf_code = True
+                info.prog.declarations.insert(0, func)
 
         write_size,_ = gen_code(write_size, info)
         skb = 'skb'

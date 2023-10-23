@@ -6,18 +6,18 @@ from instruction import UnaryOp
 
 # TODO: How to make sure that `read` is the read system-call and not a simple
 # function?
-READ_PACKET = ['async_read_some', 'read', 'recvfrom', 'recvmsg']
-WRITE_PACKET = ['async_write', 'async_write_some', 'write', 'send', 'sendmsg']
+READ_PACKET = ('async_read_some', 'read', 'recvfrom', 'recvmsg')
+WRITE_PACKET = ('async_write', 'async_write_some', 'write', 'send', 'sendto', 'sendmsg')
 COROUTINE_FUNC_NAME = ('await_resume', 'await_transform', 'await_ready', 'await_suspend')
 
 # TODO: is it formally correct to ignore a function? We should ignore a
 # function based on the effects that it makes. If the effects are not of
 # interest only then we can ignore a funciton.
-IGNORE_FUNC = ['printf', 'fprintf']
+IGNORE_FUNC = ('printf', 'fprintf')
 
-KNOWN_FUNCS = ['malloc', 'memcpy', 'memmove', 'memset', 'strcpy', 'strncpy',
+KNOWN_FUNCS = ('malloc', 'memcpy', 'memmove', 'memset', 'strcpy', 'strncpy',
                 'strlen', 'strcmp', 'ntohs', 'ntohl', 'ntohll', 'htons',
-                'htonl', 'htonll']
+                'htonl', 'htonll')
 
 
 def __is_ignored_function(cursor):
