@@ -10,6 +10,7 @@ from utility import get_tmp_var_name
 from data_structure import *
 from instruction import *
 from passes.pass_obj import PassObject
+from bpf_passes.verifier import is_bpf_ctx_ptr
 
 
 MODULE_TAG = '[Transform Vars Pass]'
@@ -64,11 +65,9 @@ def _rename_func_to_a_known_one(inst, info, target_name):
     # Mark the function used
     func = inst.get_function_def()
     assert func is not None
-    if func.is_used_in_bpf_code:
-        # debug(MODULE_TAG, 'Func was declared before', func.name)
-        return inst
-    func.is_used_in_bpf_code = True
-    info.prog.declarations.insert(0, func)
+    if not func.is_used_in_bpf_code:
+        func.is_used_in_bpf_code = True
+        info.prog.declarations.insert(0, func)
     # debug(MODULE_TAG, 'Add func:', func.name)
     return inst
 
@@ -79,6 +78,15 @@ def _known_function_substitution(inst, info):
     if inst.name == 'strlen':
         return _rename_func_to_a_known_one(inst, info, 'bpf_strlen')
     elif inst.name == 'strncpy':
+        assert len(inst.args) == 3, 'Assumption on the number of arguments'
+        is_ctx = is_bpf_ctx_ptr(inst.args[0], info)
+        debug(inst.args[0], 'is bpf context', is_ctx)
+        if is_ctx:
+            end_dest = info.prog.get_pkt_end()
+        else:
+            end_dest = BinOp.build_op(inst.args[0], '+', inst.args[2])
+        # end_src = BinOp.build_op(inst.args[1], '+', inst.args[2])
+        inst.args.extend([end_dest,])
         return _rename_func_to_a_known_one(inst, info, 'bpf_strncpy')
     elif inst.name == 'malloc':
         map_value_size,_ = gen_code([inst.args[0]], info)
@@ -387,8 +395,10 @@ def _process_current_inst(inst, info, more):
             rhs = info.prog.get_pkt_buf()
             sz  = info.prog.get_pkt_size()
             # TODO: check if context is used
-            dst_end = Literal('<not set>', CODE_LITERAL)
-            src_end = Literal('<not set>', CODE_LITERAL)
+            # dst_end = Literal('<not set>', CODE_LITERAL)
+            # TODO: cast lhs to void *
+            dst_end = BinOp.build_op(lhs, '+', Literal(inst.rd_buf.size_cursor, CODE_LITERAL))
+            src_end = info.prog.get_pkt_end()
             cpy = Call(None)
             cpy.name = 'bpf_memcpy'
             cpy.args = [lhs, rhs, sz, dst_end, src_end]

@@ -541,16 +541,12 @@ class Ref(Instruction):
             self.kind = cursor.kind if kind is None else kind
             self.owner = get_owner(self.cursor)
             self.type = MyType.from_cursor_type(cursor.type)
-        self.variable_declaration_inst = None
 
     def __str__(self):
         return f'<Ref {self.name}>'
 
     def is_func_ptr(self):
         return self.type.kind == clang.TypeKind.FUNCTIONPROTO
-
-    def get_definition(self):
-        return self.variable_declaration_inst
 
     def has_children(self):
         return False

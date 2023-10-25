@@ -195,23 +195,32 @@ def create_func_objs(info):
         processed.update(keys)
 
 
+def _declare_func(info, name, args, return_type, code):
+    assert isinstance(args, list)
+    assert isinstance(return_type, MyType)
+    assert isinstance(code, str)
+    func = Function(name, None)
+    func.is_operator = False
+    func.is_method = False
+    func.args = args
+    func.return_type = return_type
+    func.may_succeed = True
+    scope = Scope(info.sym_tbl.global_scope)
+    info.sym_tbl.scope_mapping[name] = scope
+    for a in func.args:
+        scope.insert_entry(a.name, a.type_ref, a.kind, None)
+    func.body.add_inst(Literal(code, CODE_LITERAL))
+    return func
+
+
 def add_known_func_objs(info):
     # STRLEN
-    strlen = Function('bpf_strlen', None)
-    strlen.is_operator = False
-    strlen.is_method = False
-    # Directly use the same arguments as original strlen
-    arg1 = StateObject(None)
-    arg1.name = 'str'
-    arg1.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
-    strlen.args = [arg1,]
-    strlen.return_type = BASE_TYPES[clang.TypeKind.UINT]
-    strlen.may_succeed = True
-
-    scope = Scope(info.sym_tbl.global_scope)
-    info.sym_tbl.scope_mapping[strlen.name] = scope
-    for a in strlen.args:
-        scope.insert_entry(a.name, a.type_ref, a.kind, None)
+    func_name = 'bpf_strlen'
+    count_args = 1
+    args = [StateObject(None) for i in range(count_args)]
+    args[0].name = 'str'
+    args[0].type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+    return_type = BASE_TYPES[clang.TypeKind.UINT]
     code = '''
 int len;
 len = 0;
@@ -224,92 +233,64 @@ if (str[i] == '\\0') {
 }
 return ((unsigned int)(-(1)));
 '''
-    strlen.body.add_inst(Literal(code, CODE_LITERAL))
+    _declare_func(info, func_name, args, return_type, code)
 
     # STRNCPY
-    strcpy = Function('bpf_strncpy', None)
-    strcpy.is_operator = False
-    strcpy.is_method = False
-    # Directly use the same arguments as original strlen
-    arg1 = StateObject(None)
-    arg1.name = 'dest'
-    arg1.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
-    arg2 = StateObject(None)
-    arg2.name = 'src'
-    arg2.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
-    arg3 = StateObject(None)
-    arg3.name = 'n'
-    arg3.type_ref = BASE_TYPES[clang.TypeKind.UINT]
-    strcpy.args = [arg1,arg2,arg3]
-    strcpy.return_type = BASE_TYPES[clang.TypeKind.VOID]
-    strcpy.may_succeed = True
-
-    scope = Scope(info.sym_tbl.global_scope)
-    info.sym_tbl.scope_mapping[strcpy.name] = scope
-    for a in strcpy.args:
-        scope.insert_entry(a.name, a.type_ref, a.kind, None)
+    func_name = 'bpf_strncpy'
+    count_args = 4
+    args = [StateObject(None) for i in range(count_args)]
+    args[0].name = 'dest'
+    args[0].type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+    args[1].name = 'src'
+    args[1].type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+    args[2].name = 'n'
+    args[2].type_ref = BASE_TYPES[clang.TypeKind.UINT]
+    args[3].name = 'end_dest'
+    args[3].type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+    # args[4].name = 'end_src'
+    # args[4].type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+    return_type = BASE_TYPES[clang.TypeKind.VOID]
     code = '''
+if (n == 0) return;
 for (unsigned short i = 0; i < 256; i++) {
+  if ((void *)(dest + i + 1) > end_dest) break;
   dest[i] = src[i];
   if (src[i] == '\\0' || i >= n - 1) {
     break;
   }
 }
 '''
-    strcpy.body.add_inst(Literal(code, CODE_LITERAL))
+    _declare_func(info, func_name, args, return_type, code)
 
     # FNV_HASH
-    fnv_hash = Function('__fnv_hash', None)
-    fnv_hash.is_operator = False
-    fnv_hash.is_method = False
-
-    arg1 = StateObject(None)
-    arg1.name = 'key'
-    arg1.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
-    arg2 = StateObject(None)
-    arg2.name = 'size'
-    arg2.type_ref = BASE_TYPES[clang.TypeKind.INT]
-    fnv_hash.args = [arg1, arg2]
-    fnv_hash.return_type = BASE_TYPES[clang.TypeKind.INT]
-    fnv_hash.may_succeed = True
-
-    scope = Scope(info.sym_tbl.global_scope)
-    info.sym_tbl.scope_mapping[fnv_hash.name] = scope
-    for a in fnv_hash.args:
-        scope.insert_entry(a.name, a.type_ref, a.kind, None)
+    func_name = '__fnv_hash'
+    count_args = 2
+    args = [StateObject(None) for i in range(count_args)]
+    args[0].name = 'key'
+    args[0].type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+    args[1].name = 'size'
+    args[1].type_ref = BASE_TYPES[clang.TypeKind.INT]
+    return_type = BASE_TYPES[clang.TypeKind.INT]
     code = '''
 return 0;
 '''
-    fnv_hash.body.add_inst(Literal(code, CODE_LITERAL))
+    _declare_func(info, func_name, args, return_type, code)
 
     # MEMCPY
-    memcpy = Function('bpf_memcpy', None)
-    memcpy.is_operator = False
-    memcpy.is_method = False
-
-    arg1 = StateObject(None)
-    arg1.name = 'dest'
-    arg1.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
-    arg2 = StateObject(None)
-    arg2.name = 'src'
-    arg2.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
-    arg3 = StateObject(None)
-    arg3.name = 'n'
-    arg3.type_ref = BASE_TYPES[clang.TypeKind.USHORT]
-    arg4 = StateObject(None)
-    arg4.name = 'end_dest'
-    arg4.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
-    arg5 = StateObject(None)
-    arg5.name = 'end_src'
-    arg5.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
-    memcpy.args = [arg1, arg2, arg3, arg4, arg5]
-    memcpy.return_type = BASE_TYPES[clang.TypeKind.VOID]
-    memcpy.may_succeed = True
-
-    scope = Scope(info.sym_tbl.global_scope)
-    info.sym_tbl.scope_mapping[memcpy.name] = scope
-    for a in memcpy.args:
-        scope.insert_entry(a.name, a.type_ref, a.kind, None)
+    func_name = 'bpf_memcpy'
+    count_args = 5
+    args = [StateObject(None) for i in range(count_args)]
+    args[0].name = 'dest'
+    args[0].type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+    args[1].name = 'src'
+    args[1].type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+    args[2].name = 'n'
+    args[2].type_ref = BASE_TYPES[clang.TypeKind.USHORT]
+    args[3].name = 'end_dest'
+    args[3].type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+    args[4].name = 'end_src'
+    args[4].type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+    return_type = BASE_TYPES[clang.TypeKind.VOID]
     code = '''
 if (n == 0) return;
 for (unsigned short i = 0; i < 256; i++) {
@@ -321,4 +302,4 @@ for (unsigned short i = 0; i < 256; i++) {
   }
 }
 '''
-    memcpy.body.add_inst(Literal(code, CODE_LITERAL))
+    _declare_func(info, func_name, args, return_type, code)

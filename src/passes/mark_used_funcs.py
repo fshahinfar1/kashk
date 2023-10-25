@@ -64,7 +64,7 @@ def _do_pass(inst, info, more):
             func = inst.get_function_def()
             if func:
                 if not func.is_empty() and not func.is_used_in_bpf_code:
-                    debug(MODULE_TAG, 'Add func:', func.name)
+                    # debug(MODULE_TAG, 'Add func:', func.name)
                     # Only include functions that have concrete implementation
                     func.is_used_in_bpf_code = True
                     info.prog.declarations.insert(0, func)

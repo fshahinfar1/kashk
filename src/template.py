@@ -202,7 +202,7 @@ def malloc_lookup(name, info, return_val):
 
     text = f'''
 {{
-  int zero = 0;
+  const int zero = 0;
   {tmp_name} = bpf_map_lookup_elem(&{name}_map, &zero);
   if ({tmp_name} == NULL) {{
     return {return_val};

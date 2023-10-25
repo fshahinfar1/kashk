@@ -40,6 +40,9 @@ class BPF_PROG:
     def get_pkt_buf(self):
         raise Exception('Not implemented!')
 
+    def get_pkt_end(self):
+        raise Exception('Not implemented!')
+
     def get_pkt_size(info):
         raise Exception('Not implemented!')
 
@@ -115,6 +118,24 @@ int xdp_prog(struct xdp_md *xdp)
         cast2.cast_type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
         return cast2
 
+    def get_pkt_end(self):
+        xdp = Ref(None, clang.CursorKind.DECL_REF_EXPR)
+        xdp.name = 'xdp'
+        xdp.type = self.ctx_type
+
+        ref = Ref(None, clang.CursorKind.MEMBER_REF_EXPR)
+        ref.name = 'data_end'
+        ref.type = BASE_TYPES[clang.TypeKind.UINT]
+        ref.owner.append(xdp)
+
+        cast1 = Cast()
+        cast1.castee.add_inst(ref)
+        cast1.cast_type = BASE_TYPES[clang.TypeKind.ULONGLONG]
+        cast2 = Cast()
+        cast2.castee.add_inst(cast1)
+        cast2.cast_type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+        return cast2
+
     def get_pkt_size(info):
         return Literal(f'((__u64)xdp->data_end - (__u64)xdp->data)', CODE_LITERAL)
 
@@ -149,7 +170,7 @@ if (((void *)(__u64)xdp->data + {write_size}) > (void *)(__u64)xdp->data_end) {{
         if memcpy == 'memcpy':
             code += f'\n{memcpy}((void *)(unsigned long long)xdp->data, {buf}, {write_size});'
         else:
-            code += f'\n{memcpy}((void *)(unsigned long long)xdp->data, {buf}, {write_size}, (void *)(unsigned long long)xdp->data_end, <not set>);'
+            code += f'\n{memcpy}((void *)(unsigned long long)xdp->data, {buf}, {write_size}, (void *)(unsigned long long)xdp->data_end, {buf} + {write_size});'
         if ret is True:
             code += '\nreturn XDP_TX;'
         inst = Literal(code, CODE_LITERAL)
