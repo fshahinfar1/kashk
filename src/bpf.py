@@ -24,6 +24,7 @@ class BPF_PROG:
         self.license = 'GPL'
         self.ctx = 'ctx'
         self.ctx_type = MyType()
+        self.server_config = ('127.0.0.1', '8080')
 
     def add_declaration(self, text):
         self.declarations.append(text)
@@ -43,13 +44,13 @@ class BPF_PROG:
     def get_pkt_end(self):
         raise Exception('Not implemented!')
 
-    def get_pkt_size(info):
+    def get_pkt_size(self):
         raise Exception('Not implemented!')
 
     def add_args_to_scope(self, scope):
         raise Exception('Not implemented!')
 
-    def send(self, buf, write_size, info):
+    def send(self, buf, write_size, info, ret=True, failure='XDP_DROP', do_copy=True):
         raise Exception('Not implemented!')
 
     def adjust_pkt(self, final_size):
@@ -72,22 +73,46 @@ class XDP_PROG(BPF_PROG):
         super().__init__()
         self.ctx = 'xdp'
         self.ctx_type = MyType.make_pointer(MyType.make_simple('struct xdp_md', clang.TypeKind.RECORD))
+        self.headers.extend([
+            '#include <linux/in.h>',
+            '#include <linux/if_ether.h>',
+            '#include <linux/ip.h>',
+            '#include <linux/udp.h>',
+            ])
 
     def set_bpf_context_struct_sym_tbl(self, sym_tbl):
+        """
+        This adds the definition of the BPF context to the symbol table
+        """
         struct_name = 'xdp'
         T = self.ctx_type.under_type
         scope_key = f'class_{T.spelling}'
-        sym_tbl.global_scope.insert_entry(struct_name, T, clang.CursorKind.CLASS_DECL, None)
+        entry = sym_tbl.global_scope.insert_entry(struct_name, T, clang.CursorKind.CLASS_DECL, None)
+        entry.is_bpf_ctx = True
         with sym_tbl.new_scope() as scope:
             sym_tbl.scope_mapping[scope_key] = scope
             U32 = BASE_TYPES[clang.TypeKind.UINT]
-            sym_tbl.insert_entry('data', U32, clang.CursorKind.FIELD_DECL, None)
-            sym_tbl.insert_entry('data_end', U32, clang.CursorKind.FIELD_DECL, None)
+            entry = sym_tbl.insert_entry('data', U32, clang.CursorKind.FIELD_DECL, None)
+            entry.is_bpf_ctx = True
+            entry = sym_tbl.insert_entry('data_end', U32, clang.CursorKind.FIELD_DECL, None)
+            entry.is_bpf_ctx = True
 
     def set_code(self, code):
         self.main_code = code
 
     def gen_code(self, info):
+        check_traffic = f'''
+{{
+  void *data = (void *)(unsigned long long)xdp->data;
+  void *data_end = (void *)(unsigned long long)xdp->data_end;
+  struct ethhdr *eth = data;
+  struct iphdr  *ip  = (void *)(eth + 1);
+  struct udphdr *udp = (void *)(ip  + 1);
+  if ((void *)(udp + 1) > data_end) return XDP_PASS;
+  if (udp->dest != bpf_htons({self.server_config[1]})) return XDP_PASS;
+}}
+'''
+        check_traffic = indent(check_traffic, 1)
         code,_ = gen_code(self.main_code, info)
         code = indent(code, 1)
 
@@ -95,6 +120,7 @@ class XDP_PROG(BPF_PROG):
 SEC("xdp")
 int xdp_prog(struct xdp_md *xdp)
 {{
+{check_traffic}
 {code}
 }}
 '''
@@ -136,14 +162,41 @@ int xdp_prog(struct xdp_md *xdp)
         cast2.cast_type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
         return cast2
 
-    def get_pkt_size(info):
-        return Literal(f'((__u64)xdp->data_end - (__u64)xdp->data)', CODE_LITERAL)
+    def get_pkt_size(self):
+        xdp      = Ref(None, clang.CursorKind.DECL_REF_EXPR)
+        xdp.name = 'xdp'
+        xdp.type = self.ctx_type
+
+        data      = Ref(None, clang.CursorKind.MEMBER_REF_EXPR)
+        data.name = 'data'
+        data.type = BASE_TYPES[clang.TypeKind.UINT]
+        data.owner.append(xdp)
+
+        data_end      = Ref(None, clang.CursorKind.MEMBER_REF_EXPR)
+        data_end.name = 'data_end'
+        data_end.type = BASE_TYPES[clang.TypeKind.UINT]
+        data_end.owner.append(xdp)
+
+        end = Cast.build(data_end, BASE_TYPES[clang.TypeKind.ULONGLONG])
+        beg = Cast.build(data,     BASE_TYPES[clang.TypeKind.ULONGLONG])
+
+        delta = BinOp.build_op(end, '-', beg)
+        size  = Cast.build(delta,  BASE_TYPES[clang.TypeKind.USHORT])
+        return size
 
     def add_args_to_scope(self, scope):
+        """
+        This function adds the instance of the BPF context to the scope.
+        """
         T = MyType.make_pointer(MyType.make_simple('xdp_md', clang.TypeKind.RECORD))
-        scope.insert_entry('xdp', T, clang.CursorKind.PARM_DECL, None)
+        xdp_entry = scope.insert_entry('xdp', T, clang.CursorKind.PARM_DECL, None)
+        xdp_entry.is_bpf_ctx = True
+        entry = xdp_entry.fields.insert_entry('data', BASE_TYPES[clang.TypeKind.UINT], clang.CursorKind.MEMBER_REF_EXPR, None)
+        entry.is_bpf_ctx = True
+        entry = xdp_entry.fields.insert_entry('data_end', BASE_TYPES[clang.TypeKind.UINT], clang.CursorKind.MEMBER_REF_EXPR, None)
+        entry.is_bpf_ctx = True
 
-    def send(self, buf, write_size, info, ret=True, failure='XDP_DROP'):
+    def send(self, buf, write_size, info, ret=True, failure='XDP_DROP', do_copy=True):
         #TODO: The arguments of this function are crayz ???
         is_size_integer = write_size.kind == clang.CursorKind.INTEGER_LITERAL
         if is_size_integer:
@@ -167,10 +220,11 @@ if (((void *)(__u64)xdp->data + {write_size}) > (void *)(__u64)xdp->data_end) {{
 }}
 '''
 
-        if memcpy == 'memcpy':
-            code += f'\n{memcpy}((void *)(unsigned long long)xdp->data, {buf}, {write_size});'
-        else:
-            code += f'\n{memcpy}((void *)(unsigned long long)xdp->data, {buf}, {write_size}, (void *)(unsigned long long)xdp->data_end, {buf} + {write_size});'
+        if do_copy:
+            if memcpy == 'memcpy':
+                code += f'\n{memcpy}((void *)(unsigned long long)xdp->data, {buf}, {write_size});'
+            else:
+                code += f'\n{memcpy}((void *)(unsigned long long)xdp->data, {buf}, {write_size}, (void *)(unsigned long long)xdp->data_end, {buf} + {write_size});'
         if ret is True:
             code += '\nreturn XDP_TX;'
         inst = Literal(code, CODE_LITERAL)
@@ -296,14 +350,24 @@ if (!sock_ctx) {
     def get_pkt_buf(self):
         return f'(void *)(__u64)skb->data;\n'
 
-    def get_pkt_size(info):
-        return Literal(f'skb->len', CODE_LITERAL)
+    def get_pkt_size(self):
+        skb      = Ref(None, clang.CursorKind.DECL_REF_EXPR)
+        skb.name = self.ctx
+        skb.type = self.ctx_type
+
+        length      = Ref(None, clang.CursorKind.MEMBER_REF_EXPR)
+        length.name = 'len'
+        length.type = BASE_TYPES[clang.TypeKind.UINT]
+        length.owner.append(skb)
+
+        # return Literal(f'skb->len', CODE_LITERAL)
+        return length
 
     def add_args_to_scope(self, scope):
         T = self.ctx_type
         scope.insert_entry('skb', T, clang.CursorKind.PARM_DECL, None)
 
-    def send(self, buf, write_size, info, ret=True, failure='SK_DROP'):
+    def send(self, buf, write_size, info, ret=True, failure='SK_DROP', do_copy=True):
         is_size_integer = write_size.kind == clang.CursorKind.INTEGER_LITERAL
         if is_size_integer:
             memcpy = 'memcpy'

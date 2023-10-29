@@ -5,12 +5,13 @@ from bpf_code_gen import gen_code
 from template import (prepare_shared_state_var, define_bpf_arr_map,
         define_bpf_hash_map, malloc_lookup)
 from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS
-from utility import get_tmp_var_name
+from utility import get_tmp_var_name, show_insts
 
 from data_structure import *
 from instruction import *
 from passes.pass_obj import PassObject
-from bpf_passes.verifier import is_bpf_ctx_ptr
+
+from parser.parse_helper import is_identifier
 
 
 MODULE_TAG = '[Transform Vars Pass]'
@@ -79,12 +80,7 @@ def _known_function_substitution(inst, info):
         return _rename_func_to_a_known_one(inst, info, 'bpf_strlen')
     elif inst.name == 'strncpy':
         assert len(inst.args) == 3, 'Assumption on the number of arguments'
-        is_ctx = is_bpf_ctx_ptr(inst.args[0], info)
-        debug(inst.args[0], 'is bpf context', is_ctx)
-        if is_ctx:
-            end_dest = info.prog.get_pkt_end()
-        else:
-            end_dest = BinOp.build_op(inst.args[0], '+', inst.args[2])
+        end_dest = BinOp.build_op(inst.args[0], '+', inst.args[2])
         # end_src = BinOp.build_op(inst.args[1], '+', inst.args[2])
         inst.args.extend([end_dest,])
         return _rename_func_to_a_known_one(inst, info, 'bpf_strncpy')
@@ -156,6 +152,9 @@ def _check_if_ref_is_global_state(inst, info):
 
 
 def _generate_cache_lookup(inst, info):
+    """
+    Process an annotation of type Cache Begin
+    """
     assert inst.kind == ANNOTATION_INST
     assert inst.ann_kind == Annotation.ANN_CACHE_BEGIN
     conf = json.loads(inst.msg)
@@ -213,6 +212,7 @@ def _generate_cache_lookup(inst, info):
     decl_index.name = index_name
     decl_index.type = BASE_TYPES[clang.TypeKind.INT]
     declare_at_top_of_func.append(decl_index)
+    decl_index.update_symbol_table(info.sym_tbl)
 
     # Assign hash value to the variable
     ref_index = Ref(None, clang.CursorKind.DECL_REF_EXPR)
@@ -234,6 +234,7 @@ def _generate_cache_lookup(inst, info):
     decl_val_ptr.type = MyType.make_pointer(MyType.make_simple(map_def['value_type'], clang.TypeKind.RECORD))
     # decl_val_ptr.init.add_inst(map_lookup_call)
     declare_at_top_of_func.append(decl_val_ptr)
+    decl_val_ptr.update_symbol_table(info.sym_tbl)
 
     # Assign lookup result to the variable
     val_ref = Ref(None)
@@ -293,34 +294,94 @@ def _generate_cache_lookup(inst, info):
 
 
 def _generate_cache_update(inst, info):
+    """
+    Process an annotation of type Cache Update
+    """
     assert inst.kind == ANNOTATION_INST
     assert inst.ann_kind == Annotation.ANN_CACHE_BEGIN_UPDATE
     conf = json.loads(inst.msg)
-    insts = []
-    map_name = conf['id'] + '_map'
+    map_id = conf['id']
+    def_conf = map_definitions[map_id]
+    map_name = map_id + '_map'
+
+    val_ref_name = get_tmp_var_name()
     index_name = get_tmp_var_name()
+
+    value_data_type = def_conf['value_type']
+    print(value_data_type)
+    val_type = MyType.make_simple(value_data_type, clang.TypeKind.RECORD)
+    val_decl = VarDecl.build(val_ref_name, MyType.make_pointer(val_type))
+    declare_at_top_of_func.append(val_decl)
+    val_decl.update_symbol_table(info.sym_tbl)
+
+    decl_index = VarDecl.build(index_name, BASE_TYPES[clang.TypeKind.INT])
+    declare_at_top_of_func.append(decl_index)
+    decl_index.update_symbol_table(info.sym_tbl)
+
+    insts = []
     key = Literal(conf['key'], CODE_LITERAL)
     key_size = Literal(conf['key_size'], CODE_LITERAL)
-    value = Literal(conf['value'], CODE_LITERAL)
+
+    value_annotate = conf['value']
+    assert is_identifier(value_annotate), 'To check if the variable is a packet context I need to be an identifier'
+    val_sym = info.sym_tbl.lookup(value_annotate)
+    assert val_sym is not None, 'The variable holding the value is not found in this scope'
+    value = Ref(None, clang.CursorKind.DECL_REF_EXPR)
+    value.name = value_annotate
+    value.type = val_sym.type
     value_size = Literal(conf['value_size'], clang.CursorKind.INTEGER_LITERAL)
 
     hash_call = Call(None)
     hash_call.name = '__fnv_hash'
     hash_call.args.extend([key, key_size])
 
-    decl_index = VarDecl.build(index_name, BASE_TYPES[clang.TypeKind.INT])
-    decl_index.init.add_inst(hash_call)
-    insts.append(decl_index)
+    index_ref      = decl_index.get_ref()
+    assign_index   = BinOp.build_op(index_ref, '=', hash_call)
+    insts.append(assign_index)
 
-    map_update_call = Call(None)
-    map_update_call.name = 'bpf_map_update_elem'
+    val_ref = val_decl.get_ref()
+    map_lookup_call = Call(None)
+    map_lookup_call.name = 'bpf_map_lookup_elem'
     arg1 = Literal(f'&{map_name}', CODE_LITERAL)
-    arg2 = Literal(f'&{index_name}', CODE_LITERAL)
-    arg3 = value
-    arg4 = Literal('BPF_ANY', CODE_LITERAL)
-    map_update_call.args.extend([arg1, arg2, arg3, arg4])
+    arg2 = UnaryOp.build('&', index_ref)
+    map_lookup_call.args.extend([arg1, arg2])
+    assign_val_ref = BinOp.build_op(val_ref, '=', map_lookup_call)
+    insts.append(assign_val_ref)
+
+    # check if ref is not null
+    null_check_cond = BinOp.build_op(val_ref, '!=', Literal('NULL', clang.CursorKind.INTEGER_LITERAL))
+    null_check = ControlFlowInst.build_if_inst(null_check_cond)
+
+    # Update cache
+    mask_inst = BinOp.build_op(value_size, '&', Literal('PKT_OFFSET_MASK', clang.CursorKind.MACRO_INSTANTIATION))
+    mask_assign = BinOp.build_op(value_size, '=', mask_inst)
+    # > Check that value size does not exceed the cache size
+    sz_check_cond = BinOp.build_op(value_size, '>', Literal('1000', clang.CursorKind.INTEGER_LITERAL))
+    sz_check = ControlFlowInst.build_if_inst(sz_check_cond)
+    sz_check.body.add_inst(_get_ret_inst())
+    # > Continue by calling memcpy
+    memcpy      = Call(None)
+    memcpy.name = 'bpf_memcpy'
+    dest_ref = val_ref.get_ref_field('data')
+    # TODO: 1024 should be sizeof the field
+    dest_end = BinOp.build_op(dest_ref, '+', Literal('1024', clang.CursorKind.INTEGER_LITERAL))
+    dest_end = Cast.build(dest_end, MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID]))
+    tmp = BinOp.build_op(value, '+', value_size)
+    src_end = Cast.build(tmp, MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID]))
+    memcpy.args.extend([dest_ref, value, value_size, dest_end, src_end])
+    size_assign = BinOp.build_op(val_ref.get_ref_field('size'), '=', value_size)
+    null_check.body.extend_inst([mask_assign, sz_check, memcpy, size_assign])
+    insts.append(null_check)
+
+    # map_update_call = Call(None)
+    # map_update_call.name = 'bpf_map_update_elem'
+    # arg1 = Literal(f'&{map_name}', CODE_LITERAL)
+    # arg2 = Literal(f'&{index_name}', CODE_LITERAL)
+    # arg3 = value
+    # arg4 = Literal('BPF_ANY', CODE_LITERAL)
+    # map_update_call.args.extend([arg1, arg2, arg3, arg4])
     # TODO: do I need to check update_elem return code?
-    insts.append(map_update_call)
+    # insts.append(map_update_call)
 
     blk = cb_ref.get(BODY)
     blk.extend(insts)
@@ -349,7 +410,6 @@ def _process_annotation(inst, info):
             T = MyType.make_simple(val_type, clang.TypeKind.RECORD)
             _add_type_to_declarations(T, info)
 
-
         info.prog.add_declaration(m)
         map_definitions[map_id] = conf
         report('Declare map', m, 'for malloc')
@@ -363,9 +423,63 @@ def _process_annotation(inst, info):
     elif inst.ann_kind == Annotation.ANN_CACHE_END_UPDATE:
         # TODO: do I want to have some code after update ??
         pass
-
     # Remove annotation
     return None
+
+
+def _process_read_call(inst, info):
+    blk = cb_ref.get(BODY)
+
+    # NOTE: I can assign the pointer but then the buffer size won't be right? <-- should be looked at as an optimization?
+    report('Assigning packet buffer to var:', inst.rd_buf.name)
+    # Assign packet pointer on a previouse line
+    lhs = inst.rd_buf.ref
+    rhs = info.prog.get_pkt_buf()
+    assign_inst = BinOp.build_op(lhs, '=', rhs)
+    blk.append(assign_inst)
+    # TODO: what if `skb` is not defined in this scope?
+    # Set the return value
+    inst = info.prog.get_pkt_size()
+
+    # sz_decl = VarDecl.build(get_tmp_var_name(), BASE_TYPES[clang.TypeKind.USHORT])
+    # declare_at_top_of_func.append(sz_decl)
+    # sz_ref  = sz_decl.get_ref()
+    # sz_assign  = BinOp.build_op(sz_ref, '=', info.prog.get_pkt_size())
+    # blk.append(sz_assign)
+    # sz_mask = BinOp.build_op(sz_ref, '&', Literal('PKT_OFFSET_MASK', clang.CursorKind.MACRO_INSTANTIATION))
+    # sz_assign_mask = BinOp.build_op(sz_ref, '=', sz_mask)
+    # blk.append(sz_assign_mask)
+
+    # # check size is less than map buffer size
+    # size_check_cond = BinOp.build_op(sz_ref, '>', Literal('1000', clang.CursorKind.INTEGER_LITERAL))
+    # size_check = ControlFlowInst.build_if_inst(size_check_cond)
+    # size_check.body.add_inst(_get_ret_inst())
+    # blk.append(size_check)
+
+
+    # # Copy data from XDP to Buffer
+    # lhs = Literal(inst.rd_buf.name, CODE_LITERAL)
+    # rhs = info.prog.get_pkt_buf()
+    # # TODO: check if context is used
+    # # dst_end = Literal('<not set>', CODE_LITERAL)
+    # # TODO: cast lhs to void *
+    # dst_end = BinOp.build_op(lhs, '+', Literal(inst.rd_buf.size_cursor, CODE_LITERAL))
+    # src_end = info.prog.get_pkt_end()
+    # cpy = Call(None)
+    # cpy.name = 'bpf_memcpy'
+    # cpy.args = [lhs, rhs, sz_ref, dst_end, src_end]
+    # blk.append(cpy)
+
+    # # Mark memcpy as used
+    # func = cpy.get_function_def()
+    # assert func is not None
+    # if not func.is_used_in_bpf_code:
+    #     func.is_used_in_bpf_code = True
+    #     info.prog.declarations.insert(0, func)
+    #     # debug(MODULE_TAG, 'Add func', func.name)
+
+    # inst = sz_ref
+    return inst
 
 
 def _process_current_inst(inst, info, more):
@@ -377,81 +491,17 @@ def _process_current_inst(inst, info, more):
         pass
     elif inst.kind == clang.CursorKind.CALL_EXPR:
         if inst.name in READ_PACKET:
-            blk = cb_ref.get(BODY)
-            # blk.append(assign_inst)
-
-            # NOTE: I can assign the pointer but then the buffer size won't be right? <-- should be looked at as an optimization?
-            report('Assigning packet buffer to var:', inst.rd_buf.name)
-            # # Assign packet pointer on a previouse line
-            # lhs = Literal(inst.rd_buf.name, CODE_LITERAL)
-            # rhs = info.prog.get_pkt_buf()
-            # assign_inst = BinOp.build_op(lhs, '=', rhs)
-            # # TODO: what if `skb` is not defined in this scope?
-            # # Set the return value
-            # inst = info.prog.get_pkt_size()
-
-            # Copy data from XDP to Buffer
-            lhs = Literal(inst.rd_buf.name, CODE_LITERAL)
-            rhs = info.prog.get_pkt_buf()
-            sz  = info.prog.get_pkt_size()
-            # TODO: check if context is used
-            # dst_end = Literal('<not set>', CODE_LITERAL)
-            # TODO: cast lhs to void *
-            dst_end = BinOp.build_op(lhs, '+', Literal(inst.rd_buf.size_cursor, CODE_LITERAL))
-            src_end = info.prog.get_pkt_end()
-            cpy = Call(None)
-            cpy.name = 'bpf_memcpy'
-            cpy.args = [lhs, rhs, sz, dst_end, src_end]
-            blk.append(cpy)
-
-            # Mark memcpy as used
-            func = cpy.get_function_def()
-            assert func is not None
-            if not func.is_used_in_bpf_code:
-                func.is_used_in_bpf_code = True
-                info.prog.declarations.insert(0, func)
-                # debug(MODULE_TAG, 'Add func', func.name)
-
-            inst = sz
-            return inst
+            return _process_read_call(inst, info)
         elif inst.name in WRITE_PACKET:
-            buf = inst.wr_buf.name
-            report(f'Using buffer {buf} to send response')
-            # TODO: maybe it is too soon to convert instructions to the code
-            if inst.wr_buf.size_cursor is None:
-                write_size = Literal('<UNKNOWN WRITE BUF SIZE>', CODE_LITERAL)
-            else:
-                # write_size, _ = gen_code(inst.wr_buf.size_cursor, info, context=ARG)
-                write_size = inst.wr_buf.size_cursor
-
-            if current_function is None:
-                # On the main BPF program. feel free to return the verdict value
-                inst = info.prog.send(buf, write_size, info)
-            else:
-                # On a function which is not the main. Do not return
-                copy_inst = info.prog.send(buf, write_size, info, ret=False, failure=_get_fail_ret_val())
-                # set the flag
-                flag_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
-                flag_ref.name = SEND_FLAG_NAME
-                flag_ref.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
-                deref = UnaryOp(None)
-                deref.child.add_inst(flag_ref)
-                deref.op = '*'
-                one = Literal('1', clang.CursorKind.INTEGER_LITERAL)
-                set_flag = BinOp.build_op(deref, '=', one)
-
-                # add it to the body
-                blk = cb_ref.get(BODY)
-                blk.append(copy_inst)
-                blk.append(set_flag)
-                # Return from this point to the BPF main
-                inst = _get_ret_inst()
+            # Let's not transform the send right now, wait for
+            # verifier to determine which variables are pointing to the context.
+            # return _process_write_call(inst, info)
             return inst
         elif inst.name in KNOWN_FUNCS:
             # Use known implementations of famous functions
             return _known_function_substitution(inst, info)
         else:
-            # TODO: check if the function being invoked needs to receive any flag and pass.
+            # Check if the function being invoked needs to receive any flag and pass.
             func = inst.get_function_def()
             if not func:
                 return inst

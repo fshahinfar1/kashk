@@ -27,6 +27,7 @@ from bpf_passes.feasibility_analysis import feasibilty_analysis_pass
 from bpf_passes.transform_vars import transform_vars_pass
 from bpf_passes.userspace_fallback import userspace_fallback_pass
 from bpf_passes.verifier import verifier_pass
+from bpf_passes.transform_after_verifier import transform_func_after_verifier
 from bpf_passes.reduce_params import reduce_params_pass
 
 from user_passes.select_user import select_user_pass
@@ -301,6 +302,11 @@ def gen_bpf_code(bpf, info, out_bpf):
     # Verifier
     debug('Verifier')
     bpf = verifier_pass(bpf, info, PassObject())
+    debug('~~~~~~~~~~~~~~~~~~~~~')
+
+    # Second transform
+    debug('[2nd] Transform')
+    bpf = transform_func_after_verifier(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Reduce number of parameters

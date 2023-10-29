@@ -11,23 +11,31 @@ class SymbolAccessMode:
 
 
 class SymbolTableEntry:
-    def __init__(self, name, type_, kind, ref):
+    __slots__ = ('name', 'type', 'kind', 'ref', 'fields', 'is_bpf_ctx', 'is_accessed')
+    def __init__(self, name, type_, kind, ref, scope_holding_the_entry=None):
         self.name = name
         self.type = type_
         self.kind = kind
         self.ref = ref
 
-        if type_ is not None:
-            self.is_pointer = type_.kind == clang.TypeKind.POINTER
-        else:
-            self.is_pointer = False
+        # This is added to handle the fields of a struct
+        self.fields = Scope(scope_holding_the_entry)
+
+        # if type_ is not None:
+        #     self.is_pointer = type_.kind == clang.TypeKind.POINTER
+        # else:
+        #     self.is_pointer = False
         self.is_bpf_ctx = False
         self.is_accessed = SymbolAccessMode.NOT_ACCESSED
 
     def clone(self):
         e = SymbolTableEntry(self.name, self.type, self.kind, self.ref)
-        for k, v in vars(self).items():
+        #fields = vars(self).items()
+        fields = tuple((k, self.__getattribute__(k)) for k in SymbolTableEntry.__slots__)
+        for k, v in fields:
             setattr(e, k, v)
+        # TODO: what should I pass as the parent of the cloned scope?
+        e.fields = self.fields.clone(None)
         return e
 
     def __repr__(self):

@@ -19,6 +19,10 @@ KNOWN_FUNCS = ('malloc', 'memcpy', 'memmove', 'memset', 'strcpy', 'strncpy',
                 'strlen', 'strcmp', 'ntohs', 'ntohl', 'ntohll', 'htons',
                 'htonl', 'htonll')
 
+OUR_IMPLEMENTED_FUNC = ('bpf_memcpy', 'bpf_strncpy', 'bpf_ntohs', 'bpf_ntohl',
+                        'bpf_htons', 'bpf_htonl', 'bpf_cpu_to_be64',
+                        'bpf_be64_to_cpu')
+
 
 def __is_ignored_function(cursor):
     if cursor.kind == clang.CursorKind.CALL_EXPR:

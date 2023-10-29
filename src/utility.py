@@ -31,6 +31,7 @@ clang.TypeKind.LONGDOUBLE,
 clang.TypeKind.VOID,
 ]
 
+
 def try_get_definition(cursor):
     if cursor.is_definition():
         return cursor
@@ -172,7 +173,11 @@ def visualize_ast(cursor):
         for child in children:
             q.append((child, l+1))
 
+
 def token_to_str(tkns):
+    """
+    Creates a string from the list of tokens
+    """
     return ''.join(list(map(lambda t: t.spelling, tkns)))
 
 
@@ -271,11 +276,11 @@ def get_owner(cursor):
     return res
 
 
-"""
-This method is for finding the object type in the case of having pointers of
-pointers or multi-dimensional arrays.
-"""
 def get_actual_type(_T):
+    """
+    This method is for finding the object type in the case of having pointers
+    of pointers or multi-dimensional arrays.
+    """
     T = _T
     while True:
         if T.kind == clang.TypeKind.POINTER:
@@ -287,19 +292,26 @@ def get_actual_type(_T):
     return T
 
 
-INDENT = '  '
-def indent(text, count=1):
+INDENT='  '
+def indent(text, count=1, indent=INDENT):
+    """
+    Indent a multiline string
+    """
     body = text.split('\n')
     indented = []
     for b in body:
         if not b:
             continue
-        indented.append(INDENT * count + b)
+        indented.append(indent * count + b)
     body = '\n'.join(indented)
     return body
 
 
 def filter_insts(block, filter_fn):
+    """
+    Select a set of instructions from a block of code based on a function
+    filter_fn.
+    """
     result = []
     q = [block]
     # Outside the connection polling loop
@@ -316,6 +328,11 @@ def filter_insts(block, filter_fn):
 
 
 def skip_unexposed_stmt(cursor):
+    """
+    The clang parser is generates some UNEXPOSED_STMT nodes in the AST.
+    This function simply traverse children of these nodes until reaching to a
+    node of other type.
+    """
     ptr = cursor
     while (ptr.kind == clang.CursorKind.UNEXPOSED_STMT or
             ptr.kind == clang.CursorKind.UNEXPOSED_EXPR):
@@ -398,6 +415,9 @@ def report_user_program_graph(info):
 
 tmp_num = 100
 def get_tmp_var_name():
+    """
+    This function is used to get a name for variables we need
+    """
     global tmp_num
     name = f'_tmp_{tmp_num}'
     tmp_num += 1

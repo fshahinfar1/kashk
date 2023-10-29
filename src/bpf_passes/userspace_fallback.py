@@ -78,6 +78,7 @@ def _handle_function_may_fail(inst, func, info, more):
             zero = Literal('0', clang.CursorKind.INTEGER_LITERAL)
             flag_decl.init.add_inst(zero)
             before_func_call.append(flag_decl)
+            flag_decl.update_symbol_table(info.sym_tbl)
 
         # Now add the argument to the invocation instruction
         # TODO: update every invocation of this function with the flag parameter

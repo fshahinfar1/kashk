@@ -39,13 +39,15 @@ class PacketBuffer:
     """
     def __init__(self, cursor):
         if cursor is None:
-            self.cursor = None
+            # self.cursor = None
             self.name = '__not_set_to_a_name__'
         else:
-            self.cursor = cursor
+            # self.cursor = cursor
             self.name = cursor.spelling
         # Determines the size of buffer
         self.size_cursor = None
+        self.ref = None
+        self.size_ref = None
 
 
 class CodeBlockRef:

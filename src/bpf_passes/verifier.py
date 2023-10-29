@@ -8,96 +8,17 @@ from instruction import *
 from bpf_code_gen import gen_code
 from passes.pass_obj import PassObject
 from template import bpf_ctx_bound_check, bpf_ctx_bound_check_bytes
-from prune import KNOWN_FUNCS
+from prune import KNOWN_FUNCS, OUR_IMPLEMENTED_FUNC
+
+from helpers.bpf_ctx_helper import (is_bpf_ctx_ptr, is_value_from_bpf_ctx,
+        set_ref_bpf_ctx_state)
+
 
 MODULE_TAG = '[Verfier Pass]'
-
-
-def is_value_from_bpf_ctx(inst, info, R=None):
-    """
-    Check if an instruction result is a value from the BPF context memory
-    region
-
-    @param inst: the Instruction object
-    @param info: the global information gathered about the program
-    @param R: None or a list. If not None then the range of access would be
-    written in this list.
-    """
-    # TODO: the cases are incomplete
-    if inst.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
-        if is_bpf_ctx_ptr(inst.array_ref.children[0], info):
-            if R is not None:
-                ref = inst.array_ref.children[0]
-                index =inst.index.children[0]
-                size = Literal(f'sizoef({inst.type.spelling})', kind=CODE_LITERAL)
-                R.append((ref, index, size))
-            return True
-    elif inst.kind == clang.CursorKind.UNARY_OPERATOR:
-        if inst.op == '*' and is_bpf_ctx_ptr(inst.child.children[0], info):
-            if R is not None:
-                R.append(('x', 0, 0))
-            return True
-    elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
-        # TODO: what if there are multiple member access?
-        owner = inst.owner[-1]
-        if isinstance(owner, ArrayAccess):
-            # TODO: is it possible that there are nested array accesses?
-            assert len(owner.array_ref.children) == 1
-            owner = owner.array_ref.children[0]
-        assert isinstance(owner,Ref)
-        # owner name is
-        owner = owner.name
-        sym = info.sym_tbl.lookup(owner)
-        if not sym:
-            error(MODULE_TAG, f'did not found the symbol object for {owner}')
-        elif sym.is_bpf_ctx:
-            # We are accessing BPF context
-            ref = Ref(None)
-            ref.name = sym.name
-            ref.type = sym.type # TODO: is sym.type an instance of MyType?
-            assert isinstance(ref.type, MyType)
-            ref.kind = clang.CursorKind.DECL_REF_EXPR
-            index = Literal('0', clang.CursorKind.INTEGER_LITERAL)
-            size = Literal(f'sizeof({inst.cursor.type.spelling})', CODE_LITERAL)
-            R.append((ref, index, size))
-            return True
-    return False
-
-
-def is_bpf_ctx_ptr(inst, info):
-    """
-    Check if an instruction result is a pointer to the BPF context memory
-    region
-    """
-    # TODO: this is incomplete
-    if inst.kind == clang.CursorKind.DECL_REF_EXPR:
-        # A simple variable reference
-        sym = info.sym_tbl.lookup(inst.name)
-        if sym:
-            if sym.is_bpf_ctx:
-                return True
-    elif inst.kind == clang.CursorKind.BINARY_OPERATOR:
-        # A pointer arithmatic or assignment
-        op_is_good = inst.op in itertools.chain(BinOp.ARITH_OP, BinOp.ASSIGN_OP)
-        if op_is_good:
-            if (is_bpf_ctx_ptr(inst.lhs.children[0], info)
-                    or is_bpf_ctx_ptr(inst.rhs.children[0], info)):
-                return True
-    elif inst.kind == clang.CursorKind.UNARY_OPERATOR and inst.op == '&':
-        if is_value_from_bpf_ctx(inst.child.children[0], info):
-            return True
-    elif inst.kind == clang.CursorKind.CSTYLE_CAST_EXPR:
-        if inst.cast_type.kind == clang.TypeKind.POINTER:
-            res = is_bpf_ctx_ptr(inst.castee.children[0], info)
-            return res
-    elif inst.kind == clang.CursorKind.PAREN_EXPR:
-        return is_bpf_ctx_ptr(inst.body.children[0], info)
-    return False
-
-
-END_DEPTH = 200
-NEW_BLOCK = 201
-END_BLOCK = 202
+# TODO:The CodeBlockRef thing is not correct and works really bad. Find a way
+# to fix it.
+cb_ref = CodeBlockRef()
+_has_processed_func = set()
 
 
 def _handle_binop(inst, info, more):
@@ -105,32 +26,26 @@ def _handle_binop(inst, info, more):
     rhs = inst.rhs.children[0]
     # Track which variables are pointer to the BPF context
     if inst.op == '=':
-        lhs_is_ptr = is_bpf_ctx_ptr(lhs, info)
+        # lhs_is_ptr = is_bpf_ctx_ptr(lhs, info)
         rhs_is_ptr = is_bpf_ctx_ptr(rhs, info)
-
-        # TODO: it can also be a MEMBER_REF
-        if lhs.kind == clang.CursorKind.DECL_REF_EXPR:
-            if rhs_is_ptr:
-                sym = info.sym_tbl.lookup(lhs.name)
-                sym.is_bpf_ctx = True
-                # debug(sym.name, 'is ctx ptr')
-            elif not rhs_is_ptr and lhs_is_ptr:
-                sym = info.sym_tbl.lookup(lhs.name)
-                sym.is_bpf_ctx = False
-                # debug(sym.name, 'is something else')
+        # debug("***", gen_code([inst,], info), '|| LHS kind:', lhs.kind, '|| RHS kind:', rhs.kind, '|| is rhs ctx:', rhs_is_ptr)
+        set_ref_bpf_ctx_state(lhs, rhs_is_ptr, info)
+        # assert is_bpf_ctx_ptr(lhs, info) == rhs_is_ptr, 'Check if set_ref_bpf_ctx_state and is_bpf_ctx_ptr work correctly'
+        if is_bpf_ctx_ptr(lhs, info) != rhs_is_ptr:
+            error(MODULE_TAG, 'Failed to set the BPF context flag on reference', lhs)
 
     # Check if the BPF context is accessed and add bound checking
     for x in [lhs, rhs]:
         # TODO: this API is awful
         R = []
-        val_is_from_ctx = is_value_from_bpf_ctx(x, info, R)
-        if val_is_from_ctx:
+        if is_value_from_bpf_ctx(x, info, R):
             ref, index, T = R.pop()
-
+            assert isinstance(ref, Instruction)
+            assert isinstance(index, Instruction)
 
             # TODO: this definition is duplicated through this file! do something better
             skb_ref = Ref(None)
-            skb_ref.name = 'skb'
+            skb_ref.name = info.prog.ctx
             skb_ref.kind = clang.CursorKind.DECL_REF_EXPR
             skb_ref.type = BASE_TYPES[SKB_PTR_TYPE]
 
@@ -144,10 +59,13 @@ def _handle_binop(inst, info, more):
             data_end.castee.add_inst(end_ref)
             check_inst = bpf_ctx_bound_check(ref, index, data_end)
 
+            tmp,_ = gen_code([inst], info)
+            report(f'Add a bound check before:\n    {tmp}')
+            debug(x, x.kind)
+
             blk = cb_ref.get(BODY)
             # Add the check a line before this access
             blk.append(check_inst)
-
     # Keep the instruction unchanged
     return inst
 
@@ -167,24 +85,28 @@ def _handle_call(inst, info, more):
 
     # Find the definition of the function and step into it
     func = inst.get_function_def()
-    if func and not func.is_empty():
+    if func and not func.is_empty() and func.name not in OUR_IMPLEMENTED_FUNC:
         with info.sym_tbl.with_func_scope(inst.name):
-            T = BASE_TYPES[SKB_PTR_TYPE]
             # Add skb as the last parameter of this function
-            skb_obj = StateObject(None)
-            skb_obj.name = 'skb'
-            skb_obj.is_pointer = True
-            func.args.append(skb_obj)
-            # This is added to the scope of function being called
-            info.sym_tbl.insert_entry(skb_obj.name, T, clang.CursorKind.PARM_DECL, None)
-            skb_obj.type_ref = T
+            if func.change_applied & Function.CTX_FLAG == 0:
+                skb_obj = StateObject(None)
+                skb_obj.name = info.prog.ctx
+                skb_obj.type_ref = info.prog.ctx_type
+                func.args.append(skb_obj)
+                func.change_applied |= Function.CTX_FLAG
 
-            # TODO: update every invocation of this function with the skb parameter
-            # TODO: what if the caller function does not have access to skb?
-            skb_ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
-            skb_ref.name = skb_obj.name
-            skb_ref.type = T
-            inst.args.append(skb_ref)
+                # This is added to the scope of function being called
+                info.sym_tbl.insert_entry(skb_obj.name, info.prog.ctx_type,
+                        clang.CursorKind.PARM_DECL, None)
+
+            if inst.change_applied & Function.CTX_FLAG == 0:
+                # TODO: update every invocation of this function with the skb parameter
+                # TODO: what if the caller function does not have access to skb?
+                skb_ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
+                skb_ref.name = info.prog.ctx
+                skb_ref.type = info.prog.ctx_type
+                inst.args.append(skb_ref)
+                inst.change_applied |= Function.CTX_FLAG
 
             for pos in pos_of_ctx_ptrs:
                 param = func.args[pos]
@@ -195,23 +117,25 @@ def _handle_call(inst, info, more):
                 # the scope of the function? (maybe in another run the
                 # parameter is not a pointer to the context)
 
-            modified = _do_pass(func.body, info, PassObject())
-            assert modified is not None
-
-        # Update the instructions of the function
-        func.body = modified
+            # Check to not repeat analyzing same function multiple times.
+            if inst.name not in _has_processed_func:
+                modified = _do_pass(func.body, info, PassObject())
+                assert modified is not None
+                # Update the instructions of the function
+                func.body = modified
     else:
-        if inst.name not in KNOWN_FUNCS:
+        if inst.name not in KNOWN_FUNCS + OUR_IMPLEMENTED_FUNC:
             # We can not modify this function
             error(MODULE_TAG, 'function:', inst.name,
                 'receives BPF context but is not accessible for modification')
         else:
             ref = inst.args[0]
             size = inst.args[2]
+            print('***', size, size.kind)
 
             # Add the check a line before this access
             skb_ref = Ref(None)
-            skb_ref.name = 'skb'
+            skb_ref.name = info.prog.ctx
             skb_ref.kind = clang.CursorKind.DECL_REF_EXPR
             skb_ref.type = BASE_TYPES[SKB_PTR_TYPE]
 
@@ -222,8 +146,6 @@ def _handle_call(inst, info, more):
             data_end.cast_type = '__u64'
             data_end.castee.add_inst(end_ref)
             check_inst = bpf_ctx_bound_check_bytes(ref, size, data_end)
-
-            tmp, _ = gen_code([check_inst], info)
 
             blk = cb_ref.get(BODY)
             blk.append(check_inst)
@@ -239,11 +161,6 @@ def _process_current_inst(inst, info, more):
     return inst
 
 
-# TODO: I need to ignore instructions after the ToUserspace
-
-# TODO:The CodeBlockRef thing is not correct and works really bad. Find a way
-# to fix it.
-cb_ref = CodeBlockRef()
 def _do_pass(inst, info, more):
     lvl, ctx, parent_list = more.unpack()
     new_children = []
@@ -268,6 +185,7 @@ def _do_pass(inst, info, more):
             else:
                 obj = PassObject.pack(lvl+1, tag, parent_list)
                 new_child = _do_pass(child, info, obj)
+                assert new_child is not None, 'It seems this pass does not need to remove any instruction. Just checking.'
             new_children.append(new_child)
 
     new_inst = inst.clone(new_children)

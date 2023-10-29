@@ -245,6 +245,15 @@ class VarDecl(Instruction):
         new.bpf_ignore = self.bpf_ignore
         return new
 
+    def get_ref(self):
+        ref      = Ref(None, clang.CursorKind.DECL_REF_EXPR)
+        ref.name = self.name
+        ref.type = self.type
+        return ref
+
+    def update_symbol_table(self, sym_tbl):
+        sym_tbl.insert_entry(self.name, self.type, self.kind, None)
+
 
 class ControlFlowInst(Instruction):
 
@@ -500,6 +509,13 @@ class Parenthesis(Instruction):
 
 
 class Cast(Instruction):
+    @classmethod
+    def build(cls, inst, T):
+        cast = Cast()
+        cast.castee.add_inst(inst)
+        cast.cast_type = T
+        return cast
+
     def __init__(self):
         super().__init__()
         self.kind = clang.CursorKind.CSTYLE_CAST_EXPR
@@ -564,6 +580,21 @@ class Ref(Instruction):
         new.owner  = list(self.owner)
         new.bpf_ignore = self.bpf_ignore
         return new
+
+    def get_ref_field(self, name, info=None):
+        ref = Ref(None, clang.CursorKind.MEMBER_REF_EXPR)
+        ref.name = name
+        if info:
+            key = f'class_{self.type.spelling}'
+            struct_scope = info.sym_tbl.scope_mapping[key]
+            sym = struct_scope.lookup(name)
+            assert sym is not None
+            ref.type = sym.type
+            assert isinstance(ref.type, MyType)
+        else:
+            ref.type = None
+        ref.owner.append(self)
+        return ref
 
 
 class Literal(Instruction):

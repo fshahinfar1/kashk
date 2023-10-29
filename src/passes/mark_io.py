@@ -52,6 +52,8 @@ def _do_mark_read(r, info):
     pkt_buf = PacketBuffer(None)
     pkt_buf.size_cursor, _ = gen_code([buf_sz], info)
     pkt_buf.name, _ = gen_code([buf_arg], info)
+    pkt_buf.ref = buf_arg
+    pkt_buf.size_ref = buf_sz
     r.rd_buf = pkt_buf
     debug('Read buffer:', pkt_buf.name, pkt_buf.size_cursor, r)
 
@@ -90,6 +92,8 @@ def _do_mark_write(w, info):
     pkt_buf = PacketBuffer(None)
     pkt_buf.size_cursor = buf_sz
     pkt_buf.name, _ = gen_code([buf_arg], info)
+    pkt_buf.ref = buf_arg
+    pkt_buf.size_ref = buf_sz
     w.wr_buf = pkt_buf
     debug('Write buffer:', pkt_buf.name, pkt_buf.size_cursor, w)
 
