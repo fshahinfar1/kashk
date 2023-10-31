@@ -1,9 +1,11 @@
 import itertools
+from contextlib import contextmanager
 import clang.cindex as clang
 
 from log import error, debug
 from data_structure import *
 from instruction import *
+from utility import get_tmp_var_name, show_insts
 
 from bpf_code_gen import gen_code
 from passes.pass_obj import PassObject
@@ -12,6 +14,7 @@ from prune import KNOWN_FUNCS, OUR_IMPLEMENTED_FUNC
 
 from helpers.bpf_ctx_helper import (is_bpf_ctx_ptr, is_value_from_bpf_ctx,
         set_ref_bpf_ctx_state)
+from helpers.instruction_helper import get_ret_inst, is_variable, get_scalar_variables
 
 
 MODULE_TAG = '[Verfier Pass]'
@@ -19,6 +22,39 @@ MODULE_TAG = '[Verfier Pass]'
 # to fix it.
 cb_ref = CodeBlockRef()
 _has_processed_func = set()
+current_function = None
+declare_at_top_of_func = None
+
+
+@contextmanager
+def set_current_func(func):
+    global current_function
+    tmp = current_function
+    current_function = func
+    try:
+        yield func
+    finally:
+        current_function = tmp
+
+
+def _check_if_variable_index_should_be_masked(ref, index, blk, info):
+    """
+    The ref, index are taken from range (R) list used for checking access to
+    the BPF context. blk is the current block of code to add the masking operation to.
+    """
+    set_of_variables_to_be_masked = get_scalar_variables(ref) + get_scalar_variables(index)
+    # print('these are scalar variables:', set_of_variables_to_be_masked)
+    for var in  set_of_variables_to_be_masked:
+        # TODO: should I keep the variable in tack and define a tmp value for masking? Then I should replace the access instruction and use the masked variables.
+        # decl_index  = VarDecl.build(get_tmp_var_name(), index.type)
+        # declare_at_top_of_func.append(decl_index)
+        # ref_index   = decl_index.get_ref()
+
+        mask_op     = BinOp.build_op(var, '&', info.prog.index_mask)
+        # mask_assign = BinOp.build_op(ref_index, '=', mask_op)
+        mask_assign = BinOp.build_op(var, '=', mask_op)
+        # index = ref_index.clone([])
+        blk.append(mask_assign)
 
 
 def _handle_binop(inst, info, more):
@@ -35,6 +71,7 @@ def _handle_binop(inst, info, more):
             error(MODULE_TAG, 'Failed to set the BPF context flag on reference', lhs)
 
     # Check if the BPF context is accessed and add bound checking
+    blk = cb_ref.get(BODY)
     for x in [lhs, rhs]:
         # TODO: this API is awful
         R = []
@@ -43,29 +80,18 @@ def _handle_binop(inst, info, more):
             assert isinstance(ref, Instruction)
             assert isinstance(index, Instruction)
 
-            # TODO: this definition is duplicated through this file! do something better
-            skb_ref = Ref(None)
-            skb_ref.name = info.prog.ctx
-            skb_ref.kind = clang.CursorKind.DECL_REF_EXPR
-            skb_ref.type = BASE_TYPES[SKB_PTR_TYPE]
+            _check_if_variable_index_should_be_masked(inst, index, blk, info)
 
-            # (__u64)skb->data_end
-            end_ref = Ref(None, kind=clang.CursorKind.MEMBER_REF_EXPR)
-            end_ref.name = 'data_end'
-            end_ref.owner.append(skb_ref)
-            end_ref.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
-            data_end = Cast()
-            data_end.cast_type = '__u64'
-            data_end.castee.add_inst(end_ref)
-            check_inst = bpf_ctx_bound_check(ref, index, data_end)
-
-            tmp,_ = gen_code([inst], info)
-            report(f'Add a bound check before:\n    {tmp}')
-            debug(x, x.kind)
-
-            blk = cb_ref.get(BODY)
-            # Add the check a line before this access
+            ctx_ref = info.prog.get_ctx_ref()
+            end_ref = ctx_ref.get_ref_field('data_end', info)
+            data_end = Cast.build(end_ref, BASE_TYPES[clang.TypeKind.ULONGLONG])
+            _ret_inst = get_ret_inst(current_function, info).body[0]
+            check_inst = bpf_ctx_bound_check(ref, index, data_end, _ret_inst)
             blk.append(check_inst)
+
+            # Report for debuging
+            tmp,_ = gen_code([inst], info)
+            debug(f'Add a bound check before:\n    {tmp}')
     # Keep the instruction unchanged
     return inst
 
@@ -119,7 +145,8 @@ def _handle_call(inst, info, more):
 
             # Check to not repeat analyzing same function multiple times.
             if inst.name not in _has_processed_func:
-                modified = _do_pass(func.body, info, PassObject())
+                with set_current_func(func):
+                    modified = _do_pass(func.body, info, PassObject())
                 assert modified is not None
                 # Update the instructions of the function
                 func.body = modified
@@ -131,23 +158,17 @@ def _handle_call(inst, info, more):
         else:
             ref = inst.args[0]
             size = inst.args[2]
-            print('***', size, size.kind)
-
-            # Add the check a line before this access
-            skb_ref = Ref(None)
-            skb_ref.name = info.prog.ctx
-            skb_ref.kind = clang.CursorKind.DECL_REF_EXPR
-            skb_ref.type = BASE_TYPES[SKB_PTR_TYPE]
-
-            end_ref = Ref(None, kind=clang.CursorKind.MEMBER_REF_EXPR)
-            end_ref.name = 'data_end'
-            end_ref.owner.append(skb_ref)
-            data_end = Cast()
-            data_end.cast_type = '__u64'
-            data_end.castee.add_inst(end_ref)
-            check_inst = bpf_ctx_bound_check_bytes(ref, size, data_end)
 
             blk = cb_ref.get(BODY)
+            _check_if_variable_index_should_be_masked(ref, size, blk, info)
+
+            # Add the check a line before this access
+            ctx_ref = info.prog.get_ctx_ref()
+            end_ref = ctx_ref.get_ref_field('data_end', info)
+            data_end = Cast.build(end_ref, BASE_TYPES[clang.TypeKind.ULONGLONG])
+            _ret_inst = get_ret_inst(current_function, info).body[0]
+            check_inst = bpf_ctx_bound_check_bytes(ref, size, data_end, _ret_inst)
+
             blk.append(check_inst)
     return inst
 
@@ -193,4 +214,18 @@ def _do_pass(inst, info, more):
 
 
 def verifier_pass(inst, info, more):
-    return _do_pass(inst, info, more)
+    # TODO: There is an issue, in the futuer pass that rely on the condition of
+    # the varibale being from the BPF context or not (2nd transform) the
+    # variable might only be from the BPF context in a part of the code.
+    # I need to the keep track of when the variable is BPF context not just
+    # which.
+    """
+    This pass performs following operations
+    1. Marks variables that have value from BPF context
+    2. Adds bound checking. The bound checking is added when a value from BPF
+    context is accessed. It happens when passing the value to a function or
+    when it is used in with an operator.
+    """
+    declare_at_top_of_func = []
+    with set_current_func(None):
+        return _do_pass(inst, info, more)

@@ -6,6 +6,7 @@ from template import (prepare_shared_state_var, define_bpf_arr_map,
         define_bpf_hash_map, malloc_lookup)
 from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS
 from utility import get_tmp_var_name, show_insts
+from helpers.instruction_helper import get_ret_inst
 
 from data_structure import *
 from instruction import *
@@ -31,19 +32,6 @@ declare_at_top_of_func = []
 def _set_skip(val):
     global skip_to_end
     skip_to_end = val
-
-
-# TODO: why I have to return functions! What am I doing? :)
-def _get_ret_inst():
-    ret = Instruction()
-    ret.kind = clang.CursorKind.RETURN_STMT
-    if current_function is None:
-        ret.body = [Literal('XDP_DROP', CODE_LITERAL)]
-    elif current_function.return_type.spelling != 'void':
-        ret.body = [Literal(f'({current_function.return_type.spelling})0', CODE_LITERAL)]
-    else:
-        ret.body = []
-    return ret
 
 
 def _check_if_ref_is_global_state(inst, info):
@@ -271,23 +259,23 @@ def _generate_cache_update(inst, info):
     null_check = ControlFlowInst.build_if_inst(null_check_cond)
 
     # Update cache
-    mask_inst = BinOp.build_op(value_size, '&', Literal('PKT_OFFSET_MASK', clang.CursorKind.MACRO_INSTANTIATION))
+    mask_inst = BinOp.build_op(value_size, '&', info.prog.index_mask)
     mask_assign = BinOp.build_op(value_size, '=', mask_inst)
     # > Check that value size does not exceed the cache size
     sz_check_cond = BinOp.build_op(value_size, '>', Literal('1000', clang.CursorKind.INTEGER_LITERAL))
     sz_check = ControlFlowInst.build_if_inst(sz_check_cond)
-    sz_check.body.add_inst(_get_ret_inst())
+    sz_check.body.add_inst(get_ret_inst(current_function, info))
     # > Continue by calling memcpy
     memcpy      = Call(None)
     memcpy.name = 'bpf_memcpy'
-    dest_ref = val_ref.get_ref_field('data')
+    dest_ref = val_ref.get_ref_field('data', info)
     # TODO: 1024 should be sizeof the field
     dest_end = BinOp.build_op(dest_ref, '+', Literal('1024', clang.CursorKind.INTEGER_LITERAL))
     dest_end = Cast.build(dest_end, MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID]))
     tmp = BinOp.build_op(value, '+', value_size)
     src_end = Cast.build(tmp, MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID]))
     memcpy.args.extend([dest_ref, value, value_size, dest_end, src_end])
-    size_assign = BinOp.build_op(val_ref.get_ref_field('size'), '=', value_size)
+    size_assign = BinOp.build_op(val_ref.get_ref_field('size', info), '=', value_size)
     null_check.body.extend_inst([mask_assign, sz_check, memcpy, size_assign])
     insts.append(null_check)
 

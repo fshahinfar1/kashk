@@ -25,4 +25,4 @@ $CC $INCLUDES \
 	-Wno-unused-value -Wno-pointer-sign \
 	-Wno-compare-distinct-pointer-types \
 	-O2 -g -emit-llvm -c $SOURCE -o $LL_FILE
-$LLC -mcpu=v3 -march=bpf -filetype=obj -o $BINARY $LL_FILE
+$LLC -mcpu=probe -march=bpf -filetype=obj -o $BINARY $LL_FILE

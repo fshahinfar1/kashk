@@ -8,6 +8,7 @@ from bpf_code_gen import gen_code
 from passes.pass_obj import PassObject
 from bpf_passes.transform_vars import SEND_FLAG_NAME
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr, is_value_from_bpf_ctx
+from helpers.instruction_helper import get_ret_inst
 
 
 MODULE_TAG = '[2nd Transform]'
@@ -22,18 +23,6 @@ def _get_fail_ret_val():
         return ''
     else:
         return f'({current_function.return_type.spelling})0'
-
-# TODO: why I have to return functions! What am I doing? :)
-def _get_ret_inst():
-    ret = Instruction()
-    ret.kind = clang.CursorKind.RETURN_STMT
-    if current_function is None:
-        ret.body = [Literal('XDP_DROP', CODE_LITERAL)]
-    elif current_function.return_type.spelling != 'void':
-        ret.body = [Literal(f'({current_function.return_type.spelling})0', CODE_LITERAL)]
-    else:
-        ret.body = []
-    return ret
 
 
 _malloc_map_counter = 0
@@ -150,7 +139,7 @@ def _process_write_call(inst, info):
         blk.append(copy_inst)
         blk.append(set_flag)
         # Return from this point to the BPF main
-        inst = _get_ret_inst()
+        inst = get_ret_inst(current_function, info)
     return inst
 
 

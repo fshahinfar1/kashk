@@ -5,7 +5,7 @@ from utility import get_tmp_var_name
 VOID_PTR = 'void *'
 
 
-def bpf_ctx_bound_check(ref, index, data_end):
+def bpf_ctx_bound_check(ref, index, data_end, return_value=None):
     _if = ControlFlowInst()
     _if.kind = clang.CursorKind.IF_STMT
 
@@ -41,7 +41,10 @@ def bpf_ctx_bound_check(ref, index, data_end):
     # return 0
     ret = Instruction()
     ret.kind = clang.CursorKind.RETURN_STMT
-    ret.body = [Literal('0', kind=clang.CursorKind.INTEGER_LITERAL),]
+    if return_value is None:
+        ret.body = [Literal('0', kind=clang.CursorKind.INTEGER_LITERAL),]
+    else:
+        ret.body = [return_value,]
 
     _if.cond.add_inst(cond)
     _if.body.add_inst(ret)
@@ -49,7 +52,7 @@ def bpf_ctx_bound_check(ref, index, data_end):
     return _if
 
 
-def bpf_ctx_bound_check_bytes(ref, size, data_end):
+def bpf_ctx_bound_check_bytes(ref, size, data_end, return_value=None):
     _if = ControlFlowInst()
     _if.kind = clang.CursorKind.IF_STMT
 
@@ -84,7 +87,10 @@ def bpf_ctx_bound_check_bytes(ref, size, data_end):
     # return 0
     ret = Instruction()
     ret.kind = clang.CursorKind.RETURN_STMT
-    ret.body = [Literal('0', kind=clang.CursorKind.INTEGER_LITERAL),]
+    if return_value is None:
+        ret.body = [Literal('0', kind=clang.CursorKind.INTEGER_LITERAL),]
+    else:
+        ret.body = [return_value]
 
     _if.cond.add_inst(cond)
     _if.body.add_inst(ret)

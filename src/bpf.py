@@ -25,6 +25,7 @@ class BPF_PROG:
         self.ctx = 'ctx'
         self.ctx_type = MyType()
         self.server_config = ('127.0.0.1', '8080')
+        self.index_mask = Literal('PKT_OFFSET_MASK', clang.CursorKind.MACRO_INSTANTIATION)
 
     def add_declaration(self, text):
         self.declarations.append(text)
@@ -65,6 +66,12 @@ class BPF_PROG:
     def get_send(self):
         raise Exception('Not implemented!')
 
+    def get_ctx_ref(self):
+        ref = Ref(None)
+        ref.name = self.ctx
+        ref.kind = clang.CursorKind.DECL_REF_EXPR
+        ref.type = self.ctx_type
+        return ref
 
 
 class XDP_PROG(BPF_PROG):

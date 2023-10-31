@@ -1,7 +1,7 @@
 import itertools
 import clang.cindex as clang
 
-from utility import get_owner, report_on_cursor
+from utility import get_owner, report_on_cursor, get_actual_type
 from data_structure import StateObject, Function, MyType
 from log import error, debug, report
 
@@ -585,7 +585,9 @@ class Ref(Instruction):
         ref = Ref(None, clang.CursorKind.MEMBER_REF_EXPR)
         ref.name = name
         if info:
-            key = f'class_{self.type.spelling}'
+            T = self.type
+            T = get_actual_type(T)
+            key = f'class_{T.spelling}'
             struct_scope = info.sym_tbl.scope_mapping[key]
             sym = struct_scope.lookup(name)
             assert sym is not None
@@ -593,6 +595,7 @@ class Ref(Instruction):
             assert isinstance(ref.type, MyType)
         else:
             ref.type = None
+            assert 0, 'This should not happen'
         ref.owner.append(self)
         return ref
 
