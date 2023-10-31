@@ -1,4 +1,5 @@
 import clang.cindex as clang
+from contextlib import contextmanager
 
 from log import error, debug, report
 from data_structure import *
@@ -9,20 +10,25 @@ from passes.pass_obj import PassObject
 from bpf_passes.transform_vars import SEND_FLAG_NAME
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr, is_value_from_bpf_ctx
 from helpers.instruction_helper import get_ret_inst
+from helpers.cache_helper import generate_cache_update
 
 
 MODULE_TAG = '[2nd Transform]'
 cb_ref = CodeBlockRef()
 current_function = None
 _has_processed_func = set()
+declare_at_top_of_func = None
 
-def _get_fail_ret_val():
-    if current_function is None:
-        return 'XDP_DROP'
-    elif current_function.return_type.spelling == 'void':
-        return ''
-    else:
-        return f'({current_function.return_type.spelling})0'
+
+@contextmanager
+def set_current_func(func):
+    global current_function
+    tmp = current_function
+    current_function = func
+    try:
+        yield func
+    finally:
+        current_function = tmp
 
 
 _malloc_map_counter = 0
@@ -85,7 +91,7 @@ def _known_function_substitution(inst, info):
         report('Declare map', m, 'for malloc')
 
         # Look the malloc map
-        return_val = _get_fail_ret_val()
+        return_val = get_ret_inst(current_function, info).body[0].text
         lookup_inst, ref = malloc_lookup(name, info, return_val)
         blk = cb_ref.get(BODY)
         for tmp_inst in lookup_inst:
@@ -123,7 +129,8 @@ def _process_write_call(inst, info):
         inst = info.prog.send(buf, write_size, info, do_copy=should_copy)
     else:
         # On a function which is not the main. Do not return
-        copy_inst = info.prog.send(buf, write_size, info, ret=False, failure=_get_fail_ret_val(), do_copy=should_copy)
+        return_val = get_ret_inst(current_function, info).body[0].text
+        copy_inst = info.prog.send(buf, write_size, info, ret=False, failure=return_val, do_copy=should_copy)
         # set the flag
         flag_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
         flag_ref.name = SEND_FLAG_NAME
@@ -151,9 +158,19 @@ def _process_call_inst(inst, info):
     return inst
 
 
+def _process_annotation(inst, info):
+    if inst.ann_kind == Annotation.ANN_CACHE_BEGIN_UPDATE:
+        blk = cb_ref.get(BODY)
+        new_inst, to_be_declared = generate_cache_update(inst, blk, current_function, info)
+        declare_at_top_of_func.extend(to_be_declared)
+        return new_inst
+
+
 def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.CALL_EXPR:
         return _process_call_inst(inst,info)
+    elif inst.kind == ANNOTATION_INST:
+        return _process_annotation(inst, info)
     return inst
 
 
@@ -193,14 +210,22 @@ def transform_func_after_verifier(bpf, info, more):
     e.g., to check if it is needed to copy data from a buffer to
     the packet or it is already on the packet.
     """
-    global current_function
-    current_function = None
-    res = _do_pass(bpf, info, more)
+    global declare_at_top_of_func
+    declare_at_top_of_func = []
+    with set_current_func(None):
+        res = _do_pass(bpf, info, more)
+    if declare_at_top_of_func:
+        for inst in declare_at_top_of_func:
+            res.children.insert(0, inst)
+    declare_at_top_of_func = []
 
     for func in Function.directory.values():
         if func.is_used_in_bpf_code:
-            current_function = func
-            with info.sym_tbl.with_func_scope(current_function.name):
-                func.body = _do_pass(func.body, info, PassObject())
-            current_function = None
+            with set_current_func(func):
+                with info.sym_tbl.with_func_scope(current_function.name):
+                    func.body = _do_pass(func.body, info, PassObject())
+                    if declare_at_top_of_func:
+                        for inst in declare_at_top_of_func:
+                            func.body.children.insert(0, inst)
+                    declare_at_top_of_func = []
     return res

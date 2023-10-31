@@ -31,6 +31,8 @@ class Info:
         # Keep track of information about the userspace program
         self.user_prog = UserProg()
         self.io_ctx = None
+        # Maps defined in using annotation
+        self.map_definitions = {}
 
 
 class PacketBuffer:

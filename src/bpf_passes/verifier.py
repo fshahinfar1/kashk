@@ -226,6 +226,7 @@ def verifier_pass(inst, info, more):
     context is accessed. It happens when passing the value to a function or
     when it is used in with an operator.
     """
+    global declare_at_top_of_func
     declare_at_top_of_func = []
     with set_current_func(None):
         return _do_pass(inst, info, more)
