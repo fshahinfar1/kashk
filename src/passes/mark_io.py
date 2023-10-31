@@ -86,6 +86,9 @@ def _do_mark_write(w, info):
         buf_sz = skip_unexposed_stmt(args[2])
     elif func_name == 'sendmsg':
         error('sendmsg is not supported yet')
+        # buf_arg = skip_unexposed_stmt(args[1])
+        # assert isinstance(buf_arg, Ref)
+        # buf_arg = buf_arg.get_ref_field('', info)
         buf_arg = Literal('<buf>', CODE_LITERAL)
         buf_sz = Literal('1024', clang.CursorKind.INTEGER_LITERAL)
 

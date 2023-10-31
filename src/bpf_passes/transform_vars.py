@@ -33,14 +33,6 @@ def _set_skip(val):
     skip_to_end = val
 
 
-def _get_fail_ret_val():
-    if current_function is None:
-        return 'XDP_DROP'
-    elif current_function.return_type.spelling == 'void':
-        return ''
-    else:
-        return f'({current_function.return_type.spelling})0'
-
 # TODO: why I have to return functions! What am I doing? :)
 def _get_ret_inst():
     ret = Instruction()
@@ -52,80 +44,6 @@ def _get_ret_inst():
     else:
         ret.body = []
     return ret
-
-
-_malloc_map_counter = 0
-def _get_malloc_name():
-    global _malloc_map_counter
-    _malloc_map_counter += 1
-    return f'malloc_{_malloc_map_counter}'
-
-
-def _rename_func_to_a_known_one(inst, info, target_name):
-    inst.name = target_name
-    # Mark the function used
-    func = inst.get_function_def()
-    assert func is not None
-    if not func.is_used_in_bpf_code:
-        func.is_used_in_bpf_code = True
-        info.prog.declarations.insert(0, func)
-    # debug(MODULE_TAG, 'Add func:', func.name)
-    return inst
-
-def _known_function_substitution(inst, info):
-    """
-    Replace some famous functions with implementations that work in BPF
-    """
-    if inst.name == 'strlen':
-        return _rename_func_to_a_known_one(inst, info, 'bpf_strlen')
-    elif inst.name == 'strncpy':
-        assert len(inst.args) == 3, 'Assumption on the number of arguments'
-        end_dest = BinOp.build_op(inst.args[0], '+', inst.args[2])
-        # end_src = BinOp.build_op(inst.args[1], '+', inst.args[2])
-        inst.args.extend([end_dest,])
-        return _rename_func_to_a_known_one(inst, info, 'bpf_strncpy')
-    elif inst.name == 'malloc':
-        map_value_size,_ = gen_code([inst.args[0]], info)
-        name = _get_malloc_name()
-        map_name = name + '_map'
-
-        # Define structure which will be the value of the malloc map
-        field = StateObject(None)
-        field.name = 'data'
-        field.type_ref = MyType.make_array('_unset_type_name_', BASE_TYPES[clang.TypeKind.SCHAR], map_value_size)
-        value_type = Record(name, [field])
-        value_type.is_used_in_bpf_code = True
-        info.prog.add_declaration(value_type)
-
-        __scope = info.sym_tbl.current_scope
-        info.sym_tbl.current_scope = info.sym_tbl.global_scope
-        value_type.update_symbol_table(info.sym_tbl)
-        info.sym_tbl.current_scope = __scope
-        report('Declare', value_type, 'as malloc object')
-
-        # Define the map
-        m = define_bpf_arr_map(map_name, f'struct {name}', 1)
-        info.prog.add_declaration(m)
-        report('Declare map', m, 'for malloc')
-
-        # Look the malloc map
-        return_val = _get_fail_ret_val()
-        lookup_inst, ref = malloc_lookup(name, info, return_val)
-        blk = cb_ref.get(BODY)
-        for tmp_inst in lookup_inst:
-            blk.append(tmp_inst)
-        return ref
-    elif inst.name in ('ntohs', 'ntohl', 'htons', 'htonl'):
-        inst.name = 'bpf_'+inst.name
-        return inst
-    elif inst.name == 'htonll':
-        inst.name = 'bpf_cpu_to_be64'
-        return inst
-    elif inst.name == 'ntohll':
-        inst.name = 'bpf_be64_to_cpu'
-        return inst
-    error(f'Know function {inst.name} is not implemented yet')
-    return inst
 
 
 def _check_if_ref_is_global_state(inst, info):
@@ -498,8 +416,7 @@ def _process_current_inst(inst, info, more):
             # return _process_write_call(inst, info)
             return inst
         elif inst.name in KNOWN_FUNCS:
-            # Use known implementations of famous functions
-            return _known_function_substitution(inst, info)
+            return inst
         else:
             # Check if the function being invoked needs to receive any flag and pass.
             func = inst.get_function_def()
