@@ -1,4 +1,5 @@
 import itertools
+from contextlib import contextmanager
 import clang.cindex as clang
 
 from log import error, debug
@@ -20,6 +21,20 @@ MODULE_TAG = '[Fallback Pass]'
 current_function = None
 cb_ref = CodeBlockRef()
 _has_processed = set()
+declare_at_top_of_func = []
+
+ZERO = Literal('0', clang.CursorKind.INTEGER_LITERAL)
+
+
+@contextmanager
+def _new_top_func_declare_context():
+    global declare_at_top_of_func
+    tmp = declare_at_top_of_func
+    declare_at_top_of_func = []
+    try:
+        yield declare_at_top_of_func
+    finally:
+        declare_at_top_of_func = tmp
 
 
 class After:
@@ -38,14 +53,36 @@ def remember_func(func):
         current_function = tmp
 
 
+def _set_failure_flag(failure_number, is_pointer=False):
+    int_inst = Literal(str(failure_number), clang.CursorKind.INTEGER_LITERAL)
+    ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
+    ref.name = FAIL_FLAG_NAME
+    if is_pointer:
+        ref.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+        ref = UnaryOp.build('*', ref)
+    else:
+        ref.type = BASE_TYPES[clang.TypeKind.SCHAR]
+    # Assign
+    set_failuer = BinOp.build_op(ref, '=', int_inst)
+    return set_failuer
+
+
+def _decl_failure_flag_on_stack(info):
+
+    T = BASE_TYPES[clang.TypeKind.SCHAR]
+    flag_decl = VarDecl(None)
+    flag_decl.name = FAIL_FLAG_NAME
+    flag_decl.type = T
+    flag_decl.init.add_inst(ZERO)
+
+    declare_at_top_of_func.append(flag_decl)
+    flag_decl.update_symbol_table(info.sym_tbl)
+
+
 def _handle_function_may_fail(inst, func, info, more):
     ctx = more.ctx
 
     blk = cb_ref.get(BODY)
-
-    flag_ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
-    flag_ref.name = FAIL_FLAG_NAME
-    flag_ref.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
 
     before_func_call = []
     after_func_call = []
@@ -58,39 +95,28 @@ def _handle_function_may_fail(inst, func, info, more):
             return inst
         inst.change_applied |= Function.FAIL_FLAG
 
-        flag_obj = StateObject(None)
-        flag_obj.name = flag_ref.name
-        T = flag_ref.type
-        flag_obj.type_ref = T
-
         assert (func.change_applied & Function.FAIL_FLAG) != 0, f'The fail flag should alread be added to the function definition (func:{func.name})'
 
         # Pass the flag when invoking the function
         # First check if we need to allocate the flag on the stack memory
         sym = info.sym_tbl.lookup(FAIL_FLAG_NAME)
-        is_on_the_stack = sym is not None
-        if not is_on_the_stack:
-            # declare a local variable
-            flag_decl = VarDecl(None)
-            flag_decl.name = flag_obj.name
-            flag_decl.type = flag_ref.type.under_type
-            flag_decl.state_obj = flag_obj
-            zero = Literal('0', clang.CursorKind.INTEGER_LITERAL)
-            flag_decl.init.add_inst(zero)
-            before_func_call.append(flag_decl)
-            flag_decl.update_symbol_table(info.sym_tbl)
+        is_defined = sym is not None
+        # debug('on func:', current_function.name if current_function else 'MAIN', ' and the fail flag is defined on stack[T/F]?:', is_on_the_stack)
+        if not is_defined:
+            _decl_failure_flag_on_stack(info)
+            sym = info.sym_tbl.lookup(FAIL_FLAG_NAME)
+        assert sym is not None, 'By now the flag should be defined'
+
+        is_flag_pointer = sym.type.is_pointer()
 
         # Now add the argument to the invocation instruction
         # TODO: update every invocation of this function with the flag parameter
-        if not is_on_the_stack:
-            # pass a reference
-            addr_op = UnaryOp(None)
-            addr_op.op = '&'
-            flag_ref.type = flag_decl.type
-            addr_op.child.add_inst(flag_ref)
-            inst.args.append(addr_op)
-        else:
+        flag_ref = Ref.from_sym(sym)
+        if is_flag_pointer:
             inst.args.append(flag_ref)
+        else:
+            addr_op = UnaryOp.build('&', flag_ref)
+            inst.args.append(addr_op)
 
         tmp = Literal('/* check if function fail */\n', CODE_LITERAL)
         after_func_call.append(tmp)
@@ -104,10 +130,6 @@ def _handle_function_may_fail(inst, func, info, more):
             first_failure_case = None
             prev_failure_case = None
 
-            failure_flag_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
-            failure_flag_ref.name = FAIL_FLAG_NAME
-            failure_flag_ref.type = BASE_TYPES[clang.TypeKind.SCHAR]
-
             for failure_number in func.path_ids:
                 # TODO: change declaration to a dictionary instead of array
                 meta = info.user_prog.declarations[failure_number-1]
@@ -115,7 +137,7 @@ def _handle_function_may_fail(inst, func, info, more):
 
                 # Check the failure number
                 int_literal = Literal(str(failure_number), clang.CursorKind.INTEGER_LITERAL)
-                cond = BinOp.build_op(failure_flag_ref, '==', int_literal)
+                cond = BinOp.build_op(flag_ref, '==', int_literal)
                 if_inst = ControlFlowInst.build_if_inst(cond)
                 if_inst.body.add_inst(prepare_meta_code)
                 if_inst.body.add_inst(ToUserspace.from_func_obj(current_function))
@@ -126,37 +148,35 @@ def _handle_function_may_fail(inst, func, info, more):
                     first_failure_case = if_inst
                 prev_failure_case = if_inst
             return_stmt = first_failure_case
-            flag_ref = failure_flag_ref
-
 
         # The code that should run when there is a failure
-        int_literal = Literal('0', clang.CursorKind.INTEGER_LITERAL)
-        cond = BinOp.build_op(flag_ref, '!=', int_literal)
+        if flag_ref.type.is_pointer():
+            flag_val = UnaryOp.build('*', flag_ref)
+        else:
+            flag_val = flag_ref
+        cond = BinOp.build_op(flag_val, '!=', ZERO)
         if_inst = ControlFlowInst.build_if_inst(cond)
         if_inst.body.add_inst(return_stmt)
         after_func_call.append(if_inst)
 
         # Analyse the called function.
-        with remember_func(func):
-            with info.sym_tbl.with_func_scope(func.name):
-                modified = _do_pass(func.body, info, PassObject())
-        assert modified is not None
-        func.body = modified
+        if func.name not in _has_processed:
+            _has_processed.add(func.name)
+            with remember_func(func):
+                with info.sym_tbl.with_func_scope(func.name):
+                    with _new_top_func_declare_context():
+                        body = _do_pass(func.body, info, PassObject())
+                        body.children = declare_at_top_of_func + body.children
+                        func.body = body
     else:
         # The callee function is going to fail
         if current_function and current_function.may_succeed:
             # We need to notify the caller
-            true = Literal('1', clang.CursorKind.INTEGER_LITERAL)
-
-            val_op = UnaryOp(None)
-            val_op.op = '*'
-            val_op.child.add_inst(flag_ref)
-
-            bin_op = BinOp(None)
-            bin_op.op = '='
-            bin_op.lhs.add_inst(val_op)
-            bin_op.rhs.add_inst(true)
-
+            # TODO: what failure path should we notify?
+            error("It seems there is bug here. We are not notifying the failure number")
+            sym = info.sym_tbl.lookup(FAIL_FLAG_NAME)
+            assert sym is not None, 'if it is not defined, then probably we should define it here'
+            bin_op = _set_failure_flag(1, sym.type.is_pointer())
             after_func_call.append(bin_op)
             after_func_call.append(ToUserspace.from_func_obj(current_function))
         else:
@@ -169,16 +189,20 @@ def _handle_function_may_fail(inst, func, info, more):
 
             if not current_function:
                 # We are in the main BPF function, we should fallback t user
+                error("It seems there is bug here. We are not notifying the failure number")
                 after_func_call.append(ToUserspace.from_func_obj(current_function))
 
 
         # Also take a look at the body of the called function. We may want to
         # remove everything after failure point.
         if func.name not in _has_processed:
+            _has_processed.add(func.name)
             with remember_func(func):
                 with info.sym_tbl.with_func_scope(func.name):
-                    func.body = _do_pass(func.body, info, PassObject())
-            _has_processed.add(func.name)
+                    with _new_top_func_declare_context():
+                        body = _do_pass(func.body, info, PassObject())
+                        body.children = declare_at_top_of_func + body.children
+                        func.body = body
 
     blk.extend(before_func_call)
     blk.append(After(after_func_call))
@@ -186,13 +210,10 @@ def _handle_function_may_fail(inst, func, info, more):
 
 
 def _process_current_inst(inst, info, more):
-    # text, _ = gen_code([inst, ], info)
-    # print(text)
     if inst.kind == clang.CursorKind.CALL_EXPR:
         func = inst.get_function_def()
         # we only need to investigate functions that may fail
         if func and not func.is_empty() and func.may_fail:
-            # debug(MODULE_TAG, func, func.may_succeed, func.may_fail)
             return _handle_function_may_fail(inst, func, info, more)
     elif inst.kind == TO_USERSPACE_INST:
         blk = cb_ref.get(BODY)
@@ -203,12 +224,12 @@ def _process_current_inst(inst, info, more):
             prepare_pkt = prepare_meta_data(failure_number, meta, info.prog)
             blk.append(prepare_pkt)
         else:
-            ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
-            ref.name = FAIL_FLAG_NAME
-            ref.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
-            deref = UnaryOp.build('*', ref)
-            int_inst = Literal(str(failure_number), clang.CursorKind.INTEGER_LITERAL)
-            set_failuer = BinOp.build_op(deref, '=', int_inst)
+            sym = info.sym_tbl.lookup(FAIL_FLAG_NAME)
+            if sym is None:
+                _decl_failure_flag_on_stack(info)
+                sym = info.sym_tbl.lookup(FAIL_FLAG_NAME)
+            assert sym is not None, 'We want to set the failure flag, it should be already defined!'
+            set_failuer = _set_failure_flag(failure_number, sym.type.is_pointer())
             blk.append(set_failuer)
     return inst
 
@@ -262,4 +283,8 @@ def _do_pass(inst, info, more):
 
 
 def userspace_fallback_pass(inst, info, more):
-    return _do_pass(inst, info, more)
+    with remember_func(None):
+        with _new_top_func_declare_context():
+            body = _do_pass(inst, info, more)
+            body.children = declare_at_top_of_func + body.children
+    return body

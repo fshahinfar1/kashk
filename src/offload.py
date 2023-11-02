@@ -148,9 +148,9 @@ def generate_offload(io_ctx):
     # print(code)
     # show_insts([bpf])
 
-    # func = Function.directory.get('memmove')
-    # assert func is not None
-    # print(func.name, func.may_succeed, func.may_fail)
+    func = Function.directory.get('drive_machine')
+    assert func is not None
+    print(func.name, func.may_succeed, func.may_fail)
 
     # func = Function.directory.get('try_read_udp')
     # assert func

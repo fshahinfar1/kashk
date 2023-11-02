@@ -194,13 +194,10 @@ def _process_current_inst(inst, info, more):
                     decl.name = SEND_FLAG_NAME
                     decl.type = BASE_TYPES[clang.TypeKind.SCHAR]
                     decl.init.add_inst(Literal('0', clang.CursorKind.INTEGER_LITERAL))
-                    blk = cb_ref.get(BODY)
-                    blk.append(decl)
+                    declare_at_top_of_func.append(decl)
                     info.sym_tbl.insert_entry(decl.name, decl.type, decl.kind, None)
 
-                    flag_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
-                    flag_ref.name = SEND_FLAG_NAME
-                    flag_ref.type = BASE_TYPES[clang.TypeKind.SCHAR]
+                    flag_ref = decl.get_ref()
 
                     ref = UnaryOp.build('&', flag_ref)
                     inst.args.append(ref)
@@ -293,7 +290,7 @@ def _check_func_receives_all_the_flags(func, info):
         scope = info.sym_tbl.scope_mapping.get(func.name)
         assert scope is not None
         scope.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
-        # debug('add param:', FAIL_FLAG_NAME, 'to', func.name)
+        debug('add param:', FAIL_FLAG_NAME, 'to', func.name)
 
 
 def transform_vars_pass(inst, info, more):

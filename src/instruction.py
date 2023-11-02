@@ -544,6 +544,13 @@ class Cast(Instruction):
 
 
 class Ref(Instruction):
+    @classmethod
+    def from_sym(cls, sym):
+        ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
+        ref.name = sym.name
+        ref.type = sym.type
+        return ref
+
     def __init__(self, cursor, kind=None):
         super().__init__()
         self.cursor = cursor
@@ -703,6 +710,7 @@ class ToUserspace(Instruction):
         obj.is_bpf_main = func is None
         if func is not None:
             obj.return_type = func.return_type
+        error("We are not seeting the faliure ID for a ToUserspace instruction.")
         return obj
 
     def __init__(self):
