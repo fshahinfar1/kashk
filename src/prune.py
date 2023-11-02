@@ -78,7 +78,7 @@ def should_ignore_cursor(cursor):
         tokens = [t.spelling for t in cursor.get_tokens()]
         count_token = len(tokens)
         if count_token < 2:
-            error('Unary operator with less than 2 tokens will fail to convert to UnaryOp object. It was ignored!')
+            error('Unary operator with less than 2 tokens will fail to convert to UnaryOp object. It was ignored!', cursor, tokens)
             return True
         # Basically check if we can find the unary operator
         candid = tokens[0]

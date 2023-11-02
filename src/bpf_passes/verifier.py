@@ -64,7 +64,7 @@ def _handle_binop(inst, info, more):
     if inst.op == '=':
         # lhs_is_ptr = is_bpf_ctx_ptr(lhs, info)
         rhs_is_ptr = is_bpf_ctx_ptr(rhs, info)
-        # debug("***", gen_code([inst,], info), '|| LHS kind:', lhs.kind, '|| RHS kind:', rhs.kind, '|| is rhs ctx:', rhs_is_ptr)
+        debug("***", gen_code([inst,], info), '|| LHS kind:', lhs.kind, '|| RHS kind:', rhs.kind, '|| is rhs ctx:', rhs_is_ptr)
         set_ref_bpf_ctx_state(lhs, rhs_is_ptr, info)
         # assert is_bpf_ctx_ptr(lhs, info) == rhs_is_ptr, 'Check if set_ref_bpf_ctx_state and is_bpf_ctx_ptr work correctly'
         if is_bpf_ctx_ptr(lhs, info) != rhs_is_ptr:
@@ -91,7 +91,7 @@ def _handle_binop(inst, info, more):
 
             # Report for debuging
             tmp,_ = gen_code([inst], info)
-            debug(f'Add a bound check before:\n    {tmp}')
+            # debug(f'Add a bound check before:\n    {tmp}')
     # Keep the instruction unchanged
     return inst
 

@@ -73,7 +73,7 @@ def _handle_reference(path, inst, info, ctx, parent_bin_op):
         blk = cb_ref.get(BODY)
         orig_sym = path.original_scope.lookup(inst.name)
         if orig_sym is None:
-            error(MODULE_TAG, f'Variable {inst.name} was not found in the symbol table! Assuming it is not needed in userspace')
+            error(MODULE_TAG, f'Variable {inst.name} was not found in the symbol table! Assuming it is not needed in userspace', inst.kind)
         elif _should_not_share_variable(inst, orig_sym, info):
             debug(MODULE_TAG, 'not share:', inst.name, 'type:', orig_sym.type.spelling)
             decl = VarDecl(None)

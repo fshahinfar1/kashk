@@ -84,12 +84,13 @@ def _remember_func_for_further_proc(cursor, info):
         if func_decl.is_definition():
             if func_decl == func_def_cursor:
                 # This is the same definition we already know about
-                pass
+                return
             else:
                 error(MODULE_TAG, f'Multiple definition for function {key} is found!')
+                return
         else:
             # We already know a definition and do not care about this cursor.
-            pass
+            return
     else:
         Function.func_cursor[key] = func_decl
 

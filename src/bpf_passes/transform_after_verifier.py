@@ -84,12 +84,12 @@ def _known_function_substitution(inst, info):
         info.sym_tbl.current_scope = info.sym_tbl.global_scope
         value_type.update_symbol_table(info.sym_tbl)
         info.sym_tbl.current_scope = __scope
-        report('Declare', value_type, 'as malloc object')
+        # report('Declare', value_type, 'as malloc object')
 
         # Define the map
         m = define_bpf_arr_map(map_name, f'struct {name}', 1)
         info.prog.add_declaration(m)
-        report('Declare map', m, 'for malloc')
+        # report('Declare map', m, 'for malloc')
 
         # Look the malloc map
         return_val = get_ret_inst(current_function, info).body[0].text
@@ -113,7 +113,7 @@ def _known_function_substitution(inst, info):
 
 def _process_write_call(inst, info):
     buf = inst.wr_buf.name
-    report(f'Using buffer {buf} to send response')
+    # report(f'Using buffer {buf} to send response')
     # TODO: maybe it is too soon to convert instructions to the code
     if inst.wr_buf.size_cursor is None:
         write_size = Literal('<UNKNOWN WRITE BUF SIZE>', CODE_LITERAL)

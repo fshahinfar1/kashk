@@ -710,7 +710,7 @@ class ToUserspace(Instruction):
         obj.is_bpf_main = func is None
         if func is not None:
             obj.return_type = func.return_type
-        error("We are not seeting the faliure ID for a ToUserspace instruction.")
+        error('We are not seting the faliure ID for a ToUserspace instruction.')
         return obj
 
     def __init__(self):

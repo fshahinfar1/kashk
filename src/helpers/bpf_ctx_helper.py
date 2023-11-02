@@ -74,7 +74,7 @@ def is_bpf_ctx_ptr(inst, info):
         sym = info.sym_tbl.lookup(inst.name)
         # assert sym is not None, 'What does it mean there is no symbol table entry  ??'
         if sym is None:
-            error('Symbol for reference {inst.name} was not found in the tabel!')
+            error(f'Symbol for reference {inst.name} was not found in the tabel!')
             return False
         # debug(sym.name, '--bpf ctx-->', sym.is_bpf_ctx)
         if sym.is_bpf_ctx:
@@ -128,13 +128,13 @@ def set_ref_bpf_ctx_state(ref, state, info):
     @param ref: object of type Ref
     @param state: bool
     """
-    debug('set', ref, 'as context:', state)
+    # debug('set', ref, 'as context:', state)
     # TODO: it can also be a MEMBER_REF
     if ref.kind == clang.CursorKind.DECL_REF_EXPR:
         sym = info.sym_tbl.lookup(ref.name)
         # assert sym is not None, f'{ref.name} should be found in symbol table'
         if sym is None:
-            error('Symbol for reference {inst.name} was not found in the tabel! [2]')
+            error(f'Symbol for reference {ref.name} was not found in the tabel! [2]')
             return
         sym.is_bpf_ctx = state
         debug(sym.name, '--> ctx ptr:', state)
@@ -155,5 +155,5 @@ def set_ref_bpf_ctx_state(ref, state, info):
         if sym is None:
             sym = owner_symbol.fields.insert_entry(ref.name, ref.type, ref.kind, None)
         sym.is_bpf_ctx = state
-        # debug('Just set member field:', owner.name, ref.name, 'to', state)
+        debug('Just set member field:', owner.name, ref.name, 'to', state)
         # debug('owner symb ref:', id(owner_symbol), 'field ref:', id(sym))

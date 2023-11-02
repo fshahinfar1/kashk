@@ -178,6 +178,7 @@ def linear_code_pass(inst, info, more):
     for func in Function.directory.values():
         if not func.is_used_in_bpf_code:
             continue
+        debug(func.name)
         func.body = _do_pass(func.body, info, PassObject())
         if not func.is_empty() and func.return_type.spelling == 'void':
             _make_sure_void_func_return(func, info)

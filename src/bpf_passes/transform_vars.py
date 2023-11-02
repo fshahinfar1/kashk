@@ -87,7 +87,7 @@ def _process_annotation(inst, info):
         info.prog.add_declaration(m)
         assert map_id not in info.map_definitions, 'Multiple deffinition of the same map id'
         info.map_definitions[map_id] = conf
-        report('Declare map', m, 'for malloc')
+        # report('Declare map', m, 'for malloc')
     elif inst.ann_kind == Annotation.ANN_CACHE_END:
         # Nothing to do
         pass
@@ -113,7 +113,7 @@ def _process_read_call(inst, info):
     blk = cb_ref.get(BODY)
 
     # NOTE: I can assign the pointer but then the buffer size won't be right? <-- should be looked at as an optimization?
-    report('Assigning packet buffer to var:', inst.rd_buf.name)
+    # report('Assigning packet buffer to var:', inst.rd_buf.name)
     # Assign packet pointer on a previouse line
     lhs = inst.rd_buf.ref
     rhs = info.prog.get_pkt_buf()
@@ -316,7 +316,7 @@ def _check_func_receives_all_the_flags(func, info):
         func.change_applied |= Function.CTX_FLAG
         scope = info.sym_tbl.scope_mapping.get(func.name)
         assert scope is not None
-        scope.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
+        info.prog.add_args_to_scope(info.sym_tbl.current_scope)
 
     if func.calls_send and (func.change_applied & Function.SEND_FLAG == 0):
         # Add the send flag
@@ -338,7 +338,7 @@ def _check_func_receives_all_the_flags(func, info):
         scope = info.sym_tbl.scope_mapping.get(func.name)
         assert scope is not None
         scope.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
-        debug('add param:', FAIL_FLAG_NAME, 'to', func.name)
+        # debug('add param:', FAIL_FLAG_NAME, 'to', func.name)
 
 
 def transform_vars_pass(inst, info, more):

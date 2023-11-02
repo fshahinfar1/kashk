@@ -36,7 +36,8 @@ def remember_func(func):
 def is_function_call_feasible(inst, info):
     func = inst.get_function_def()
     if func is None:
-        error(f'Do not have function struct for {inst.name}')
+        current_func_name =  current_function.name if current_function is not None else '<unknown func>'
+        error(f'Do not have function struct for {inst.name}', 'Invoked from', current_function)
         return False
     if func.is_empty():
         if inst.name in (KNOWN_FUNCS + READ_PACKET + WRITE_PACKET):
@@ -49,10 +50,8 @@ def is_function_call_feasible(inst, info):
     if processed_before:
         return func.may_succeed
 
-    # print('is func call feasable?', inst.name)
     with remember_func(func):
         with info.sym_tbl.with_func_scope(inst.name):
-            # print(func.name)
             body = _do_pass(func.body, info, PassObject())
 
     assert body is not None, 'this pass should not remove anything'
@@ -70,7 +69,6 @@ def _process_current_inst(inst, info, more):
         func = inst.get_function_def()
         if func and current_function and func.may_fail:
             # The called function may fail
-            # print('Current function has failed:', func.name)
             current_function.may_fail = True
     return inst, False
 

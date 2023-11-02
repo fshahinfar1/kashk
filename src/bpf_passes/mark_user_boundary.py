@@ -11,7 +11,7 @@ from passes.pass_obj import PassObject
 from passes.clone import clone_pass
 
 
-MODULE_TAG = '[Feasibility Pass]'
+MODULE_TAG = '[Mark Boundary]'
 FAILED = 999
 PARENT_INST = 1000
 
@@ -55,7 +55,7 @@ def _process_current_inst(inst, info, more):
         assert func is not None or inst.is_func_ptr, 'only function pointer are allowed to not have function structure'
         if func is None:
             # TODO: calling function pointers are not support for now. But I should add the support
-            error(MODULE_TAG, 'calling function pointers are not support for now')
+            # debug(MODULE_TAG, 'calling function pointers are not support for now')
             return inst, YES
         assert func.may_fail or func.may_succeed, f'The information about function failures should be processed before this step (func: {func.name})'
 
@@ -99,7 +99,7 @@ def _to_userspace(i, info, body):
     to_user_inst.path_id = failure_path_id
     failure_path_id += 1
     body.append(to_user_inst)
-    debug(MODULE_TAG, 'new failure path:', to_user_inst.path_id)
+    # debug(MODULE_TAG, 'new failure path:', to_user_inst.path_id)
 
     if current_function:
         current_function.path_ids.append(to_user_inst.path_id)
@@ -145,7 +145,7 @@ def _do_pass(inst, info, more):
             blk = cb_ref.get(BODY)
             _to_userspace(inst, info, blk)
             text, _ = gen_code([inst], info)
-            debug(MODULE_TAG, 'Go to userspace at instruction:', text)
+            # debug(MODULE_TAG, 'Go to userspace at instruction:', text)
             failed = MARKED
             fail_ref.set(FAILED, failed)
             return clone_pass(inst, info, PassObject())

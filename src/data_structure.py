@@ -396,7 +396,6 @@ class Function(TypeDefinition):
         if directory is None:
             directory = Function.directory
         if self.name in directory:
-            debug(directory)
             raise Exception(f'Function is already defined ({self.name})')
         directory[self.name] = self
 
