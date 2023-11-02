@@ -3,7 +3,7 @@ from log import error, debug
 from data_structure import *
 from instruction import *
 from sym_table import SymbolTableEntry
-from utility import indent, get_tmp_var_name, show_insts
+from utility import indent, get_tmp_var_name
 from bpf_code_gen import gen_code
 from passes.pass_obj import PassObject
 

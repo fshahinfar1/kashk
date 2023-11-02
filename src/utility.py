@@ -222,22 +222,6 @@ def report_on_cursor(c):
                 debug(' ' * (c.location.column -1) + '^')
 
 
-def show_insts(lst, depth=0):
-    """
-    Visualize the tree of instructions
-    """
-    from instruction import Block
-    indent = '  '
-    if isinstance(lst, Block):
-        lst = lst.children
-    for i in lst:
-        debug(indent * depth + str(i))
-        if isinstance(i, list):
-            show_insts(i, depth=depth+1)
-        elif i.has_children():
-            show_insts(i.get_children(), depth=depth+1)
-
-
 def get_owner(cursor):
     """
     @returns list of Instruction

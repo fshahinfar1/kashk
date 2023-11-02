@@ -1,5 +1,5 @@
 import clang.cindex as clang
-from utility import (get_code, report_on_cursor, visualize_ast, show_insts, skip_unexposed_stmt)
+from utility import (get_code, report_on_cursor, visualize_ast, skip_unexposed_stmt)
 from log import error, debug, report
 from prune import READ_PACKET, WRITE_PACKET, COROUTINE_FUNC_NAME
 from data_structure import *

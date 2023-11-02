@@ -1,6 +1,23 @@
 from instruction import *
 
 
+def show_insts(lst, depth=0):
+    """
+    Visualize the tree of instructions
+    """
+    indent = '  '
+    if isinstance(lst, Block):
+        lst = lst.children
+    elif isinstance(lst, Instruction):
+        lst = [lst,]
+    for i in lst:
+        debug(indent * depth + str(i))
+        if isinstance(i, list):
+            show_insts(i, depth=depth+1)
+        elif i.has_children():
+            show_insts(i.get_children(), depth=depth+1)
+
+
 def get_ret_inst(func, info=None):
     """
     Prepare appropriate return instruction based on the current function.

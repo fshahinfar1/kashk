@@ -5,6 +5,7 @@ from log import error, debug, report
 from data_structure import *
 from instruction import *
 from utility import get_tmp_var_name
+from helpers.instruction_helper import show_insts
 
 from bpf_code_gen import gen_code
 from passes.pass_obj import PassObject
@@ -86,6 +87,8 @@ def _move_function_out(inst, info, more):
 def _separate_var_decl_and_init(inst, info, more):
     blk = cb_ref.get(BODY)
     assert blk is not None
+
+    show_insts(inst)
 
     clone = clone_pass(inst, info, PassObject())
 

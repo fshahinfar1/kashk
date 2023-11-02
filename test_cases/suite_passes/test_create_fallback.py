@@ -7,7 +7,8 @@ sys.path.insert(0, root_dir)
 from basic_test_structure import BasicTest, current_file_dir
 
 from bpf_code_gen import gen_code
-from utility import show_insts, find_elems_of_kind, draw_tree
+from utility import find_elems_of_kind, draw_tree
+from helpers.instruction_helper import show_insts
 from data_structure import *
 from instruction import *
 from sym_table import *

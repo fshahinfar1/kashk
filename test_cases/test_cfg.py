@@ -2,7 +2,7 @@ import os
 from basic_test_structure import BasicTest, current_file_dir
 
 from bpf_code_gen import gen_code
-from utility import show_insts
+from helpers.instruction_helper import show_insts
 from data_structure import *
 from instruction import *
 from sym_table import *

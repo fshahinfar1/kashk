@@ -5,7 +5,7 @@ from framework_support import InputOutputContext
 from log import *
 from data_structure import *
 from instruction import *
-from utility import (parse_file, find_elem, report_user_program_graph, draw_tree, show_insts)
+from utility import (parse_file, find_elem, report_user_program_graph, draw_tree)
 from find_ev_loop import get_entry_code
 from sym_table import Scope
 from sym_table_gen import build_sym_table, process_source_file
@@ -34,6 +34,8 @@ from user_passes.select_user import select_user_pass
 from user_passes.number_fallback_graph import number_fallback_graph_pass
 from user_passes.var_dependency import var_dependency_pass
 from user_passes.create_fallback import create_fallback_pass
+
+from helpers.instruction_helper import show_insts
 
 
 MODULE_TAG = '[Gen Offload]'

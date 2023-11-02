@@ -5,7 +5,7 @@ from bpf_code_gen import gen_code
 from template import (prepare_shared_state_var, define_bpf_arr_map,
         define_bpf_hash_map, malloc_lookup)
 from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS
-from utility import get_tmp_var_name, show_insts
+from utility import get_tmp_var_name
 from helpers.cache_helper import generate_cache_lookup
 from helpers.instruction_helper import get_ret_inst
 
