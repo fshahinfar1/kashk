@@ -14,7 +14,7 @@ from prune import WRITE_PACKET, KNOWN_FUNCS, OUR_IMPLEMENTED_FUNC
 
 from helpers.bpf_ctx_helper import (is_bpf_ctx_ptr, is_value_from_bpf_ctx,
         set_ref_bpf_ctx_state)
-from helpers.instruction_helper import get_ret_inst, is_variable, get_scalar_variables
+from helpers.instruction_helper import get_ret_inst, get_scalar_variables, get_ret_value_text
 
 
 MODULE_TAG = '[Verfier Pass]'
@@ -85,7 +85,7 @@ def _handle_binop(inst, info, more):
             ctx_ref = info.prog.get_ctx_ref()
             end_ref = ctx_ref.get_ref_field('data_end', info)
             data_end = Cast.build(end_ref, BASE_TYPES[clang.TypeKind.ULONGLONG])
-            _ret_inst = get_ret_inst(current_function, info).body[0]
+            _ret_inst = get_ret_inst(current_function, info).body.children[0]
             check_inst = bpf_ctx_bound_check(ref, index, data_end, _ret_inst)
             blk.append(check_inst)
 
@@ -166,7 +166,7 @@ def _handle_call(inst, info, more):
             ctx_ref = info.prog.get_ctx_ref()
             end_ref = ctx_ref.get_ref_field('data_end', info)
             data_end = Cast.build(end_ref, BASE_TYPES[clang.TypeKind.ULONGLONG])
-            _ret_inst = get_ret_inst(current_function, info).body[0]
+            _ret_inst = get_ret_inst(current_function, info).body.children[0]
             check_inst = bpf_ctx_bound_check_bytes(ref, size, data_end, _ret_inst)
 
             blk.append(check_inst)

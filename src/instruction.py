@@ -36,7 +36,7 @@ def _generate_marked_children(groups, context):
 
 class Instruction:
     MAY_NOT_OVERLOAD = (clang.CursorKind.BREAK_STMT,
-            clang.CursorKind.CONTINUE_STMT, clang.CursorKind.RETURN_STMT,
+            clang.CursorKind.CONTINUE_STMT,
             clang.CursorKind.GOTO_STMT, clang.CursorKind.LABEL_STMT, clang.CursorKind.INIT_LIST_EXPR)
     def __init__(self):
         self.kind = None
@@ -91,6 +91,33 @@ class Instruction:
 
     def __repr__(self):
         return self.__str__()
+
+
+class Return(Instruction):
+    @classmethod
+    def build(cls, values):
+        obj = Return()
+        obj.body.extend_inst(values)
+        return obj
+
+    def __init__(self):
+        super().__init__()
+        self.body = Block(ARG)
+        self.kind = clang.CursorKind.RETURN_STMT
+
+    def has_children(self):
+        return self.body.has_children()
+
+    def get_children(self):
+        return [self.body,]
+
+    def get_children_context_marked(self):
+        return [(self.body, ARG),]
+
+    def clone(self, children):
+        new = Return()
+        new.body  = children[0]
+        return new
 
 
 class Call(Instruction):
@@ -160,7 +187,7 @@ class Call(Instruction):
         return func
 
     def has_children(self):
-        return True
+        return len(self.args) >  0
 
     def get_children(self):
         return self.args
@@ -678,10 +705,12 @@ class Block(Instruction):
         return f'<Block>'
 
     def add_inst(self, inst):
-        assert inst is not None
+        assert isinstance(inst, Instruction)
         self.children.append(inst)
 
     def extend_inst(self, insts):
+        for inst in insts:
+            assert isinstance(inst, Instruction)
         self.children.extend(insts)
 
     def has_children(self):

@@ -102,6 +102,8 @@ def _do_pass(inst, info, more):
     lvl, ctx, parent_list = more.unpack()
     new_children = []
     failed = fail_ref.get(FAILED)
+    if inst.kind == clang.CursorKind.RETURN_STMT:
+        assert isinstance(inst, Return)
 
     if current_function and not failed and inst.kind == clang.CursorKind.RETURN_STMT:
         current_function.may_succeed = True

@@ -430,12 +430,12 @@ def __convert_cursor_to_inst(c, info, _state):
         # TODO: Return statement is not updated with Block class
         children = list(c.get_children())
         count_children =  len(children)
-        inst = Instruction()
-        inst.kind = c.kind
+        inst = Return()
         if count_children == 0:
-            inst.body = []
+            pass
         elif count_children == 1:
-            inst.body = gather_instructions_from(children[0], info, context=ARG)
+            children = gather_instructions_from(children[0], info, context=ARG)
+            inst.body.extend_inst(children)
         else:
             raise Exception('Unexpected situation when encountering RETURN_STMT')
         return inst
@@ -447,9 +447,7 @@ def __convert_cursor_to_inst(c, info, _state):
         # Some hacks
         text = get_code(c)
         if text.startswith('co_return'):
-            inst = Instruction()
-            inst.kind = clang.CursorKind.RETURN_STMT
-            inst.body = []
+            inst = Return()
             return inst
         else:
             error('TODO:')

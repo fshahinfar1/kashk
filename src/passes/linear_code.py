@@ -23,9 +23,7 @@ def _make_sure_void_func_return(func, info):
     if last_inst.kind == clang.CursorKind.RETURN_STMT:
         # The function end with a return
         return
-    ret_inst = Instruction()
-    ret_inst.kind = clang.CursorKind.RETURN_STMT
-    ret_inst.body = []
+    ret_inst = Return()
     func.body.add_inst(ret_inst)
     # report('Add return statement to the end of', func.name)
 

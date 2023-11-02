@@ -48,7 +48,7 @@ class TestCase(BasicTest):
         assert func2.args[-1].type == 'struct __ex_func2 *'
 
         ret_inst = func.body.children[0]
-        ref = ret_inst.body[0].rhs.children[0]
+        ref = ret_inst.body.children[0].rhs.children[0]
         assert ref.name == 'i', 'Make sure the right reference is selected'
         assert ref.owner[0].name == '__ex', 'The references to the variables should be replaced with access to the struct'
 

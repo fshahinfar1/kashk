@@ -10,18 +10,9 @@ SWITCH = 2
 LOOP = 3
 
 
-SK_DROP = Literal('SK_DROP', clang.CursorKind.MACRO_INSTANTIATION)
-XDP_DROP = Literal('XDP_DROP', clang.CursorKind.MACRO_INSTANTIATION)
-
 def _return_drop_inst(info):
-    ret_inst = Instruction()
-    ret_inst.kind = clang.CursorKind.RETURN_STMT
-    if info.io_ctx.bpf_hook == info.io_ctx.__class__.HOOK_SK_SKB:
-        ret_inst.body = [SK_DROP.clone([]),]
-    elif info.io_ctx.bpf_hook == info.io_ctx.__class__.HOOK_XDP:
-        ret_inst.body = [XDP_DROP.clone([]),]
-    else:
-        raise Exception('Unexpected bpf hook')
+    val      = Literal(info.prog.get_drop(), clang.CursorKind.INTEGER_LITERAL)
+    ret_inst = Return.build([val,])
     return ret_inst
 
 

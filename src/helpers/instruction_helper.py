@@ -5,18 +5,24 @@ def get_ret_inst(func, info=None):
     """
     Prepare appropriate return instruction based on the current function.
     """
-    ret = Instruction()
-    ret.kind = clang.CursorKind.RETURN_STMT
+    ret = Return()
     if func is None:
         ret_val = 'DROP'
         if info is not None:
             ret_val = info.prog.get_drop()
-        ret.body = [Literal(ret_val, CODE_LITERAL)]
+        ret.body.add_inst(Literal(ret_val, CODE_LITERAL))
     elif func.return_type.spelling != 'void':
-        ret.body = [Literal(f'({func.return_type.spelling})0', CODE_LITERAL)]
-    else:
-        ret.body = []
+        ret.body.add_inst(Literal(f'({func.return_type.spelling})0', CODE_LITERAL))
     return ret
+
+
+def get_ret_value_text(func, info):
+    __tmp = get_ret_inst(func, info)
+    if __tmp.body.has_children():
+        return_val = __tmp.body.children[0].text
+    else:
+        return_val = ''
+    return return_val
 
 
 def is_variable(inst):

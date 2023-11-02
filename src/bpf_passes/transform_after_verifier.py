@@ -10,7 +10,7 @@ from bpf_code_gen import gen_code
 from passes.pass_obj import PassObject
 from bpf_passes.transform_vars import SEND_FLAG_NAME
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr, is_value_from_bpf_ctx
-from helpers.instruction_helper import get_ret_inst
+from helpers.instruction_helper import get_ret_inst, get_ret_value_text
 from helpers.cache_helper import generate_cache_update
 
 
@@ -37,16 +37,6 @@ def _get_malloc_name():
     global _malloc_map_counter
     _malloc_map_counter += 1
     return f'malloc_{_malloc_map_counter}'
-
-
-def _get_ret_value_text(current_function, info):
-    __tmp = get_ret_inst(current_function, info)
-    if __tmp.body:
-        return_val = __tmp.body[0].text
-    else:
-        return_val = ''
-    return return_val
-
 
 def _rename_func_to_a_known_one(inst, info, target_name):
     inst.name = target_name
@@ -101,7 +91,7 @@ def _known_function_substitution(inst, info):
         # report('Declare map', m, 'for malloc')
 
         # Look the malloc map
-        return_val = _get_ret_value_text(current_function, info)
+        return_val = get_ret_value_text(current_function, info)
         lookup_inst, ref = malloc_lookup(name, info, return_val)
         blk = cb_ref.get(BODY)
         for tmp_inst in lookup_inst:
@@ -139,7 +129,7 @@ def _process_write_call(inst, info):
         inst = info.prog.send(buf, write_size, info, do_copy=should_copy)
     else:
         # On a function which is not the main. Do not return
-        return_val = _get_ret_value_text(current_function, info)
+        return_val = get_ret_value_text(current_function, info)
         copy_inst = info.prog.send(buf, write_size, info, ret=False, failure=return_val, do_copy=should_copy)
         # set the flag
         flag_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)

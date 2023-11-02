@@ -201,9 +201,7 @@ def _process_call_needing_send_flag(inst, blk, current_function, info):
     check = ControlFlowInst.build_if_inst(cond)
     if current_function is None:
         ret_val  = Literal(info.prog.get_send(), clang.CursorKind.INTEGER_LITERAL)
-        ret_inst = Instruction()
-        ret_inst.kind = clang.CursorKind.RETURN_STMT
-        ret_inst.body = [ret_val,]
+        ret_inst = Return.build([ret_val,])
         check.body.add_inst(ret_inst)
     else:
         assert sym.type.is_pointer()

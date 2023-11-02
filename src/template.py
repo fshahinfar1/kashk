@@ -39,12 +39,11 @@ def bpf_ctx_bound_check(ref, index, data_end, return_value=None):
     cond.rhs.add_inst(rhs_cast)
 
     # return 0
-    ret = Instruction()
-    ret.kind = clang.CursorKind.RETURN_STMT
+    ret = Return()
     if return_value is None:
-        ret.body = [Literal('0', kind=clang.CursorKind.INTEGER_LITERAL),]
+        ret.body.add_inst(Literal('0', kind=clang.CursorKind.INTEGER_LITERAL))
     else:
-        ret.body = [return_value,]
+        ret.body.add_inst(return_value)
 
     _if.cond.add_inst(cond)
     _if.body.add_inst(ret)
@@ -85,12 +84,11 @@ def bpf_ctx_bound_check_bytes(ref, size, data_end, return_value=None):
     cond.rhs.add_inst(rhs_cast)
 
     # return 0
-    ret = Instruction()
-    ret.kind = clang.CursorKind.RETURN_STMT
+    ret = Return()
     if return_value is None:
-        ret.body = [Literal('0', kind=clang.CursorKind.INTEGER_LITERAL),]
+        ret.body.add_inst(Literal('0', kind=clang.CursorKind.INTEGER_LITERAL))
     else:
-        ret.body = [return_value]
+        ret.body.add_inst(return_value)
 
     _if.cond.add_inst(cond)
     _if.body.add_inst(ret)
