@@ -5,6 +5,7 @@ from log import error, debug, report
 from data_structure import *
 from instruction import *
 from prune import WRITE_PACKET, KNOWN_FUNCS
+from template import define_bpf_arr_map, malloc_lookup
 from bpf_code_gen import gen_code
 from passes.pass_obj import PassObject
 from bpf_passes.transform_vars import SEND_FLAG_NAME

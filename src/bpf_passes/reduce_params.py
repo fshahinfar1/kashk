@@ -68,15 +68,12 @@ def _function_check_param_reduc(inst, func, info, more):
         # Move some parameters to a struct
         count_extra = (count_args - PARAMETER_LIMIT) + 1
         # debug('Reduce parameters of', func.name, 'original args:', func.args)
-        print(func.args)
         for i in range(count_extra):
             param = func.args.pop()
             # TODO: do I need to maintain the symbol of this parameter?
             # I am passing a struct which might have a field that
             # points to the BPF context.
             assert func_scope.lookup(param.name) is not None, f'Did not found {param.name} in the scope for function {func.name}'
-            print('--', param.name)
-            print(func_scope.symbols)
             sym = func_scope.delete(param.name)
             change.add_param(param)
 

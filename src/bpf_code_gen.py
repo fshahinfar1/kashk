@@ -82,7 +82,10 @@ def handle_unary_op(inst, info, more):
     # TODO: in case of ++ operator, it makes a difference if it is before or
     # after the `child'. Currently it can introduce bugs in the generated
     # program because of not considering this.
-    if inst.comes_after:
+
+    if inst.op == 'sizeof':
+        text = f'sizeof({child})'
+    elif inst.comes_after:
         text = f'{child}{inst.op}'
     else:
         text = f'{inst.op}{child}'

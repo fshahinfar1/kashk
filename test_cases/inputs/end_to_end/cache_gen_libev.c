@@ -132,7 +132,7 @@ void _prepare_event_handler_args(void)
 	int fd = 0;
 	short which = 0;
 	struct conn _c;
-	memset(&c, 0, sizeof(struct conn));
+	memset(&_c, 0, sizeof(struct conn));
 	/* _c.rsize = 1024; */
 	/* _c.rbuf = malloc(1024); */
 	void *arg = &_c;

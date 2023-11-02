@@ -42,7 +42,6 @@ def is_value_from_bpf_ctx(inst, info, R=None):
             owner = owner.array_ref.children[0]
         if isinstance(owner, Cast):
             owner = owner.castee.children[0]
-        print(owner)
         assert isinstance(owner, Ref)
         # owner name is
         sym = info.sym_tbl.lookup(owner.name)
