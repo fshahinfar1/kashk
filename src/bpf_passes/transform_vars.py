@@ -7,6 +7,7 @@ from template import (prepare_shared_state_var, define_bpf_arr_map,
 from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS
 from utility import get_tmp_var_name, show_insts
 from helpers.cache_helper import generate_cache_lookup
+from helpers.instruction_helper import get_ret_inst
 
 from data_structure import *
 from instruction import *
@@ -25,6 +26,12 @@ current_function = None
 # Skip until the cache END
 skip_to_end = None
 declare_at_top_of_func = []
+ZERO = Literal('0', clang.CursorKind.INTEGER_LITERAL)
+
+
+class After:
+    def __init__(self, box):
+        self.box = box
 
 
 def _set_skip(val):
@@ -157,28 +164,78 @@ def _process_read_call(inst, info):
     return inst
 
 
+def _process_call_needing_send_flag(inst, blk, current_function, info):
+    """
+    @parm inst, a Call object for a Function which needs a send flag
+    @parm blk
+    @parm current_function
+    @parm info
+    @return Instruction
+    """
+    inst.change_applied |= Function.SEND_FLAG
+    sym = info.sym_tbl.lookup(SEND_FLAG_NAME)
+    if current_function is None:
+        assert sym is None
+        # Allocate the flag on the stack and pass a poitner
+        decl = VarDecl(None)
+        decl.name = SEND_FLAG_NAME
+        decl.type = BASE_TYPES[clang.TypeKind.SCHAR]
+        decl.init.add_inst(Literal('0', clang.CursorKind.INTEGER_LITERAL))
+        declare_at_top_of_func.append(decl)
+        sym = info.sym_tbl.insert_entry(decl.name, decl.type, decl.kind, None)
+
+        flag_ref = decl.get_ref()
+        ref = UnaryOp.build('&', flag_ref)
+        inst.args.append(ref)
+    else:
+        # Just pass the reference
+        assert sym is not None and sym.type.is_pointer()
+        flag_ref = Ref.from_sym(sym)
+        inst.args.append(flag_ref)
+    # Check the flag after the function
+    if flag_ref.type.is_pointer():
+        flag_val = UnaryOp.build('*', flag_ref)
+    else:
+        flag_val = flag_ref
+    cond  = BinOp.build_op(flag_val, '!=', ZERO)
+    check = ControlFlowInst.build_if_inst(cond)
+    if current_function is None:
+        ret_val  = Literal(info.prog.get_send(), clang.CursorKind.INTEGER_LITERAL)
+        ret_inst = Instruction()
+        ret_inst.kind = clang.CursorKind.RETURN_STMT
+        ret_inst.body = [ret_val,]
+        check.body.add_inst(ret_inst)
+    else:
+        assert sym.type.is_pointer()
+        ret_inst = get_ret_inst(current_function, info)
+        check.body.add_inst(ret_inst)
+    after = After([check,])
+    blk.append(after)
+    return inst
+
+
 def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.DECL_REF_EXPR:
         return _check_if_ref_is_global_state(inst, info)
     elif inst.kind == clang.CursorKind.VAR_DECL:
         # TODO: I might want to remove some variable declarations here
         # e.g., ones related to reading/writing responses
-        pass
+        return inst
     elif inst.kind == clang.CursorKind.CALL_EXPR:
         if inst.name in READ_PACKET:
             return _process_read_call(inst, info)
         elif inst.name in WRITE_PACKET:
-            # Let's not transform the send right now, wait for
-            # verifier to determine which variables are pointing to the context.
-            # return _process_write_call(inst, info)
+            # NOTE: the write calls are transformed after verifer pass
             return inst
         elif inst.name in KNOWN_FUNCS:
+            # NOTE: the known function calls are transformed after verifer pass
             return inst
         else:
             # Check if the function being invoked needs to receive any flag and pass.
             func = inst.get_function_def()
             if not func:
                 return inst
+            # Add context
             if (func.calls_recv  or func.calls_send) and (inst.change_applied & Function.CTX_FLAG == 0):
                 inst.change_applied |= Function.CTX_FLAG
                 ctx_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
@@ -186,27 +243,12 @@ def _process_current_inst(inst, info, more):
                 ctx_ref.type = info.prog.ctx_type
                 inst.args.append(ctx_ref)
 
+            # Add send flag
             if func.calls_send and (inst.change_applied & Function.SEND_FLAG == 0):
-                inst.change_applied |= Function.SEND_FLAG
-                if current_function is None:
-                    # Allocate the flag on the stack and pass a poitner
-                    decl = VarDecl(None)
-                    decl.name = SEND_FLAG_NAME
-                    decl.type = BASE_TYPES[clang.TypeKind.SCHAR]
-                    decl.init.add_inst(Literal('0', clang.CursorKind.INTEGER_LITERAL))
-                    declare_at_top_of_func.append(decl)
-                    info.sym_tbl.insert_entry(decl.name, decl.type, decl.kind, None)
+                blk = cb_ref.get(BODY)
+                inst = _process_call_needing_send_flag(inst, blk, current_function, info)
 
-                    flag_ref = decl.get_ref()
-
-                    ref = UnaryOp.build('&', flag_ref)
-                    inst.args.append(ref)
-                else:
-                    # Just pass the reference
-                    flag_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
-                    flag_ref.name = SEND_FLAG_NAME
-                    flag_ref.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
-                    inst.args.append(flag_ref)
+            # NOTE: fail flag is added in userspace_fallback
     elif inst.kind == ANNOTATION_INST:
         return _process_annotation(inst, info)
     return inst
@@ -243,7 +285,13 @@ def _do_pass(inst, info, more):
                     new_inst = _do_pass(i, info, obj)
                     if new_inst is None:
                         continue
+
+                    after = []
+                    while new_child and isinstance(new_child[-1], After):
+                        after.append(new_child.pop())
                     new_child.append(new_inst)
+                    for a in reversed(after):
+                        new_child.extend(a.box)
             if not is_list:
                 if len(new_child) < 1:
                     # debug(MODULE_TAG, 'remove instruction:', inst)
