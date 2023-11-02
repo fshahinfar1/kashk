@@ -63,7 +63,7 @@ def _set_failure_flag(failure_number, is_pointer=False):
     else:
         ref.type = BASE_TYPES[clang.TypeKind.SCHAR]
     # Assign
-    set_failuer = BinOp.build_op(ref, '=', int_inst)
+    set_failuer = BinOp.build(ref, '=', int_inst)
     return set_failuer
 
 
@@ -137,7 +137,7 @@ def _handle_function_may_fail(inst, func, info, more):
 
                 # Check the failure number
                 int_literal = Literal(str(failure_number), clang.CursorKind.INTEGER_LITERAL)
-                cond = BinOp.build_op(flag_ref, '==', int_literal)
+                cond = BinOp.build(flag_ref, '==', int_literal)
                 if_inst = ControlFlowInst.build_if_inst(cond)
                 if_inst.body.add_inst(prepare_meta_code)
                 if_inst.body.add_inst(ToUserspace.from_func_obj(current_function))
@@ -154,7 +154,7 @@ def _handle_function_may_fail(inst, func, info, more):
             flag_val = UnaryOp.build('*', flag_ref)
         else:
             flag_val = flag_ref
-        cond = BinOp.build_op(flag_val, '!=', ZERO)
+        cond = BinOp.build(flag_val, '!=', ZERO)
         if_inst = ControlFlowInst.build_if_inst(cond)
         if_inst.body.add_inst(return_stmt)
         after_func_call.append(if_inst)

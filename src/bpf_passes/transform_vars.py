@@ -117,7 +117,7 @@ def _process_read_call(inst, info):
     # Assign packet pointer on a previouse line
     lhs = inst.rd_buf.ref
     rhs = info.prog.get_pkt_buf()
-    assign_inst = BinOp.build_op(lhs, '=', rhs)
+    assign_inst = BinOp.build(lhs, '=', rhs)
     blk.append(assign_inst)
     # TODO: what if `skb` is not defined in this scope?
     # Set the return value
@@ -126,14 +126,14 @@ def _process_read_call(inst, info):
     # sz_decl = VarDecl.build(get_tmp_var_name(), BASE_TYPES[clang.TypeKind.USHORT])
     # declare_at_top_of_func.append(sz_decl)
     # sz_ref  = sz_decl.get_ref()
-    # sz_assign  = BinOp.build_op(sz_ref, '=', info.prog.get_pkt_size())
+    # sz_assign  = BinOp.build(sz_ref, '=', info.prog.get_pkt_size())
     # blk.append(sz_assign)
-    # sz_mask = BinOp.build_op(sz_ref, '&', Literal('PKT_OFFSET_MASK', clang.CursorKind.MACRO_INSTANTIATION))
-    # sz_assign_mask = BinOp.build_op(sz_ref, '=', sz_mask)
+    # sz_mask = BinOp.build(sz_ref, '&', Literal('PKT_OFFSET_MASK', clang.CursorKind.MACRO_INSTANTIATION))
+    # sz_assign_mask = BinOp.build(sz_ref, '=', sz_mask)
     # blk.append(sz_assign_mask)
 
     # # check size is less than map buffer size
-    # size_check_cond = BinOp.build_op(sz_ref, '>', Literal('1000', clang.CursorKind.INTEGER_LITERAL))
+    # size_check_cond = BinOp.build(sz_ref, '>', Literal('1000', clang.CursorKind.INTEGER_LITERAL))
     # size_check = ControlFlowInst.build_if_inst(size_check_cond)
     # size_check.body.add_inst(_get_ret_inst())
     # blk.append(size_check)
@@ -145,7 +145,7 @@ def _process_read_call(inst, info):
     # # TODO: check if context is used
     # # dst_end = Literal('<not set>', CODE_LITERAL)
     # # TODO: cast lhs to void *
-    # dst_end = BinOp.build_op(lhs, '+', Literal(inst.rd_buf.size_cursor, CODE_LITERAL))
+    # dst_end = BinOp.build(lhs, '+', Literal(inst.rd_buf.size_cursor, CODE_LITERAL))
     # src_end = info.prog.get_pkt_end()
     # cpy = Call(None)
     # cpy.name = 'bpf_memcpy'
@@ -197,7 +197,7 @@ def _process_call_needing_send_flag(inst, blk, current_function, info):
         flag_val = UnaryOp.build('*', flag_ref)
     else:
         flag_val = flag_ref
-    cond  = BinOp.build_op(flag_val, '!=', ZERO)
+    cond  = BinOp.build(flag_val, '!=', ZERO)
     check = ControlFlowInst.build_if_inst(cond)
     if current_function is None:
         ret_val  = Literal(info.prog.get_send(), clang.CursorKind.INTEGER_LITERAL)

@@ -50,9 +50,9 @@ def _check_if_variable_index_should_be_masked(ref, index, blk, info):
         # declare_at_top_of_func.append(decl_index)
         # ref_index   = decl_index.get_ref()
 
-        mask_op     = BinOp.build_op(var, '&', info.prog.index_mask)
-        # mask_assign = BinOp.build_op(ref_index, '=', mask_op)
-        mask_assign = BinOp.build_op(var, '=', mask_op)
+        mask_op     = BinOp.build(var, '&', info.prog.index_mask)
+        # mask_assign = BinOp.build(ref_index, '=', mask_op)
+        mask_assign = BinOp.build(var, '=', mask_op)
         # index = ref_index.clone([])
         blk.append(mask_assign)
 

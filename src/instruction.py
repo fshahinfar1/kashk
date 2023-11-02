@@ -374,7 +374,7 @@ class BinOp(Instruction):
     CLOSE_GROUP = ')}]'
 
     @classmethod
-    def build_op(cls, lhs_inst, op, rhs_inst):
+    def build(cls, lhs_inst, op, rhs_inst):
         assert op in BinOp.ALL_OP, f'Unexpected binary operation requseted ({op})'
         obj = BinOp(None)
         obj.lhs.add_inst(lhs_inst)

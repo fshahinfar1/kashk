@@ -187,7 +187,7 @@ int xdp_prog(struct xdp_md *xdp)
         end = Cast.build(data_end, BASE_TYPES[clang.TypeKind.ULONGLONG])
         beg = Cast.build(data,     BASE_TYPES[clang.TypeKind.ULONGLONG])
 
-        delta = BinOp.build_op(end, '-', beg)
+        delta = BinOp.build(end, '-', beg)
         size  = Cast.build(delta,  BASE_TYPES[clang.TypeKind.USHORT])
         return size
 

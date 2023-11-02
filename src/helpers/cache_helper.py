@@ -68,7 +68,7 @@ def generate_cache_lookup(inst, blk, parent_children, info):
     hash_call.args.extend([arg1, arg2])
 
     limit_inst = Literal(map_def['entries'], clang.CursorKind.INTEGER_LITERAL)
-    modulo_inst = BinOp.build_op(hash_call, '%', limit_inst)
+    modulo_inst = BinOp.build(hash_call, '%', limit_inst)
 
     # Declare variable which hold the hash value
     decl_index = VarDecl.build(index_name, BASE_TYPES[clang.TypeKind.INT])
@@ -77,7 +77,7 @@ def generate_cache_lookup(inst, blk, parent_children, info):
 
     # Assign hash value to the variable
     ref_index = decl_index.get_ref()
-    ref_assign     = BinOp.build_op(ref_index, '=', modulo_inst)
+    ref_assign     = BinOp.build(ref_index, '=', modulo_inst)
     lookup.append(ref_assign)
 
     map_lookup_call = Call(None)
@@ -100,17 +100,17 @@ def generate_cache_lookup(inst, blk, parent_children, info):
     val_ref.name = val_ptr
     val_ref.kind = clang.CursorKind.DECL_REF_EXPR
     val_ref.type = decl_val_ptr.type
-    ref_assign = BinOp.build_op(val_ref, '=', map_lookup_call)
+    ref_assign = BinOp.build(val_ref, '=', map_lookup_call)
     lookup.append(ref_assign)
 
     # Check if the value is valid
-    cond = BinOp.build_op(val_ref, '==', Literal('NULL', clang.CursorKind.INTEGER_LITERAL))
+    cond = BinOp.build(val_ref, '==', Literal('NULL', clang.CursorKind.INTEGER_LITERAL))
     check_miss = ControlFlowInst.build_if_inst(cond)
     # when miss
     check_miss.body.extend_inst(on_miss)
     # when hit
     # actual_val = Literal(conf['value_ref'], CODE_LITERAL)
-    # assign_ref = BinOp.build_op(actual_val, '=', val_ref)
+    # assign_ref = BinOp.build(actual_val, '=', val_ref)
     # check_miss.other_body.add_inst(assign_ref)
     template_code = end_conf['code']
     template_code = template_code.replace('%p', val_ref.name)
@@ -204,7 +204,7 @@ def generate_cache_update(inst, blk, current_function, info):
     hash_call.args.extend([key, key_size])
 
     index_ref      = decl_index.get_ref()
-    assign_index   = BinOp.build_op(index_ref, '=', hash_call)
+    assign_index   = BinOp.build(index_ref, '=', hash_call)
     insts.append(assign_index)
 
     val_ref = val_decl.get_ref()
@@ -213,18 +213,18 @@ def generate_cache_update(inst, blk, current_function, info):
     arg1 = Literal(f'&{map_name}', CODE_LITERAL)
     arg2 = UnaryOp.build('&', index_ref)
     map_lookup_call.args.extend([arg1, arg2])
-    assign_val_ref = BinOp.build_op(val_ref, '=', map_lookup_call)
+    assign_val_ref = BinOp.build(val_ref, '=', map_lookup_call)
     insts.append(assign_val_ref)
 
     # check if ref is not null
-    null_check_cond = BinOp.build_op(val_ref, '!=', Literal('NULL', clang.CursorKind.INTEGER_LITERAL))
+    null_check_cond = BinOp.build(val_ref, '!=', Literal('NULL', clang.CursorKind.INTEGER_LITERAL))
     null_check = ControlFlowInst.build_if_inst(null_check_cond)
 
     # Update cache
-    mask_inst = BinOp.build_op(value_size, '&', info.prog.index_mask)
-    mask_assign = BinOp.build_op(value_size, '=', mask_inst)
+    mask_inst = BinOp.build(value_size, '&', info.prog.index_mask)
+    mask_assign = BinOp.build(value_size, '=', mask_inst)
     # > Check that value size does not exceed the cache size
-    sz_check_cond = BinOp.build_op(value_size, '>', Literal('1000', clang.CursorKind.INTEGER_LITERAL))
+    sz_check_cond = BinOp.build(value_size, '>', Literal('1000', clang.CursorKind.INTEGER_LITERAL))
     sz_check = ControlFlowInst.build_if_inst(sz_check_cond)
     sz_check.body.add_inst(get_ret_inst(current_function, info))
     # > Continue by calling memcpy
@@ -235,17 +235,17 @@ def generate_cache_update(inst, blk, current_function, info):
     if is_bpf_ctx_ptr(dest_ref, info):
         dest_end = info.prog.get_pkt_end()
     else:
-        dest_end = BinOp.build_op(dest_ref, '+', Literal('1024', clang.CursorKind.INTEGER_LITERAL))
+        dest_end = BinOp.build(dest_ref, '+', Literal('1024', clang.CursorKind.INTEGER_LITERAL))
         dest_end = Cast.build(dest_end, MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID]))
 
     if is_bpf_ctx_ptr(value, info):
         src_end = info.prog.get_pkt_end()
     else:
-        tmp = BinOp.build_op(value, '+', value_size)
+        tmp = BinOp.build(value, '+', value_size)
         src_end = Cast.build(tmp, MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID]))
 
     memcpy.args.extend([dest_ref, value, value_size, dest_end, src_end])
-    size_assign = BinOp.build_op(val_ref.get_ref_field('size', info), '=', value_size)
+    size_assign = BinOp.build(val_ref.get_ref_field('size', info), '=', value_size)
     null_check.body.extend_inst([mask_assign, sz_check, memcpy, size_assign])
     insts.append(null_check)
 

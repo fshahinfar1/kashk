@@ -52,14 +52,14 @@ def error(*args, **kwargs):
 
 def debug(*args, **kwargs):
     if is_repeating(DEBUG, args, kwargs):
-        print(f'\r(x{g_counter}) ', end='', sep='', file=stderr)
+        print(f'\r(x{g_counter}) ', end='', sep='', file=stdout)
     else:
         clear_repeating()
         print('\033[33m', *args, '\033[0m', file=stdout, **kwargs)
 
 def report(*args, **kwargs):
     if is_repeating(REPORT, args, kwargs):
-        print(f'\r(x{g_counter}) ', end='', sep='', file=stderr)
+        print(f'\r(x{g_counter}) ', end='', sep='', file=stdout)
     else:
         clear_repeating()
         print('\033[36m', *args, '\033[0m', file=stdout, **kwargs)

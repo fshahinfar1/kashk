@@ -39,6 +39,15 @@ def _get_malloc_name():
     return f'malloc_{_malloc_map_counter}'
 
 
+def _get_ret_value_text(current_function, info):
+    __tmp = get_ret_inst(current_function, info)
+    if __tmp.body:
+        return_val = __tmp.body[0].text
+    else:
+        return_val = ''
+    return return_val
+
+
 def _rename_func_to_a_known_one(inst, info, target_name):
     inst.name = target_name
     # Mark the function used
@@ -63,8 +72,8 @@ def _known_function_substitution(inst, info):
         if is_bpf_ctx_ptr(buf, info):
             end_dest = info.prog.get_pkt_end()
         else:
-            end_dest = BinOp.build_op(buf, '+', inst.args[2])
-        # end_src = BinOp.build_op(inst.args[1], '+', inst.args[2])
+            end_dest = BinOp.build(buf, '+', inst.args[2])
+        # end_src = BinOp.build(inst.args[1], '+', inst.args[2])
         inst.args.extend([end_dest,])
         return _rename_func_to_a_known_one(inst, info, 'bpf_strncpy')
     elif inst.name == 'malloc':
@@ -92,7 +101,7 @@ def _known_function_substitution(inst, info):
         # report('Declare map', m, 'for malloc')
 
         # Look the malloc map
-        return_val = get_ret_inst(current_function, info).body[0].text
+        return_val = _get_ret_value_text(current_function, info)
         lookup_inst, ref = malloc_lookup(name, info, return_val)
         blk = cb_ref.get(BODY)
         for tmp_inst in lookup_inst:
@@ -130,7 +139,7 @@ def _process_write_call(inst, info):
         inst = info.prog.send(buf, write_size, info, do_copy=should_copy)
     else:
         # On a function which is not the main. Do not return
-        return_val = get_ret_inst(current_function, info).body[0].text
+        return_val = _get_ret_value_text(current_function, info)
         copy_inst = info.prog.send(buf, write_size, info, ret=False, failure=return_val, do_copy=should_copy)
         # set the flag
         flag_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
@@ -140,7 +149,7 @@ def _process_write_call(inst, info):
         deref.child.add_inst(flag_ref)
         deref.op = '*'
         one = Literal('1', clang.CursorKind.INTEGER_LITERAL)
-        set_flag = BinOp.build_op(deref, '=', one)
+        set_flag = BinOp.build(deref, '=', one)
 
         # add it to the body
         blk = cb_ref.get(BODY)
