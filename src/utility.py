@@ -326,6 +326,13 @@ def skip_unexposed_stmt(cursor):
     return ptr
 
 
+def skip_typedef(T):
+    tmp = T
+    while tmp.kind == clang.TypeKind.TYPEDEF:
+        tmp = tmp.under_type
+    return tmp
+
+
 def draw_tree(root, fn=lambda x: str(len(x.children))):
     delimeter = ' '
     v_space = 2

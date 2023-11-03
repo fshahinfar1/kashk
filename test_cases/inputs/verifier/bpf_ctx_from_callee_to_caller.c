@@ -20,6 +20,12 @@ void do_read(int fd, char *buf, int len, int *_size)
 	*_size = size;
 }
 
+void do_read2(int fd, struct conn *c)
+{
+	int size = read(fd, c->buf, 128);
+	c->size = size;
+}
+
 int main(int argc, char *argv[])
 {
 	int fd;
@@ -28,10 +34,13 @@ int main(int argc, char *argv[])
 	char buf[128];
 	char *ptr;
 	struct conn t;
+	struct conn t2;
 	struct conn *c = &t;
+	struct conn *c2 = &t2;
 	struct request *req1;
 	struct request *req2;
 	struct request *req3;
+	struct request *req4;
 
 	/* Test 1: Array */
 	fd = 0;
@@ -56,6 +65,12 @@ int main(int argc, char *argv[])
 	req3 = (void *)ptr;
 	/* I expect the tool generate a bound check for this access */
 	x = req3->type;
+
+	/* Test 4: */
+	do_read2(fd, c2);
+	req4 = (void *)c2->buf;
+	/* I expect the tool generate a bound check for this access */
+	x = req2->type;
 
 	return 0;
 }

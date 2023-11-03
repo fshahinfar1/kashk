@@ -5,7 +5,7 @@ import clang.cindex as clang
 from log import error, debug
 from data_structure import *
 from instruction import *
-from utility import get_tmp_var_name
+from utility import get_tmp_var_name, skip_typedef
 
 from bpf_code_gen import gen_code
 from passes.pass_obj import PassObject
@@ -34,13 +34,6 @@ def set_current_func(func):
         yield func
     finally:
         current_function = tmp
-
-
-def get_typedef_under(T):
-    tmp = T
-    while tmp.kind == clang.TypeKind.TYPEDEF:
-        tmp = tmp.under_type
-    return tmp
 
 
 def _check_if_variable_index_should_be_masked(ref, index, blk, info):
@@ -162,6 +155,7 @@ def _step_into_func_and_track_context(inst, func, pos_of_ctx_ptrs, info):
 
         if param.type_ref.is_pointer():
             ptr_type = param.type_ref.get_pointee()
+            ptr_type = skip_typedef(ptr_type)
             # NOTE: If the pointer is to a structure, then check if each field of that pointer is set to BPF.
             # Recursion here!
             if ptr_type.is_record():
@@ -204,7 +198,11 @@ def _handle_call(inst, info, more):
             ctx_ref = info.prog.get_ctx_ref()
             end_ref = ctx_ref.get_ref_field('data_end', info)
             data_end = Cast.build(end_ref, BASE_TYPES[clang.TypeKind.ULONGLONG])
-            _ret_inst = get_ret_inst(current_function, info).body.children[0]
+            __tmp = get_ret_inst(current_function, info)
+            if __tmp.body.has_children():
+                _ret_inst = __tmp.body.children[0]
+            else:
+                _ret_inst = None
             check_inst = bpf_ctx_bound_check_bytes(ref, size, data_end, _ret_inst)
 
             blk.append(check_inst)
