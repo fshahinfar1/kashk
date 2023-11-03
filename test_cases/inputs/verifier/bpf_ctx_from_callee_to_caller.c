@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <unistd.h>
 
 struct conn {
 	char buf[128];
@@ -15,7 +16,7 @@ struct request {
 
 void do_read(int fd, char *buf, int len, int *_size)
 {
-	int size = read(fd, buf, len, 0);
+	int size = read(fd, buf, len);
 	*_size = size;
 }
 

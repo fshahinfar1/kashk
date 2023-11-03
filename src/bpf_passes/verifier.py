@@ -14,7 +14,7 @@ from prune import WRITE_PACKET, KNOWN_FUNCS, OUR_IMPLEMENTED_FUNC
 
 from helpers.bpf_ctx_helper import (is_bpf_ctx_ptr, is_value_from_bpf_ctx,
         set_ref_bpf_ctx_state)
-from helpers.instruction_helper import get_ret_inst, get_scalar_variables, get_ret_value_text
+from helpers.instruction_helper import get_ret_inst, get_scalar_variables, get_ret_value_text, get_ref_symbol
 
 
 MODULE_TAG = '[Verfier Pass]'
@@ -43,25 +43,6 @@ def get_typedef_under(T):
     return tmp
 
 
-def get_ref_symbol(ref, info):
-    if ref.is_member():
-        owner_sym = None
-        scope     = info.sym_tbl.current_scope
-        assert scope.lookup(ref.owner[-1].name) is not None, 'The argument parent should be recognized in the caller scope'
-        for o in reversed(ref.owner):
-            owner_sym = scope.lookup(o.name)
-            if owner_sym is None:
-                owner_sym = scope.insert_entry(o.name, o.type, o.kind, None)
-            scope = owner_sym.fields
-
-        sym = scope.lookup(ref.name)
-        if sym is None:
-            sym = scope.insert_entry(ref.name, ref.type, ref.kind, None)
-        return sym
-    else:
-        return info.sym_tbl.lookup(ref.name)
-
-
 def _check_if_variable_index_should_be_masked(ref, index, blk, info):
     """
     The ref, index are taken from range (R) list used for checking access to
@@ -73,6 +54,10 @@ def _check_if_variable_index_should_be_masked(ref, index, blk, info):
         # TODO: should I keep the variable in tack and define a tmp value for masking? Then I should replace the access instruction and use the masked variables.
         # decl_index  = VarDecl.build(get_tmp_var_name(), index.type)
         # ref_index   = decl_index.get_ref()
+
+        sym = get_ref_symbol(var, info)
+        if sym.is_bpf_ctx:
+            continue
 
         mask_op     = BinOp.build(var, '&', info.prog.index_mask)
         # mask_assign = BinOp.build(ref_index, '=', mask_op)
@@ -103,7 +88,7 @@ def _handle_binop(inst, info, more):
             assert isinstance(ref, Instruction)
             assert isinstance(index, Instruction)
 
-            _check_if_variable_index_should_be_masked(inst, index, blk, info)
+            _check_if_variable_index_should_be_masked(ref, index, blk, info)
 
             ctx_ref = info.prog.get_ctx_ref()
             end_ref = ctx_ref.get_ref_field('data_end', info)

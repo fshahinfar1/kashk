@@ -88,3 +88,27 @@ def get_scalar_variables(inst):
             return [inst,]
     else:
         return []
+
+
+def get_ref_symbol(ref, info):
+    """
+    Get the symbol entry of a Ref object from the symbol table.
+    This function handles the case which a reference is a member of another
+    reference.
+    """
+    if ref.is_member():
+        owner_sym = None
+        scope     = info.sym_tbl.current_scope
+        assert scope.lookup(ref.owner[-1].name) is not None, 'The argument parent should be recognized in the caller scope'
+        for o in reversed(ref.owner):
+            owner_sym = scope.lookup(o.name)
+            if owner_sym is None:
+                owner_sym = scope.insert_entry(o.name, o.type, o.kind, None)
+            scope = owner_sym.fields
+
+        sym = scope.lookup(ref.name)
+        if sym is None:
+            sym = scope.insert_entry(ref.name, ref.type, ref.kind, None)
+        return sym
+    else:
+        return info.sym_tbl.lookup(ref.name)
