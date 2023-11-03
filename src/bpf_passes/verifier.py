@@ -23,7 +23,6 @@ MODULE_TAG = '[Verfier Pass]'
 cb_ref = CodeBlockRef()
 _has_processed_func = set()
 current_function = None
-declare_at_top_of_func = None
 
 
 @contextmanager
@@ -37,6 +36,32 @@ def set_current_func(func):
         current_function = tmp
 
 
+def get_typedef_under(T):
+    tmp = T
+    while tmp.kind == clang.TypeKind.TYPEDEF:
+        tmp = tmp.under_type
+    return tmp
+
+
+def get_ref_symbol(ref, info):
+    if ref.is_member():
+        owner_sym = None
+        scope     = info.sym_tbl.current_scope
+        assert scope.lookup(ref.owner[-1].name) is not None, 'The argument parent should be recognized in the caller scope'
+        for o in reversed(ref.owner):
+            owner_sym = scope.lookup(o.name)
+            if owner_sym is None:
+                owner_sym = scope.insert_entry(o.name, o.type, o.kind, None)
+            scope = owner_sym.fields
+
+        sym = scope.lookup(ref.name)
+        if sym is None:
+            sym = scope.insert_entry(ref.name, ref.type, ref.kind, None)
+        return sym
+    else:
+        return info.sym_tbl.lookup(ref.name)
+
+
 def _check_if_variable_index_should_be_masked(ref, index, blk, info):
     """
     The ref, index are taken from range (R) list used for checking access to
@@ -47,7 +72,6 @@ def _check_if_variable_index_should_be_masked(ref, index, blk, info):
     for var in  set_of_variables_to_be_masked:
         # TODO: should I keep the variable in tack and define a tmp value for masking? Then I should replace the access instruction and use the masked variables.
         # decl_index  = VarDecl.build(get_tmp_var_name(), index.type)
-        # declare_at_top_of_func.append(decl_index)
         # ref_index   = decl_index.get_ref()
 
         mask_op     = BinOp.build(var, '&', info.prog.index_mask)
@@ -62,7 +86,6 @@ def _handle_binop(inst, info, more):
     rhs = inst.rhs.children[0]
     # Track which variables are pointer to the BPF context
     if inst.op == '=':
-        # lhs_is_ptr = is_bpf_ctx_ptr(lhs, info)
         rhs_is_ptr = is_bpf_ctx_ptr(rhs, info)
         debug("***", gen_code([inst,], info), '|| LHS kind:', lhs.kind, '|| RHS kind:', rhs.kind, '|| is rhs ctx:', rhs_is_ptr)
         set_ref_bpf_ctx_state(lhs, rhs_is_ptr, info)
@@ -85,7 +108,11 @@ def _handle_binop(inst, info, more):
             ctx_ref = info.prog.get_ctx_ref()
             end_ref = ctx_ref.get_ref_field('data_end', info)
             data_end = Cast.build(end_ref, BASE_TYPES[clang.TypeKind.ULONGLONG])
-            _ret_inst = get_ret_inst(current_function, info).body.children[0]
+            __tmp = get_ret_inst(current_function, info)
+            if __tmp.body.has_children():
+                _ret_inst = get_ret_inst(current_function, info).body.children[0]
+            else:
+                _ret_inst = None
             check_inst = bpf_ctx_bound_check(ref, index, data_end, _ret_inst)
             blk.append(check_inst)
 
@@ -94,6 +121,72 @@ def _handle_binop(inst, info, more):
             # debug(f'Add a bound check before:\n    {tmp}')
     # Keep the instruction unchanged
     return inst
+
+
+def _step_into_func_and_track_context(inst, func, pos_of_ctx_ptrs, info):
+    assert func.change_applied & Function.CTX_FLAG != 0, 'The function does not receive the BPF context!'
+    # NOTE: here was a code adding the flag to the function parameters, I have removed it because it should be done in transform pass.
+    assert inst.change_applied & Function.CTX_FLAG != 0, 'The instruction should be updated before to pass the BPF context!'
+    # NOTE: here was a code adding the BPF context to function call arguments. It should have been done by transform pass
+
+    # Caller scope
+    caller_scope = info.sym_tbl.current_scope
+    # Callee scope
+    callee_scope = info.sym_tbl.scope_mapping[func.name]
+
+    # Mark parameters inside the function scope as BPF context if they receive BPF context as input
+    for pos in pos_of_ctx_ptrs:
+        param = func.args[pos]
+        sym = callee_scope.lookup(param.name)
+        sym.is_bpf_ctx = True
+        # debug('function:', inst.name, 'param:', param.name, 'is bpf ctx')
+        # TODO: do I need to turn the flag off when removing
+        # the scope of the function? (maybe in another run the
+        # parameter is not a pointer to the context)
+
+    # Check to not repeat analyzing same function multiple times.
+    if inst.name not in _has_processed_func:
+        _has_processed_func.add(inst.name)
+        with info.sym_tbl.with_func_scope(inst.name):
+            with set_current_func(func):
+                func.body = _do_pass(func.body, info, PassObject())
+
+    # Check if value of pointers passed to this function was changed to point to BPF context
+    for param, argum in zip(func.get_arguments(), inst.get_arguments()):
+        # TODO: do I need to skip typedef to get to the udner type ? get_typedef_under(param.type_ref)
+        if not param.type_ref.is_pointer() and not param.type_ref.is_array():
+            # Only pointer and arrays can carry the BPF context to this scope
+            continue
+
+        if not isinstance(argum, Ref):
+            # TODO: I have not implemented the other cases.
+            # A question, How complex can it get?
+            continue
+
+        debug(f'Parameter {param.name} ({param.type_ref.kind}) is given argument {argum.owner} {argum.name} ({argum.type})')
+
+        # If the pointer it self is set to be BPF context, then the pointer will be BPF context in this scope too.
+        param_sym  = callee_scope.lookup(param.name)
+        assert param_sym is not None, f'The function parameters should be found in its symbol table\'s scope ({param.name})'
+        argum_sym = get_ref_symbol(argum, info)
+        assert argum_sym is not None
+
+        if param_sym.is_bpf_ctx:
+            argum_sym.is_bpf_ctx = True
+            report(argum.owner, argum.name, 'is bpf context')
+
+        if param.type_ref.is_pointer():
+            ptr_type = param.type_ref.get_pointee()
+            # NOTE: If the pointer is to a structure, then check if each field of that pointer is set to BPF.
+            # Recursion here!
+            if ptr_type.is_record():
+                for key, entry in param_sym.fields.symbols.items():
+                    # propagate the state of being BPF context or not from the callee scope to caller scope
+                    e2 = argum_sym.fields.lookup(key)
+                    if e2 is None:
+                        e2 = argum_sym.fields.insert_entry(entry.name, entry.type, entry.kind, None)
+                    e2.is_bpf_ctx = entry.is_bpf_ctx
+                    report(argum.name, e2.name, 'is bpf ctx:', entry.is_bpf_ctx)
 
 
 def _handle_call(inst, info, more):
@@ -112,50 +205,10 @@ def _handle_call(inst, info, more):
     # Find the definition of the function and step into it
     func = inst.get_function_def()
     if func and not func.is_empty() and func.name not in OUR_IMPLEMENTED_FUNC:
-        with info.sym_tbl.with_func_scope(inst.name):
-            # Add skb as the last parameter of this function
-            if func.change_applied & Function.CTX_FLAG == 0:
-                skb_obj = StateObject(None)
-                skb_obj.name = info.prog.ctx
-                skb_obj.type_ref = info.prog.ctx_type
-                func.args.append(skb_obj)
-                func.change_applied |= Function.CTX_FLAG
-
-                # This is added to the scope of function being called
-                info.sym_tbl.insert_entry(skb_obj.name, info.prog.ctx_type,
-                        clang.CursorKind.PARM_DECL, None)
-
-            if inst.change_applied & Function.CTX_FLAG == 0:
-                # TODO: update every invocation of this function with the skb parameter
-                # TODO: what if the caller function does not have access to skb?
-                skb_ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
-                skb_ref.name = info.prog.ctx
-                skb_ref.type = info.prog.ctx_type
-                inst.args.append(skb_ref)
-                inst.change_applied |= Function.CTX_FLAG
-
-            for pos in pos_of_ctx_ptrs:
-                param = func.args[pos]
-                sym = info.sym_tbl.lookup(param.name)
-                sym.is_bpf_ctx = True
-                # debug('function:', inst.name, 'param:', param.name, 'is bpf ctx')
-                # TODO: do I need to turn the flag off when removing
-                # the scope of the function? (maybe in another run the
-                # parameter is not a pointer to the context)
-
-            # Check to not repeat analyzing same function multiple times.
-            if inst.name not in _has_processed_func:
-                with set_current_func(func):
-                    modified = _do_pass(func.body, info, PassObject())
-                assert modified is not None
-                # Update the instructions of the function
-                func.body = modified
+        _step_into_func_and_track_context(inst, func, pos_of_ctx_ptrs, info)
     else:
-        if inst.name not in itertools.chain(KNOWN_FUNCS, OUR_IMPLEMENTED_FUNC, WRITE_PACKET):
-            # We can not modify this function
-            error(MODULE_TAG, 'function:', inst.name,
-                'receives BPF context but is not accessible for modification')
-        else:
+        if inst.name in KNOWN_FUNCS:
+            # TODO: this is handing memcpy, handle other known fucntions
             ref = inst.args[0]
             size = inst.args[2]
 
@@ -170,6 +223,10 @@ def _handle_call(inst, info, more):
             check_inst = bpf_ctx_bound_check_bytes(ref, size, data_end, _ret_inst)
 
             blk.append(check_inst)
+        elif inst.name not in itertools.chain(OUR_IMPLEMENTED_FUNC, WRITE_PACKET):
+            # We can not modify this function
+            error(MODULE_TAG, 'function:', inst.name,
+                'receives BPF context but is not accessible for modification')
     return inst
 
 
@@ -226,7 +283,5 @@ def verifier_pass(inst, info, more):
     context is accessed. It happens when passing the value to a function or
     when it is used in with an operator.
     """
-    global declare_at_top_of_func
-    declare_at_top_of_func = []
     with set_current_func(None):
         return _do_pass(inst, info, more)

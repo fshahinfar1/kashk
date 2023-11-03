@@ -145,7 +145,7 @@ class StateObject:
 
             return text
         elif self.type_ref.kind == clang.TypeKind.RECORD:
-            return f'struct {self.type} {self.name};'
+            return f'{self.type} {self.name};'
         return f'{self.type} {self.name};'
 
     def __repr__(self):
@@ -205,6 +205,24 @@ class MyType:
                 obj.under_type = MyType.from_cursor_type(decl.underlying_typedef_type)
             else:
                 error('Did not found the TYPEDEF underlying type')
+                obj.under_type = None
+        elif obj.kind == clang.TypeKind.ELABORATED:
+            decl = T.get_declaration()
+            if decl:
+                # children = tuple(decl.get_children())
+                # debug('Elaborated children:', children)
+                # report_on_cursor(decl)
+                # debug(decl.type.kind)
+                # for c in children:
+                #     report_on_cursor(c)
+                # debug('--------------------------------')
+                # assert len(children) == 1, 'This is what I expect'
+                # obj.under_type = MyType.from_cursor_type(decl.type)
+                new_obj = MyType.from_cursor_type(decl.type)
+                # Let's get rid of ELABORATED
+                return new_obj
+            else:
+                error('Did not found the ELABORATED type declartion')
                 obj.under_type = None
         return obj
 
@@ -440,8 +458,6 @@ class Function(TypeDefinition):
         return list(self.args)
 
 
-SKB_STRUCT_TYPE = 1000
-SKB_PTR_TYPE = 1001
 BASE_TYPES = {}
 def prepare_base_types():
     kind_name_map = {
@@ -460,8 +476,5 @@ def prepare_base_types():
 
     for kind, name in kind_name_map.items():
         BASE_TYPES[kind] = MyType.make_simple(name, kind)
-
-    BASE_TYPES[SKB_STRUCT_TYPE] = MyType.make_simple('struct __sk_buff', clang.TypeKind.RECORD)
-    BASE_TYPES[SKB_PTR_TYPE] = MyType.make_pointer(BASE_TYPES[SKB_STRUCT_TYPE])
 
 prepare_base_types()

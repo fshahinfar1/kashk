@@ -40,20 +40,17 @@ def __collect_information_about_class(cursor, info):
 
 
 def __collect_information_about_func(cursor, info):
-    # children = list(cursor.get_children())
-    # assert len(children) != 0
-
     T = MyType.from_cursor_type(cursor.type)
     e = info.sym_tbl.insert_entry('__func__', T, cursor.kind, None)
     e.name = cursor.spelling
 
     # Add function parameters to the scope
     for pos, arg in enumerate(cursor.get_arguments()):
+        if arg.type.kind == clang.TypeKind.TYPEDEF:
+            decl = arg.type.get_declaration()
         T = MyType.from_cursor_type(arg.type)
         e = info.sym_tbl.insert_entry(arg.spelling, T, arg.kind, arg)
 
-    # TODO: Do I need to process the body of each functions?
-    # body = children[-1]
 
 def pass_over_global_variables(cursor, info):
     """
@@ -69,7 +66,7 @@ def pass_over_global_variables(cursor, info):
 
 
 def _remember_func_for_further_proc(cursor, info):
-    # Check if we have insert an entry for this function before
+    # Check if we have inserted an entry for this function before
     key = cursor.spelling
     know_previous_def_of_func = False
     if key in Function.func_cursor:
@@ -101,7 +98,6 @@ def __function_decl(cursor, info):
 
     scope_key = f'{cursor.spelling}'
     if scope_key in info.sym_tbl.scope_mapping:
-        # debug(MODULE_TAG, f'function {scope_key} has once been declared')
         return
     T = MyType.from_cursor_type(cursor.result_type)
     info.sym_tbl.insert_entry(scope_key, T, clang.CursorKind.FUNCTION_DECL, None)

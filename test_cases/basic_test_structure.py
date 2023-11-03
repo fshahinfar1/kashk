@@ -40,6 +40,7 @@ class BasicTest:
         scope = Scope(self.info.sym_tbl.global_scope)
         self.info.sym_tbl.scope_mapping[BPF_MAIN] = scope
         self.info.sym_tbl.current_scope = scope
+        self.info.prog.add_args_to_scope(scope)
         # Find the entry function
         main = get_entry_code(cursor, self.info)
         assert main is not None

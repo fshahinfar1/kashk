@@ -598,6 +598,9 @@ class Ref(Instruction):
     def is_func_ptr(self):
         return self.type.kind == clang.TypeKind.FUNCTIONPROTO
 
+    def is_member(self):
+        return self.kind == clang.CursorKind.MEMBER_REF_EXPR
+
     def has_children(self):
         return False
 

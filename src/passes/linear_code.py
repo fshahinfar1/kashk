@@ -87,19 +87,12 @@ def _move_function_out(inst, info, more):
 def _separate_var_decl_and_init(inst, info, more):
     blk = cb_ref.get(BODY)
     assert blk is not None
-
-    show_insts(inst)
-
     clone = clone_pass(inst, info, PassObject())
-
     rhs = clone.init.children[0]
     # clear the children
     clone.init.children = []
 
-    ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
-    ref.name = inst.name
-    ref.type = inst.type
-
+    ref = inst.get_ref()
     bin_op = BinOp(None)
     bin_op.op = '='
     bin_op.lhs.add_inst(ref)

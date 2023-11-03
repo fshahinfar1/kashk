@@ -43,6 +43,7 @@ class SymbolTableEntry:
 
 
 class Scope:
+    __slots__ = ('number', 'symbols', 'parent', 'children')
     def __init__(self, parent=None):
         # TODO: the nubmer system is wrong and misleading. I should assign a
         # name to each scope. This way, the relation between scopes can easily

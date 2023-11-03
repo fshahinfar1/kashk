@@ -15,10 +15,10 @@ from understand_logic_handler import create_func_objs, add_known_func_objs
 from bpf_code_gen import generate_bpf_prog, gen_code
 from user import generate_user_prog
 
+from passes.pass_obj import PassObject
 from passes.mark_used_funcs import mark_used_funcs
 from passes.replace_func_ptr import replace_func_pointers
 from passes.mark_io import mark_io
-from passes.pass_obj import PassObject
 from passes.clone import clone_pass
 from passes.linear_code import linear_code_pass
 

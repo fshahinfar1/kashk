@@ -40,7 +40,23 @@ class BPF_PROG:
         raise Exception('Not implemented!')
 
     def get_pkt_buf(self):
-        raise Exception('Not implemented!')
+        xdp = Ref(None, clang.CursorKind.DECL_REF_EXPR)
+        xdp.name = self.ctx
+        xdp.type = self.ctx_type
+
+        ref = Ref(None, clang.CursorKind.MEMBER_REF_EXPR)
+        ref.name = 'data'
+        ref.type = BASE_TYPES[clang.TypeKind.UINT]
+        ref.owner.append(xdp)
+
+        cast1 = Cast()
+        cast1.castee.add_inst(ref)
+        cast1.cast_type = BASE_TYPES[clang.TypeKind.ULONGLONG]
+        cast2 = Cast()
+        cast2.castee.add_inst(cast1)
+        cast2.cast_type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+        return cast2
+
 
     def get_pkt_end(self):
         raise Exception('Not implemented!')
@@ -49,7 +65,16 @@ class BPF_PROG:
         raise Exception('Not implemented!')
 
     def add_args_to_scope(self, scope):
-        raise Exception('Not implemented!')
+        """
+        This function adds the instance of the BPF context to the scope.
+        """
+        T = self.ctx_type
+        xdp_entry = scope.insert_entry(self.ctx, T, clang.CursorKind.PARM_DECL, None)
+        xdp_entry.is_bpf_ctx = True
+        entry = xdp_entry.fields.insert_entry('data', BASE_TYPES[clang.TypeKind.UINT], clang.CursorKind.MEMBER_REF_EXPR, None)
+        entry.is_bpf_ctx = True
+        entry = xdp_entry.fields.insert_entry('data_end', BASE_TYPES[clang.TypeKind.UINT], clang.CursorKind.MEMBER_REF_EXPR, None)
+        entry.is_bpf_ctx = True
 
     def send(self, buf, write_size, info, ret=True, failure='XDP_DROP', do_copy=True):
         raise Exception('Not implemented!')
@@ -91,10 +116,9 @@ class XDP_PROG(BPF_PROG):
         """
         This adds the definition of the BPF context to the symbol table
         """
-        struct_name = 'xdp'
         T = self.ctx_type.under_type
         scope_key = f'class_{T.spelling}'
-        entry = sym_tbl.global_scope.insert_entry(struct_name, T, clang.CursorKind.CLASS_DECL, None)
+        entry = sym_tbl.global_scope.insert_entry(scope_key, T, clang.CursorKind.CLASS_DECL, None)
         entry.is_bpf_ctx = True
         with sym_tbl.new_scope() as scope:
             sym_tbl.scope_mapping[scope_key] = scope
@@ -132,24 +156,6 @@ int xdp_prog(struct xdp_md *xdp)
 }}
 '''
         return text
-
-    def get_pkt_buf(self):
-        xdp = Ref(None, clang.CursorKind.DECL_REF_EXPR)
-        xdp.name = 'xdp'
-        xdp.type = self.ctx_type
-
-        ref = Ref(None, clang.CursorKind.MEMBER_REF_EXPR)
-        ref.name = 'data'
-        ref.type = BASE_TYPES[clang.TypeKind.UINT]
-        ref.owner.append(xdp)
-
-        cast1 = Cast()
-        cast1.castee.add_inst(ref)
-        cast1.cast_type = BASE_TYPES[clang.TypeKind.ULONGLONG]
-        cast2 = Cast()
-        cast2.castee.add_inst(cast1)
-        cast2.cast_type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
-        return cast2
 
     def get_pkt_end(self):
         xdp = Ref(None, clang.CursorKind.DECL_REF_EXPR)
@@ -190,18 +196,6 @@ int xdp_prog(struct xdp_md *xdp)
         delta = BinOp.build(end, '-', beg)
         size  = Cast.build(delta,  BASE_TYPES[clang.TypeKind.USHORT])
         return size
-
-    def add_args_to_scope(self, scope):
-        """
-        This function adds the instance of the BPF context to the scope.
-        """
-        T = MyType.make_pointer(MyType.make_simple('xdp_md', clang.TypeKind.RECORD))
-        xdp_entry = scope.insert_entry('xdp', T, clang.CursorKind.PARM_DECL, None)
-        xdp_entry.is_bpf_ctx = True
-        entry = xdp_entry.fields.insert_entry('data', BASE_TYPES[clang.TypeKind.UINT], clang.CursorKind.MEMBER_REF_EXPR, None)
-        entry.is_bpf_ctx = True
-        entry = xdp_entry.fields.insert_entry('data_end', BASE_TYPES[clang.TypeKind.UINT], clang.CursorKind.MEMBER_REF_EXPR, None)
-        entry.is_bpf_ctx = True
 
     def send(self, buf, write_size, info, ret=True, failure='XDP_DROP', do_copy=True):
         #TODO: The arguments of this function are crayz ???
@@ -284,9 +278,12 @@ class SK_SKB_PROG(BPF_PROG):
             # e.name = struct_name
             # # -------------------------------------------------------------------
             U32 = BASE_TYPES[clang.TypeKind.UINT]
-            sym_tbl.insert_entry('data', U32, clang.CursorKind.FIELD_DECL, None)
-            sym_tbl.insert_entry('data_end', U32, clang.CursorKind.FIELD_DECL, None)
-            sym_tbl.insert_entry('len', U32, clang.CursorKind.FIELD_DECL, None)
+            entry = sym_tbl.insert_entry('data', U32, clang.CursorKind.FIELD_DECL, None)
+            entry.is_bpf_ctx = True
+            entry = sym_tbl.insert_entry('data_end', U32, clang.CursorKind.FIELD_DECL, None)
+            entry.is_bpf_ctx = True
+            entry = sym_tbl.insert_entry('len', U32, clang.CursorKind.FIELD_DECL, None)
+            entry.is_bpf_ctx = False
 
     def set_code(self, code):
         self.verdict_code = code
@@ -354,9 +351,6 @@ if (!sock_ctx) {
 
         return '\n'.join(info.prog._parser_prog([per_conn] + [''] + [parser_code]) + [''] + info.prog._verdict_prog([verdict_code]))
 
-    def get_pkt_buf(self):
-        return f'(void *)(__u64)skb->data;\n'
-
     def get_pkt_size(self):
         skb      = Ref(None, clang.CursorKind.DECL_REF_EXPR)
         skb.name = self.ctx
@@ -369,10 +363,6 @@ if (!sock_ctx) {
 
         # return Literal(f'skb->len', CODE_LITERAL)
         return length
-
-    def add_args_to_scope(self, scope):
-        T = self.ctx_type
-        scope.insert_entry('skb', T, clang.CursorKind.PARM_DECL, None)
 
     def send(self, buf, write_size, info, ret=True, failure='SK_DROP', do_copy=True):
         is_size_integer = write_size.kind == clang.CursorKind.INTEGER_LITERAL

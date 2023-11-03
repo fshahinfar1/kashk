@@ -54,7 +54,7 @@ def is_value_from_bpf_ctx(inst, info, R=None):
             assert isinstance(ref.type, MyType)
             ref.kind = clang.CursorKind.DECL_REF_EXPR
             index = Literal('0', clang.CursorKind.INTEGER_LITERAL)
-            size = Literal(f'sizeof({inst.cursor.type.spelling})', CODE_LITERAL)
+            size = Literal(f'sizeof({inst.type.spelling})', CODE_LITERAL)
             R.append((ref, index, size))
             return True
         else:
@@ -74,11 +74,12 @@ def is_bpf_ctx_ptr(inst, info):
         sym = info.sym_tbl.lookup(inst.name)
         # assert sym is not None, 'What does it mean there is no symbol table entry  ??'
         if sym is None:
-            error(f'Symbol for reference {inst.name} was not found in the tabel!')
+            error(f'Symbol for reference {inst.name} was not found in the table!')
+            # debug(info.sym_tbl.current_scope.symbols)
+            # assert 0
             return False
         # debug(sym.name, '--bpf ctx-->', sym.is_bpf_ctx)
-        if sym.is_bpf_ctx:
-            return True
+        return sym.is_bpf_ctx
     elif inst.kind == clang.CursorKind.BINARY_OPERATOR:
         # A pointer arithmatic or assignment
         op_is_good = inst.op in itertools.chain(BinOp.ARITH_OP, BinOp.ASSIGN_OP)
@@ -105,7 +106,7 @@ def is_bpf_ctx_ptr(inst, info):
             error('Owner is not a reference and handling this case is not implemented yet [2]')
             return
         owner_symbol = info.sym_tbl.lookup(owner.name)
-        assert owner_symbol is not None, 'We do not recognize the owner of member access instruction!'
+        assert owner_symbol is not None, f'We do not recognize the owner of member access instruction! ({owner.name})'
         sym = owner_symbol.fields.lookup(inst.name)
         # debug('mem ref:', owner.name, inst.name, ':')
         if sym is None:
@@ -134,7 +135,7 @@ def set_ref_bpf_ctx_state(ref, state, info):
         sym = info.sym_tbl.lookup(ref.name)
         # assert sym is not None, f'{ref.name} should be found in symbol table'
         if sym is None:
-            error(f'Symbol for reference {ref.name} was not found in the tabel! [2]')
+            error(f'Symbol for reference {ref.name} was not found in the table! [2]')
             return
         sym.is_bpf_ctx = state
         debug(sym.name, '--> ctx ptr:', state)
@@ -157,3 +158,6 @@ def set_ref_bpf_ctx_state(ref, state, info):
         sym.is_bpf_ctx = state
         debug('Just set member field:', owner.name, ref.name, 'to', state)
         # debug('owner symb ref:', id(owner_symbol), 'field ref:', id(sym))
+    else:
+        error('Setting BPF Context Flag for the given Instruction is not implemented!')
+        debug('Inst:', ref)

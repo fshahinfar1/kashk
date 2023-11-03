@@ -36,8 +36,6 @@ def handle_var(inst, info, more):
             text = f'{tmp[:first_brack]}[{el_count}]{tmp[first_brack:]}'
         else:
             text = f'{tmp}[{el_count}]'
-    elif inst.is_record:
-        text = f'struct {inst.type.spelling} {inst.name}'
     else:
         text = f'{inst.type.spelling} {inst.name}'
     if inst.init.has_children():

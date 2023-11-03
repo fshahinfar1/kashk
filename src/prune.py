@@ -6,7 +6,7 @@ from instruction import UnaryOp
 
 # TODO: How to make sure that `read` is the read system-call and not a simple
 # function?
-READ_PACKET = ('async_read_some', 'read', 'recvfrom', 'recvmsg')
+READ_PACKET = ('async_read_some', 'recv', 'read', 'recvfrom', 'recvmsg')
 WRITE_PACKET = ('async_write', 'async_write_some', 'write', 'send', 'sendto', 'sendmsg')
 COROUTINE_FUNC_NAME = ('await_resume', 'await_transform', 'await_ready', 'await_suspend')
 
