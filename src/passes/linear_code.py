@@ -105,13 +105,53 @@ def _separate_var_decl_and_init(inst, info, more):
     return bin_op
 
 
+def _assign_block_to(blk, ref):
+    assert len(blk.children)
+    assign = BinOp.build(ref, '=', blk.children[0])
+    return assign
+
+
+def inst_type(inst):
+    if inst.kind in (clang.CursorKind.DECL_REF_EXPR, clang.CursorKind.MEMBER_REF_EXPR, clang.CursorKind.VAR_DECL):
+        return inst.type
+    elif inst.kind in (clang.CursorKind.PAREN_EXPR,):
+        return inst_type(inst.body.children[0])
+    else:
+        error(MODULE_TAG, 'ignoring some cases:', inst,inst.kind)
+    return MyType.make_simple('<Unknown>', clang.TypeKind.RECORD)
+
+
+def _handle_conditional_operator(inst, info):
+    blk = cb_ref.get(BODY)
+
+    # TODO: does type of body and other body match?
+    # TODO: is it possible that body do not have a child?
+    T = inst_type(inst.body.children[0])
+    tmp_var = VarDecl.build(get_tmp_var_name(), T)
+    tmp_ref = tmp_var.get_ref()
+    blk.append(tmp_var)
+
+    assert len(inst.cond.children) == 1
+    cond = inst.cond.children[0]
+    if_stmt = ControlFlowInst.build_if_inst(cond)
+    if inst.body.has_children():
+        assign = _assign_block_to(inst.body, tmp_ref)
+    else:
+        assign = _assign_block_to(if_stmt.cond, tmp_ref)
+    if_stmt.body.add_inst(assign)
+
+    if inst.other_body.has_children():
+        assign = _assign_block_to(inst.other_body, tmp_ref)
+    else:
+        assign = _assign_block_to(if_stmt.cond, tmp_ref)
+    if_stmt.other_body.add_inst(assign)
+    blk.append(if_stmt)
+
+    return tmp_ref
+
+
 def _process_current_inst(inst, info, more):
     ctx = more.ctx
-
-    # if inst.kind == ANNOTATION_INST:
-    #     if inst.ann_kind == Annotation.ANN_FUNC_PTR:
-    #         ptr, actual = inst.msg.split(Annotation.FUNC_PTR_DELIMITER)
-    #         func_ptr_mapping[ptr] = actual
 
     if inst.kind == clang.CursorKind.CALL_EXPR:
         # if inst.is_func_ptr:
@@ -128,10 +168,11 @@ def _process_current_inst(inst, info, more):
                 # Let's not mess up with operators
                 return inst
             return _move_function_out(inst, info, more)
-
-    if inst.kind == clang.CursorKind.VAR_DECL:
+    elif inst.kind == clang.CursorKind.VAR_DECL:
         if inst.has_children():
             return _separate_var_decl_and_init(inst, info, more)
+    elif inst.kind == clang.CursorKind.CONDITIONAL_OPERATOR:
+        return _handle_conditional_operator(inst, info)
 
     return inst
 
