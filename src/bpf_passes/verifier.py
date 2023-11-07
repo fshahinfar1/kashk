@@ -23,6 +23,7 @@ MODULE_TAG = '[Verfier Pass]'
 cb_ref = CodeBlockRef()
 _has_processed_func = set()
 current_function = None
+backward_jmp_ctx = None
 
 
 @contextmanager
@@ -34,6 +35,17 @@ def set_current_func(func):
         yield func
     finally:
         current_function = tmp
+
+
+@contextmanager
+def new_backward_jump_context():
+    global backward_jmp_ctx
+    tmp = backward_jmp_ctx
+    backward_jmp_ctx = []
+    try:
+        yield backward_jmp_ctx
+    finally:
+        backward_jmp_ctx = tmp
 
 
 def _check_if_variable_index_should_be_masked(ref, index, blk, info):
@@ -70,6 +82,9 @@ def _handle_binop(inst, info, more):
         # assert is_bpf_ctx_ptr(lhs, info) == rhs_is_ptr, 'Check if set_ref_bpf_ctx_state and is_bpf_ctx_ptr work correctly'
         if is_bpf_ctx_ptr(lhs, info) != rhs_is_ptr:
             error(MODULE_TAG, 'Failed to set the BPF context flag on reference', lhs)
+
+        if backward_jmp_ctx is not None and rhs_is_ptr:
+            backward_jmp_ctx.append(lhs)
 
     # Check if the BPF context is accessed and add bound checking
     blk = cb_ref.get(BODY)
@@ -151,7 +166,15 @@ def _step_into_func_and_track_context(inst, func, pos_of_ctx_ptrs, info):
 
         if param_sym.is_bpf_ctx:
             argum_sym.is_bpf_ctx = True
-            report(argum.owner, argum.name, 'is bpf context')
+            # report(argum.owner, argum.name, 'is bpf context')
+
+            if backward_jmp_ctx:
+                backward_jmp_ctx.append(argum)
+
+        if param.type_ref.spelling != argum.type.spelling:
+            error('There is a type case when passing the argument. I lose track of BPF context when there is a type cast!')
+            error('argument type:', argum.type.spelling, 'parameter type:', param.type.spelling)
+            continue
 
         if param.type_ref.is_pointer():
             ptr_type = param.type_ref.get_pointee()
@@ -165,7 +188,10 @@ def _step_into_func_and_track_context(inst, func, pos_of_ctx_ptrs, info):
                     if e2 is None:
                         e2 = argum_sym.fields.insert_entry(entry.name, entry.type, entry.kind, None)
                     e2.is_bpf_ctx = entry.is_bpf_ctx
-                    report(argum.name, e2.name, 'is bpf ctx:', entry.is_bpf_ctx)
+                    # report(argum.name, e2.name, 'is bpf ctx:', entry.is_bpf_ctx)
+                    if backward_jmp_ctx and e2.is_bpf_ctx:
+                        field = argum.get_ref_field(key, info)
+                        backward_jmp_ctx.append(field)
 
 
 def _handle_call(inst, info, more):
@@ -233,6 +259,17 @@ def _do_pass(inst, info, more):
         if inst is None:
             # This instruction should be removed
             return None
+
+        if inst.kind in MAY_HAVE_BACKWARD_JUMP_INSTRUCTIONS:
+            # This is a loop (may jump back), go through the loop once,
+            # remember which fields my be BPF Context
+            with new_backward_jump_context() as marked_refs:
+                _do_pass(inst.body, info, PassObject())
+                debug('in a loop these were marked:')
+                for ref in marked_refs:
+                    debug(ref)
+                    set_ref_bpf_ctx_state(ref, True, info)
+                debug('-----')
 
         # Continue deeper
         for child, tag in inst.get_children_context_marked():

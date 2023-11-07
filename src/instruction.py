@@ -23,6 +23,9 @@ BRANCHING_INSTRUCTIONS = (clang.CursorKind.IF_STMT, clang.CursorKind.SWITCH_STMT
         clang.CursorKind.WHILE_STMT, clang.CursorKind.DO_STMT,
         clang.CursorKind.CONDITIONAL_OPERATOR)
 
+MAY_HAVE_BACKWARD_JUMP_INSTRUCTIONS = (clang.CursorKind.FOR_STMT,
+        clang.CursorKind.WHILE_STMT, clang.CursorKind.DO_STMT,)
+
 def get_context_name(ctx):
     return {
             BODY: 'BODY',
@@ -628,6 +631,8 @@ class Ref(Instruction):
             T = self.type
             T = get_actual_type(T)
             key = f'class_{T.spelling}'
+            if key not in info.sym_tbl.scope_mapping:
+                error(info.sym_tbl.scope_mapping)
             struct_scope = info.sym_tbl.scope_mapping[key]
             sym = struct_scope.lookup(name)
             assert sym is not None
