@@ -130,7 +130,7 @@ def _handle_function_may_fail(inst, func, info, more):
             first_failure_case = None
             prev_failure_case = None
 
-            for failure_number in func.path_ids:
+            for failure_number in set(func.path_ids):
                 # TODO: change declaration to a dictionary instead of array
                 meta = info.user_prog.declarations[failure_number-1]
                 prepare_meta_code = prepare_meta_data(failure_number, meta, info.prog)

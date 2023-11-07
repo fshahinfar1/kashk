@@ -39,7 +39,7 @@ class FallbackRegionGraph:
         # Codes associated with this node
         self.paths = Path()
         # Id of paths that cross this node
-        self.path_ids = []
+        self.path_ids = set()
 
         self.to_user_inst = None
 
@@ -66,12 +66,9 @@ class FallbackRegionGraph:
         if self.parent:
             self.parent.remove_child(self)
             self.parent = None
-
         # TODO: what happens to the children?
         assert len(self.children) == 0
-
-        # self.paths.clear()
-        self.paths = None
+        self.paths = Path()
 
     def remove_child(self, child):
         self.children.remove(child)
@@ -84,7 +81,7 @@ class FallbackRegionGraph:
         return node
 
     def set_id(self, i):
-        self.path_ids.append(i)
+        self.path_ids.add(i)
         # traves up toward root and tag the nodes
         if self.parent is not None:
             self.parent.set_id(i)

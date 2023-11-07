@@ -29,6 +29,7 @@ from bpf_passes.userspace_fallback import userspace_fallback_pass
 from bpf_passes.verifier import verifier_pass
 from bpf_passes.transform_after_verifier import transform_func_after_verifier
 from bpf_passes.reduce_params import reduce_params_pass
+from bpf_passes.remove_everything_not_used import remove_everything_not_used
 
 from user_passes.select_user import select_user_pass
 from user_passes.number_fallback_graph import number_fallback_graph_pass
@@ -190,34 +191,60 @@ def generate_offload(io_ctx):
     return info
 
 
-def dfs_over_deps_vars(root):
+def dfs_over_deps_vars(root, visited=None):
     """
-    recursion basis is on the length of children
+    Get organize the variables we need to share with userspace for each failure
+    path.
+
+    Recursion basis is on the length of children.
 
     @param root: a node of the User Program Graph
+    @param visited: set of nodes already visited (we should not process a node
+    twice, we should not encounter a node twice if the graph is truely a tree)
+
     @returns a list of set of variables dependencies along with the failure number
     """
-    # TODO: have another look at this implementation. It seems to have issue of
-    # including some paths multiple times
+    if visited is None:
+        visited = set()
+    visited.add(root)
+
     this_node_deps = root.paths.var_deps
-
     if len(root.children) == 0:
+        # Base condition
+        # Reaching a leaf node
         if len(root.path_ids) != 1:
-            return [{'vars': [], 'path_id': '-'}]
-        assert len(root.path_ids) == 1, f'Expected the leaf to have one failure number. But it has more/less (list: {root.path_ids})'
-        return [{'vars': list(this_node_deps), 'path_id': root.path_ids[0]}]
+            error('This was not expected!!!', root.path_ids)
+            raise Exception(f'Expected the leaf to have one failure number. But it has more/less (list: {root.path_ids})')
+            # return [{'vars': [], 'path_id': '-'}]
+        path_id = tuple(root.path_ids)[0]
+        return ({'vars': list(this_node_deps), 'path_id': path_id},)
 
+    this_node_ids = root.path_ids.copy()
     have_it = set()
     results = []
     for child in root.children:
-        mid_res = dfs_over_deps_vars(child)
+        if child in visited:
+            error('The user graph is not a graph? a node has two parents?')
+            raise Exception('Unexpected')
+
+        # Remove the path ids that are in the children. If a path Id is not in
+        # the children then the failure happens in this node (this node would
+        # be the leaf for that failure path)
+        this_node_ids.difference_update(child.path_ids)
+
+        mid_res = dfs_over_deps_vars(child, visited)
         for r in mid_res:
-            if r['path_id'] in have_it:
+            path_id = r['path_id']
+            if path_id in have_it:
                 continue
-            have_it.add(r['path_id'])
-            r['vars'].extend(this_node_deps)
-            results.append(r)
-    return results
+            have_it.add(path_id)
+            item = {'vars': r['vars'] + list(this_node_deps), 'path_id': path_id}
+            results.append(item)
+    if len(this_node_ids) > 0:
+        # There are some ids that are not in any of the children
+        for i in this_node_ids:
+            results.append({'vars': list(this_node_deps), 'path_id': i})
+    return tuple(results)
 
 
 def gen_user_code(user, info, out_user):
@@ -238,6 +265,8 @@ def gen_user_code(user, info, out_user):
         # debug(tree)
         # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
         # debug(MODULE_TAG, info.user_prog.graph.paths.var_deps)
+        # debug(tree)
+        # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(x.path_ids))
         # debug(tree)
         # ----
 
@@ -267,10 +296,7 @@ def gen_user_code(user, info, out_user):
             info.sym_tbl.current_scope = info.sym_tbl.global_scope
             meta.update_symbol_table(info.sym_tbl)
             info.sym_tbl.current_scope = __scope
-
-        # Generate the user code in the context of userspace program
-        # TODO: I have disabled this part just for testing
-        # return
+            # debug('Meta', path_id, 'at index:', len(info.user_prog.declarations))
 
         text = generate_user_prog(info)
         debug('~~~~~~~~~~~~~~~~~~~~~')
@@ -316,14 +342,8 @@ def gen_bpf_code(bpf, info, out_bpf):
     bpf = reduce_params_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
-    debug('[2nd] Mark Functions used in BPF')
-    report("This pass was omited because it was buggy!")
-    # for func in Function.directory.values():
-    #     func.is_used_in_bpf_code = False
-    # info.prog.declarations = list(filter(lambda x: not isinstance(x, Function), info.prog.declarations))
-    # obj = PassObject()
-    # obj.func_only = True
-    # mark_used_funcs(bpf, info, None)
+    debug('[2nd] remove everything that is not used in BPF')
+    remove_everything_not_used(bpf, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # TODO: split the code between parser and verdict

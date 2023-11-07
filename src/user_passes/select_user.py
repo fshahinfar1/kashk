@@ -49,22 +49,24 @@ def _get_the_rest_of_the_code(inst, blk):
 
 def _process_call_inst(inst, info, more):
     func = inst.get_function_def()
-    if func and not func.is_empty():
-        parent_node = node_ref.get(NODE)
-        node = parent_node.new_child()
-        node_used = False
-        # Step inside the function
-        # debug('Investigate:', inst.name)
-        obj = more.repack(0, None, None)
-        with node_ref.new_ref(NODE, node):
-            with info.sym_tbl.with_func_scope(func.name):
-                ret = _do_pass(func.body, info, obj)
-            # It is important that the code which check the user_graph_node
-            # be in the context of "graph_node(node)"
-            tmp_node = node_ref.get(NODE)
-            node_used = not tmp_node.is_empty()
-            if tmp_node.is_empty():
-                tmp_node.remove()
+    if not func or func.is_empty():
+        return
+    parent_node = node_ref.get(NODE)
+    node = parent_node.new_child()
+    node_used = False
+    # Step inside the function
+    # debug('Investigate:', inst.name)
+    obj = more.repack(0, None, None)
+    with node_ref.new_ref(NODE, node):
+        with info.sym_tbl.with_func_scope(func.name):
+            ret = _do_pass(func.body, info, obj)
+        # It is important that the code which check the user_graph_node
+        # be in the context of "graph_node(node)"
+        tmp_node = node_ref.get(NODE)
+        if tmp_node.is_empty():
+            tmp_node.remove()
+        else:
+            node_used = True
 
         if func.may_fail:
             # debug(MODULE_TAG, f'function {func.name} may fail!')
@@ -77,13 +79,14 @@ def _process_call_inst(inst, info, more):
             # debug(MODULE_TAG, 'Code selected for after calling the failing function:', rest_of_the_code)
             node = node_ref.get(NODE)
             node.paths.code.extend_inst(rest_of_the_code)
+            # _set_in_userland(more)
 
-        if node_used:
-            node = node_ref.get(NODE)
-            new_node = node.parent.new_child()
-            node_ref.set(NODE, new_node)
+    if node_used:
+        node = node_ref.get(NODE)
+        new_node = node.parent.new_child()
+        node_ref.set(NODE, new_node)
 
-        # debug (f'step out of function: {inst.name} and userland state in function is: {obj.in_user_land}')
+    # debug (f'step out of function: {inst.name} and userland state in function is: {obj.in_user_land}')
 
 
 def _do_pass(inst, info, more):

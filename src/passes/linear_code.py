@@ -16,7 +16,7 @@ MODULE_TAG = '[Linear Code Pass]'
 cb_ref = CodeBlockRef()
 
 # TODO: this is a hack, I should use a stack to associate a mapping for each
-# scope. I am Lazy:) (issue is more time constraint than lazy)
+# scope.
 func_ptr_mapping = {}
 
 def _make_sure_void_func_return(func, info):
@@ -26,7 +26,6 @@ def _make_sure_void_func_return(func, info):
         return
     ret_inst = Return()
     func.body.add_inst(ret_inst)
-    # report('Add return statement to the end of', func.name)
 
 def _move_function_out(inst, info, more):
     return_type = None
@@ -59,21 +58,15 @@ def _move_function_out(inst, info, more):
         tmp_decl = VarDecl(None)
         tmp_decl.name = tmp_var_name
         tmp_decl.type = T
-        tmp_decl.state_obj = None
         blk.append(tmp_decl)
 
         # Update the symbol table
         info.sym_tbl.insert_entry(tmp_decl.name, T, tmp_decl.kind, None)
 
         # Assign function return value to tmp
-        tmp_ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
-        tmp_ref.name = tmp_var_name
-        tmp_ref.type = T
-        bin_op = BinOp(None)
-        bin_op.op = '='
-        bin_op.lhs.add_inst(tmp_ref)
+        tmp_ref = tmp_decl.get_ref()
         cloned_inst = clone_pass(inst, info, PassObject())
-        bin_op.rhs.add_inst(cloned_inst)
+        bin_op = BinOp.build(tmp_ref, '=', cloned_inst)
         blk.append(bin_op)
 
         tmp_decl.bpf_ignore = cloned_inst.bpf_ignore
@@ -90,17 +83,11 @@ def _separate_var_decl_and_init(inst, info, more):
     clone = clone_pass(inst, info, PassObject())
     rhs = clone.init.children[0]
     # clear the children
-    clone.init.children = []
-
+    clone.init.children.clear()
     ref = inst.get_ref()
-    bin_op = BinOp(None)
-    bin_op.op = '='
-    bin_op.lhs.add_inst(ref)
-    bin_op.rhs.add_inst(rhs)
-
+    bin_op = BinOp.build(ref, '=', rhs)
     # If the declartion was ignored, also ignore the initialization
     bin_op.bpf_ignore = clone.bpf_ignore
-
     blk.append(clone)
     return bin_op
 
@@ -154,14 +141,6 @@ def _process_current_inst(inst, info, more):
     ctx = more.ctx
 
     if inst.kind == clang.CursorKind.CALL_EXPR:
-        # if inst.is_func_ptr:
-        #     actual = func_ptr_mapping.get(inst.name)
-        #     if actual is not None:
-        #         # bind function pointer to an actual function
-        #         report(f'Function {inst.name} is replaced with {actual}')
-        #         inst.name = actual
-        #         inst.is_func_ptr = False
-
         # TODO: shoud it not be RHS ??
         if ctx in (ARG, LHS):
             if inst.is_operator:
@@ -207,6 +186,26 @@ def _do_pass(inst, info, more):
 
 
 def linear_code_pass(inst, info, more):
+    """
+    The following transformations are performed in this pass
+
+    1. Move function calls out of argument places. It include if-statement
+    condition, other function arguments, etc. This is done because we need to
+    add some checks after or before some functions, they should be in a block
+    of code and not in an argument.
+
+    2. Seperate value declaration and initialization to two different
+    instructions (declaration and assignment). [I have forgot why I needed this]
+
+    3. Convert conditional operations (ternary operations) to if else
+    instructions. This is needed for the similar reason as case 1. If some
+    operation in each path of this operation need a check then we would like to
+    add it in a block of code. The ternary operation does no allow this.
+
+    4. Make sure all void functions terminate with a return statement (It is
+    valid for a void function to not have return instruction, but we are using
+    return instruction as a sign of end of the function in future passes.)
+    """
     res = _do_pass(inst, info, more)
     # Make sure all the void functions are terminated with Return instructions
     # Other functions must return something so the compiler should complain.

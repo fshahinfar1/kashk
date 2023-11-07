@@ -65,7 +65,7 @@ def _handle_binop(inst, info, more):
     # Track which variables are pointer to the BPF context
     if inst.op == '=':
         rhs_is_ptr = is_bpf_ctx_ptr(rhs, info)
-        debug("***", gen_code([inst,], info), '|| LHS kind:', lhs.kind, '|| RHS kind:', rhs.kind, '|| is rhs ctx:', rhs_is_ptr)
+        # debug("***", gen_code([inst,], info), '|| LHS kind:', lhs.kind, '|| RHS kind:', rhs.kind, '|| is rhs ctx:', rhs_is_ptr)
         set_ref_bpf_ctx_state(lhs, rhs_is_ptr, info)
         # assert is_bpf_ctx_ptr(lhs, info) == rhs_is_ptr, 'Check if set_ref_bpf_ctx_state and is_bpf_ctx_ptr work correctly'
         if is_bpf_ctx_ptr(lhs, info) != rhs_is_ptr:
@@ -141,7 +141,7 @@ def _step_into_func_and_track_context(inst, func, pos_of_ctx_ptrs, info):
             # A question, How complex can it get?
             continue
 
-        debug(f'Parameter {param.name} ({param.type_ref.kind}) is given argument {argum.owner} {argum.name} ({argum.type})')
+        # debug(f'Parameter {param.name} ({param.type_ref.kind}) is given argument {argum.owner} {argum.name} ({argum.type})')
 
         # If the pointer it self is set to be BPF context, then the pointer will be BPF context in this scope too.
         param_sym  = callee_scope.lookup(param.name)
