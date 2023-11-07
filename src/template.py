@@ -149,27 +149,32 @@ if (!shared) {
     return new_inst
 
 
-def prepare_meta_data(failure_number, meta_declaration, prog):
-    # TODO: use the Instruction object instead of hard coded strings
+def prepare_meta_data(failure_number, meta_declaration, info):
     type_name = f'struct {meta_declaration.name}'
-    T = MyType.make_simple(type_name, clang.TypeKind.RECORD)
+    T = MyType.make_pointer(MyType.make_simple(type_name, clang.TypeKind.RECORD))
+
+    adjust_inst = info.prog.adjust_pkt(f'sizeof({T.spelling})')
+    adjust_inst = Literal(adjust_inst, CODE_LITERAL)
+
     meta_var_name = get_tmp_var_name()
-    adjust_inst = prog.adjust_pkt(f'sizeof({T.spelling})')
-    ctx = prog.ctx
-    code = f'''
-{adjust_inst}
-if (((void *)(__u64){ctx}->data + sizeof({T.spelling}))  > (void *)(__u64){ctx}->data_end) {{
-  return {prog.get_drop()};
-}}
-{T.spelling} *{meta_var_name} = (void *)(__u64){ctx}->data;
-'''
-    # TODO: I need to know the failure number and failure structure
+    decl = VarDecl.build(meta_var_name, T)
+    decl.update_symbol_table(info.sym_tbl)
+
+    ref = decl.get_ref()
+    assign = BinOp.build(ref, '=', info.prog.get_pkt_buf())
+
+    DROP = Literal(info.prog.get_drop(), clang.CursorKind.INTEGER_LITERAL)
+    ZERO = Literal('0', clang.CursorKind.INTEGER_LITERAL)
+    bound_check = bpf_ctx_bound_check(ref, ZERO, info.prog.get_pkt_end(), DROP)
+
     store = [f'{meta_var_name}->failure_number = {failure_number};', ]
     for f in meta_declaration.fields[1:]:
         store.append(f'{meta_var_name}->{f.name} = {f.name};')
-    code += '\n'.join(store) + '\n'
-    tmp = Literal(code, CODE_LITERAL)
-    return tmp
+    code = '\n'.join(store) + '\n'
+    populate = Literal(code, CODE_LITERAL)
+
+    insts = [adjust_inst, decl, assign, bound_check, populate]
+    return insts
 
 
 def define_bpf_map(map_name, map_type, key_type, val_type, entries):

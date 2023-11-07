@@ -428,8 +428,8 @@ class Function(TypeDefinition):
     def body(self, v):
         self._body  = v
 
-    def get_name(self):
-        return f'func {self.name}'
+    # def get_name(self):
+    #     return f'func {self.name}'
 
     def clone(self, directory):
         return self.clone2(self.name, directory)

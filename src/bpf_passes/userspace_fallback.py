@@ -133,13 +133,13 @@ def _handle_function_may_fail(inst, func, info, more):
             for failure_number in set(func.path_ids):
                 # TODO: change declaration to a dictionary instead of array
                 meta = info.user_prog.declarations[failure_number-1]
-                prepare_meta_code = prepare_meta_data(failure_number, meta, info.prog)
+                prepare_meta_code = prepare_meta_data(failure_number, meta, info)
 
                 # Check the failure number
                 int_literal = Literal(str(failure_number), clang.CursorKind.INTEGER_LITERAL)
                 cond = BinOp.build(flag_ref, '==', int_literal)
                 if_inst = ControlFlowInst.build_if_inst(cond)
-                if_inst.body.add_inst(prepare_meta_code)
+                if_inst.body.extend_inst(prepare_meta_code)
                 if_inst.body.add_inst(ToUserspace.from_func_obj(current_function))
 
                 if prev_failure_case is not None:
@@ -221,8 +221,8 @@ def _process_current_inst(inst, info, more):
         if current_function is None:
             # Found a split point on the BPF entry function
             meta = info.user_prog.declarations[failure_number - 1]
-            prepare_pkt = prepare_meta_data(failure_number, meta, info.prog)
-            blk.append(prepare_pkt)
+            prepare_pkt = prepare_meta_data(failure_number, meta, info)
+            blk.extend(prepare_pkt)
         else:
             sym = info.sym_tbl.lookup(FAIL_FLAG_NAME)
             if sym is None:
