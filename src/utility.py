@@ -273,6 +273,7 @@ def get_actual_type(_T):
             T = T.element_type
         else:
             break
+    T = skip_typedef(T)
     return T
 
 

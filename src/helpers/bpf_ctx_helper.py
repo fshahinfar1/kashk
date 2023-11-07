@@ -1,5 +1,6 @@
 from instruction import *
 from data_structure import *
+from helpers.instruction_helper import symbol_for_inst
 
 
 def is_value_from_bpf_ctx(inst, info, R=None):
@@ -131,33 +132,8 @@ def set_ref_bpf_ctx_state(ref, state, info):
     """
     # debug('set', ref, 'as context:', state)
     # TODO: it can also be a MEMBER_REF
-    if ref.kind == clang.CursorKind.DECL_REF_EXPR:
-        sym = info.sym_tbl.lookup(ref.name)
-        # assert sym is not None, f'{ref.name} should be found in symbol table'
-        if sym is None:
-            error(f'Symbol for reference {ref.name} was not found in the table! [2]')
-            return
-        sym.is_bpf_ctx = state
-        debug(sym.name, '--> ctx ptr:', state)
-    elif ref.kind == clang.CursorKind.MEMBER_REF_EXPR:
-        # TODO: I should set the flag only for one field of the data structure
-        # but my symbol table is too simple and does not keep state for fields
-        # of a data structure.
-        # _set_ref_bpf_ctx_state(ref.owner[0], state, info)
-        # TODO: THERE IS A BUG HERE, WHAT IF THERE ARE MULTIPLE NESTED STRUCTS? I NEED A RECURSION HERE.
-        debug("THERE IS A BUG HERE, WHAT IF THERE ARE MULTIPLE NESTED STRUCTS? I NEED A RECURSION HERE.")
-        owner = ref.owner[-1]
-        if not isinstance(owner, Ref):
-            error('Owner is not a reference and handling this case is not implemented yet')
-            return
-        owner_symbol = info.sym_tbl.lookup(owner.name)
-        assert owner_symbol is not None
-        sym = owner_symbol.fields.lookup(ref.name)
-        if sym is None:
-            sym = owner_symbol.fields.insert_entry(ref.name, ref.type, ref.kind, None)
-        sym.is_bpf_ctx = state
-        debug('Just set member field:', owner.name, ref.name, 'to', state)
-        # debug('owner symb ref:', id(owner_symbol), 'field ref:', id(sym))
-    else:
-        error('Setting BPF Context Flag for the given Instruction is not implemented!')
-        debug('Inst:', ref)
+
+    sym = symbol_for_inst(ref, info)
+    if sym is None:
+        return
+    sym.is_bpf_ctx = state

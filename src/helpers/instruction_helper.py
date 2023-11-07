@@ -112,3 +112,29 @@ def get_ref_symbol(ref, info):
         return sym
     else:
         return info.sym_tbl.lookup(ref.name)
+
+
+def symbol_for_inst(inst, info):
+    if inst.kind == clang.CursorKind.DECL_REF_EXPR:
+        return info.sym_tbl.lookup(inst.name)
+    elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
+        # TODO: I should set the flag only for one field of the data structure
+        # but my symbol table is too simple and does not keep state for fields
+        # of a data structure.
+        # _set_ref_bpf_ctx_state(ref.owner[0], state, info)
+        # TODO: THERE IS A BUG HERE, WHAT IF THERE ARE MULTIPLE NESTED STRUCTS? I NEED A RECURSION HERE.
+        debug("THERE IS A BUG HERE, WHAT IF THERE ARE MULTIPLE NESTED STRUCTS? I NEED A RECURSION HERE.")
+        owner = inst.owner[-1]
+        if not isinstance(owner, Ref):
+            error('Owner is not a reference and handling this case is not implemented yet')
+            return None
+        owner_symbol = info.sym_tbl.lookup(owner.name)
+        assert owner_symbol is not None
+        sym = owner_symbol.fields.lookup(inst.name)
+        if sym is None:
+            sym = owner_symbol.fields.insert_entry(inst.name, inst.type, inst.kind, None)
+        return sym
+    else:
+        error('Setting BPF Context Flag for the given Instruction is not implemented!')
+        debug('Inst:', inst)
+        return None
