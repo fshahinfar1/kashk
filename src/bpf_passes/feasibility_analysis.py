@@ -99,12 +99,25 @@ def _process_child(child, inst, info, more):
 
 
 def _do_pass(inst, info, more):
+    """
+    Description of how feasibility analysis is performed:
+        The body of each function is analysed, until we reach to a end of the
+        function. End of each function is marked with a `return' instruction.
+        If a void function does not have a return instruction we must have add
+        it in linear pass (before this pass).
+        Reaching a return instruction means the function may terminate successfully.
+
+        When a function invocation is found which might fail (meaning its
+        implementation is not known (completely unfeasible to offload to BPF)
+        or it calls a function that may fail) the current function is marked as
+        possible to fail.)
+
+        This information is used later to add ToUserspace (BPF-Userspace
+        boundaries) instruction where needed to fallback to userspace.
+    """
     lvl, ctx, parent_list = more.unpack()
     new_children = []
     failed = fail_ref.get(FAILED)
-    if inst.kind == clang.CursorKind.RETURN_STMT:
-        assert isinstance(inst, Return)
-
     if current_function and not failed and inst.kind == clang.CursorKind.RETURN_STMT:
         current_function.may_succeed = True
 
@@ -119,7 +132,6 @@ def _do_pass(inst, info, more):
                 current_function.may_fail = True
             # Not a stack
             fail_ref.set(FAILED, True)
-
         # Continue deeper
         for child, tag in inst.get_children_context_marked():
             with fail_ref.new_ref(FAILED, failed):
@@ -129,16 +141,12 @@ def _do_pass(inst, info, more):
                 if new_child is None:
                     return None
                 failed = fail_ref.get(FAILED)
-
-            # TODO: when should I propagate the failure to the upper level
-            # context?
+            # Propagate failure to upper level
+            # We are not propagating when we are branching to a different path.
             parent = cb_ref.get(PARENT_INST)
-            if parent is None or parent.kind != clang.CursorKind.IF_STMT:
+            if parent is None or parent.kind not in BRANCHING_INSTRUCTIONS:
                 fail_ref.set(FAILED, failed)
-                # debug(MODULE_TAG, 'propagate failure: ', inst.kind, inst)
-
             new_children.append(new_child)
-
     new_inst = inst.clone(new_children)
     return new_inst
 
@@ -157,8 +165,10 @@ def _do_feasibility_analisys(inst, info, more):
 
 
 def feasibilty_analysis_pass(inst, info, more):
-    # Start the analysis from the given function and perform it on the all know
-    # functions.
+    """
+    Start the analysis from the given function and perform it on the all know
+    functions.
+    """
     res = _do_feasibility_analisys(inst, info, more)
     for func in Function.directory.values():
         if func.may_succeed or func.may_fail:
@@ -177,9 +187,6 @@ def feasibilty_analysis_pass(inst, info, more):
         obj = PassObject()
         obj.func = func
         _do_feasibility_analisys(func.body, info, obj)
-        # debug(func.name, func.body.children)
-        # if not(func.may_fail or func.may_succeed):
-        #     debug('bpf ignore:', func.body.children[0].bpf_ignore)
         assert func.may_fail or func.may_succeed, f'After this processing we should have decide if function can fail or not (func: {func.name})'
 
     res = mark_user_boundary_pass(res, info, PassObject())

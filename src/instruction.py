@@ -18,6 +18,11 @@ RHS = 3
 DEF = 4
 FUNC = 5
 
+BRANCHING_INSTRUCTIONS = (clang.CursorKind.IF_STMT, clang.CursorKind.SWITCH_STMT,
+        clang.CursorKind.CASE_STMT, clang.CursorKind.FOR_STMT,
+        clang.CursorKind.WHILE_STMT, clang.CursorKind.DO_STMT,
+        clang.CursorKind.CONDITIONAL_OPERATOR)
+
 def get_context_name(ctx):
     return {
             BODY: 'BODY',
@@ -226,12 +231,10 @@ class VarDecl(Instruction):
             # TODO: this is because I am not following a solid design in
             # implementing things
             self.cursor = c
-            self.state_obj = StateObject(c)
             self.type = MyType.from_cursor_type(c.type)
             self.name = c.spelling
         else:
             self.cursor = None
-            self.state_obj = None
             self.type = None
             self.name = ''
         self.kind = clang.CursorKind.VAR_DECL
