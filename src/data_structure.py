@@ -341,7 +341,7 @@ class Record(TypeDefinition):
             sym_tbl.scope_mapping[scope_key] = scope
             for f in self.fields:
                 T = MyType()
-                T.spelling = f.type
+                T.spelling = f.type_ref.spelling
                 if f.is_pointer:
                     T.kind = clang.TypeKind.POINTER
                     T.under_type = None

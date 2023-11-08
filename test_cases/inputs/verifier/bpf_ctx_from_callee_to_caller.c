@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
 	do_read2(fd, c2);
 	req4 = (void *)c2->buf;
 	/* I expect the tool generate a bound check for this access */
-	x = req2->type;
+	x = req4->type;
 
 	return 0;
 }

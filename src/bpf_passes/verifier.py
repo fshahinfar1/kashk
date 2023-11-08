@@ -173,7 +173,7 @@ def _step_into_func_and_track_context(inst, func, pos_of_ctx_ptrs, info):
 
         if param.type_ref.spelling != argum.type.spelling:
             error('There is a type case when passing the argument. I lose track of BPF context when there is a type cast!')
-            error('argument type:', argum.type.spelling, 'parameter type:', param.type.spelling)
+            error('argument type:', argum.type.spelling, 'parameter type:', param.type_ref.spelling)
             continue
 
         if param.type_ref.is_pointer():
