@@ -1,5 +1,5 @@
 import clang.cindex as clang
-from utility import generate_struct_with_fields, indent
+from utility import generate_struct_with_fields, indent, get_tmp_var_name
 from data_structure import MyType, BASE_TYPES
 from instruction import *
 from log import debug
@@ -26,6 +26,9 @@ class BPF_PROG:
         self.ctx_type = MyType()
         self.server_config = ('127.0.0.1', '8080')
         self.index_mask = Literal('PKT_OFFSET_MASK', clang.CursorKind.MACRO_INSTANTIATION)
+
+    def get_ctx_ref(self):
+        return Ref.build(self.ctx, self.ctx_type)
 
     def add_declaration(self, text):
         self.declarations.append(text)
@@ -76,8 +79,43 @@ class BPF_PROG:
         entry = xdp_entry.fields.insert_entry('data_end', BASE_TYPES[clang.TypeKind.UINT], clang.CursorKind.MEMBER_REF_EXPR, None)
         entry.is_bpf_ctx = True
 
-    def send(self, buf, write_size, info, ret=True, failure='XDP_DROP', do_copy=True):
-        raise Exception('Not implemented!')
+    def send(self, buf, write_size, info, failure_return, ret=True, do_copy=True):
+        #TODO: The arguments of this function are crayz ???
+        is_size_integer = write_size.kind == clang.CursorKind.INTEGER_LITERAL
+        if is_size_integer:
+            memcpy = 'memcpy'
+        else:
+            # TODO: I need to check that BPF MEMCPY succeeds
+            memcpy = 'bpf_memcpy'
+            func = Function.directory[memcpy]
+            if not func.is_used_in_bpf_code:
+                func.is_used_in_bpf_code = True
+                info.prog.declarations.insert(0, func)
+
+        inst = self.adjust_pkt(write_size)
+        if do_copy:
+            off          = BinOp.build(self.get_pkt_buf(), '+', write_size)
+            cond         = BinOp.build(off, '>', self.get_pkt_end())
+            check        = ControlFlowInst.build_if_inst(cond)
+            ret_inst     = failure_return
+            check.body.add_inst(ret_inst)
+
+            copy         = Call(None)
+            copy.name    = memcpy
+            args         = [self.get_pkt_buf(), buf, write_size]
+            if memcpy == 'bpf_memcpy':
+                src_end = BinOp.build(buf, '+', write_size)
+                dst_end = self.get_pkt_end()
+                args.extend([dst_end, src_end])
+            copy.args = args
+
+            inst.extend([check, copy])
+
+        if ret is True:
+            ret_val  = Literal(self.get_send(), clang.CursorKind.INTEGER_LITERAL)
+            ret_inst = Return.build([ret_val,])
+            inst.append(ret_inst)
+        return inst
 
     def adjust_pkt(self, final_size):
         raise Exception('Not implemented!');
@@ -197,47 +235,17 @@ int xdp_prog(struct xdp_md *xdp)
         size  = Cast.build(delta,  BASE_TYPES[clang.TypeKind.USHORT])
         return size
 
-    def send(self, buf, write_size, info, ret=True, failure='XDP_DROP', do_copy=True):
-        #TODO: The arguments of this function are crayz ???
-        is_size_integer = write_size.kind == clang.CursorKind.INTEGER_LITERAL
-        if is_size_integer:
-            memcpy = 'memcpy'
-        else:
-            # TODO: I need to check that BPF MEMCPY succeeds
-            memcpy = 'bpf_memcpy'
-            func = Function.directory[memcpy]
-            if not func.is_used_in_bpf_code:
-                func.is_used_in_bpf_code = True
-                info.prog.declarations.insert(0, func)
-
-        write_size,_ = gen_code([write_size], info, ARG)
-        code = f'''
-{{
-  int delta = {write_size} - (unsigned short)((unsigned long long)xdp->data_end - (unsigned long long)xdp->data);
-  bpf_xdp_adjust_tail(xdp, delta);
-}}
-if (((void *)(__u64)xdp->data + {write_size}) > (void *)(__u64)xdp->data_end) {{
-    return {failure};
-}}
-'''
-
-        if do_copy:
-            if memcpy == 'memcpy':
-                code += f'\n{memcpy}((void *)(unsigned long long)xdp->data, {buf}, {write_size});'
-            else:
-                code += f'\n{memcpy}((void *)(unsigned long long)xdp->data, {buf}, {write_size}, (void *)(unsigned long long)xdp->data_end, {buf} + {write_size});'
-        if ret is True:
-            code += '\nreturn XDP_TX;'
-        inst = Literal(code, CODE_LITERAL)
-        return inst
-
     def adjust_pkt(self, final_size):
-        return f'''
-{{
-  int delta = {final_size} - ((__u64)xdp->data_end - (__u64)xdp->data);
-  bpf_xdp_adjust_tail(xdp, delta);
-}}
-'''
+        decl         = VarDecl.build(get_tmp_var_name(), BASE_TYPES[clang.TypeKind.INT])
+        delta_ref    = decl.get_ref()
+        compute_size = BinOp.build(final_size, '-', self.get_pkt_size())
+        delta_assign = BinOp.build(delta_ref, '=', compute_size)
+
+        adjust_pkt   = Call(None)
+        adjust_pkt.name = 'bpf_xdp_adjust_tail'
+        adjust_pkt.args = [self.get_ctx_ref(), delta_ref]
+        insts = [decl, delta_assign, adjust_pkt]
+        return insts
 
     def get_drop(self):
         return 'XDP_DROP'
@@ -351,6 +359,11 @@ if (!sock_ctx) {
 
         return '\n'.join(info.prog._parser_prog([per_conn] + [''] + [parser_code]) + [''] + info.prog._verdict_prog([verdict_code]))
 
+    def send(self, buf, write_size, info, failure_return, ret=True, do_copy=True):
+        if not do_copy:
+            raise Exception('The sk_skb adjust size would not adjust tail but the head of the packet and this makes issues when the send buffer is already on the packet')
+        super().send(buf, write_size, info, failure_return, ret, do_copy)
+
     def get_pkt_size(self):
         skb      = Ref(None, clang.CursorKind.DECL_REF_EXPR)
         skb.name = self.ctx
@@ -360,39 +373,14 @@ if (!sock_ctx) {
         length.name = 'len'
         length.type = BASE_TYPES[clang.TypeKind.UINT]
         length.owner.append(skb)
-
-        # return Literal(f'skb->len', CODE_LITERAL)
         return length
 
-    def send(self, buf, write_size, info, ret=True, failure='SK_DROP', do_copy=True):
-        is_size_integer = write_size.kind == clang.CursorKind.INTEGER_LITERAL
-        if is_size_integer:
-            memcpy = 'memcpy'
-        else:
-            # TODO: I need to check that BPF MEMCPY succeeds
-            memcpy = 'bpf_memcpy'
-            func = Function.directory[memcpy]
-            if not func.is_used_in_bpf_code:
-                debug(MODULE_TAG, 'Add bpf_memcpy to declarations')
-                func.is_used_in_bpf_code = True
-                info.prog.declarations.insert(0, func)
-
-        write_size,_ = gen_code(write_size, info)
-        skb = 'skb'
-        code = [
-            f'__adjust_skb_size({skb}, {write_size});',
-            f'if (((void *)(__u64){skb}->data + {write_size})  > (void *)(__u64){skb}->data_end) {{',
-            f'  return SK_DROP;',
-            '}',
-            f'{memcpy}((void *)(__u64){skb}->data, {buf}, {write_size});',
-            f'return bpf_sk_redirect_map({skb}, &sock_map, sock_ctx->sock_map_index, 0);',
-            ]
-        text = '\n'.join(code)
-        inst = Literal(text, CODE_LITERAL)
-        return inst
-
     def adjust_pkt(self, final_size):
-        return f'__adjust_skb_size(skb, {final_size});'
+        adjust_pkt   = Call(None)
+        adjust_pkt.name = '__adjust_skb_size'
+        adjust_pkt.args = [self.get_ctx_ref(), final_size]
+        insts = [adjust_pkt]
+        return insts
 
     def get_drop(self):
         return 'SK_DROP'
@@ -401,4 +389,5 @@ if (!sock_ctx) {
         return 'SK_PASS'
 
     def get_send(self):
-        raise Exception('not implemented')
+        # raise Exception('not implemented')
+        return f'return bpf_sk_redirect_map(skb, &sock_map, sock_ctx->sock_map_index, 0);'

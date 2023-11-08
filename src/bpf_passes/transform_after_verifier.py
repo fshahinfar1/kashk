@@ -111,8 +111,6 @@ def _known_function_substitution(inst, info):
 
 
 def _process_write_call(inst, info):
-    buf = inst.wr_buf.name
-    # report(f'Using buffer {buf} to send response')
     # TODO: maybe it is too soon to convert instructions to the code
     if inst.wr_buf.size_cursor is None:
         write_size = Literal('<UNKNOWN WRITE BUF SIZE>', CODE_LITERAL)
@@ -124,13 +122,16 @@ def _process_write_call(inst, info):
     ref = inst.wr_buf.ref
     should_copy = not is_bpf_ctx_ptr(ref, info)
 
+    blk = cb_ref.get(BODY)
+    return_val = get_ret_inst(current_function, info)
     if current_function is None:
         # On the main BPF program. feel free to return the verdict value
-        inst = info.prog.send(buf, write_size, info, do_copy=should_copy)
+        insts = info.prog.send(ref, write_size, info, return_val, do_copy=should_copy)
+        blk.extend(insts[:-1])
+        inst = insts[-1]
     else:
         # On a function which is not the main. Do not return
-        return_val = get_ret_value_text(current_function, info)
-        copy_inst = info.prog.send(buf, write_size, info, ret=False, failure=return_val, do_copy=should_copy)
+        copy_inst = info.prog.send(ref, write_size, info, return_val, ret=False, do_copy=should_copy)
         # set the flag
         flag_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
         flag_ref.name = SEND_FLAG_NAME
@@ -142,8 +143,7 @@ def _process_write_call(inst, info):
         set_flag = BinOp.build(deref, '=', one)
 
         # add it to the body
-        blk = cb_ref.get(BODY)
-        blk.append(copy_inst)
+        blk.extend(copy_inst)
         blk.append(set_flag)
         # Return from this point to the BPF main
         inst = get_ret_inst(current_function, info)

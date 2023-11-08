@@ -153,8 +153,7 @@ def prepare_meta_data(failure_number, meta_declaration, info):
     type_name = f'struct {meta_declaration.name}'
     T = MyType.make_pointer(MyType.make_simple(type_name, clang.TypeKind.RECORD))
 
-    adjust_inst = info.prog.adjust_pkt(f'sizeof({T.spelling})')
-    adjust_inst = Literal(adjust_inst, CODE_LITERAL)
+    adjust_inst = info.prog.adjust_pkt(Literal(f'sizeof({T.spelling})', CODE_LITERAL))
 
     meta_var_name = get_tmp_var_name()
     decl = VarDecl.build(meta_var_name, T)
@@ -173,7 +172,7 @@ def prepare_meta_data(failure_number, meta_declaration, info):
     code = '\n'.join(store) + '\n'
     populate = Literal(code, CODE_LITERAL)
 
-    insts = [adjust_inst, decl, assign, bound_check, populate]
+    insts = adjust_inst + [decl, assign, bound_check, populate]
     return insts
 
 

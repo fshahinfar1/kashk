@@ -45,7 +45,7 @@ def remove_everything_not_used(bpf, info, more):
     all_declarations = [decl.get_name() for decl in info.prog.declarations if hasattr(decl, 'get_name')]
     _do_pass(bpf, all_declarations, info)
     new_list = []
-    # debug('List of declarations to remove:', all_declarations)
+    debug('List of declarations to remove:', all_declarations)
     for decl in info.prog.declarations:
         if not hasattr(decl, 'get_name'):
             new_list.append(decl)

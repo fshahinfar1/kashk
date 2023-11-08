@@ -584,6 +584,14 @@ class Ref(Instruction):
         ref.type = sym.type
         return ref
 
+    @classmethod
+    def build(cls, name, T, is_member = False):
+        kind = clang.CursorKind.MEMBER_REF_EXPR if is_member else clang.CursorKind.DECL_REF_EXPR
+        ref = Ref(None, kind)
+        ref.name = name
+        ref.type = T
+        return ref
+
     def __init__(self, cursor, kind=None):
         super().__init__()
         self.cursor = cursor
