@@ -1,3 +1,4 @@
+from data_structure import StateObject
 from instruction import *
 
 
@@ -138,3 +139,19 @@ def symbol_for_inst(inst, info):
         error('Setting BPF Context Flag for the given Instruction is not implemented!')
         debug('Inst:', inst)
         return None
+
+
+def add_flag_to_func(flag, func, info):
+    if flag == Function.CTX_FLAG:
+        assert func.change_applied & Function.CTX_FLAG == 0
+        arg = StateObject(None)
+        arg.name = info.prog.ctx
+        arg.type_ref = info.prog.ctx_type
+        func.args.append(arg)
+        func.change_applied |= Function.CTX_FLAG
+        scope = info.sym_tbl.scope_mapping.get(func.name)
+        assert scope is not None
+        # info.prog.add_args_to_scope(info.sym_tbl.current_scope)
+        info.prog.add_args_to_scope(scope)
+    else:
+        raise Exception('Not implemented yet!')

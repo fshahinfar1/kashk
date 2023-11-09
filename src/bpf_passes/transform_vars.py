@@ -7,7 +7,7 @@ from template import (prepare_shared_state_var, define_bpf_arr_map,
 from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS
 from utility import get_tmp_var_name
 from helpers.cache_helper import generate_cache_lookup
-from helpers.instruction_helper import get_ret_inst
+from helpers.instruction_helper import get_ret_inst, add_flag_to_func
 
 from data_structure import *
 from instruction import *
@@ -182,7 +182,7 @@ def _process_call_needing_send_flag(inst, blk, current_function, info):
         decl.type = BASE_TYPES[clang.TypeKind.SCHAR]
         decl.init.add_inst(Literal('0', clang.CursorKind.INTEGER_LITERAL))
         declare_at_top_of_func.append(decl)
-        sym = info.sym_tbl.insert_entry(decl.name, decl.type, decl.kind, None)
+        sym = decl.update_symbol_table(info.sym_tbl)
 
         flag_ref = decl.get_ref()
         ref = UnaryOp.build('&', flag_ref)
@@ -235,11 +235,10 @@ def _process_current_inst(inst, info, more):
                 return inst
             # Add context
             if (func.calls_recv  or func.calls_send) and (inst.change_applied & Function.CTX_FLAG == 0):
+                assert func.change_applied & Function.CTX_FLAG != 0
                 inst.change_applied |= Function.CTX_FLAG
-                ctx_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
-                ctx_ref.name = info.prog.ctx
-                ctx_ref.type = info.prog.ctx_type
-                inst.args.append(ctx_ref)
+                inst.args.append(info.prog.get_ctx_ref())
+                debug('add ctx ref to call:', inst.name)
 
             # Add send flag
             if func.calls_send and (inst.change_applied & Function.SEND_FLAG == 0):
@@ -305,17 +304,11 @@ def _check_func_receives_all_the_flags(func, info):
     """
     Check if function receives flags it need through its arguments
     """
+    debug("check func", func.name, 'send or recv?', func.calls_send, func.calls_recv)
     if (func.calls_send or func.calls_recv) and (func.change_applied & Function.CTX_FLAG == 0):
         # Add the BPF context to its arguemt
-        arg = StateObject(None)
-        arg.name = info.prog.ctx
-        arg.type_ref = info.prog.ctx_type
-        func.args.append(arg)
-        func.change_applied |= Function.CTX_FLAG
-        scope = info.sym_tbl.scope_mapping.get(func.name)
-        assert scope is not None
-        info.prog.add_args_to_scope(info.sym_tbl.current_scope)
-
+        add_flag_to_func(Function.CTX_FLAG, func, info)
+        print(func.name)
     if func.calls_send and (func.change_applied & Function.SEND_FLAG == 0):
         # Add the send flag
         arg = StateObject(None)
@@ -350,6 +343,18 @@ def transform_vars_pass(inst, info, more):
     * Cache Generation
     """
     global current_function
+
+
+    # First check function definitions and flags they receive
+    for func in Function.directory.values():
+        if not func.is_used_in_bpf_code:
+            continue
+        current_function = func
+        with info.sym_tbl.with_func_scope(current_function.name):
+            _check_func_receives_all_the_flags(func, info)
+
+
+    # Process the main
     current_function = None
     res = _do_pass(inst, info, more)
     if declare_at_top_of_func:
@@ -357,11 +362,11 @@ def transform_vars_pass(inst, info, more):
             res.children.insert(0, inst)
     declare_at_top_of_func.clear()
 
+    # Process other functions
     for func in Function.directory.values():
         if func.is_used_in_bpf_code:
             current_function = func
             with info.sym_tbl.with_func_scope(current_function.name):
-                _check_func_receives_all_the_flags(func, info)
                 func.body = _do_pass(func.body, info, PassObject())
                 if declare_at_top_of_func:
                     for inst in declare_at_top_of_func:
