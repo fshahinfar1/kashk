@@ -304,11 +304,10 @@ def _check_func_receives_all_the_flags(func, info):
     """
     Check if function receives flags it need through its arguments
     """
-    debug("check func", func.name, 'send or recv?', func.calls_send, func.calls_recv)
+    # debug("check func", func.name, 'send or recv?', func.calls_send, func.calls_recv)
     if (func.calls_send or func.calls_recv) and (func.change_applied & Function.CTX_FLAG == 0):
         # Add the BPF context to its arguemt
         add_flag_to_func(Function.CTX_FLAG, func, info)
-        print(func.name)
     if func.calls_send and (func.change_applied & Function.SEND_FLAG == 0):
         # Add the send flag
         arg = StateObject(None)

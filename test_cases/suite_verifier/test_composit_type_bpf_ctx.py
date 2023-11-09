@@ -56,15 +56,17 @@ class TestCase(BasicTest):
 
         func = Function.directory['access_data']
 
+        # Generate the code and show it for debuging
+        text, _ = gen_code(bpf, info)
+        print(text)
+
+        text, _ = gen_code([func,], info)
+        print(text)
+
+
+        # Tests
         elems = find_elems_of_kind(func.body, clang.CursorKind.IF_STMT)
         assert len(elems) > 0, 'The compiler should add an if statment'
-
-        # Generate the code and show it for debuging
-        # text, _ = gen_code(bpf, info)
-        # print(text)
-
-        # text, _ = gen_code([func,], info)
-        # print(text)
 
         print('Reduce Params Pass Test: Okay')
 

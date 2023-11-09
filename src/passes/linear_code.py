@@ -55,13 +55,9 @@ def _move_function_out(inst, info, more):
         # Declare tmp
         T = return_type
         assert isinstance(T, MyType)
-        tmp_decl = VarDecl(None)
-        tmp_decl.name = tmp_var_name
-        tmp_decl.type = T
+        tmp_decl = VarDecl.build(tmp_var_name, T)
         blk.append(tmp_decl)
-
-        # Update the symbol table
-        info.sym_tbl.insert_entry(tmp_decl.name, T, tmp_decl.kind, None)
+        tmp_decl.update_symbol_table(info.sym_tbl)
 
         # Assign function return value to tmp
         tmp_ref = tmp_decl.get_ref()
@@ -117,6 +113,7 @@ def _handle_conditional_operator(inst, info):
     tmp_var = VarDecl.build(get_tmp_var_name(), T)
     tmp_ref = tmp_var.get_ref()
     blk.append(tmp_var)
+    tmp_var.update_symbol_table(info.sym_tbl)
 
     assert len(inst.cond.children) == 1
     cond = inst.cond.children[0]
@@ -212,8 +209,8 @@ def linear_code_pass(inst, info, more):
     for func in Function.directory.values():
         if not func.is_used_in_bpf_code:
             continue
-        debug(func.name)
-        func.body = _do_pass(func.body, info, PassObject())
-        if not func.is_empty() and func.return_type.spelling == 'void':
-            _make_sure_void_func_return(func, info)
+        with info.sym_tbl.with_func_scope(func.name):
+            func.body = _do_pass(func.body, info, PassObject())
+            if not func.is_empty() and func.return_type.spelling == 'void':
+                _make_sure_void_func_return(func, info)
     return res

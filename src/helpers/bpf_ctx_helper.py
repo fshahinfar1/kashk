@@ -107,6 +107,10 @@ def is_bpf_ctx_ptr(inst, info):
             error('Owner is not a reference and handling this case is not implemented yet [2]')
             return
         owner_symbol = info.sym_tbl.lookup(owner.name)
+        if owner_symbol is None:
+            debug('DEBUG INFO:')
+            debug(inst.name, inst.owner, owner.name)
+            debug(info.sym_tbl.current_scope.symbols)
         assert owner_symbol is not None, f'We do not recognize the owner of member access instruction! ({owner.name})'
         sym = owner_symbol.fields.lookup(inst.name)
         # debug('mem ref:', owner.name, inst.name, ':')

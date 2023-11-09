@@ -17,14 +17,11 @@ class SymbolTableEntry:
         self.type = type_
         self.kind = kind
         self.ref = ref
+        from data_structure import MyType
+        assert isinstance(type_, MyType)
 
         # This is added to handle the fields of a struct
         self.fields = Scope(scope_holding_the_entry)
-
-        # if type_ is not None:
-        #     self.is_pointer = type_.kind == clang.TypeKind.POINTER
-        # else:
-        #     self.is_pointer = False
         self.is_bpf_ctx = False
         self.is_accessed = SymbolAccessMode.NOT_ACCESSED
 

@@ -135,11 +135,10 @@ def _handle_call(inst, info, more):
     # Add the struct definition to the line before calling the function
     blk = cb_ref.get(BODY)
     blk.append(decl)
+    decl.update_symbol_table(info.sym_tbl)
 
     # Pass a reference of this struct to the function
-    ref = Ref(None, kind=clang.CursorKind.DECL_REF_EXPR)
-    ref.name = decl.name
-    ref.type = decl.type
+    ref = decl.get_ref()
     unary = UnaryOp(None)
     unary.op = '&'
     unary.child.add_inst(ref)

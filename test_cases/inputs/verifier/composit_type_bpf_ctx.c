@@ -6,17 +6,19 @@
 
 struct conn {
 	char buf[128];
+	char *buf2;
 	int size;
 };
 
-void access_data(struct conn *c)
+void access_data(struct conn *t)
 {
-	int x = c->buf[0];
+	int x = t->buf2[0];
 }
 
 void process_event(int fd, struct conn *c)
 {
 	c->size = read(fd, c->buf, 128);
+	c->buf2 = &c->buf[1];
 	access_data(c);
 }
 

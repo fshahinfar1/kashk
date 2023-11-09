@@ -56,19 +56,20 @@ def _check_if_variable_index_should_be_masked(ref, index, blk, info):
     set_of_variables_to_be_masked = get_scalar_variables(ref) + get_scalar_variables(index)
     # debug('these are scalar variables:', set_of_variables_to_be_masked)
     for var in  set_of_variables_to_be_masked:
-        # TODO: should I keep the variable in tack and define a tmp value for masking? Then I should replace the access instruction and use the masked variables.
-        # decl_index  = VarDecl.build(get_tmp_var_name(), index.type)
-        # ref_index   = decl_index.get_ref()
+        # TODO: should I keep the variable intact and define a tmp value for
+        # masking? Then I should replace the access instruction and use the
+        # masked variables.
 
-        debug(var)
         sym = get_ref_symbol(var, info)
+        if sym is None:
+            error('Failed to find symbol!')
+            debug(MODULE_TAG, var)
+            debug(info.sym_tbl.current_scope.symbols)
+            raise Exception('Failure')
         if sym.is_bpf_ctx:
             continue
-
         mask_op     = BinOp.build(var, '&', info.prog.index_mask)
-        # mask_assign = BinOp.build(ref_index, '=', mask_op)
         mask_assign = BinOp.build(var, '=', mask_op)
-        # index = ref_index.clone([])
         blk.append(mask_assign)
 
 
@@ -117,8 +118,15 @@ def _handle_binop(inst, info, more):
     return inst
 
 
+class FoundFields:
+    def __init__(self):
+        self.count_bpf_fields = 0
+        self.fields = []
+
+
 def _has_bpf_ctx_in_field(ref, info, field_name=None):
     assert isinstance(ref, Instruction)
+    found = False
     T = ref.type
     T = get_actual_type(T)
     if T.is_record():
@@ -131,17 +139,19 @@ def _has_bpf_ctx_in_field(ref, info, field_name=None):
         # First check if any of the fields are BPF context
         for field in decl.fields:
             ref_field = Ref.build(field.name, field.type_ref, is_member=True)
-            ref_field.owner = ref.owner + [ref,]
+            ref_field.owner = [ref,] + ref.owner
             if is_bpf_ctx_ptr(ref_field, info):
                 if field_name is not None:
-                    field_name.append(field)
-                return True
+                    field_name.fields.append([ref_field,])
+                    found = True
+                    field_name.count_bpf_fields += 1
+                    debug(MODULE_TAG, ref.name, field.name, 'is BPF CTX')
         # Check if any of the field has an object which is BPF context
         # for field in decl.fields:
         #     if _has_bpf_ctx_in_field(field, info, field_name):
         #         return True
         # TODO: it might have a field of the type from the parent class. There would be a recursion here which I might not be able to solve.
-        return False
+    return found
 
 
 def _check_passing_bpf_context(inst, func, info):
@@ -164,20 +174,22 @@ def _check_passing_bpf_context(inst, func, info):
                 error('There is a type cast when passing the argument. I lose track of BPF context when there is a type cast! [1]')
                 debug(f'param: {param.type_ref.spelling}    argument: {a.type.spelling}')
                 continue
-            field = []
-            if _has_bpf_ctx_in_field(a, info, field):
-                sym = callee_scope.lookup(param.name)
-                assert sym is not None, 'We should have all the parameters in the scope of functions'
-                scope = sym.fields
-                debug('fields:', field)
-                for ref in reversed(field):
-                    sym = scope.lookup(ref.name)
-                    if sym is None:
-                            sym = scope.insert_entry(ref.name, ref.type, clang.CursorKind.MEMBER_REF_EXPR, None)
-                    scope = sym.fields
-                sym.is_bpf_ctx = True
-                receives_bpf_ctx = True
-                debug(f'Set the {param.name} .. {sym.name} to BPF_CTX')
+            fields = FoundFields()
+            # debug(callee_scope.symbols)
+            if _has_bpf_ctx_in_field(a, info, fields):
+                param_sym = callee_scope.lookup(param.name)
+                assert param_sym is not None, 'We should have all the parameters in the scope of functions'
+                # debug('fields:', field)
+                for field in fields.fields:
+                    scope = param_sym.fields
+                    for ref in reversed(field):
+                        sym = scope.lookup(ref.name)
+                        if sym is None:
+                                sym = scope.insert_entry(ref.name, ref.type, clang.CursorKind.MEMBER_REF_EXPR, None)
+                        scope = sym.fields
+                    sym.is_bpf_ctx = True
+                    receives_bpf_ctx = True
+                    debug(f'Set the {param.name} .. {sym.name} to BPF_CTX')
             else:
                 debug(f'Does not have BPF CTX in its field {a.name}')
     return receives_bpf_ctx
@@ -259,6 +271,7 @@ def _step_into_func_and_track_context(inst, func, info):
     # if inst.name not in _has_processed_func:
     # _has_processed_func.add(inst.name)
     with info.sym_tbl.with_func_scope(inst.name):
+        sym = info.sym_tbl.current_scope.lookup('t')
         with set_current_func(func):
             func.body = _do_pass(func.body, info, PassObject())
 
@@ -285,6 +298,10 @@ def _handle_call(inst, info, more):
             size = inst.args[2]
 
             blk = cb_ref.get(BODY)
+            # text, _ = gen_code(blk, info)
+            # debug(text)
+            # text, _ = gen_code([inst,], info)
+            # debug(text)
             _check_if_variable_index_should_be_masked(ref, size, blk, info)
             # Add the check a line before this access
             ctx_ref = info.prog.get_ctx_ref()
@@ -348,11 +365,11 @@ def _do_pass(inst, info, more):
             # remember which fields my be BPF Context
             with new_backward_jump_context() as marked_refs:
                 _do_pass(inst.body, info, PassObject())
-                debug('in a loop these were marked:')
+                # debug('in a loop these were marked:')
                 for ref in marked_refs:
-                    debug(ref)
+                    # debug(ref)
                     set_ref_bpf_ctx_state(ref, True, info)
-                debug('----------------------------')
+                # debug('----------------------------')
 
         # Continue deeper
         for child, tag in inst.get_children_context_marked():
