@@ -153,7 +153,7 @@ def prepare_meta_data(failure_number, meta_declaration, info):
     type_name = f'struct {meta_declaration.name}'
     T = MyType.make_pointer(MyType.make_simple(type_name, clang.TypeKind.RECORD))
 
-    adjust_inst = info.prog.adjust_pkt(Literal(f'sizeof({T.spelling})', CODE_LITERAL))
+    adjust_inst = info.prog.adjust_pkt(Literal(f'sizeof({T.spelling})', CODE_LITERAL), info)
 
     meta_var_name = get_tmp_var_name()
     decl = VarDecl.build(meta_var_name, T)
@@ -207,6 +207,7 @@ def malloc_lookup(name, info, return_val):
     var_decl.name = tmp_name
     var_decl.type = T
     var_decl.init.add_inst(Literal('NULL', clang.CursorKind.INTEGER_LITERAL))
+    var_decl.update_symbol_table(info.sym_tbl)
 
     text = f'''
 {{

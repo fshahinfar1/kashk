@@ -15,9 +15,11 @@ COROUTINE_FUNC_NAME = ('await_resume', 'await_transform', 'await_ready', 'await_
 # interest only then we can ignore a funciton.
 IGNORE_FUNC = ('printf', 'fprintf')
 
-KNOWN_FUNCS = ('malloc', 'memcpy', 'memmove', 'memset', 'strcpy', 'strncpy',
-                'strlen', 'strcmp', 'ntohs', 'ntohl', 'ntohll', 'htons',
+MEMORY_ACCESS_FUNC = ('memcpy', 'memmove', 'memset', 'strcpy', 'strncpy',
+                'strlen', 'strcmp')
+KNOWN_FUNCS = (*MEMORY_ACCESS_FUNC, 'malloc', 'ntohs', 'ntohl', 'ntohll', 'htons',
                 'htonl', 'htonll')
+
 
 OUR_IMPLEMENTED_FUNC = ('bpf_memcpy', 'bpf_strncpy', 'bpf_ntohs', 'bpf_ntohl',
                         'bpf_htons', 'bpf_htonl', 'bpf_cpu_to_be64',

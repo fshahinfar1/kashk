@@ -92,7 +92,7 @@ class BPF_PROG:
                 func.is_used_in_bpf_code = True
                 info.prog.declarations.insert(0, func)
 
-        inst = self.adjust_pkt(write_size)
+        inst = self.adjust_pkt(write_size, info)
         if do_copy:
             off          = BinOp.build(self.get_pkt_buf(), '+', write_size)
             cond         = BinOp.build(off, '>', self.get_pkt_end())
@@ -117,7 +117,7 @@ class BPF_PROG:
             inst.append(ret_inst)
         return inst
 
-    def adjust_pkt(self, final_size):
+    def adjust_pkt(self, final_size, info):
         raise Exception('Not implemented!');
 
     def get_drop(self):
@@ -235,11 +235,12 @@ int xdp_prog(struct xdp_md *xdp)
         size  = Cast.build(delta,  BASE_TYPES[clang.TypeKind.USHORT])
         return size
 
-    def adjust_pkt(self, final_size):
+    def adjust_pkt(self, final_size, info):
         decl         = VarDecl.build(get_tmp_var_name(), BASE_TYPES[clang.TypeKind.INT])
         delta_ref    = decl.get_ref()
         compute_size = BinOp.build(final_size, '-', self.get_pkt_size())
         delta_assign = BinOp.build(delta_ref, '=', compute_size)
+        decl.update_symbol_table(info.sym_tbl)
 
         adjust_pkt   = Call(None)
         adjust_pkt.name = 'bpf_xdp_adjust_tail'
@@ -375,7 +376,7 @@ if (!sock_ctx) {
         length.owner.append(skb)
         return length
 
-    def adjust_pkt(self, final_size):
+    def adjust_pkt(self, final_size, info):
         adjust_pkt   = Call(None)
         adjust_pkt.name = '__adjust_skb_size'
         adjust_pkt.args = [self.get_ctx_ref(), final_size]
