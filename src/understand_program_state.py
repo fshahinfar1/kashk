@@ -75,7 +75,7 @@ def generate_decleration_for(cursor):
     elif T.kind == clang.TypeKind.ELABORATED:
         decl.append(Elaborate(c))
     elif T.kind == clang.TypeKind.ENUM:
-        print('We have an enum?', cursor)
+        debug('We have an enum?')
         # TODO: No further deps?
         return []
     elif T.kind == clang.TypeKind.TYPEDEF:

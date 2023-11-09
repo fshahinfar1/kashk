@@ -10,11 +10,11 @@ from utility import get_tmp_var_name, skip_typedef
 from bpf_code_gen import gen_code
 from passes.pass_obj import PassObject
 from template import bpf_ctx_bound_check, bpf_ctx_bound_check_bytes
-from prune import WRITE_PACKET, KNOWN_FUNCS, OUR_IMPLEMENTED_FUNC
+from prune import WRITE_PACKET, KNOWN_FUNCS, OUR_IMPLEMENTED_FUNC, MEMORY_ACCESS_FUNC
 
 from helpers.bpf_ctx_helper import (is_bpf_ctx_ptr, is_value_from_bpf_ctx,
         set_ref_bpf_ctx_state)
-from helpers.instruction_helper import get_ret_inst, get_scalar_variables, get_ret_value_text, get_ref_symbol
+from helpers.instruction_helper import get_ret_inst, get_scalar_variables, get_ret_value_text, get_ref_symbol, add_flag_to_func
 
 
 MODULE_TAG = '[Verfier Pass]'
@@ -54,12 +54,13 @@ def _check_if_variable_index_should_be_masked(ref, index, blk, info):
     the BPF context. blk is the current block of code to add the masking operation to.
     """
     set_of_variables_to_be_masked = get_scalar_variables(ref) + get_scalar_variables(index)
-    # print('these are scalar variables:', set_of_variables_to_be_masked)
+    # debug('these are scalar variables:', set_of_variables_to_be_masked)
     for var in  set_of_variables_to_be_masked:
         # TODO: should I keep the variable in tack and define a tmp value for masking? Then I should replace the access instruction and use the masked variables.
         # decl_index  = VarDecl.build(get_tmp_var_name(), index.type)
         # ref_index   = decl_index.get_ref()
 
+        debug(var)
         sym = get_ref_symbol(var, info)
         if sym.is_bpf_ctx:
             continue
@@ -116,35 +117,77 @@ def _handle_binop(inst, info, more):
     return inst
 
 
-def _step_into_func_and_track_context(inst, func, pos_of_ctx_ptrs, info):
-    assert func.change_applied & Function.CTX_FLAG != 0, 'The function does not receive the BPF context!'
-    # NOTE: here was a code adding the flag to the function parameters, I have removed it because it should be done in transform pass.
-    assert inst.change_applied & Function.CTX_FLAG != 0, 'The instruction should be updated before to pass the BPF context!'
-    # NOTE: here was a code adding the BPF context to function call arguments. It should have been done by transform pass
+def _has_bpf_ctx_in_field(ref, info, field_name=None):
+    assert isinstance(ref, Instruction)
+    T = ref.type
+    T = get_actual_type(T)
+    if T.is_record():
+        name = T.spelling[len('struct '):]
+        decl = Record.directory.get(name)
+        if not decl:
+            error(f'Did not found the definition of the Record {T.spelling}')
+            return False
 
-    # Caller scope
-    caller_scope = info.sym_tbl.current_scope
-    # Callee scope
+        # First check if any of the fields are BPF context
+        for field in decl.fields:
+            ref_field = Ref.build(field.name, field.type_ref, is_member=True)
+            ref_field.owner = ref.owner + [ref,]
+            if is_bpf_ctx_ptr(ref_field, info):
+                if field_name is not None:
+                    field_name.append(field)
+                return True
+        # Check if any of the field has an object which is BPF context
+        # for field in decl.fields:
+        #     if _has_bpf_ctx_in_field(field, info, field_name):
+        #         return True
+        # TODO: it might have a field of the type from the parent class. There would be a recursion here which I might not be able to solve.
+        return False
+
+
+def _check_passing_bpf_context(inst, func, info):
+    callee_scope = info.sym_tbl.scope_mapping[func.name]
+    receives_bpf_ctx = False
+
+    # Find BPF pointers passed to a function
+    for pos, a in enumerate(inst.args):
+        param = func.args[pos]
+        if is_bpf_ctx_ptr(a, info):
+            debug(f'Passing BPF_CTX as argument {param.name} <-- {a.name}')
+            sym = callee_scope.lookup(param.name)
+            sym.is_bpf_ctx = True
+            receives_bpf_ctx = True
+        else:
+            if not isinstance(a, Ref):
+                error('I am not checking whether the argument which are not simple references (e.g, are operations) have BPF context as a field or not')
+                continue
+            if param.type_ref.spelling != a.type.spelling:
+                error('There is a type cast when passing the argument. I lose track of BPF context when there is a type cast! [1]')
+                debug(f'param: {param.type_ref.spelling}    argument: {a.type.spelling}')
+                continue
+            field = []
+            if _has_bpf_ctx_in_field(a, info, field):
+                sym = callee_scope.lookup(param.name)
+                assert sym is not None, 'We should have all the parameters in the scope of functions'
+                scope = sym.fields
+                debug('fields:', field)
+                for ref in reversed(field):
+                    sym = scope.lookup(ref.name)
+                    if sym is None:
+                            sym = scope.insert_entry(ref.name, ref.type, clang.CursorKind.MEMBER_REF_EXPR, None)
+                    scope = sym.fields
+                sym.is_bpf_ctx = True
+                receives_bpf_ctx = True
+                debug(f'Set the {param.name} .. {sym.name} to BPF_CTX')
+            else:
+                debug(f'Does not have BPF CTX in its field {a.name}')
+    return receives_bpf_ctx
+
+
+def _check_setting_bpf_context_in_callee(inst, func, info):
     callee_scope = info.sym_tbl.scope_mapping[func.name]
 
-    # Mark parameters inside the function scope as BPF context if they receive BPF context as input
-    for pos in pos_of_ctx_ptrs:
-        param = func.args[pos]
-        sym = callee_scope.lookup(param.name)
-        sym.is_bpf_ctx = True
-        # debug('function:', inst.name, 'param:', param.name, 'is bpf ctx')
-        # TODO: do I need to turn the flag off when removing
-        # the scope of the function? (maybe in another run the
-        # parameter is not a pointer to the context)
-
-    # Check to not repeat analyzing same function multiple times.
-    if inst.name not in _has_processed_func:
-        _has_processed_func.add(inst.name)
-        with info.sym_tbl.with_func_scope(inst.name):
-            with set_current_func(func):
-                func.body = _do_pass(func.body, info, PassObject())
-
     # Check if value of pointers passed to this function was changed to point to BPF context
+    # NOTE: it is important that this code be in the context of caller function
     for param, argum in zip(func.get_arguments(), inst.get_arguments()):
         # TODO: do I need to skip typedef to get to the udner type ? get_typedef_under(param.type_ref)
         if not param.type_ref.is_pointer() and not param.type_ref.is_array():
@@ -172,7 +215,7 @@ def _step_into_func_and_track_context(inst, func, pos_of_ctx_ptrs, info):
                 backward_jmp_ctx.append(argum)
 
         if param.type_ref.spelling != argum.type.spelling:
-            error('There is a type case when passing the argument. I lose track of BPF context when there is a type cast!')
+            error('There is a type cast when passing the argument. I lose track of BPF context when there is a type cast!')
             error('argument type:', argum.type.spelling, 'parameter type:', param.type_ref.spelling)
             continue
 
@@ -194,32 +237,55 @@ def _step_into_func_and_track_context(inst, func, pos_of_ctx_ptrs, info):
                         backward_jmp_ctx.append(field)
 
 
+def _pass_ctx_to_func_if_needed(inst, func, info):
+    if func.change_applied & Function.CTX_FLAG == 0:
+        add_flag_to_func(Function.CTX_FLAG, func, info)
+        # TODO: I need to go through the code and the context to the all of the
+        # instructions invoking this function.
+    if inst.change_applied & Function.CTX_FLAG == 0:
+        inst.change_applied |= Function.CTX_FLAG
+        inst.args.append(info.prog.get_ctx_ref())
+
+
+def _step_into_func_and_track_context(inst, func, info):
+    # caller_scope = info.sym_tbl.current_scope
+    # callee_scope = info.sym_tbl.scope_mapping[func.name]
+
+    receives_bpf_ctx = _check_passing_bpf_context(inst, func, info)
+    if receives_bpf_ctx:
+        _pass_ctx_to_func_if_needed(inst, func, info)
+
+    # Check to not repeat analyzing same function multiple times.
+    # if inst.name not in _has_processed_func:
+    # _has_processed_func.add(inst.name)
+    with info.sym_tbl.with_func_scope(inst.name):
+        with set_current_func(func):
+            func.body = _do_pass(func.body, info, PassObject())
+
+    _check_setting_bpf_context_in_callee(inst, func, info)
+
+
 def _handle_call(inst, info, more):
-    # Are we passing BPF context pointer to the function?
-    # If yest, find the position of the argument.
-    pos_of_ctx_ptrs = []
-    for pos, a in enumerate(inst.args):
-        if is_bpf_ctx_ptr(a, info):
-            pos_of_ctx_ptrs.append(pos)
-
-    if not pos_of_ctx_ptrs:
-        # We are not passing any special pointers. We do not need to
-        # investigate inside of the function.
-        return inst
-
     # Find the definition of the function and step into it
     func = inst.get_function_def()
     if func and not func.is_empty() and func.name not in OUR_IMPLEMENTED_FUNC:
-        _step_into_func_and_track_context(inst, func, pos_of_ctx_ptrs, info)
+        _step_into_func_and_track_context(inst, func, info)
     else:
-        if inst.name in KNOWN_FUNCS:
+        # Check if there is argument which is BPF context
+        for a in inst.args:
+            if is_bpf_ctx_ptr(a, info):
+                break
+        else:
+            # There is none
+            return inst
+
+        if inst.name in ('memcpy', 'memmove', 'strcpy',):
             # TODO: this is handing memcpy, handle other known fucntions
             ref = inst.args[0]
             size = inst.args[2]
 
             blk = cb_ref.get(BODY)
             _check_if_variable_index_should_be_masked(ref, size, blk, info)
-
             # Add the check a line before this access
             ctx_ref = info.prog.get_ctx_ref()
             end_ref = ctx_ref.get_ref_field('data_end', info)
@@ -230,12 +296,29 @@ def _handle_call(inst, info, more):
             else:
                 _ret_inst = None
             check_inst = bpf_ctx_bound_check_bytes(ref, size, data_end, _ret_inst)
+            blk.append(check_inst)
+        elif inst.name in ('strlen', ):
+            ref = inst.args[0]
 
+            blk = cb_ref.get(BODY)
+            _check_if_variable_index_should_be_masked(ref, size, blk, info)
+            # Add the check a line before this access
+            ctx_ref = info.prog.get_ctx_ref()
+            end_ref = ctx_ref.get_ref_field('data_end', info)
+            data_end = Cast.build(end_ref, BASE_TYPES[clang.TypeKind.ULONGLONG])
+            __tmp = get_ret_inst(current_function, info)
+            if __tmp.body.has_children():
+                _ret_inst = __tmp.body.children[0]
+            else:
+                _ret_inst = None
+            check_inst = bpf_ctx_bound_check_bytes(ref, size, data_end, _ret_inst)
             blk.append(check_inst)
         elif inst.name not in itertools.chain(OUR_IMPLEMENTED_FUNC, WRITE_PACKET):
             # We can not modify this function
             error(MODULE_TAG, 'function:', inst.name,
                 'receives BPF context but is not accessible for modification')
+        else:
+            debug('<><><>', inst.name, 'I only considered some functions, also check for other mem access functions')
     return inst
 
 
@@ -269,7 +352,7 @@ def _do_pass(inst, info, more):
                 for ref in marked_refs:
                     debug(ref)
                     set_ref_bpf_ctx_state(ref, True, info)
-                debug('-----')
+                debug('----------------------------')
 
         # Continue deeper
         for child, tag in inst.get_children_context_marked():

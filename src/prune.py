@@ -23,7 +23,7 @@ KNOWN_FUNCS = (*MEMORY_ACCESS_FUNC, 'malloc', 'ntohs', 'ntohl', 'ntohll', 'htons
 
 OUR_IMPLEMENTED_FUNC = ('bpf_memcpy', 'bpf_strncpy', 'bpf_ntohs', 'bpf_ntohl',
                         'bpf_htons', 'bpf_htonl', 'bpf_cpu_to_be64',
-                        'bpf_be64_to_cpu')
+                        'bpf_be64_to_cpu', 'bpf_xdp_adjust_tail',)
 
 
 def __is_ignored_function(cursor):

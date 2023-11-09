@@ -29,7 +29,8 @@ def _do_pass(bpf, all_declarations, info):
                         if field.type_ref.is_record():
                             keys.append(get_actual_type(field.type_ref).spelling)
                 else:
-                    debug(MODULE_TAG, 'Did not found decleration for', type_name2)
+                    # debug(MODULE_TAG, 'Did not found decleration for', type_name2)
+                    pass
 
 
         if keys is not None:
@@ -45,7 +46,7 @@ def remove_everything_not_used(bpf, info, more):
     all_declarations = [decl.get_name() for decl in info.prog.declarations if hasattr(decl, 'get_name')]
     _do_pass(bpf, all_declarations, info)
     new_list = []
-    debug('List of declarations to remove:', all_declarations)
+    # debug(MODULE_TAG, 'List of declarations to remove:', all_declarations)
     for decl in info.prog.declarations:
         if not hasattr(decl, 'get_name'):
             new_list.append(decl)

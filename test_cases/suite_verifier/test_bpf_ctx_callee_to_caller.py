@@ -34,6 +34,7 @@ from user_passes.select_user import select_user_pass
 
 class TestCase(BasicTest):
     def test(self, insts):
+        assert 0, 'This test case is very broken'
         info = self.info
         bpf = Block(BODY)
         bpf.extend_inst(insts)

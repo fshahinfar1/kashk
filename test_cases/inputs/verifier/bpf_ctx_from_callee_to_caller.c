@@ -41,6 +41,7 @@ int main(int argc, char *argv[])
 	struct request *req2;
 	struct request *req3;
 	struct request *req4;
+	struct request *req5;
 
 	/* Test 1: Array */
 	fd = 0;
@@ -71,6 +72,11 @@ int main(int argc, char *argv[])
 	req4 = (void *)c2->buf;
 	/* I expect the tool generate a bound check for this access */
 	x = req4->type;
+
+	/* Test 5: */
+	do_read(fd, (char *)buf, 128, &size);
+	req5 = (void *)buf;
+	x = req5->type;
 
 	return 0;
 }

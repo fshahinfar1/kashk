@@ -16,7 +16,7 @@ from instruction import BODY
 from framework_support import InputOutputContext
 from bpf import SK_SKB_PROG
 
-from offload import load_other_sources, BPF_MAIN
+from offload import load_other_sources, _prepare_event_handler_args, BPF_MAIN
 from find_ev_loop import get_entry_code
 from sym_table import Scope
 
@@ -48,6 +48,8 @@ class BasicTest:
         insts = gather_instructions_under(main, self.info, BODY)
         create_func_objs(self.info)
         add_known_func_objs(self.info)
+        prepare_insts = _prepare_event_handler_args(cursor, self.info)
+        insts = prepare_insts + insts
         self.test(insts)
 
     def test(self, insts):

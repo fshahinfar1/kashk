@@ -45,8 +45,6 @@ def is_value_from_bpf_ctx(inst, info, R=None):
             owner = owner.castee.children[0]
         assert isinstance(owner, Ref)
         # owner name is
-        debug('!', owner.name, inst.owner)
-        debug(info.sym_tbl.current_scope.symbols)
         sym = info.sym_tbl.lookup(owner.name)
         assert sym is not None
         if sym.is_bpf_ctx:

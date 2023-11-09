@@ -130,6 +130,8 @@ def symbol_for_inst(inst, info):
             error('Owner is not a reference and handling this case is not implemented yet')
             return None
         owner_symbol = info.sym_tbl.lookup(owner.name)
+        # debug(inst.name, inst.owner, owner.name)
+        # debug(info.sym_tbl.current_scope.symbols)
         assert owner_symbol is not None
         sym = owner_symbol.fields.lookup(inst.name)
         if sym is None:
