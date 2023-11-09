@@ -43,12 +43,17 @@ def _generate_marked_children(groups, context):
 
 
 class Instruction:
+    BOUND_CHECK_FLAG = 1 << 3
+    OFFSET_MASK_FLAG = 1 << 4
+
     MAY_NOT_OVERLOAD = (clang.CursorKind.BREAK_STMT,
             clang.CursorKind.CONTINUE_STMT,
             clang.CursorKind.GOTO_STMT, clang.CursorKind.LABEL_STMT, clang.CursorKind.INIT_LIST_EXPR)
     def __init__(self):
         self.kind = None
         self.bpf_ignore = False
+        # Mark which arguments are added to the code
+        self.change_applied = 0
 
     def has_children(self):
         if self.kind not in Instruction.MAY_NOT_OVERLOAD:
@@ -181,8 +186,6 @@ class Call(Instruction):
 
         self.rd_buf = None
         self.wr_buf = None
-        # Mark which arguments are added to the code
-        self.change_applied = 0
 
     def __str__(self):
         return f'<Call {self.name} ({self.args})>'
@@ -213,6 +216,7 @@ class Call(Instruction):
         new.is_method = self.is_method
         new.is_operator = self.is_operator
         new.bpf_ignore = self.bpf_ignore
+        new.change_applied = self.change_applied
         new.rd_buf = self.rd_buf
         new.wr_buf = self.wr_buf
         new.change_applied = self.change_applied
@@ -276,6 +280,7 @@ class VarDecl(Instruction):
         if children:
             new.init = children[0]
         new.bpf_ignore = self.bpf_ignore
+        new.change_applied = self.change_applied
         return new
 
     def get_ref(self):
@@ -325,6 +330,7 @@ class ControlFlowInst(Instruction):
         new.body = children[1]
         new.other_body = children[2]
         new.bpf_ignore = self.bpf_ignore
+        new.change_applied = self.change_applied
         return new
 
 
@@ -393,6 +399,7 @@ class UnaryOp(Instruction):
         new.child = children[0]
         new.comes_after = self.comes_after
         new.bpf_ignore = self.bpf_ignore
+        new.change_applied = self.change_applied
         return new
 
 
@@ -461,6 +468,7 @@ class BinOp(Instruction):
         new.rhs = children[0]
         new.lhs = children[1]
         new.bpf_ignore = self.bpf_ignore
+        new.change_applied = self.change_applied
         return new
 
 
@@ -488,6 +496,7 @@ class CaseSTMT(Instruction):
         new.case = children[0]
         new.body = children[1]
         new.bpf_ignore = self.bpf_ignore
+        new.change_applied = self.change_applied
         return new
 
 
@@ -523,6 +532,7 @@ class ArrayAccess(Instruction):
         new.array_ref = children[0]
         new.index = children[1]
         new.bpf_ignore = self.bpf_ignore
+        new.change_applied = self.change_applied
         return new
 
 
@@ -545,6 +555,7 @@ class Parenthesis(Instruction):
         new = Parenthesis()
         new.body = children[0]
         new.bpf_ignore = self.bpf_ignore
+        new.change_applied = self.change_applied
         return new
 
 
@@ -580,6 +591,7 @@ class Cast(Instruction):
         new.cast_type = self.cast_type
         new.castee = children[0]
         new.bpf_ignore = self.bpf_ignore
+        new.change_applied = self.change_applied
         return new
 
 
@@ -637,6 +649,7 @@ class Ref(Instruction):
         new.type = self.type
         new.owner  = list(self.owner)
         new.bpf_ignore = self.bpf_ignore
+        new.change_applied = self.change_applied
         return new
 
     def get_ref_field(self, name, info=None):
@@ -681,6 +694,7 @@ class Literal(Instruction):
     def clone(self, _):
         new = Literal(self.text, self.kind)
         new.bpf_ignore = self.bpf_ignore
+        new.change_applied = self.change_applied
         return new
 
 class ForLoop(Instruction):
@@ -712,6 +726,7 @@ class ForLoop(Instruction):
         new.post = children[2]
         new.body = children[3]
         new.bpf_ignore = self.bpf_ignore
+        new.change_applied = self.change_applied
         return new
 
 
@@ -754,6 +769,7 @@ class Block(Instruction):
         new = Block(self.tag)
         new.children = children[0]
         new.bpf_ignore = self.bpf_ignore
+        new.change_applied = self.change_applied
         return new
 
 
@@ -784,6 +800,7 @@ class ToUserspace(Instruction):
         new.return_type = self.return_type
         new.path_id = self.path_id
         new.bpf_ignore = self.bpf_ignore
+        new.change_applied = self.change_applied
         return new
 
     def has_children(self):

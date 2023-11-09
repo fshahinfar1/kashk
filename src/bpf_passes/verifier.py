@@ -95,6 +95,9 @@ def _handle_binop(inst, info, more):
         R = []
         if is_value_from_bpf_ctx(x, info, R):
             ref, index, T = R.pop()
+            if ref.change_applied & Instruction.BOUND_CHECK_FLAG != 0:
+                continue
+
             assert isinstance(ref, Instruction)
             assert isinstance(index, Instruction)
 
@@ -110,6 +113,8 @@ def _handle_binop(inst, info, more):
                 _ret_inst = None
             check_inst = bpf_ctx_bound_check(ref, index, data_end, _ret_inst)
             blk.append(check_inst)
+
+            ref.change_applied |= Instruction.BOUND_CHECK_FLAG
 
             # Report for debuging
             tmp,_ = gen_code([inst], info)
@@ -297,6 +302,9 @@ def _handle_call(inst, info, more):
             ref = inst.args[0]
             size = inst.args[2]
 
+            if ref.change_applied & Instruction.BOUND_CHECK_FLAG != 0:
+                return inst
+
             blk = cb_ref.get(BODY)
             # text, _ = gen_code(blk, info)
             # debug(text)
@@ -314,8 +322,11 @@ def _handle_call(inst, info, more):
                 _ret_inst = None
             check_inst = bpf_ctx_bound_check_bytes(ref, size, data_end, _ret_inst)
             blk.append(check_inst)
+            ref.change_applied |= Instruction.BOUND_CHECK_FLAG
         elif inst.name in ('strlen', ):
             ref = inst.args[0]
+            if ref.change_applied & Instruction.BOUND_CHECK_FLAG != 0:
+                return inst
 
             blk = cb_ref.get(BODY)
             _check_if_variable_index_should_be_masked(ref, size, blk, info)
@@ -330,6 +341,7 @@ def _handle_call(inst, info, more):
                 _ret_inst = None
             check_inst = bpf_ctx_bound_check_bytes(ref, size, data_end, _ret_inst)
             blk.append(check_inst)
+            ref.change_applied |= Instruction.BOUND_CHECK_FLAG
         elif inst.name not in itertools.chain(OUR_IMPLEMENTED_FUNC, WRITE_PACKET):
             # We can not modify this function
             error(MODULE_TAG, 'function:', inst.name,
