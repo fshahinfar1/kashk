@@ -152,10 +152,10 @@ def handle_array_sub(inst, info, more):
 def handle_cast_expr(inst, info, more):
     lvl = more[0]
     body, _ = gen_code(inst.castee, info, context=ARG)
-    if isinstance(inst.cast_type, str):
-        ctype = inst.cast_type
+    if isinstance(inst.type, str):
+        ctype = inst.type
     else:
-        ctype = inst.cast_type.spelling
+        ctype = inst.type.spelling
     text = f'({ctype})({body})'
     text = indent(text, lvl)
     return text

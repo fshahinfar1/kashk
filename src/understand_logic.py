@@ -284,7 +284,7 @@ def __convert_cursor_to_inst(c, info, _state):
         assert count_children < 3
         inst = Cast()
         inst.castee.extend_inst(gather_instructions_from(children[-1], info, context=ARG))
-        inst.cast_type = MyType.from_cursor_type(c.type)
+        inst.type = MyType.from_cursor_type(c.type)
         return inst
     elif c.kind == clang.CursorKind.DECL_STMT:
         children = c.get_children()

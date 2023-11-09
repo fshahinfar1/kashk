@@ -95,10 +95,12 @@ def _assign_block_to(blk, ref):
 
 
 def inst_type(inst):
-    if inst.kind in (clang.CursorKind.DECL_REF_EXPR, clang.CursorKind.MEMBER_REF_EXPR, clang.CursorKind.VAR_DECL):
+    if inst.kind in (clang.CursorKind.DECL_REF_EXPR, clang.CursorKind.MEMBER_REF_EXPR, clang.CursorKind.VAR_DECL, clang.CursorKind.CSTYLE_CAST_EXPR):
         return inst.type
     elif inst.kind in (clang.CursorKind.PAREN_EXPR,):
         return inst_type(inst.body.children[0])
+    elif inst.kind == clang.CursorKind.CALL_EXPR:
+        return inst.return_type
     else:
         error(MODULE_TAG, 'ignoring some cases:', inst,inst.kind)
     return MyType.make_simple('<Unknown>', clang.TypeKind.RECORD)

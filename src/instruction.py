@@ -222,6 +222,12 @@ class Call(Instruction):
         new.change_applied = self.change_applied
         return new
 
+    @property
+    def return_type(self):
+        func = self.get_function_def()
+        assert func is not None
+        return func.return_type
+
 
 class VarDecl(Instruction):
     @classmethod
@@ -564,18 +570,14 @@ class Cast(Instruction):
     def build(cls, inst, T):
         cast = Cast()
         cast.castee.add_inst(inst)
-        cast.cast_type = T
+        cast.type = T
         return cast
 
     def __init__(self):
         super().__init__()
         self.kind = clang.CursorKind.CSTYLE_CAST_EXPR
         self.castee = Block(ARG)
-        self.cast_type = None
-
-    @property
-    def type(self):
-        return self.cast_type
+        self.type = None
 
     def has_children(self):
         return True
@@ -588,7 +590,7 @@ class Cast(Instruction):
 
     def clone(self, children):
         new = Cast()
-        new.cast_type = self.cast_type
+        new.type = self.type
         new.castee = children[0]
         new.bpf_ignore = self.bpf_ignore
         new.change_applied = self.change_applied

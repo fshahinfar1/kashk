@@ -54,10 +54,10 @@ class BPF_PROG:
 
         cast1 = Cast()
         cast1.castee.add_inst(ref)
-        cast1.cast_type = BASE_TYPES[clang.TypeKind.ULONGLONG]
+        cast1.type = BASE_TYPES[clang.TypeKind.ULONGLONG]
         cast2 = Cast()
         cast2.castee.add_inst(cast1)
-        cast2.cast_type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+        cast2.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
         return cast2
 
 
@@ -207,10 +207,10 @@ int xdp_prog(struct xdp_md *xdp)
 
         cast1 = Cast()
         cast1.castee.add_inst(ref)
-        cast1.cast_type = BASE_TYPES[clang.TypeKind.ULONGLONG]
+        cast1.type = BASE_TYPES[clang.TypeKind.ULONGLONG]
         cast2 = Cast()
         cast2.castee.add_inst(cast1)
-        cast2.cast_type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+        cast2.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
         return cast2
 
     def get_pkt_size(self):
