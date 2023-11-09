@@ -285,7 +285,7 @@ class VarDecl(Instruction):
         return ref
 
     def update_symbol_table(self, sym_tbl):
-        sym_tbl.insert_entry(self.name, self.type, self.kind, None)
+        return sym_tbl.insert_entry(self.name, self.type, self.kind, None)
 
 
 class ControlFlowInst(Instruction):
@@ -467,7 +467,7 @@ class BinOp(Instruction):
 class CaseSTMT(Instruction):
     def __init__(self, cursor):
         super().__init__()
-        self.kind = cursor.kind
+        self.kind = clang.CursorKind.CASE_STMT
         self.cursor = cursor
         self.case = Block(ARG)
         self.body = Block(BODY)
@@ -492,13 +492,20 @@ class CaseSTMT(Instruction):
 
 
 class ArrayAccess(Instruction):
-    def __init__(self, cursor):
+    def __init__(self, T):
         super().__init__()
         self.kind = clang.CursorKind.ARRAY_SUBSCRIPT_EXPR
-        self.cursor = cursor
-        self.type = MyType.from_cursor_type(cursor.type)
-        self.array_ref = Block(ARG)
+        self.type = T
+        self.array_ref = None
         self.index = Block(ARG)
+
+    @property
+    def name(self):
+        return self.array_ref.name
+
+    @property
+    def owner(self):
+        return self.array_ref.owner
 
     def has_children(self):
         return True
@@ -509,10 +516,10 @@ class ArrayAccess(Instruction):
     def get_children_context_marked(self):
         context = (None, ARG)
         groups = (self.array_ref, self.index)
-        return _generate_marked_children(groups, context)
+        return ((self.array_ref, None), (self.index, ARG),)
 
     def clone(self, children):
-        new = ArrayAccess(self.cursor)
+        new = ArrayAccess(self.type)
         new.array_ref = children[0]
         new.index = children[1]
         new.bpf_ignore = self.bpf_ignore

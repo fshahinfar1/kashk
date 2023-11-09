@@ -14,6 +14,7 @@ struct conn {
 	char *rbuf;
 	int rsize;
 	struct resp resp;
+	struct resp arr[3];
 };
 
 void event_handler(int fd, short which, void *arg)
@@ -31,6 +32,9 @@ void event_handler(int fd, short which, void *arg)
 
 	c->resp.ptr = "Hello world!END\r\n";
 	c->resp.size = strlen(c->resp.ptr);
+
+	/* Test if owner of array access is parsed correctly */
+	c->arr[0].size = 2;
 
 	send(fd, c->resp.ptr, c->resp.size, 0);
 

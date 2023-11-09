@@ -320,7 +320,7 @@ def __convert_cursor_to_inst(c, info, _state):
         # Add variable to the scope
         if info.sym_tbl.lookup(c.spelling) is not None:
             error(f'{MODULE_TAG} Shadowing variables are not supported and can cause issues! ({c.spelling})')
-        info.sym_tbl.insert_entry(inst.name, inst.type, inst.kind, None)
+        inst.update_symbol_table(info.sym_tbl)
         return inst
     elif c.kind == clang.CursorKind.MEMBER_REF_EXPR:
         inst = Ref(c)
@@ -332,8 +332,12 @@ def __convert_cursor_to_inst(c, info, _state):
     elif c.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
         children = c.get_children()
 
-        inst = ArrayAccess(c)
-        inst.array_ref.extend_inst(gather_instructions_from(next(children), info, context=ARG))
+        T = MyType.from_cursor_type(c.type)
+        inst = ArrayAccess(T)
+        ref = gather_instructions_from(next(children), info, context=ARG)
+        assert len(ref) == 1
+        ref = ref[0]
+        inst.array_ref = ref
         inst.index.extend_inst(gather_instructions_from(next(children), info, context=ARG))
         return inst
     elif c.kind in (clang.CursorKind.CXX_BOOL_LITERAL_EXPR,

@@ -142,7 +142,7 @@ def handle_member_ref_expr(inst, info, more):
 
 def handle_array_sub(inst, info, more):
     lvl = more[0]
-    name, _ = gen_code(inst.array_ref, info, context=ARG)
+    name, _ = gen_code([inst.array_ref,], info, context=ARG)
     index, _ = gen_code(inst.index, info, context=ARG)
     text = f'{name}[{index}]'
     text = indent(text, lvl)

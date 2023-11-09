@@ -21,9 +21,9 @@ def is_value_from_bpf_ctx(inst, info, R=None):
     # TODO: the cases are incomplete
     ZERO = Literal('0', CODE_LITERAL)
     if inst.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
-        if is_bpf_ctx_ptr(inst.array_ref.children[0], info):
+        if is_bpf_ctx_ptr(inst.array_ref, info):
             if R is not None:
-                ref = inst.array_ref.children[0]
+                ref = inst.array_ref
                 index =inst.index.children[0]
                 size = Literal(f'sizoef({inst.type.spelling})', kind=CODE_LITERAL)
                 R.append((ref, index, size))
@@ -39,12 +39,14 @@ def is_value_from_bpf_ctx(inst, info, R=None):
         owner = inst.owner[-1]
         if isinstance(owner, ArrayAccess):
             # TODO: is it possible that there are nested array accesses?
-            assert len(owner.array_ref.children) == 1
-            owner = owner.array_ref.children[0]
+            assert isinstance(owner.array_ref, Ref)
+            owner = owner.array_ref
         if isinstance(owner, Cast):
             owner = owner.castee.children[0]
         assert isinstance(owner, Ref)
         # owner name is
+        debug('!', owner.name, inst.owner)
+        debug(info.sym_tbl.current_scope.symbols)
         sym = info.sym_tbl.lookup(owner.name)
         assert sym is not None
         if sym.is_bpf_ctx:

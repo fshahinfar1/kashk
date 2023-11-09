@@ -41,6 +41,12 @@ class TestCase(BasicTest):
         assert ptr.owner[1].name == 'c', 'The second owner should be the `c` pointer'
         assert ptr.owner[0].owner[0].name == ptr.owner[1].name
 
+        e = elems[-3]
+        assert e.name == 'size'
+        assert len(e.owner) == 2
+        assert e.owner[0].name == 'arr'
+        assert e.owner[1].name == 'c'
+
         text, _ = gen_code([ptr], info)
         expect = 'c->resp.ptr'
         assert text == expect, f'The code generated for this member access is incorrect ({text} <=> {expect})'
