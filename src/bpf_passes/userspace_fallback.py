@@ -79,6 +79,62 @@ def _decl_failure_flag_on_stack(info):
     flag_decl.update_symbol_table(info.sym_tbl)
 
 
+def _generate_failure_flag_check_in_main_func_if_else(flag_ref, func, info):
+    current_function = None
+    first_failure_case = None
+    prev_failure_case = None
+
+    for failure_number in set(func.path_ids):
+        # TODO: change declaration to a dictionary instead of array
+        meta = info.user_prog.declarations[failure_number-1]
+        prepare_meta_code = prepare_meta_data(failure_number, meta, info)
+
+        # Check the failure number
+        int_literal = Literal(str(failure_number), clang.CursorKind.INTEGER_LITERAL)
+        cond = BinOp.build(flag_ref, '==', int_literal)
+        if_inst = ControlFlowInst.build_if_inst(cond)
+        if_inst.body.extend_inst(prepare_meta_code)
+        if_inst.body.add_inst(ToUserspace.from_func_obj(current_function))
+
+        if prev_failure_case is not None:
+            prev_failure_case.other_body.add_inst(if_inst)
+        else:
+            first_failure_case = if_inst
+        prev_failure_case = if_inst
+    return_stmt = first_failure_case
+    return return_stmt
+
+
+def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
+    """
+    Generate checks after calling a function (@param func) that may fail from the BPF main function.
+    This function generates a Switch-Case on the value of failure_number.
+    @param flag_ref: the reference to the failure number variable
+    @param func:     the func that was called and may fail.
+    @param info:
+    @returns: Instruction
+    """
+    # We must be in BPF main function
+    current_function = None
+
+    switch      = ControlFlowInst()
+    switch.kind = clang.CursorKind.SWITCH_STMT
+    switch.cond.add_inst(flag_ref)
+    for failure_number in set(func.path_ids):
+        # TODO: change declaration to a dictionary instead of array
+        meta = info.user_prog.declarations[failure_number-1]
+        prepare_meta_code = prepare_meta_data(failure_number, meta, info)
+
+        # Check the failure number
+        int_literal = Literal(str(failure_number), clang.CursorKind.INTEGER_LITERAL)
+        case        = CaseSTMT(None)
+        case.case.add_inst(int_literal)
+        case.body.extend_inst(prepare_meta_code)
+        case.body.add_inst(ToUserspace.from_func_obj(current_function))
+        switch.body.add_inst(case)
+    return switch
+
+
 def _handle_function_may_fail(inst, func, info, more):
     ctx = more.ctx
 
@@ -126,28 +182,7 @@ def _handle_function_may_fail(inst, func, info, more):
 
         if current_function == None:
             assert len(func.path_ids) > 0
-
-            first_failure_case = None
-            prev_failure_case = None
-
-            for failure_number in set(func.path_ids):
-                # TODO: change declaration to a dictionary instead of array
-                meta = info.user_prog.declarations[failure_number-1]
-                prepare_meta_code = prepare_meta_data(failure_number, meta, info)
-
-                # Check the failure number
-                int_literal = Literal(str(failure_number), clang.CursorKind.INTEGER_LITERAL)
-                cond = BinOp.build(flag_ref, '==', int_literal)
-                if_inst = ControlFlowInst.build_if_inst(cond)
-                if_inst.body.extend_inst(prepare_meta_code)
-                if_inst.body.add_inst(ToUserspace.from_func_obj(current_function))
-
-                if prev_failure_case is not None:
-                    prev_failure_case.other_body.add_inst(if_inst)
-                else:
-                    first_failure_case = if_inst
-                prev_failure_case = if_inst
-            return_stmt = first_failure_case
+            return_stmt = _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info)
 
         # The code that should run when there is a failure
         if flag_ref.type.is_pointer():
