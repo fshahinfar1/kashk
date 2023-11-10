@@ -256,11 +256,16 @@ def __convert_cursor_to_inst(c, info, _state):
         # Find the variable initialization, if there is any.
         init = []
         if inst.is_array:
-            for child in c.get_children():
-                if child.kind == clang.CursorKind.INTEGER_LITERAL:
-                    continue
-                init = gather_instructions_from(child, info, context=ARG)
-                break
+            pass
+            # debug(MODULE_TAG, 'declaring an array and initializing:')
+            # debug(MODULE_TAG, inst)
+            # report_on_cursor(c)
+            # for child in c.get_children():
+            #     debug(child)
+            #     if child.kind == clang.CursorKind.INTEGER_LITERAL:
+            #         continue
+            #     init = gather_instructions_from(child, info, context=ARG)
+            #     break
         else:
             init = []
             children = list(c.get_children())

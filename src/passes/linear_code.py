@@ -101,6 +101,8 @@ def inst_type(inst):
         return inst_type(inst.body.children[0])
     elif inst.kind == clang.CursorKind.CALL_EXPR:
         return inst.return_type
+    elif inst.kind == clang.CursorKind.INTEGER_LITERAL:
+        return BASE_TYPES[clang.TypeKind.INT]
     else:
         error(MODULE_TAG, 'ignoring some cases:', inst,inst.kind)
     return MyType.make_simple('<Unknown>', clang.TypeKind.RECORD)
