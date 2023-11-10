@@ -43,6 +43,8 @@ int main(int argc, char *argv[])
 		case state_3:
 			b += 3;
 			break;
+		default:
+			b = 12;
 	}
 	return 0;
 }

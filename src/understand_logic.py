@@ -9,6 +9,7 @@ from instruction import *
 from prune import (should_process_this_cursor, should_ignore_cursor, READ_PACKET, WRITE_PACKET)
 
 from parser.for_loop import parse_for_loop_stmt
+from parser.switch_case import parse_switch_case
 
 from dfs import DFSPass
 
@@ -157,7 +158,7 @@ def _make_for_loop(cursor, info):
     # inst.cursor = c
     inst.cursor = None # TODO: do I need the reference?
     if init:
-        inst.pre.extend_inst(gather_instructions_from( init, info, context=ARG))
+        inst.pre.extend_inst(gather_instructions_from(init,  info, context=ARG))
     if cond:
         inst.cond.extend_inst(gather_instructions_from(cond, info, context=ARG))
     if post:
@@ -167,67 +168,22 @@ def _make_for_loop(cursor, info):
     return inst
 
 
-def _process_switch_case(c, info):
-    children = c.get_children()
-    cond = next(children)
-    body = next(children)
+def _make_switch_case(cursor, info):
+    assert cursor.kind == clang.CursorKind.SWITCH_STMT
+    sw_cond_cursor, cases = parse_switch_case(cursor, info)
     inst = ControlFlowInst()
-    inst.kind = c.kind
-    inst.cond.extend_inst(gather_instructions_from(cond, info, context=ARG))
-
-    # Remedi
-    # Group instructions for each case
-    body = list(body.get_children())
-    assert body[0].kind in (clang.CursorKind.CASE_STMT,
-            clang.CursorKind.DEFAULT_STMT)
-    cases =  []
-    cond = None
-    case_body = []
-    for cursor in body:
-        if cursor.kind in (clang.CursorKind.CASE_STMT, clang.CursorKind.DEFAULT_STMT):
-            if case_body or cond:
-                cases.append((cond, case_body))
-            case_body = []
-            children = list(cursor.get_children())
-            assert len(children) == 2 or len(children) == 1
-            if len(children) == 2:
-                # Case:
-                cond = cursor, gather_instructions_from(children[0], info, context=ARG)
-                body_cursor = children[1]
-            else:
-                # Default:
-                cond = cursor, None
-                body_cursor = children[0]
-
-            while body_cursor.kind in (clang.CursorKind.CASE_STMT, clang.CursorKind.DEFAULT_STMT):
-                # NOTE: trying to fix the case when a case does not have a body
-                if case_body or cond:
-                    cases.append((cond, case_body))
-                case_body = []
-                children = list(body_cursor.get_children())
-                assert len(children) == 2 or len(children) == 1
-                if len(children) == 2:
-                    cond = body_cursor, gather_instructions_from(children[0], info, ARG)
-                    body_cursor = children[1]
-                else:
-                    cond = body_cursor, None
-                    body_cursor = children[0]
-
-            tmp = gather_instructions_from(body_cursor, info, context=BODY)
-            case_body.extend(tmp)
-        else:
-            i = gather_instructions_from(cursor, info)
-            case_body.extend(i)
-    if case_body or cond:
-        cases.append((cond, case_body))
-    current_case = []
-    # End of switch body and grouping
-    # Creat the jumps
-    for (case_cursor, case), inst_list in cases:
-        case_inst = CaseSTMT(case_cursor)
-        if case:
-            case_inst.case.extend_inst(case)
-        case_inst.body.extend_inst(inst_list)
+    inst.kind = clang.CursorKind.SWITCH_STMT
+    cond = gather_instructions_from(sw_cond_cursor, info, context=ARG)
+    inst.cond.extend_inst(cond)
+    for case in cases:
+        case_inst = CaseSTMT(case.cursor)
+        case_inst.kind = case.kind
+        if case.cond_cursor is not None:
+            case_cond = gather_instructions_from(case.cond_cursor, info, ARG)
+            case_inst.case.extend_inst(case_cond)
+        for body_cursor in case.body_cursors:
+            body_insts = gather_instructions_from(body_cursor, info, BODY)
+            case_inst.body.extend_inst(body_insts)
         inst.body.add_inst(case_inst)
     return inst
 
@@ -410,7 +366,7 @@ def __convert_cursor_to_inst(c, info, _state):
         inst = _make_for_loop(c, info)
         return inst
     elif c.kind == clang.CursorKind.SWITCH_STMT:
-        inst = _process_switch_case(c, info)
+        inst = _make_switch_case(c, info)
         return inst
     elif c.kind == clang.CursorKind.CASE_STMT:
         report_on_cursor(c)

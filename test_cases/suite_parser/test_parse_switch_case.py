@@ -23,9 +23,9 @@ class TestCase(BasicTest):
         bpf.extend_inst(insts)
 
         # Generate the code and show it for debuging
-        # text, _ = gen_code(bpf, self.info)
-        # print(text)
-        show_insts([bpf])
+        text, _ = gen_code(bpf, self.info)
+        print(text)
+        # show_insts([bpf])
 
         cases = find_elems_of_kind(insts, clang.CursorKind.CASE_STMT)
 
