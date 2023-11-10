@@ -71,6 +71,9 @@ def get_scalar_variables(inst):
 
     @returns a list of objects of type Ref(Instruction)
     """
+    if inst is None:
+        return []
+
     # TODO: the set of conditions handled in this function is incomplete!
     if inst.kind in (BLOCK_OF_CODE,
             clang.CursorKind.CSTYLE_CAST_EXPR,
@@ -130,8 +133,9 @@ def symbol_for_inst(inst, info):
             error('Owner is not a reference and handling this case is not implemented yet')
             return None
         owner_symbol = info.sym_tbl.lookup(owner.name)
-        # debug(inst.name, inst.owner, owner.name)
-        # debug(info.sym_tbl.current_scope.symbols)
+        if owner_symbol is None:
+            debug(inst.name, inst.owner, owner.name)
+            debug(info.sym_tbl.current_scope.symbols)
         assert owner_symbol is not None
         sym = owner_symbol.fields.lookup(inst.name)
         if sym is None:

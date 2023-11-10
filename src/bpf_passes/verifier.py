@@ -38,10 +38,18 @@ def set_current_func(func):
 
 
 @contextmanager
-def new_backward_jump_context():
+def new_backward_jump_context(off=False):
+    """
+    @off: disable backward jump context
+    """
     global backward_jmp_ctx
     tmp = backward_jmp_ctx
-    backward_jmp_ctx = []
+
+    if off:
+        backward_jmp_ctx = None
+    else:
+        backward_jmp_ctx = []
+
     try:
         yield backward_jmp_ctx
     finally:
@@ -275,10 +283,10 @@ def _step_into_func_and_track_context(inst, func, info):
     # Check to not repeat analyzing same function multiple times.
     # if inst.name not in _has_processed_func:
     # _has_processed_func.add(inst.name)
-    with info.sym_tbl.with_func_scope(inst.name):
-        sym = info.sym_tbl.current_scope.lookup('t')
-        with set_current_func(func):
-            func.body = _do_pass(func.body, info, PassObject())
+    with new_backward_jump_context(off=True):
+        with info.sym_tbl.with_func_scope(inst.name):
+            with set_current_func(func):
+                func.body = _do_pass(func.body, info, PassObject())
 
     _check_setting_bpf_context_in_callee(inst, func, info)
 
@@ -323,13 +331,13 @@ def _handle_call(inst, info, more):
             check_inst = bpf_ctx_bound_check_bytes(ref, size, data_end, _ret_inst)
             blk.append(check_inst)
             ref.change_applied |= Instruction.BOUND_CHECK_FLAG
-        elif inst.name in ('strlen', ):
+        elif inst.name in ('__strlen', ):
             ref = inst.args[0]
             if ref.change_applied & Instruction.BOUND_CHECK_FLAG != 0:
                 return inst
 
             blk = cb_ref.get(BODY)
-            _check_if_variable_index_should_be_masked(ref, size, blk, info)
+            _check_if_variable_index_should_be_masked(ref, None, blk, info)
             # Add the check a line before this access
             ctx_ref = info.prog.get_ctx_ref()
             end_ref = ctx_ref.get_ref_field('data_end', info)
@@ -339,6 +347,7 @@ def _handle_call(inst, info, more):
                 _ret_inst = __tmp.body.children[0]
             else:
                 _ret_inst = None
+            assert 0, 'What range of access should be checked? size is not defined in this scope!'
             check_inst = bpf_ctx_bound_check_bytes(ref, size, data_end, _ret_inst)
             blk.append(check_inst)
             ref.change_applied |= Instruction.BOUND_CHECK_FLAG
