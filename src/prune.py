@@ -81,7 +81,7 @@ def should_ignore_cursor(cursor):
         tokens = [t.spelling for t in cursor.get_tokens()]
         count_token = len(tokens)
         if count_token < 2:
-            report_on_cursor(cursor)
+            # report_on_cursor(cursor)
             # while True:
             #     children = list(cursor.get_children())
             #     for child in children:

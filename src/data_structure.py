@@ -266,6 +266,9 @@ class MyType:
     def is_func_proto(self):
         return self.kind == clang.TypeKind.FUNCTIONPROTO
 
+    def is_enum(self):
+        return self.kind == clang.TypeKind.ENUM
+
     def clone(self):
         obj = MyType()
         obj.spelling = self.spelling

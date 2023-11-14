@@ -73,6 +73,7 @@ def _process_current_inst(inst, info, more):
             return inst, YES
 
         if not func.may_succeed:
+            # debug(func.name, 'function may not succeed')
             return inst, YES
 
         # Do not process body of a function multiple times
@@ -148,7 +149,7 @@ def _do_pass(inst, info, more):
             blk = cb_ref.get(BODY)
             _to_userspace(inst, info, blk)
             text, _ = gen_code([inst], info)
-            # debug(MODULE_TAG, 'Go to userspace at instruction:', text)
+            debug(MODULE_TAG, 'Go to userspace at instruction:', text)
             failed = MARKED
             fail_ref.set(FAILED, failed)
             return clone_pass(inst, info, PassObject())

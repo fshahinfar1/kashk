@@ -77,8 +77,13 @@ def parse_file(file_path, args):
             subprocess.run(cmd, shell=True, stdin=subprocess.DEVNULL, stdout=f)
     else:
         prepfile = file_path
+    options = (
+            clang.TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD |
+            clang.TranslationUnit.PARSE_INCLUDE_BRIEF_COMMENTS_IN_CODE_COMPLETION
+            )
+    options = clang.TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD
     index = clang.Index.create()
-    tu = index.parse(prepfile, args=compiler_args)
+    tu = index.parse(prepfile, args=compiler_args, options=options)
     if tu.diagnostics:
         error('Diagnostics:')
         for d in tu.diagnostics:

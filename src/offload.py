@@ -151,7 +151,11 @@ def generate_offload(io_ctx):
     # print(code)
     # show_insts([bpf])
 
-    # func = Function.directory.get('out_string')
+    # func = Function.directory.get('try_read_command_udp')
+    # assert func is not None
+    # debug(func.name, func.may_succeed, func.may_fail)
+
+    # func = Function.directory.get('try_read_command_ascii')
     # assert func is not None
     # debug(func.name, func.may_succeed, func.may_fail)
     # assert 0

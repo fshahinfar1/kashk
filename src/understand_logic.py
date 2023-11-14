@@ -193,7 +193,19 @@ def __convert_cursor_to_inst(c, info, _state):
         return understand_call_expr(c, info)
     elif (c.kind == clang.CursorKind.BINARY_OPERATOR
             or c.kind == clang.CursorKind.COMPOUND_ASSIGNMENT_OPERATOR):
-        inst = BinOp(c)
+
+        # tmp = [c, ]
+        # while tmp:
+        #     x = tmp.pop()
+        #     report_on_cursor(x)
+        #     for y in x.get_children():
+        #         tmp.insert(0, y)
+
+        try:
+            inst = BinOp(c)
+        except:
+            error('Issuw with BinOp')
+            return Literal('<Failed to create Binary Op>', CODE_LITERAL)
         children = c.get_children()
 
         lhs_child = next(children)

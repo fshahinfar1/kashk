@@ -1,4 +1,9 @@
+#include <stdlib.h>
 #include <stdint.h>
+#include <assert.h>
+
+#define ITEM_CAS 2
+#define ITEM_CFLAGS 256
 #define ITEM_suffix(item) ((char*) &((item)->data) + (item)->nkey + 1 \
 		+ (((item)->it_flags & ITEM_CAS) ? sizeof(uint64_t) : 0))
 
@@ -38,10 +43,23 @@ typedef struct _stritem {
 } item;
 
 
+item *do_get_it(void)
+{
+	item *it = calloc(1, sizeof(item));
+	assert(it != NULL);
+	return it;
+}
+
+void fancy(void) {
+	int flags;
+	item *old_it = do_get_it();
+	FLAGS_CONV(old_it, flags);
+}
+
+
 int main(int argc, char *argv[])
 {
 
-	int flags;
-	FLAGS_CONV(old_it, flags);
+	fancy();
 	return 0;
 }

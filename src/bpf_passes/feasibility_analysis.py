@@ -20,6 +20,7 @@ PARENT_INST = 1000
 current_function = None
 cb_ref = None
 fail_ref = None
+_has_processed = set()
 
 
 @contextmanager
@@ -50,12 +51,14 @@ def is_function_call_feasible(inst, info):
     if processed_before:
         return func.may_succeed
 
-    with remember_func(func):
-        with info.sym_tbl.with_func_scope(inst.name):
-            body = _do_pass(func.body, info, PassObject())
-
-    assert body is not None, 'this pass should not remove anything'
-    func.body = body
+    if func.get_name() not in _has_processed:
+        # Let's protected against self loop
+        _has_processed.add(func.get_name())
+        with remember_func(func):
+            with info.sym_tbl.with_func_scope(inst.name):
+                body = _do_pass(func.body, info, PassObject())
+                assert body is not None, 'this pass should not remove anything'
+                func.body = body
     return True
 
 
@@ -139,7 +142,8 @@ def _do_pass(inst, info, more):
         for child, tag in inst.get_children_context_marked():
             with fail_ref.new_ref(FAILED, failed):
                 obj = PassObject.pack(lvl + 1, tag, parent_list)
-                with cb_ref.new_ref(PARENT_INST, inst):
+                parent = inst if inst.kind != BLOCK_OF_CODE else cb_ref.get(PARENT_INST)
+                with cb_ref.new_ref(PARENT_INST, parent):
                     new_child = _process_child(child, inst, info, obj)
                 if new_child is None:
                     return None

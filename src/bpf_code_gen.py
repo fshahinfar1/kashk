@@ -104,7 +104,7 @@ def handle_ref_expr(inst, info, more):
     sym, scope = info.sym_tbl.lookup2(inst.name)
     is_global = scope == info.sym_tbl.global_scope
     is_shared = scope == info.sym_tbl.shared_scope
-    if is_global:
+    if is_global and not sym.type.is_enum():
         text = 'sock_ctx->state.' + inst.name
     elif is_shared:
         text = 'shared->' + inst.name

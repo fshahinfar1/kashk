@@ -414,7 +414,8 @@ class BinOp(Instruction):
     ARITH_OP = ('+', '-', '*', '/', '%')
     ASSIGN_OP = ('=', '+=', '-=', '*=', '/=', '<<=', '>>=', '&=', '|=')
     BIT_OP = ('&', '|', '<<', '>>')
-    ALL_OP = tuple(itertools.chain(REL_OP, ARITH_OP, ASSIGN_OP, BIT_OP))
+    LOGICAL_OP = ('&&', '||')
+    ALL_OP = tuple(itertools.chain(REL_OP, ARITH_OP, ASSIGN_OP, BIT_OP, LOGICAL_OP))
 
     OPEN_GROUP = '({['
     CLOSE_GROUP = ')}]'
@@ -455,6 +456,7 @@ class BinOp(Instruction):
         # report_on_cursor(cursor)
 
         self.op = tokens[lhs_tokens].spelling
+        assert self.op in BinOp.ALL_OP, f'Unexpected binary operation requseted ({self.op})'
 
     def has_children(self):
         return True
