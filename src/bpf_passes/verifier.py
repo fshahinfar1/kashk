@@ -158,7 +158,7 @@ def _has_bpf_ctx_in_field(ref, info, field_name=None):
                     field_name.fields.append([ref_field,])
                     found = True
                     field_name.count_bpf_fields += 1
-                    debug(MODULE_TAG, ref.name, field.name, 'is BPF CTX')
+                    # debug(MODULE_TAG, ref.name, field.name, 'is BPF CTX')
         # Check if any of the field has an object which is BPF context
         # for field in decl.fields:
         #     if _has_bpf_ctx_in_field(field, info, field_name):
@@ -175,7 +175,7 @@ def _check_passing_bpf_context(inst, func, info):
     for pos, a in enumerate(inst.args):
         param = func.args[pos]
         if is_bpf_ctx_ptr(a, info):
-            debug(f'Passing BPF_CTX as argument {param.name} <-- {a.name}')
+            # debug(f'Passing BPF_CTX as argument {param.name} <-- {a.name}')
             sym = callee_scope.lookup(param.name)
             sym.is_bpf_ctx = True
             receives_bpf_ctx = True
@@ -202,9 +202,10 @@ def _check_passing_bpf_context(inst, func, info):
                         scope = sym.fields
                     sym.is_bpf_ctx = True
                     receives_bpf_ctx = True
-                    debug(f'Set the {param.name} .. {sym.name} to BPF_CTX')
+                    # debug(f'Set the {param.name} .. {sym.name} to BPF_CTX')
             else:
-                debug(f'Does not have BPF CTX in its field {a.name}')
+                # debug(f'Does not have BPF CTX in its field {a.name}')
+                pass
     return receives_bpf_ctx
 
 
@@ -356,7 +357,8 @@ def _handle_call(inst, info, more):
             error(MODULE_TAG, 'function:', inst.name,
                 'receives BPF context but is not accessible for modification')
         else:
-            debug('<><><>', inst.name, 'I only considered some functions, also check for other mem access functions')
+            # debug('<><><>', inst.name, 'I only considered some functions, also check for other mem access functions')
+            pass
     return inst
 
 

@@ -454,6 +454,11 @@ def __convert_cursor_to_inst(c, info, _state):
         inst.list = children
         # debug(MODULE_TAG, 'INIT_LIST:', inst.list)
         return inst
+    elif c.kind == clang.CursorKind.ENUM_DECL:
+        enum = Enum.from_cursor(c)
+        enum.update_symbol_table(info.sym_tbl.current_scope)
+        error('A local declaration of enum was removed from the source code! Need to fix this issue.')
+        return None
     else:
         error('TODO:')
         report_on_cursor(c)

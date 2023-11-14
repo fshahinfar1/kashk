@@ -1,5 +1,6 @@
 import clang.cindex as clang
 from utility import report_on_cursor
+from helpers.instruction_helper import show_insts
 from log import debug, error, report
 from instruction import UnaryOp
 
@@ -80,7 +81,17 @@ def should_ignore_cursor(cursor):
         tokens = [t.spelling for t in cursor.get_tokens()]
         count_token = len(tokens)
         if count_token < 2:
-            error('Unary operator with less than 2 tokens will fail to convert to UnaryOp object. It was ignored!', cursor, tokens)
+            report_on_cursor(cursor)
+            # while True:
+            #     children = list(cursor.get_children())
+            #     for child in children:
+            #         print('here')
+            #         report_on_cursor(child)
+            #         print('end')
+            #     cursor = children[0]
+
+            error('Unary operator with less than 2 tokens will fail to convert to UnaryOp object. It was ignored!', tokens)
+            # assert 0
             return True
         # Basically check if we can find the unary operator
         candid = tokens[0]

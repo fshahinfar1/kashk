@@ -85,7 +85,6 @@ def get_scalar_variables(inst):
             res += get_scalar_variables(c)
         return res
     elif isinstance(inst, Ref):
-        print(inst)
         if inst.type.is_pointer() or inst.type.is_array():
             return []
         else:
@@ -127,7 +126,7 @@ def symbol_for_inst(inst, info):
         # of a data structure.
         # _set_ref_bpf_ctx_state(ref.owner[0], state, info)
         # TODO: THERE IS A BUG HERE, WHAT IF THERE ARE MULTIPLE NESTED STRUCTS? I NEED A RECURSION HERE.
-        debug("THERE IS A BUG HERE, WHAT IF THERE ARE MULTIPLE NESTED STRUCTS? I NEED A RECURSION HERE.")
+        # debug("THERE IS A BUG HERE, WHAT IF THERE ARE MULTIPLE NESTED STRUCTS? I NEED A RECURSION HERE.")
         owner = inst.owner[-1]
         if not isinstance(owner, Ref):
             error('Owner is not a reference and handling this case is not implemented yet')

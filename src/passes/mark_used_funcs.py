@@ -32,15 +32,6 @@ def _find_type_decl(name, info):
     if tmp:
         return tmp
     return []
-    # entry = info.sym_tbl.global_scope.lookup(name)
-    # if entry is None:
-    #     debug(f'did not found type: {name}')
-    #     return []
-    # cursor = entry.ref
-    # assert cursor is not None
-    # decls = generate_decleration_for(cursor)
-    # # debug(name, decls)
-    # return decls
 
 
 def _add_type_to_declarations(T, info):

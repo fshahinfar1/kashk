@@ -43,10 +43,10 @@ def _do_pass(bpf, all_declarations, info):
 
 
 def remove_everything_not_used(bpf, info, more):
-    all_declarations = [decl.get_name() for decl in info.prog.declarations if hasattr(decl, 'get_name')]
+    all_declarations = [decl.get_name() for decl in info.prog.declarations if hasattr(decl, 'get_name') and not decl.get_name().startswith('enum')]
     _do_pass(bpf, all_declarations, info)
     new_list = []
-    # debug(MODULE_TAG, 'List of declarations to remove:', all_declarations)
+    debug(MODULE_TAG, 'List of declarations to remove:', all_declarations)
     for decl in info.prog.declarations:
         if not hasattr(decl, 'get_name'):
             new_list.append(decl)
@@ -54,7 +54,6 @@ def remove_everything_not_used(bpf, info, more):
 
         for name in all_declarations:
             if decl.get_name() == name:
-                remove = True
                 break
         else:
             new_list.append(decl)

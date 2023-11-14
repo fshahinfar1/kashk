@@ -295,6 +295,9 @@ class TypeDefinition:
     def get_c_code(self):
         raise Exception('Not implemented')
 
+    def update_symbol_table(self, sym_tbl):
+        return None
+
 
 class Elaborate(TypeDefinition):
     directory = {}
@@ -314,6 +317,46 @@ class Elaborate(TypeDefinition):
         return f'<Elaborate {self.name} >'
 
 
+class Enum(TypeDefinition):
+    directory = {}
+
+    @classmethod
+    def from_cursor(cls, cursor):
+        # Get the known object
+        name = cursor.spelling
+        if name in Enum.directory:
+            return Enum.directory[name]
+        # Create a new object
+        obj = Enum(cursor.spelling)
+        for child in cursor.get_children():
+            obj.values.append(child.spelling)
+        return obj
+
+    def __init__(self, name):
+        super().__init__(name)
+        self.kind = clang.CursorKind.ENUM_DECL
+        self.values = []
+        # assert self.name not in Enum.directory, f'Multiple object of Enum with the same name ({self.name})!'
+        Enum.directory[self.name] = self
+
+    def get_c_code(self):
+        values = '\n'.join(f'{val},' for val in self.values)
+        text = f'enum {self.name} {{\n{values}\n}};'
+        return text
+
+    def get_name(self):
+        return f'enum {self.name}'
+
+    def update_symbol_table(self, sym_tbl):
+        T = MyType()
+        T.spelling = self.get_name()
+        T.kind = clang.TypeKind.ENUM
+        scope_key = self.get_name()
+        sym_tbl.insert_entry(scope_key, T, clang.CursorKind.ENUM_DECL, None)
+        for v in self.values:
+            sym_tbl.insert_entry(v, T, clang.CursorKind.ENUM_CONSTANT_DECL, None)
+
+
 class Record(TypeDefinition):
     directory = {}
 
@@ -325,7 +368,7 @@ class Record(TypeDefinition):
         Record.directory[self.name] = self
 
     def get_c_code(self):
-        return '\n'+generate_struct_with_fields(self.name, self.fields)
+        return generate_struct_with_fields(self.name, self.fields)
 
     def get_name(self):
         return f'struct {self.name}'
@@ -374,6 +417,7 @@ class FunctionBodyEvaluator:
             blk = Block(BODY)
             blk.children = body
             return blk
+
 
 class Function(TypeDefinition):
     CTX_FLAG  = 1 << 0

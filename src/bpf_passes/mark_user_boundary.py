@@ -72,6 +72,9 @@ def _process_current_inst(inst, info, more):
             fail_ref.set(FAILED, YES)
             return inst, YES
 
+        if not func.may_succeed:
+            return inst, YES
+
         # Do not process body of a function multiple times
         if func.name not in _have_processed:
             # Go into the functions and mark boundary

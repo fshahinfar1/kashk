@@ -3,7 +3,7 @@ from log import debug, error, report
 from prune import should_process_this_cursor
 from utility import report_on_cursor, PRIMITIVE_TYPES, try_get_definition
 
-from data_structure import Function
+from data_structure import Function, Enum
 
 from data_structure import MyType
 import clang.cindex as clang
@@ -52,7 +52,7 @@ def __collect_information_about_func(cursor, info):
         e = info.sym_tbl.insert_entry(arg.spelling, T, arg.kind, arg)
 
 
-def pass_over_global_variables(cursor, info):
+def __pass_over_global_variables(cursor, info):
     """
     Go through the global variables and add them to the top level scope
     """
@@ -65,7 +65,7 @@ def pass_over_global_variables(cursor, info):
             d.go_deep()
 
 
-def _remember_func_for_further_proc(cursor, info):
+def __remember_func_for_further_proc(cursor, info):
     # Check if we have inserted an entry for this function before
     key = cursor.spelling
     know_previous_def_of_func = False
@@ -94,7 +94,7 @@ def _remember_func_for_further_proc(cursor, info):
 
 def __function_decl(cursor, info):
     assert cursor.kind == clang.CursorKind.FUNCTION_DECL
-    _remember_func_for_further_proc(cursor, info)
+    __remember_func_for_further_proc(cursor, info)
 
     scope_key = f'{cursor.spelling}'
     if scope_key in info.sym_tbl.scope_mapping:
@@ -105,6 +105,15 @@ def __function_decl(cursor, info):
     with info.sym_tbl.new_scope() as scope:
         info.sym_tbl.scope_mapping[scope_key] = scope
         __collect_information_about_func(cursor, info)
+
+
+def __enum_decl(cursor, info):
+    assert cursor.kind == clang.CursorKind.ENUM_DECL
+    enum = Enum.from_cursor(cursor)
+    scope_key = enum.get_name()
+    if scope_key in info.sym_tbl.scope_mapping:
+        return
+    enum.update_symbol_table(info.sym_tbl)
 
 
 def __pass_over_source_file(cursor, info):
@@ -120,8 +129,10 @@ def __pass_over_source_file(cursor, info):
         if c.kind == clang.CursorKind.FUNCTION_DECL:
             __function_decl(c, info)
             continue
-
-        if c.kind == clang.CursorKind.CLASS_DECL:
+        elif c.kind == clang.CursorKind.ENUM_DECL:
+            __enum_decl(c, info)
+            continue
+        elif c.kind == clang.CursorKind.CLASS_DECL:
             scope_key = f'class_{c.spelling}'
             if info.sym_tbl.lookup(scope_key) is not None:
                 # report(f'The class {scope_key} is declared multiple times, ignoring')
@@ -198,7 +209,7 @@ def process_source_file(cursor, info):
     later.
     """
     info.sym_tbl.current_scope = info.sym_tbl.global_scope
-    pass_over_global_variables(cursor, info)
+    __pass_over_global_variables(cursor, info)
     __pass_over_source_file(cursor, info)
 
 

@@ -70,6 +70,9 @@ def _process_current_inst(inst, info, more):
         if func and current_function and func.may_fail:
             # The called function may fail
             current_function.may_fail = True
+        return inst, func.may_succeed
+    elif inst.kind == ANNOTATION_INST and inst.ann_kind == Annotation.ANN_SKIP:
+        return inst, True
     return inst, False
 
 

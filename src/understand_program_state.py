@@ -20,26 +20,14 @@ def generate_decleration_for(cursor):
     cursor is a class, struct, enum, ...
     return a list of strings having codes for defining the types needed.
     """
-
     T = get_actual_type(cursor.type)
-
     if T.kind in PRIMITIVE_TYPES:
         return []
-
     if cursor.kind == clang.CursorKind.TYPEDEF_DECL:
         decl = Elaborate(cursor)
-        children = cursor.get_children()
-        decls = []
-        # for child in children:
-        #     if child.kind != clang.CursorKind.TYPE_REF:
-        #         continue
-        #     child = child.referenced
-        #     d = generate_decleration_for(child)
-        #     decls.extend(d)
-        decls.append(decl)
-        return decls
+        return [decl,]
 
-
+    # TODO: I do not remember what was happening here!
     c = T.get_declaration()
     if c is None:
         error(MODULE_TAG, f'Failed to find the definition for {T.spelling} [1]')
@@ -56,11 +44,8 @@ def generate_decleration_for(cursor):
     T = cursor.type
     type_name = T.spelling
 
-    # List of type dependencies for this specific type
-    decl = []
-
     if T.kind in PRIMITIVE_TYPES:
-        return decl
+        return []
 
     if T.kind == clang.TypeKind.RECORD:
         #TODO: what should I do about it???
@@ -69,15 +54,16 @@ def generate_decleration_for(cursor):
         # Go through the fields, add any dependencies field might have, then
         # define a struct for it.
         fields, new_decl = extract_state(cursor)
-        decl += new_decl
         r = Record(type_name, fields)
-        decl.append(r)
+        return new_decl + [r,]
     elif T.kind == clang.TypeKind.ELABORATED:
-        decl.append(Elaborate(c))
+        e = Elaborate(c)
+        return [e,]
     elif T.kind == clang.TypeKind.ENUM:
-        debug('We have an enum?')
-        # TODO: No further deps?
-        return []
+        # debug(f'We have an enum? {c.spelling}')
+        # report_on_cursor(c)
+        e = Enum.from_cursor(c)
+        return [e,]
     elif T.kind == clang.TypeKind.TYPEDEF:
         x = c.underlying_typedef_type
         x = x.get_declaration()
@@ -85,8 +71,7 @@ def generate_decleration_for(cursor):
     else:
         report_on_cursor(cursor)
         error('Unexpected! ' + str(cursor.type.kind))
-
-    return decl
+    return []
 
 
 def extract_state(cursor):
@@ -110,17 +95,17 @@ def extract_state(cursor):
     return states, decl
 
 
-def get_state_for(cursor):
-    """
-    Get state definition and needed decleration for a variable or parameter
-    declartion
-    """
-    states = []
-    decl = []
+# def get_state_for(cursor):
+#     """
+#     Get state definition and needed decleration for a variable or parameter
+#     declartion
+#     """
+#     states = []
+#     decl = []
 
-    assert cursor is not None
-    obj = StateObject(cursor)
-    states.append(obj)
-    decl = generate_decleration_for(cursor)
+#     assert cursor is not None
+#     obj = StateObject(cursor)
+#     states.append(obj)
+#     decl = generate_decleration_for(cursor)
 
-    return states, decl
+#     return states, decl

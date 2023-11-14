@@ -400,9 +400,6 @@ def gen_code(list_instructions, info, context=BODY):
 
 
 def __generate_code_type_definition(inst, info):
-    if not inst.is_used_in_bpf_code:
-        return ''
-
     if isinstance(inst, Function):
         if inst.name in (*READ_PACKET, *WRITE_PACKET):
             return ''
@@ -430,7 +427,7 @@ def __generate_code_type_definition(inst, info):
         return text
     else:
         text = inst.get_c_code()
-        return text
+        return '\n\n' + text
 
 
 def __generate_global_shared_state(info):
