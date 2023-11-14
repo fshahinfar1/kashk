@@ -149,7 +149,8 @@ def _do_pass(inst, info, more):
             blk = cb_ref.get(BODY)
             _to_userspace(inst, info, blk)
             text, _ = gen_code([inst], info)
-            debug(MODULE_TAG, 'Go to userspace at instruction:', text)
+            current_func_name = current_function.name if current_function is not None else 'NOT SET'
+            # debug(MODULE_TAG, 'Go to userspace at instruction:', text, f'@{current_func_name}')
             failed = MARKED
             fail_ref.set(FAILED, failed)
             return clone_pass(inst, info, PassObject())

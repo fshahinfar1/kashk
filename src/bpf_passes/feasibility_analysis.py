@@ -38,13 +38,17 @@ def is_function_call_feasible(inst, info):
     func = inst.get_function_def()
     if func is None:
         current_func_name =  current_function.name if current_function is not None else '<unknown func>'
-        error(f'Do not have function struct for {inst.name}', 'Invoked from', current_function)
+        error(f'Do not have function struct for {inst.name}', 'Invoked from', current_func_name)
         return False
     if func.is_empty():
-        if inst.name in (KNOWN_FUNCS + READ_PACKET + WRITE_PACKET):
+        if func.name in (KNOWN_FUNCS + READ_PACKET + WRITE_PACKET):
             # It is fine
+            func.may_fail    = False
+            func.may_succeed = True
             return True
-        func.may_fail = True
+        # debug('does not know func:', func.name)
+        func.may_fail    = True
+        func.may_succeed = False
         return False
 
     processed_before = func.may_fail or func.may_succeed
@@ -55,7 +59,7 @@ def is_function_call_feasible(inst, info):
         # Let's protected against self loop
         _has_processed.add(func.get_name())
         with remember_func(func):
-            with info.sym_tbl.with_func_scope(inst.name):
+            with info.sym_tbl.with_func_scope(func.name):
                 body = _do_pass(func.body, info, PassObject())
                 assert body is not None, 'this pass should not remove anything'
                 func.body = body
@@ -64,16 +68,15 @@ def is_function_call_feasible(inst, info):
 
 def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.CALL_EXPR:
-        res = is_function_call_feasible(inst, info)
-        if not res:
+        if not is_function_call_feasible(inst, info):
             return inst, True
-
-        # Check if the function may fail
         func = inst.get_function_def()
         if func and current_function and func.may_fail:
-            # The called function may fail
+            # The called function may fail so the current function may also fail
             current_function.may_fail = True
-        return inst, func.may_succeed
+        # Although the function may fail or not the fact that current function
+        # fails depend on whether the function may succeed.
+        return inst, not func.may_succeed
     elif inst.kind == ANNOTATION_INST and inst.ann_kind == Annotation.ANN_SKIP:
         return inst, True
     return inst, False
@@ -136,6 +139,8 @@ def _do_pass(inst, info, more):
         if failed:
             if current_function:
                 current_function.may_fail = True
+                text, _ = gen_code([inst,], info)
+                debug(f'Failed @{current_function.name} on:', text, inst)
             # Not a stack
             fail_ref.set(FAILED, True)
         # Continue deeper

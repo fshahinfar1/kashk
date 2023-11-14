@@ -17,7 +17,7 @@ COROUTINE_FUNC_NAME = ('await_resume', 'await_transform', 'await_ready', 'await_
 IGNORE_FUNC = ('printf', 'fprintf')
 
 MEMORY_ACCESS_FUNC = ('memchr', 'memrchr', 'memcpy', 'memmove', 'memset', 'strcpy', 'strncpy',
-                'strlen', 'strcmp')
+                'strlen', 'strnlen', 'strcmp', 'strncmp')
 KNOWN_FUNCS = (*MEMORY_ACCESS_FUNC, 'malloc', 'ntohs', 'ntohl', 'ntohll', 'htons',
                 'htonl', 'htonll')
 

@@ -438,7 +438,11 @@ class BinOp(Instruction):
         self.op = ''
 
         if cursor is not None:
-            self.__find_op_str(cursor)
+            assert cursor.kind == clang.CursorKind.BINARY_OPERATOR
+            op = cursor.get_opcode()
+            print(op)
+            self.op = op
+            # self.__find_op_str(cursor)
 
         if not self.op:
             self.op = '<operation is unknown>'
