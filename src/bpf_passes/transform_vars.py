@@ -175,20 +175,24 @@ def _process_call_needing_send_flag(inst, blk, current_function, info):
     inst.change_applied |= Function.SEND_FLAG
     sym = info.sym_tbl.lookup(SEND_FLAG_NAME)
     if current_function is None:
-        assert sym is None
-        # Allocate the flag on the stack and pass a poitner
-        decl = VarDecl(None)
-        decl.name = SEND_FLAG_NAME
-        decl.type = BASE_TYPES[clang.TypeKind.SCHAR]
-        decl.init.add_inst(Literal('0', clang.CursorKind.INTEGER_LITERAL))
-        declare_at_top_of_func.append(decl)
-        sym = decl.update_symbol_table(info.sym_tbl)
+        if sym is None:
+            # Allocate the flag on the stack and pass a poitner
+            decl = VarDecl(None)
+            decl.name = SEND_FLAG_NAME
+            decl.type = BASE_TYPES[clang.TypeKind.SCHAR]
+            decl.init.add_inst(Literal('0', clang.CursorKind.INTEGER_LITERAL))
+            declare_at_top_of_func.append(decl)
+            sym = decl.update_symbol_table(info.sym_tbl)
 
-        flag_ref = decl.get_ref()
+            flag_ref = decl.get_ref()
+        else:
+            flag_ref = Ref.from_sym(sym)
+            assert not flag_ref.type.is_pointer()
         ref = UnaryOp.build('&', flag_ref)
         inst.args.append(ref)
     else:
-        # Just pass the reference
+        # Just pass the reference, the function must have received a flag from
+        # the entry scope
         assert sym is not None and sym.type.is_pointer()
         flag_ref = Ref.from_sym(sym)
         inst.args.append(flag_ref)
