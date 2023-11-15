@@ -176,8 +176,7 @@ def _make_switch_case(cursor, info):
     cond = gather_instructions_from(sw_cond_cursor, info, context=ARG)
     inst.cond.extend_inst(cond)
     for case in cases:
-        case_inst = CaseSTMT(case.cursor)
-        case_inst.kind = case.kind
+        case_inst = CaseSTMT(case.cursor, case.kind)
         if case.cond_cursor is not None:
             case_cond = gather_instructions_from(case.cond_cursor, info, ARG)
             case_inst.case.extend_inst(case_cond)

@@ -484,9 +484,9 @@ class BinOp(Instruction):
 
 
 class CaseSTMT(Instruction):
-    def __init__(self, cursor):
+    def __init__(self, cursor, kind=clang.CursorKind.CASE_STMT):
         super().__init__()
-        self.kind = clang.CursorKind.CASE_STMT
+        self.kind = kind
         self.cursor = cursor
         self.case = Block(ARG)
         self.body = Block(BODY)
@@ -503,7 +503,7 @@ class CaseSTMT(Instruction):
         return _generate_marked_children(groups, context)
 
     def clone(self, children):
-        new = CaseSTMT(self.cursor)
+        new = CaseSTMT(self.cursor, self.kind)
         new.case = children[0]
         new.body = children[1]
         new.bpf_ignore = self.bpf_ignore

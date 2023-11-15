@@ -181,7 +181,11 @@ def _check_passing_bpf_context(inst, func, info):
             receives_bpf_ctx = True
         else:
             if not isinstance(a, Ref):
-                error('I am not checking whether the argument which are not simple references (e.g, are operations) have BPF context as a field or not')
+                debug('I am not checking whether the argument which are not simple references (e.g, are operations) have BPF context as a field or not')
+                # text, _ = gen_code([a,], info)
+                # debug(a)
+                # debug(text)
+                # debug('--------')
                 continue
             if param.type_ref.spelling != a.type.spelling:
                 error('There is a type cast when passing the argument. I lose track of BPF context when there is a type cast! [1]')
@@ -306,7 +310,7 @@ def _handle_call(inst, info, more):
             # There is none
             return inst
 
-        if inst.name in ('memcpy', 'memmove', 'strcpy',):
+        if inst.name in ('memcpy', 'memmove', 'strcpy', 'strncpy',):
             # TODO: this is handing memcpy, handle other known fucntions
             ref = inst.args[0]
             size = inst.args[2]
@@ -329,26 +333,6 @@ def _handle_call(inst, info, more):
                 _ret_inst = __tmp.body.children[0]
             else:
                 _ret_inst = None
-            check_inst = bpf_ctx_bound_check_bytes(ref, size, data_end, _ret_inst)
-            blk.append(check_inst)
-            ref.change_applied |= Instruction.BOUND_CHECK_FLAG
-        elif inst.name in ('__strlen', ):
-            ref = inst.args[0]
-            if ref.change_applied & Instruction.BOUND_CHECK_FLAG != 0:
-                return inst
-
-            blk = cb_ref.get(BODY)
-            _check_if_variable_index_should_be_masked(ref, None, blk, info)
-            # Add the check a line before this access
-            ctx_ref = info.prog.get_ctx_ref()
-            end_ref = ctx_ref.get_ref_field('data_end', info)
-            data_end = Cast.build(end_ref, BASE_TYPES[clang.TypeKind.ULONGLONG])
-            __tmp = get_ret_inst(current_function, info)
-            if __tmp.body.has_children():
-                _ret_inst = __tmp.body.children[0]
-            else:
-                _ret_inst = None
-            assert 0, 'What range of access should be checked? size is not defined in this scope!'
             check_inst = bpf_ctx_bound_check_bytes(ref, size, data_end, _ret_inst)
             blk.append(check_inst)
             ref.change_applied |= Instruction.BOUND_CHECK_FLAG
