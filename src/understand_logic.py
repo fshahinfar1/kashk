@@ -267,7 +267,7 @@ def __convert_cursor_to_inst(c, info, _state):
         inst = VarDecl(c)
         # Find the variable initialization, if there is any.
         init = []
-        if inst.is_array:
+        if inst.type.is_array():
             pass
             # debug(MODULE_TAG, 'declaring an array and initializing:')
             # debug(MODULE_TAG, inst)
@@ -278,6 +278,10 @@ def __convert_cursor_to_inst(c, info, _state):
             #         continue
             #     init = gather_instructions_from(child, info, context=ARG)
             #     break
+        elif inst.type.is_func_ptr():
+            # TODO: what to do whit available information about function pointer decleration?
+            # debug('Function pointer?')
+            pass
         else:
             init = []
             children = list(c.get_children())

@@ -131,18 +131,12 @@ def generate_offload(io_ctx):
 
     debug('Mark Read/Write Inst & Buf')
     mark_io(bpf, info)
-    # for f in Function.directory.values():
-    #     if f.is_used_in_bpf_code:
-    #         debug(f.name, 'send:', f.calls_send, 'recv:', f.calls_recv)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
-    ## Simplify Code
-    # Move function calls out of the ARG context!
     debug('Linear Code')
     bpf = linear_code_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
-    ## Feasibility Analysis
     debug('Feasibility Analysis')
     bpf = feasibilty_analysis_pass(bpf, info, PassObject())
     # for func in sorted(Function.directory.values(), key=lambda x: x.name):
@@ -165,7 +159,6 @@ def generate_offload(io_ctx):
     # show_insts(func.body)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
-    # Create the userspace program graph
     debug('Create User Code Graph')
     select_user_pass(bpf, info, PassObject())
     # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
@@ -179,8 +172,6 @@ def generate_offload(io_ctx):
     # debug('is user empty:', root.is_empty())
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
-    # Create a clone of unmodified but marked AST, later used for creating the
-    # userspace program
     debug('Clone All State')
     user = clone_pass(bpf, info, PassObject())
     info.user_prog.sym_tbl = info.sym_tbl.clone()
@@ -189,7 +180,7 @@ def generate_offload(io_ctx):
         new_f = func.clone(info.user_prog.func_dir)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
-    # TODO: right now the order of generating the userspace and then BPF is important
+    # NOTE: the order of generating the userspace and then BPF is important
     if not info.user_prog.graph.is_empty():
         gen_user_code(user, info, io_ctx.user_out_file)
     else:

@@ -266,6 +266,17 @@ class MyType:
     def is_func_proto(self):
         return self.kind == clang.TypeKind.FUNCTIONPROTO
 
+    def is_func_ptr(self):
+        # In my opinion both of the following cases are function pointers and I do not want to distinguish them.
+        # case 1:
+        #   void (*cb2)(int);
+        # case 2:
+        #   typedef void(*callback)(int);
+        #   callback cb;
+        case1 = (self.is_pointer() and self.get_pointee().is_func_proto())
+        case2 = self.is_func_proto()
+        return case1 or case2
+
     def is_enum(self):
         return self.kind == clang.TypeKind.ENUM
 
