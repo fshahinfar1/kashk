@@ -21,7 +21,7 @@ class Path:
         self.original_scope = Scope()
         # Function definition which holds this path
         self.func_obj = Function('__empty__', None, {})
-        self.call_inst = None
+        self.call_inst = []
 
     @property
     def code(self):

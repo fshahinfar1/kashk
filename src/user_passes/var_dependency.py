@@ -166,10 +166,17 @@ def _remove_unused_args(func_obj, call_inst, scope):
             # debug(f'The variable {sym.name} is needed at {func_obj.name}')
             pass
 
+    debug('removing unsed args:', remove, func_obj.args, call_inst)
     for already_poped, pos in enumerate(remove):
+        # debug('Function Object:', func_obj.name)
         pop_index = pos - already_poped
         func_obj.args.pop(pop_index)
-        call_inst.args.pop(pop_index)
+        for tmp_c in call_inst:
+            # debug('Call instruction:', tmp_c.name)
+            if len(tmp_c.args) <= pop_index:
+                error('We are trying to remove more arguments than already exists!')
+                continue
+            tmp_c.args.pop(pop_index)
 
 
 def _process_node(node, info):

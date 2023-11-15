@@ -125,7 +125,7 @@ def _process_node(node, info):
             with info.sym_tbl.with_func_scope(call_inst.name):
                 body = _process_node(child, info)
             child.paths.func_obj = new_func
-            child.paths.call_inst = call_inst
+            child.paths.call_inst.append(call_inst)
             child.paths.code = body
         else:
             cur = info.sym_tbl.current_scope
