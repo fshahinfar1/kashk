@@ -58,6 +58,7 @@ if __name__ == '__main__':
     file_path = os.path.join(input_files_dir, 'parse_member.c')
     entry_func_name = 'event_handler'
     compiler_args = ''
-    test = TestCase(file_path, entry_func_name, compiler_args)
+    hook = 'xdp'
+    test = TestCase(file_path, entry_func_name, compiler_args, hook)
     test.run_test()
 
