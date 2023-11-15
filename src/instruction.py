@@ -783,12 +783,16 @@ class Block(Instruction):
 class ToUserspace(Instruction):
 
     @classmethod
-    def from_func_obj(cls, func):
+    def from_func_obj(cls, func, path_id=None):
         obj = ToUserspace()
         obj.is_bpf_main = func is None
         if func is not None:
             obj.return_type = func.return_type
-        error('We are not seting the faliure ID for a ToUserspace instruction.')
+
+        if path_id is None:
+            error('We are not setting the faliure ID for a ToUserspace instruction.')
+        else:
+            obj.path_id = path_id
         return obj
 
     def __init__(self):
