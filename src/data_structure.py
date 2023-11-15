@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 import clang.cindex as clang
 
-from utility import get_code, get_owner, generate_struct_with_fields, report_on_cursor
+from utility import get_code, get_owner, generate_struct_with_fields, report_on_cursor, indent
 from log import error, debug
 from sym_table import SymbolTable
 
@@ -344,6 +344,7 @@ class Enum(TypeDefinition):
 
     def get_c_code(self):
         values = '\n'.join(f'{val},' for val in self.values)
+        values = indent(values, 1)
         text = f'enum {self.name} {{\n{values}\n}};'
         return text
 

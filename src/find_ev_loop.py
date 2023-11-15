@@ -1,7 +1,7 @@
 import clang.cindex as clang
 
 from log import error, debug, report
-from utility import skip_unexposed_stmt, get_body_of_the_loop, report_on_cursor, find_elem
+from utility import skip_unexposed_stmt, report_on_cursor, find_elem
 from sym_table import SymbolTableEntry
 from dfs import DFSPass
 from prune import READ_PACKET
@@ -46,9 +46,10 @@ def find_request_processing_logic(cursor, info):
         body_of_loop = list(cursor.get_children())[-1]
         body_of_loop = skip_unexposed_stmt(body_of_loop)
     else:
-        assert 0, 'Need to check the code. This path is dead'
         # Go through the AST, generate instructions
-        body_of_loop = get_body_of_the_loop(ev_loop)
+        children = list(ev_loop.get_children())
+        assert len(children) > 0 and children[-1].kind == clang.CursorKind.COMPOUND_STMT
+        body_of_loop = children[-1]
 
     assert body_of_loop is not None
     return body_of_loop

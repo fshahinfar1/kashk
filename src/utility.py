@@ -40,17 +40,9 @@ def try_get_definition(cursor):
         return cursor
     return tmp
 
+
 def implies(q, p):
     return not q or p
-
-
-def get_body_of_the_loop(cursor):
-    body_of_loop = None
-    for child in cursor.get_children():
-        if child.kind == clang.CursorKind.COMPOUND_STMT:
-            body_of_loop = child
-            break
-    return body_of_loop
 
 
 def parse_file(file_path, args):
