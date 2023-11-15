@@ -65,4 +65,4 @@ def get_entry_code(cursor, info):
     last_child = children[-1]
     assert last_child.kind == clang.CursorKind.COMPOUND_STMT, 'The entry function does not have an implementation body!'
     body_of_loop = find_request_processing_logic(entry_func, info)
-    return body_of_loop
+    return body_of_loop, entry_func

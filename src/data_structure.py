@@ -33,6 +33,8 @@ class Info:
         self.io_ctx = None
         # Maps defined in using annotation
         self.map_definitions = {}
+        # For tracking name of read buffers in a scope (scope name --> set of var names)
+        self.read_decl = {}
 
 
 class PacketBuffer:

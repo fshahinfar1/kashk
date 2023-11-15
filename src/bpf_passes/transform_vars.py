@@ -220,9 +220,23 @@ def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.DECL_REF_EXPR:
         return _check_if_ref_is_global_state(inst, info)
     elif inst.kind == clang.CursorKind.VAR_DECL:
-        # TODO: I might want to remove some variable declarations here
-        # e.g., ones related to reading/writing responses
-        return inst
+        current_func_name = current_function.name if current_function else '[[main]]'
+        names = info.read_decl.get(current_func_name, set())
+        if inst.name in names:
+            # This will become a packet pointer, change the type if needed!
+            # TODO: this code does not consider shadowing variables and scopes
+            # other than those given to each function.
+            if (inst.type.is_pointer() and
+                    inst.type.get_pointee().kind == clang.TypeKind.SCHAR):
+                # The type is okay
+                return inst
+            # Change the declaration
+            T = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+            new_inst = VarDecl.build(inst.name, T)
+            return new_inst
+        else:
+            # We do not care about this variable
+            return inst
     elif inst.kind == clang.CursorKind.CALL_EXPR:
         if inst.name in READ_PACKET:
             return _process_read_call(inst, info)

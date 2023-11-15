@@ -42,7 +42,7 @@ class BasicTest:
         self.info.sym_tbl.current_scope = scope
         self.info.prog.add_args_to_scope(scope)
         # Find the entry function
-        main = get_entry_code(cursor, self.info)
+        main, entry_func = get_entry_code(cursor, self.info)
         assert main is not None
         # Convert cursors to instruction objects
         insts = gather_instructions_under(main, self.info, BODY)

@@ -235,7 +235,9 @@ def _check_setting_bpf_context_in_callee(inst, func, info):
         param_sym  = callee_scope.lookup(param.name)
         assert param_sym is not None, f'The function parameters should be found in its symbol table\'s scope ({param.name})'
         argum_sym = get_ref_symbol(argum, info)
-        assert argum_sym is not None
+        if argum_sym is None:
+            error(MODULE_TAG, '(Checking BPF_CTX set in callee)', 'Did not found the symbol for argument', argum)
+            continue
 
         if param_sym.is_bpf_ctx:
             argum_sym.is_bpf_ctx = True

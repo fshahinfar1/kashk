@@ -46,7 +46,12 @@ def is_value_from_bpf_ctx(inst, info, R=None):
         assert isinstance(owner, Ref)
         # owner name is
         sym = info.sym_tbl.lookup(owner.name)
-        assert sym is not None
+        if sym is None:
+            error('Did not found the symbol for owner of member reference')
+            debug('debug info:')
+            debug('Instruction:', inst, 'Owner list:', inst.owner)
+            debug('--------------------')
+            return False
         if sym.is_bpf_ctx:
             # We are accessing BPF context
             ref = Ref(None)
@@ -108,10 +113,12 @@ def is_bpf_ctx_ptr(inst, info):
             return
         owner_symbol = info.sym_tbl.lookup(owner.name)
         if owner_symbol is None:
+            error(f'We do not recognize the owner of member access instruction! ({owner.name})')
             debug('DEBUG INFO:')
             debug(inst.name, inst.owner, owner.name)
             debug(info.sym_tbl.current_scope.symbols)
-        assert owner_symbol is not None, f'We do not recognize the owner of member access instruction! ({owner.name})'
+            debug('-------------------------')
+            return False
         sym = owner_symbol.fields.lookup(inst.name)
         # debug('mem ref:', owner.name, inst.name, ':')
         if sym is None:

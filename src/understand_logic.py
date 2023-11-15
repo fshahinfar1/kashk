@@ -38,7 +38,7 @@ class _State:
             self.code_for_bpf = tmp
 
 
-def get_variable_declaration_before_elem(cursor, target_cursor, info):
+def get_variable_declaration_before_elem(cursor, target_cursor):
     variables = []
     d = DFSPass(cursor)
     for c, _ in d:

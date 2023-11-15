@@ -5,11 +5,13 @@ from framework_support import InputOutputContext
 from log import *
 from data_structure import *
 from instruction import *
-from utility import (parse_file, find_elem, report_user_program_graph, draw_tree)
+from utility import (parse_file, find_elem, report_user_program_graph,
+        draw_tree)
 from find_ev_loop import get_entry_code
 from sym_table import Scope
 from sym_table_gen import build_sym_table, process_source_file
-from understand_logic import  gather_instructions_from
+from understand_logic import  (gather_instructions_from,
+        get_variable_declaration_before_elem)
 from understand_logic_handler import create_func_objs, add_known_func_objs
 
 from bpf_code_gen import generate_bpf_prog, gen_code
@@ -70,9 +72,11 @@ def _prepare_event_handler_args(cursor, info):
             # the global_scope is the per connection scope
             # This is crazy. Why did I not fix this before. I should correct it
 
-            # NOTE: the arguments of the event handler function are put on a map for future access (connection context)
+            # NOTE: the arguments of the event handler function are put on a
+            # map for future access (connection context)
             assert not arg.type_ref.is_pointer(), 'Putting a pointer on the shared map is incorrect'
-            info.sym_tbl.shared_scope.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
+            info.sym_tbl.shared_scope.insert_entry(arg.name,
+                    arg.type_ref, clang.CursorKind.PARM_DECL, None)
     # No instructions to be added
     return []
 
@@ -90,7 +94,8 @@ def generate_offload(io_ctx):
     info = Info.from_io_ctx(io_ctx)
     # Parse the main file
     index, tu, cursor = parse_file(info.io_ctx.input_file, io_ctx.cflags)
-    # Parse other files. Collect information about classes, functions, variables, ...
+    # Parse other files. Collect information about classes, functions,
+    # variables, ...
     build_sym_table(cursor, info)
     # Load other source files
     load_other_sources(io_ctx, info)
@@ -100,7 +105,14 @@ def generate_offload(io_ctx):
     info.sym_tbl.current_scope = scope
     info.prog.add_args_to_scope(scope)
     # Find the entry function
-    main = get_entry_code(cursor, info)
+    main, entry_func = get_entry_code(cursor, info)
+
+
+    list_vars = get_variable_declaration_before_elem(entry_func, main)
+    if list_vars:
+        debug('This is the list of variables before event loop:')
+        debug(tuple(map(lambda x: f'{x.name}:{x.type.spelling}', list_vars)))
+        debug('-------------------------------------------------')
 
     # Start the passes
     debug('First pass on the AST (initializing...)')

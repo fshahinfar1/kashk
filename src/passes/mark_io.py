@@ -6,7 +6,7 @@ BPF supported instructions
 from contextlib import contextmanager
 
 from data_structure import *
-from instruction import Literal, CODE_LITERAL
+from instruction import Literal, CODE_LITERAL, Ref
 from dfs import DFSPass
 from utility import skip_unexposed_stmt, find_elems_of_kind
 from prune import READ_PACKET, WRITE_PACKET, COROUTINE_FUNC_NAME
@@ -55,6 +55,12 @@ def _do_mark_read(r, info):
     pkt_buf.ref = buf_arg
     pkt_buf.size_ref = buf_sz
     r.rd_buf = pkt_buf
+
+    # TODO: it is a hack for finding the variable declaration
+    if isinstance(buf_arg, Ref):
+        current_func_name = current_function.name if current_function else '[[main]]'
+        names = info.read_decl.setdefault(current_func_name, set())
+        names.add(buf_arg.name)
     # debug('Read buffer:', pkt_buf.name, pkt_buf.size_cursor, r)
 
 
