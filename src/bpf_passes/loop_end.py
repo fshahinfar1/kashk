@@ -4,6 +4,7 @@ from instruction import *
 from dfs import DFSPass
 
 
+MODULE_TAG = '[Loop End]'
 top_block_stack = []
 EV_LOOP = 1
 SWITCH = 2
@@ -24,7 +25,8 @@ def _do_pass(inst, info, more):
         # Returing from the event loop
         return _return_drop_inst(info)
     elif inst.kind == clang.CursorKind.CONTINUE_STMT:
-        top_index = len(top_block_stack)
+        top_index = len(top_block_stack) -1
+        # debug('Found a continue', top_index, top_block_stack[top_index])
         while top_block_stack[top_index] == SWITCH:
             # continue is ignored in switch statements
             top_index -= 1
@@ -33,7 +35,8 @@ def _do_pass(inst, info, more):
     elif inst.kind == clang.CursorKind.BREAK_STMT:
         if top_block_stack[-1] == EV_LOOP:
             return _return_drop_inst(info)
-    elif inst.kind == clang.CursorKind.SWITCH_STMT:
+    elif inst.kind in (clang.CursorKind.SWITCH_STMT,
+            clang.CursorKind.CASE_STMT, clang.CursorKind.IF_STMT):
         top_block_stack.append(SWITCH)
         need_pop = True
     elif (inst.kind == clang.CursorKind.FOR_STMT
@@ -52,6 +55,7 @@ def _do_pass(inst, info, more):
         for i in child:
             new_inst = _do_pass(i, info, None)
             if new_inst is None:
+                error(MODULE_TAG, 'remove something ??')
                 if not is_list:
                     return None
                 else:
@@ -82,12 +86,12 @@ def _has_unterminated_path(inst, info):
         elif inst.kind == clang.CursorKind.IF_STMT:
             c1 = _has_unterminated_path(inst.body, info)
             c2 = _has_unterminated_path(inst.other_body, info)
-            if c1 and c2:
+            if not c1 and not c2:
                 return False
         elif inst.kind == clang.CursorKind.SWITCH_STMT:
-            for case in inst.body:
+            for case in inst.body.get_children():
                 c = _has_unterminated_path(case, info)
-                if not c:
+                if c:
                     break
             else:
                 # All of the cases termintated

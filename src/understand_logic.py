@@ -493,7 +493,9 @@ def gather_instructions_from(cursor, info, context=BODY, _state=None):
         # debug('  ' * lvl, c.kind, c.spelling)
         if should_ignore_cursor(c):
             txt = ''.join(map(lambda x: x.spelling, c.get_tokens()))
-            return [Literal(f'/*<placeholder {txt}>*/', CODE_LITERAL)]
+            inst = Literal(f'/*<placeholder {txt}>*/', CODE_LITERAL)
+            ops.append(inst)
+            continue
 
         if not should_process_this_cursor(c):
             with _state.set_global_for_bpf(False):
