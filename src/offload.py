@@ -166,6 +166,7 @@ def generate_offload(io_ctx):
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # Create the userspace program graph
+    debug('Create User Code Graph')
     select_user_pass(bpf, info, PassObject())
     # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
     # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)) + str(x.path_ids))
@@ -180,6 +181,7 @@ def generate_offload(io_ctx):
 
     # Create a clone of unmodified but marked AST, later used for creating the
     # userspace program
+    debug('Clone All State')
     user = clone_pass(bpf, info, PassObject())
     info.user_prog.sym_tbl = info.sym_tbl.clone()
     info.user_prog.func_dir = {}
@@ -256,8 +258,10 @@ def gen_user_code(user, info, out_user):
     # Switch the symbol table and functions to the snapshot suitable for
     # userspace analysis
     with info.user_prog.select_context(info):
+        debug('User Prog: Handle Fallback')
         create_fallback_pass(user, info, PassObject())
         debug('~~~~~~~~~~~~~~~~~~~~~')
+        debug('User Prog: Calculate Variable Deps')
         var_dependency_pass(info)
         debug('~~~~~~~~~~~~~~~~~~~~~')
 

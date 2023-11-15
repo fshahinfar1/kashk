@@ -438,7 +438,9 @@ class BinOp(Instruction):
         self.op = ''
 
         if cursor is not None:
-            assert cursor.kind == clang.CursorKind.BINARY_OPERATOR
+            accepted_kind = (clang.CursorKind.BINARY_OPERATOR,
+                    clang.CursorKind.COMPOUND_ASSIGNMENT_OPERATOR)
+            assert cursor.kind in accepted_kind, f'wrong cursor kind {cursor.kind}'
             self.__find_op_str(cursor)
 
         if not self.op:

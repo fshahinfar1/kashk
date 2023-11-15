@@ -203,7 +203,7 @@ def __convert_cursor_to_inst(c, info, _state):
 
         try:
             inst = BinOp(c)
-        except:
+        except Exception as e:
             error('Issuw with BinOp')
             return Literal('<Failed to create Binary Op>', CODE_LITERAL)
         children = c.get_children()
