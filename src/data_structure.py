@@ -1,7 +1,8 @@
 from contextlib import contextmanager
 import clang.cindex as clang
 
-from utility import get_code, get_owner, generate_struct_with_fields, report_on_cursor, indent
+from utility import (get_code, get_owner, generate_struct_with_fields,
+        report_on_cursor, indent, PRIMITIVE_TYPE_SIZE)
 from log import error, debug
 from sym_table import SymbolTable
 
@@ -103,9 +104,9 @@ class StateObject:
             self.kind = None
             self.type_ref = None
 
-    @property
-    def type(self):
-        return self.type_ref.spelling
+    # @property
+    # def type(self):
+    #     return self.type_ref.spelling
 
     @property
     def is_pointer(self):
@@ -147,8 +148,8 @@ class StateObject:
 
             return text
         elif self.type_ref.kind == clang.TypeKind.RECORD:
-            return f'{self.type} {self.name};'
-        return f'{self.type} {self.name};'
+            return f'{self.type_ref.spelling} {self.name};'
+        return f'{self.type_ref.spelling} {self.name};'
 
     def __repr__(self):
         return f'<StateObject: {self.type} {self.name}>'
@@ -255,6 +256,40 @@ class MyType:
     def element_count(self):
         assert self.kind == clang.TypeKind.CONSTANTARRAY
         return self._element_count
+
+    @property
+    def mem_size(self):
+        """
+        Return amount of memory this type requires
+        """
+        if self.is_pointer() or self.is_func_proto():
+            return 8
+        elif self.is_array():
+            return self.element_count * self.element_type.mem_size
+        elif self.is_record():
+            # assume it is a packed struct (assume no padding is added)
+            size = 0
+            # TODO: I should consider having access to the type definition in
+            # this object instead of a seperate object
+            tmp_hack = self.spelling[len('struct '):]
+            record = Record.directory.get(tmp_hack)
+            if record is None:
+                error(f'did not found declaration for struct {tmp_hack} (is it a type I do not track in the compiler?)')
+                return 0
+            # debug(Record.directory)
+            assert record is not None, f'did not found declaration for {tmp_hack}'
+            for field in record.fields:
+                size += field.type_ref.mem_size
+            return size
+        elif self.is_enum():
+            # sizeof(int)
+            return 4
+        elif self.kind in PRIMITIVE_TYPE_SIZE:
+            return PRIMITIVE_TYPE_SIZE[self.kind]
+        elif self.kind == clang.TypeKind.TYPEDEF:
+            return self.under_type.mem_size
+        else:
+            raise Exception('Does not know the size (unhandled case)?', self.kind)
 
     def is_array(self):
         return self.kind == clang.TypeKind.CONSTANTARRAY

@@ -38,6 +38,7 @@ def _get_malloc_name():
     _malloc_map_counter += 1
     return f'malloc_{_malloc_map_counter}'
 
+
 def _rename_func_to_a_known_one(inst, info, target_name):
     inst.name = target_name
     # Mark the function used
@@ -188,11 +189,19 @@ def _process_annotation(inst, info):
         return new_inst
 
 
+def _process_var_decl(inst, info):
+    # NOTE: these variables are defined on the stack memory
+    debug(f'{inst.name}:{inst.type.spelling} ({inst.type.mem_size} bytes)')
+    return inst
+
+
 def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.CALL_EXPR:
         return _process_call_inst(inst,info)
     elif inst.kind == ANNOTATION_INST:
         return _process_annotation(inst, info)
+    elif inst.kind == clang.CursorKind.VAR_DECL:
+        return _process_var_decl(inst, info)
     return inst
 
 
