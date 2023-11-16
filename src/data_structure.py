@@ -472,6 +472,8 @@ class Function(TypeDefinition):
         # What operations has alread been applied (bitset)
         self.change_applied = 0
 
+        self.function_dependancy = set()
+
         if directory is None:
             directory = Function.directory
         if self.name in directory:

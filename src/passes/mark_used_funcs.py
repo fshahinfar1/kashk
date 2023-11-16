@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import clang.cindex as clang
 from dfs import DFSPass
 from log import *
@@ -6,11 +7,21 @@ from prune import should_process_this_cursor
 
 from understand_program_state import generate_decleration_for
 
-
 MODULE_TAG = '[Mark Used Func]'
 _has_processed = set()
+current_function = None
 
-# TODO: what if a name of a struct is changed using a typedef ?
+
+@contextmanager
+def set_current_func(func):
+    global current_function
+    tmp = current_function
+    current_function = func
+    try:
+        yield func
+    finally:
+        current_function = tmp
+
 
 def _find_type_decl_class(name, info):
     scope_key = f'class_{name}'
@@ -53,6 +64,8 @@ def _do_pass(inst, info, more):
     for inst, _ in d:
         if inst.kind == clang.CursorKind.CALL_EXPR:
             func = inst.get_function_def()
+            if current_function is not None:
+                current_function.function_dependancy.add(func.name)
             if func:
                 if not func.is_empty() and not func.is_used_in_bpf_code:
                     # debug(MODULE_TAG, 'Add func:', func.name)
@@ -66,8 +79,9 @@ def _do_pass(inst, info, more):
                     for arg in func.get_arguments():
                         _add_type_to_declarations(arg.type_ref, info)
                 # Continue processing the code reachable inside the function
-                _do_pass(func.body, info, None)
-            continue
+                with set_current_func(func):
+                    _do_pass(func.body, info, None)
+            # continue
         elif inst.kind == clang.CursorKind.VAR_DECL:
             if not flag:
                 _add_type_to_declarations(inst.type, info)
@@ -82,4 +96,5 @@ def mark_used_funcs(bpf, info, more):
         flag = True
     else:
         flag = False
-    _do_pass(bpf, info, None)
+    with set_current_func(None):
+        _do_pass(bpf, info, None)

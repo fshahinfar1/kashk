@@ -443,6 +443,13 @@ def __generate_global_shared_state(info):
     return shared_state_struct_decl
 
 
+def __sort_by_function_depandancy(funcs):
+    # TODO: the sorting should consider the graph of dependancy not the number
+    # of functions.
+    new = sorted(funcs, key=lambda x: len(x.function_dependancy))
+    return new
+
+
 def generate_bpf_prog(info):
     shared_state_struct_decl = __generate_global_shared_state(info)
 
@@ -451,6 +458,8 @@ def generate_bpf_prog(info):
     func_decs = list(filter(lambda d: isinstance(d, Function), decs))
     non_func_declarations, _ = gen_code(non_func_decs, info, context=DEF)
     non_func_declarations += shared_state_struct_decl
+
+    func_decs = __sort_by_function_depandancy(func_decs)
     func_declarations, _ = gen_code(func_decs, info, context=ARG)
     declarations = (non_func_declarations + '\n' + func_declarations)
 
