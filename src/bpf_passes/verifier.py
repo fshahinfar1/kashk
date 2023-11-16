@@ -180,12 +180,19 @@ def _check_passing_bpf_context(inst, func, info):
             sym.is_bpf_ctx = True
             receives_bpf_ctx = True
         else:
+            if hasattr(a, 'type'):
+                # check if possible that an argument is a record or not.
+                # Not record --> Not composit type --> no BPF_CTX field
+                T = get_actual_type(a.type)
+                if not T.is_record():
+                    continue
             if not isinstance(a, Ref):
                 debug('I am not checking whether the argument which are not simple references (e.g, are operations) have BPF context as a field or not')
-                # text, _ = gen_code([a,], info)
-                # debug(a)
-                # debug(text)
-                # debug('--------')
+                debug('debug info:')
+                text, _ = gen_code([a,], info)
+                debug(a)
+                debug(text)
+                debug('--------')
                 continue
             if param.type_ref.spelling != a.type.spelling:
                 error('There is a type cast when passing the argument. I lose track of BPF context when there is a type cast! [1]')
@@ -369,16 +376,27 @@ def _do_pass(inst, info, more):
             # This instruction should be removed
             return None
 
-        if inst.kind in MAY_HAVE_BACKWARD_JUMP_INSTRUCTIONS:
-            # This is a loop (may jump back), go through the loop once,
-            # remember which fields my be BPF Context
-            with new_backward_jump_context() as marked_refs:
-                _do_pass(inst.body, info, PassObject())
-                # debug('in a loop these were marked:')
-                for ref in marked_refs:
-                    # debug(ref)
-                    set_ref_bpf_ctx_state(ref, True, info)
-                # debug('----------------------------')
+        # ------------------------------------------------------------------
+        # TODO: this backward jump implementation has a huge bug to be fixed.
+        # In the first pass, I might add bound checks and these checks are lost
+        # because this pass is only for infomation gathering. The checks are
+        # not added in the second pass becasue the instructions are makred as
+        # bound-checked.
+        # I should fix this before uncommneting.
+        # ------------------------------------------------------------------
+        # if inst.kind in MAY_HAVE_BACKWARD_JUMP_INSTRUCTIONS:
+        #     # This is a loop (may jump back), go through the loop once,
+        #     # remember which fields my be BPF Context
+        #     with new_backward_jump_context() as marked_refs:
+        #         _do_pass(inst.body, info, PassObject())
+        #         debug('in a loop these were marked:')
+        #         tmp_sym = info.sym_tbl.lookup('head')
+        #         if tmp_sym:
+        #             debug('&&', tmp_sym.name, tmp_sym.is_bpf_ctx)
+        #         for ref in marked_refs:
+        #             debug('jump back mark', ref)
+        #             set_ref_bpf_ctx_state(ref, True, info)
+        #         debug('----------------------------')
 
         # Continue deeper
         for child, tag in inst.get_children_context_marked():

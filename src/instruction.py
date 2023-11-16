@@ -365,6 +365,19 @@ class UnaryOp(Instruction):
             self.op = '<not set>'
             self.comes_after = False
 
+    @property
+    def type(self):
+        T = self.child.children[0].type
+        if self.op == '&':
+            return MyType.make_pointer(T)
+        elif self.op == '*':
+            assert T.is_pointer(), 'derefrencing a non pointer type!'
+            return T.get_pointee()
+        elif self.op == 'sizeof':
+            return BASE_TYPES[clang.TypeKind.ULONGLONG]
+        else:
+            return T
+
     def __str__(self):
         return f'<UnaryOp {self.op}>'
 
@@ -545,6 +558,9 @@ class ArrayAccess(Instruction):
         new.bpf_ignore = self.bpf_ignore
         new.change_applied = self.change_applied
         return new
+
+    def __str__(self):
+        return f'<ArrayAccess {self.array_ref.name}@{self.index.children}>'
 
 
 class Parenthesis(Instruction):

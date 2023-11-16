@@ -142,9 +142,8 @@ def set_ref_bpf_ctx_state(ref, state, info):
     @param state: bool
     """
     # debug('set', ref, 'as context:', state)
-    # TODO: it can also be a MEMBER_REF
-
     sym = symbol_for_inst(ref, info)
     if sym is None:
+        error('Setting BPF Context Flag for the given Instruction is not implemented!')
         return
     sym.is_bpf_ctx = state

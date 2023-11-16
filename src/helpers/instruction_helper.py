@@ -121,10 +121,6 @@ def symbol_for_inst(inst, info):
     if inst.kind == clang.CursorKind.DECL_REF_EXPR:
         return info.sym_tbl.lookup(inst.name)
     elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
-        # TODO: I should set the flag only for one field of the data structure
-        # but my symbol table is too simple and does not keep state for fields
-        # of a data structure.
-        # _set_ref_bpf_ctx_state(ref.owner[0], state, info)
         # TODO: THERE IS A BUG HERE, WHAT IF THERE ARE MULTIPLE NESTED STRUCTS? I NEED A RECURSION HERE.
         # debug("THERE IS A BUG HERE, WHAT IF THERE ARE MULTIPLE NESTED STRUCTS? I NEED A RECURSION HERE.")
         owner = inst.owner[-1]
@@ -144,8 +140,13 @@ def symbol_for_inst(inst, info):
             sym = owner_symbol.fields.insert_entry(inst.name, inst.type, inst.kind, None)
         return sym
     else:
-        error('Setting BPF Context Flag for the given Instruction is not implemented!')
-        debug('Inst:', inst)
+        error('Can not determine symbol for given instruction (not implemented?)')
+        debug('debug info:')
+        debug('inst:', inst)
+        from bpf_code_gen import gen_code
+        text, _ = gen_code([inst,], info)
+        debug('text:', text)
+        debug('------------------------')
         return None
 
 
