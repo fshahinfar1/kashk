@@ -42,7 +42,7 @@ def _rename_func_to_a_known_one(inst, info, target_name):
     inst.name = target_name
     # Mark the function used
     func = inst.get_function_def()
-    assert func is not None
+    assert func is not None, 'We should have a Function object for each known function'
     if not func.is_used_in_bpf_code:
         func.is_used_in_bpf_code = True
         info.prog.declarations.insert(0, func)
@@ -97,6 +97,28 @@ def _known_function_substitution(inst, info):
         for tmp_inst in lookup_inst:
             blk.append(tmp_inst)
         return ref
+    elif inst.name == 'memcpy':
+        assert len(inst.args) == 3
+        size = inst.args[2]
+        is_constant = (isinstance(size, Literal)
+                or (size.kind == clang.CursorKind.UNARY_OPERATOR
+                    and size.op == 'sizeof'))
+        if is_constant:
+            # No change is needed the builtin memcpy would work
+            return inst
+
+        src = inst.args[0]
+        dest = inst.args[1]
+        if is_bpf_ctx_ptr(src, info):
+            end_src = info.prog.get_pkt_end()
+        else:
+            end_src = BinOp.build(src, '+', inst.args[2])
+        if is_bpf_ctx_ptr(dest, info):
+            end_dest = info.prog.get_pkt_end()
+        else:
+            end_dest = BinOp.build(dest, '+', inst.args[2])
+        inst.args.extend([end_src, end_dest,])
+        return _rename_func_to_a_known_one(inst, info, 'bpf_memcpy')
     elif inst.name in ('ntohs', 'ntohl', 'htons', 'htonl'):
         inst.name = 'bpf_'+inst.name
         return inst
