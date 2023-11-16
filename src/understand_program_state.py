@@ -7,7 +7,7 @@ from utility import (find_elem, get_code, generate_struct_with_fields,
 from bpf import SK_SKB_PROG
 from data_structure import *
 
-from prune import get_namespace_of_cursor
+from prune import get_namespace_of_cursor, should_process_this_cursor
 
 
 MODULE_TAG = '[Program State]'
@@ -20,6 +20,8 @@ def generate_decleration_for(cursor):
     cursor is a class, struct, enum, ...
     return a list of strings having codes for defining the types needed.
     """
+    if not should_process_this_cursor(cursor):
+        return []
     T = get_actual_type(cursor.type)
     if T.kind in PRIMITIVE_TYPES:
         return []
@@ -43,6 +45,8 @@ def generate_decleration_for(cursor):
     cursor = c2
     T = cursor.type
     type_name = T.spelling
+    if not should_process_this_cursor(cursor):
+        return []
 
     if T.kind in PRIMITIVE_TYPES:
         return []

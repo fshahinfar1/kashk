@@ -35,6 +35,8 @@ def _find_type_decl_class(name, info):
         return []
     assert cursor is not None
     decls = generate_decleration_for(cursor)
+    # debug(cursor.spelling)
+    # debug([d.name for d in decls])
     return decls
 
 
@@ -45,11 +47,15 @@ def _find_type_decl(name, info):
     return []
 
 
+__analysed_types = set()
 def _add_type_to_declarations(T, info):
     T = get_actual_type(T)
     if T is None or T.kind in PRIMITIVE_TYPES or T.spelling in _has_processed:
         return
     type_name = T.spelling
+    if type_name in __analysed_types:
+        return
+    __analysed_types.add(type_name)
     decls = _find_type_decl(type_name, info)
     for decl in decls:
         if decl.is_used_in_bpf_code or decl.name in _has_processed:
