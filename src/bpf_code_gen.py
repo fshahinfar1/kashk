@@ -5,18 +5,9 @@ from instruction import *
 from utility import (indent, INDENT, report_on_cursor)
 from prune import READ_PACKET, WRITE_PACKET
 
-from template import (memcpy_internal_defs, license_text,
-        load_shared_object_code, shared_map_decl)
+from template import (memcpy_internal_defs, license_text, shared_map_decl)
 
 MODULE_TAG = '[BPF Code Gen]'
-
-
-def check_if_shared_obj_is_loaded(info):
-    shared_sym = info.sym_tbl.lookup('shared')
-    if shared_sym:
-        # This object is defined in this scope
-        return False, ''
-    return True, load_shared_object_code()
 
 
 def handle_var(inst, info, more):
@@ -443,8 +434,8 @@ def __generate_global_shared_state(info):
     if fields:
         shared_state = Record('shared_state', fields)
         shared_state_struct_decl = (
-                '\n/* The globaly shared state is in this structure */'
-                + shared_state.get_c_code() + ';\n'
+                '\n/* The globaly shared state is in this structure */\n'
+                + shared_state.get_c_code() + ';\n\n'
                 + shared_map_decl() + '\n'
                 )
     else:

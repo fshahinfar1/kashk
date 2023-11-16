@@ -59,9 +59,13 @@ def __pass_over_global_variables(cursor, info):
     d = DFSPass(cursor)
     for c, l in d:
         if c.kind == clang.CursorKind.VAR_DECL:
+            if not should_process_this_cursor(c):
+                continue
             T = MyType.from_cursor_type(c.type)
             info.sym_tbl.insert_entry(c.spelling, T, c.kind, c)
         elif c.kind == clang.CursorKind.TRANSLATION_UNIT:
+            # Only go deep on the translation unit. we just want global
+            # variables.
             d.go_deep()
 
 
@@ -208,8 +212,13 @@ def process_source_file(cursor, info):
     This function does not explore the body of functions. This is postponed for
     later.
     """
-    info.sym_tbl.current_scope = info.sym_tbl.global_scope
+    # NOTE: there is a very silly but important note about global scopes:
+    #   global_scope: the scope used for keep a state for a single connection. Information not shared with other connections.
+    #   shared scope: the scope shared between all connections
+    # Global variables belong to the shared scope
+    info.sym_tbl.current_scope = info.sym_tbl.shared_scope
     __pass_over_global_variables(cursor, info)
+    info.sym_tbl.current_scope = info.sym_tbl.global_scope
     __pass_over_source_file(cursor, info)
 
 

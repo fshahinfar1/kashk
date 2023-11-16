@@ -81,6 +81,16 @@ def _prepare_event_handler_args(cursor, info):
     return []
 
 
+def _move_vars_before_event_loop_to_shared_scope(entry_func, main, info):
+    list_vars = get_variable_declaration_before_elem(entry_func, main)
+    # if list_vars:
+    #     debug('This is the list of variables before event loop:')
+    #     debug(tuple(map(lambda x: f'{x.name}:{x.type.spelling}', list_vars)))
+    #     debug('-------------------------------------------------')
+    for var in list_vars:
+        var.update_symbol_table(info.sym_tbl.shared_scope)
+
+
 def load_other_sources(io_ctx, info):
     # This is the AST generated with Clang
     others = []
@@ -89,6 +99,7 @@ def load_other_sources(io_ctx, info):
         _, _, other_cursor = parse_file(path, io_ctx.cflags)
         others.append(other_cursor)
         process_source_file(other_cursor, info)
+
 
 def generate_offload(io_ctx):
     info = Info.from_io_ctx(io_ctx)
@@ -99,20 +110,15 @@ def generate_offload(io_ctx):
     build_sym_table(cursor, info)
     # Load other source files
     load_other_sources(io_ctx, info)
-    # Select the main scope
+    # Activate the main scope
     scope = Scope(info.sym_tbl.global_scope)
     info.sym_tbl.scope_mapping[BPF_MAIN] = scope
     info.sym_tbl.current_scope = scope
     info.prog.add_args_to_scope(scope)
     # Find the entry function
     main, entry_func = get_entry_code(cursor, info)
-
-
-    list_vars = get_variable_declaration_before_elem(entry_func, main)
-    if list_vars:
-        debug('This is the list of variables before event loop:')
-        debug(tuple(map(lambda x: f'{x.name}:{x.type.spelling}', list_vars)))
-        debug('-------------------------------------------------')
+    #
+    _move_vars_before_event_loop_to_shared_scope(entry_func, main, info)
 
     # Start the passes
     debug('First pass on the AST (initializing...)')

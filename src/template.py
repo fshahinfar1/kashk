@@ -115,15 +115,6 @@ def license_text(license):
     return f'char _license[] SEC("license") = "{license}";'
 
 
-def load_shared_object_code():
-    return '''struct shared_state *shared = NULL;
-{
-  int zero = 0;
-  shared = bpf_map_lookup_elem(&shared_map, &zero);
-}
-'''
-
-
 def shared_map_decl():
     return '''struct {
   __uint(type,  BPF_MAP_TYPE_ARRAY);
@@ -134,19 +125,26 @@ def shared_map_decl():
 '''
 
 
-def prepare_shared_state_var():
-    text = '''struct shared_state *shared = NULL;
-{
+def prepare_shared_state_var(ret_val=None):
+    NULL = Literal('NULL', clang.CursorKind.MACRO_INSTANTIATION)
+    shared_struct = MyType.make_simple('struct shared_state', clang.TypeKind.RECORD)
+    T = MyType.make_pointer(shared_struct)
+    var_decl = VarDecl.build('shared',T)
+    var_decl.init.add_inst(NULL)
+    tmp_text = '''{
   int zero = 0;
   shared = bpf_map_lookup_elem(&shared_map, &zero);
-}
-if (!shared) {
-  return SK_DROP;
-}
+}'''
+    lookup = Literal(tmp_text, CODE_LITERAL)
 
-'''
-    new_inst = Literal(text, CODE_LITERAL)
-    return new_inst
+    shared_ref = var_decl.get_ref()
+    cond  = BinOp.build(shared_ref, '==', NULL)
+    check = ControlFlowInst.build_if_inst(cond)
+    if ret_val is None:
+        ret_val = Return.build([])
+    check.body.add_inst(ret_val)
+    insts = [var_decl, lookup, check]
+    return insts
 
 
 def prepare_meta_data(failure_number, meta_declaration, info):
