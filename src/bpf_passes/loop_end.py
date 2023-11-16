@@ -74,9 +74,10 @@ def _do_pass(inst, info, more):
     return new_inst
 
 
-def _has_unterminated_path(inst, info):
-    d = DFSPass(inst)
-    for inst, lvl in d:
+def _has_unterminated_path(root, info):
+    # d = DFSPass(root)
+    # for inst, lvl in d:
+    for inst in root.get_children():
         if inst.kind == clang.CursorKind.RETURN_STMT:
             return False
         elif inst.kind == clang.CursorKind.CALL_EXPR:
@@ -96,7 +97,7 @@ def _has_unterminated_path(inst, info):
             else:
                 # All of the cases termintated
                 return False
-        d.go_deep()
+        # d.go_deep()
     return True
 
 
@@ -107,4 +108,9 @@ def loop_end_pass(inst, info, more):
 
     if _has_unterminated_path(res, info):
         res.add_inst(_return_drop_inst(info))
+
+    # from bpf_code_gen import gen_code
+    # text, _ = gen_code(res, info)
+    # debug(text)
+    # assert 0
     return res
