@@ -70,9 +70,9 @@ def _do_pass(inst, info, more):
     for inst, _ in d:
         if inst.kind == clang.CursorKind.CALL_EXPR:
             func = inst.get_function_def()
-            if current_function is not None:
-                current_function.function_dependancy.add(func.name)
             if func:
+                if current_function is not None:
+                    current_function.function_dependancy.add(func.name)
                 if not func.is_empty() and not func.is_used_in_bpf_code:
                     # debug(MODULE_TAG, 'Add func:', func.name)
                     # Only include functions that have concrete implementation
@@ -87,6 +87,8 @@ def _do_pass(inst, info, more):
                 # Continue processing the code reachable inside the function
                 with set_current_func(func):
                     _do_pass(func.body, info, None)
+            else:
+                debug('did not found function struct for', inst.name)
             # continue
         elif inst.kind == clang.CursorKind.VAR_DECL:
             if not flag:

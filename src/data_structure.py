@@ -152,7 +152,7 @@ class StateObject:
         return f'{self.type_ref.spelling} {self.name};'
 
     def __repr__(self):
-        return f'<StateObject: {self.type} {self.name}>'
+        return f'<StateObject: {self.type_ref.spelling} {self.name}>'
 
 
 class FunctionPrototypeType:
