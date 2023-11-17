@@ -55,8 +55,9 @@ def _known_function_substitution(inst, info):
     """
     Replace some famous functions with implementations that work in BPF
     """
-    if inst.name == 'strlen':
-        return _rename_func_to_a_known_one(inst, info, 'bpf_strlen')
+    if inst.name in ('strlen', 'strncmp'):
+        new_name = 'bpf_' + inst.name
+        return _rename_func_to_a_known_one(inst, info, new_name)
     elif inst.name == 'strncpy':
         assert len(inst.args) == 3, 'Assumption on the number of arguments'
         buf = inst.args[0]
@@ -191,7 +192,14 @@ def _process_annotation(inst, info):
 
 def _process_var_decl(inst, info):
     # NOTE: these variables are defined on the stack memory
-    debug(f'{inst.name}:{inst.type.spelling} ({inst.type.mem_size} bytes)')
+    # TODO: I need to tack the total memory allocated on the stack and not just
+    # the size of each object. But for now let's just move huge objects to the
+    # map.
+    if inst.type.mem_size > 255:
+        debug(MODULE_TAG, f'moving {inst.name}:{inst.type.spelling} to BPF map')
+        debug(MODULE_TAG, f'{inst.name}:{inst.type.spelling} ({inst.type.mem_size} bytes)')
+        error('have not implemented moving large values from stack to BPF map yet')
+
     return inst
 
 

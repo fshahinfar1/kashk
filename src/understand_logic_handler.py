@@ -262,6 +262,31 @@ for (unsigned short i = 0; i < 256; i++) {
 '''
     _declare_func(info, func_name, args, return_type, code)
 
+    # STRNCMP
+    func_name = 'bpf_strncmp'
+    count_args = 3
+    args = [StateObject(None) for i in range(count_args)]
+    args[0].name = 'str1'
+    args[0].type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+    args[1].name = 'str2'
+    args[1].type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+    args[2].name = 'len'
+    args[2].type_ref = BASE_TYPES[clang.TypeKind.USHORT]
+    return_type = BASE_TYPES[clang.TypeKind.INT]
+    code = '''
+int i;
+for(i = 0; i < 256; (i)++) {
+  if (i == len) {
+    return (0);
+  }
+  if (str1[i] != str2[i] || str1[i] == '\\0') {
+    return (str1[i] - str2[i]);
+  }
+}
+return (-(10000));
+'''
+    _declare_func(info, func_name, args, return_type, code)
+
     # FNV_HASH
     func_name = '__fnv_hash'
     count_args = 2

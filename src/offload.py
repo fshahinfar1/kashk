@@ -218,7 +218,8 @@ def dfs_over_deps_vars(root, visited=None):
     @param visited: set of nodes already visited (we should not process a node
     twice, we should not encounter a node twice if the graph is truely a tree)
 
-    @returns a list of set of variables dependencies along with the failure number
+    @returns a list of set of variables dependencies along with the failure
+    number
     """
     if visited is None:
         visited = set()
