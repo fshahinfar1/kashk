@@ -39,6 +39,13 @@ def _get_malloc_name():
     return f'malloc_{_malloc_map_counter}'
 
 
+_stack_large_obj = 0
+def _get_stack_obj_name():
+    global _stack_large_obj
+    _stack_large_obj += 1
+    return f'stack_obj_{_stack_large_obj}'
+
+
 def _rename_func_to_a_known_one(inst, info, target_name):
     inst.name = target_name
     # Mark the function used
@@ -198,7 +205,47 @@ def _process_var_decl(inst, info):
     if inst.type.mem_size > 255:
         debug(MODULE_TAG, f'moving {inst.name}:{inst.type.spelling} to BPF map')
         debug(MODULE_TAG, f'{inst.name}:{inst.type.spelling} ({inst.type.mem_size} bytes)')
-        error('have not implemented moving large values from stack to BPF map yet')
+
+        name = _get_stack_obj_name()
+        map_name = name + '_map'
+        data_field = StateObject(None)
+        data_field.name = 'data'
+        data_field.type_ref = inst.type
+        struct_decl = Record(name, [data_field])
+        struct_decl.is_used_in_bpf_code = True
+        info.prog.add_declaration(struct_decl)
+
+        # Update symbol table
+        __scope = info.sym_tbl.current_scope
+        info.sym_tbl.current_scope = info.sym_tbl.global_scope
+        struct_decl.update_symbol_table(info.sym_tbl)
+        info.sym_tbl.current_scope = __scope
+
+        # Define the BPF map
+        m = define_bpf_arr_map(map_name, struct_decl.get_name(), 1)
+        info.prog.add_declaration(m)
+
+        # Look the malloc map
+        return_val = get_ret_value_text(current_function, info)
+        lookup_inst, ref = malloc_lookup(name, info, return_val)
+        blk = cb_ref.get(BODY)
+        for tmp_inst in lookup_inst:
+            blk.append(tmp_inst)
+
+        new_type = None
+        if inst.type.is_array():
+            new_type = MyType.make_pointer(inst.type.element_type)
+        elif inst.type.is_record():
+            new_type = MyType.make_pointer(inst.type)
+            error('TODO: Changing type of record to a pointer requires updating the references')
+        else:
+            raise Exception('Not implemented yet?')
+
+        new_var_decl = VarDecl.build(inst.name, new_type)
+        blk.append(new_var_decl)
+        var_ref = new_var_decl.get_ref()
+        assign = BinOp.build(var_ref, '=', ref)
+        return assign
 
     return inst
 

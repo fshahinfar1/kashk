@@ -92,6 +92,7 @@ class CodeBlockRef:
 
 
 class StateObject:
+    __slots__ = ('cursor', 'name', 'kind', 'type_ref')
     def __init__(self, c):
         if c:
             self.cursor = c
