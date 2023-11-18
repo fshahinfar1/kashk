@@ -12,6 +12,8 @@ exclude_inst_flag = False
 skip_path_flag = False
 func_ptr_mapping = {}
 
+loop_ann = None
+
 
 def _set_exclude_flag(val):
     global exclude_inst_flag
@@ -22,8 +24,18 @@ def _set_skip_path(val):
     global skip_path_flag
     skip_path_flag = val
 
+def _set_loop_ann(val):
+    global loop_ann
+    loop_ann = val
+
 
 def _process_current_inst(inst, info):
+    if loop_ann is not None:
+        assert inst.kind in MAY_HAVE_BACKWARD_JUMP_INSTRUCTIONS
+        inst.repeat = loop_ann
+        _set_loop_ann(None)
+        return inst
+
     if inst.kind == ANNOTATION_INST:
         if inst.ann_kind == Annotation.ANN_FUNC_PTR:
             ptr, actual = inst.msg.split(Annotation.FUNC_PTR_DELIMITER)
@@ -36,6 +48,9 @@ def _process_current_inst(inst, info):
         elif inst.ann_kind == Annotation.ANN_EXCLUDE_END:
             _set_exclude_flag(False)
             return None
+        elif inst.ann_kind == Annotation.ANN_LOOP:
+            repeat = int(inst.msg)
+            _set_loop_ann(repeat)
         # elif inst.ann_kind == Annotation.ANN_SKIP:
         #     _set_skip_path(True)
     elif inst.kind == clang.CursorKind.CALL_EXPR:

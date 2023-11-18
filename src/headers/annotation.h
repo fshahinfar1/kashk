@@ -14,6 +14,7 @@ enum {
 	ANN_CACHE_END_UPDATE,
 	ANN_EXCLUDE_BEGIN,
 	ANN_EXCLUDE_END,
+	ANN_LOOP,
 };
 #define __ANNOTATE(_m, _k) (struct __annotation){ \
 	.message = _m, \
@@ -72,6 +73,8 @@ enum {
 		JSON_FIELD_MID("id", id) \
 		JSON_FIELD("code", code) \
 		"}", ANN_CACHE_END_UPDATE)
+
+#define __ANNOTATE_LOOP(repeat) __ANNOTATE(#repeat, ANN_LOOP)
 
 
 

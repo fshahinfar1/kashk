@@ -11,7 +11,7 @@ class SymbolAccessMode:
 
 
 class SymbolTableEntry:
-    __slots__ = ('name', 'type', 'kind', 'ref', 'fields', 'is_bpf_ctx', 'is_accessed')
+    __slots__ = ('name', 'type', 'kind', 'ref', 'fields', 'is_bpf_ctx', 'is_bpf_map', 'is_accessed',)
     def __init__(self, name, type_, kind, ref, scope_holding_the_entry=None):
         self.name = name
         self.type = type_
@@ -23,6 +23,7 @@ class SymbolTableEntry:
         # This is added to handle the fields of a struct
         self.fields = Scope(scope_holding_the_entry)
         self.is_bpf_ctx = False
+        self.is_bpf_map = False
         self.is_accessed = SymbolAccessMode.NOT_ACCESSED
 
     def clone(self):
@@ -107,6 +108,7 @@ class Scope:
 
 
 class SymbolTable:
+    __slots__ = ('shared_scope', 'global_scope', 'current_scope', 'scope_mapping',)
     def __init__(self):
         # State that is shared between connection
         self.shared_scope = Scope()
@@ -188,6 +190,7 @@ class SymbolTable:
 
 
 class ScopeMapping:
+    __slots__ = ('scope_mapping',)
     def __init__(self):
         self.scope_mapping = {}
 

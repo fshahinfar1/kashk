@@ -195,7 +195,7 @@ def create_func_objs(info):
         processed.update(keys)
 
 
-def _declare_func(info, name, args, return_type, code):
+def _declare_func(info, name, args, return_type, code, comp):
     assert isinstance(args, list)
     assert isinstance(return_type, MyType)
     assert isinstance(code, str)
@@ -210,6 +210,7 @@ def _declare_func(info, name, args, return_type, code):
     for a in func.args:
         scope.insert_entry(a.name, a.type_ref, a.kind, None)
     func.body.add_inst(Literal(code, CODE_LITERAL))
+    func.complexity = comp
     return func
 
 
@@ -233,7 +234,7 @@ if (str[i] == '\\0') {
 }
 return ((unsigned int)(-(1)));
 '''
-    _declare_func(info, func_name, args, return_type, code)
+    _declare_func(info, func_name, args, return_type, code, 513)
 
     # STRNCPY
     func_name = 'bpf_strncpy'
@@ -260,7 +261,7 @@ for (unsigned short i = 0; i < 256; i++) {
   }
 }
 '''
-    _declare_func(info, func_name, args, return_type, code)
+    _declare_func(info, func_name, args, return_type, code, 1792)
 
     # STRNCMP
     func_name = 'bpf_strncmp'
@@ -285,7 +286,7 @@ for(i = 0; i < 256; (i)++) {
 }
 return (-(10000));
 '''
-    _declare_func(info, func_name, args, return_type, code)
+    _declare_func(info, func_name, args, return_type, code, 1024)
 
     # FNV_HASH
     func_name = '__fnv_hash'
@@ -299,7 +300,7 @@ return (-(10000));
     code = '''
 return 0;
 '''
-    _declare_func(info, func_name, args, return_type, code)
+    _declare_func(info, func_name, args, return_type, code, 0)
 
     # MEMCPY
     func_name = 'bpf_memcpy'
@@ -327,4 +328,4 @@ for (unsigned short i = 0; i < 256; i++) {
   }
 }
 '''
-    _declare_func(info, func_name, args, return_type, code)
+    _declare_func(info, func_name, args, return_type, code, 2560)

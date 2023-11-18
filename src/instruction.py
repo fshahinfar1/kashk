@@ -314,6 +314,7 @@ class ControlFlowInst(Instruction):
         self.cond = Block(ARG)
         self.body = Block(BODY)
         self.other_body = Block(BODY)
+        self.repeat = None
 
     def has_children(self):
         return True
@@ -337,6 +338,7 @@ class ControlFlowInst(Instruction):
         new.other_body = children[2]
         new.bpf_ignore = self.bpf_ignore
         new.change_applied = self.change_applied
+        new.repeat = self.repeat
         return new
 
 
@@ -729,6 +731,7 @@ class ForLoop(Instruction):
         self.cond = Block(ARG)
         self.post = Block(ARG)
         self.body = Block(BODY)
+        self.repeat = None
 
     def has_children(self):
         return True
@@ -750,6 +753,7 @@ class ForLoop(Instruction):
         new.body = children[3]
         new.bpf_ignore = self.bpf_ignore
         new.change_applied = self.change_applied
+        new.repeat = self.repeat
         return new
 
 
@@ -858,6 +862,8 @@ class Annotation(Instruction):
     ANN_CACHE_BEGIN_UPDATE = 'ANN_CACHE_BEGIN_UPDATE'
     ANN_CACHE_END_UPDATE   = 'ANN_CACHE_END_UPDATE'
 
+    ANN_LOOP          = 'ANN_LOOP'
+
     def __init__(self, msg, ann_kind):
         super().__init__()
         assert len(msg) > 2
@@ -865,7 +871,7 @@ class Annotation(Instruction):
                 Annotation.ANN_CACNE_DEFINE, Annotation.ANN_CACHE_BEGIN,
                 Annotation.ANN_CACHE_END, Annotation.ANN_EXCLUDE_BEGIN,
                 Annotation.ANN_EXCLUDE_END, Annotation.ANN_CACHE_BEGIN_UPDATE,
-                Annotation.ANN_CACHE_END_UPDATE)
+                Annotation.ANN_CACHE_END_UPDATE, Annotation.ANN_LOOP,)
         # self.msg = msg[1:-1]
         self.msg = eval(msg)
         self.ann_kind = ann_kind

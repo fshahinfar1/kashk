@@ -290,7 +290,8 @@ class MyType:
         elif self.kind == clang.TypeKind.TYPEDEF:
             return self.under_type.mem_size
         else:
-            raise Exception('Does not know the size (unhandled case)?', self.kind)
+            error('Does not know the size (unhandled case)?', self.kind)
+            return 0
 
     def is_array(self):
         return self.kind == clang.TypeKind.CONSTANTARRAY
@@ -501,6 +502,7 @@ class Function(TypeDefinition):
         self.may_succeed = False
         self.calls_send = False
         self.calls_recv = False
+        self.complexity = 0
 
         self.path_ids = []
         self.last_arg_is_auto_gen = False
