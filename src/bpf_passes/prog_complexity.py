@@ -14,13 +14,12 @@ MODULE_TAG = '[Complexity]'
 
 
 def _get_repeat_from_for_loop(inst):
+    assert 0, 'This path is incomplete'
     cond = inst.cond.children[0]
-    show_insts([cond,])
     if cond.kind == clang.CursorKind.BINARY_OPERATOR and cond.op in ('<', '=', '>', '>=', '<='):
         lhs = cond.lhs.children[0]
         rhs = cond.rhs.children[0]
         const = lhs if isinstance(lhs, Literal) else (rhs if isinstance(rhs, Literal) else None)
-        print('here', const)
         if const is None:
             return None
         try:
@@ -63,13 +62,21 @@ class MeasureProgramComplexity(Pass):
 
     def process_current_inst(self, inst, more):
         info = self.info
-        if inst.kind in (clang.CursorKind.BINARY_OPERATOR, clang.CursorKind.UNARY_OPERATOR):
-            self.instruction_count += 1
+        if inst.kind == clang.CursorKind.UNARY_OPERATOR:
+            # One read, one operation, and one write
+            self.instruction_count += 3
+        elif inst.kind == clang.CursorKind.BINARY_OPERATOR:
+            self.instruction_count += 6
         elif inst.kind == clang.CursorKind.CALL_EXPR:
+            # Move each argument to the correct register
+            self.instruction_count += len(inst.args)
+            #
             func = inst.get_function_def()
             if func is not None and not func.is_empty():
                 if func.complexity:
                     self.instruction_count += func.complexity
+                    debug(MODULE_TAG, 'func:', func.name, 'inst:',
+                            func.complexity)
                 else:
                     with self.set_current_func(func):
                         count = self.do_measure(func.body)
@@ -86,19 +93,24 @@ class MeasureProgramComplexity(Pass):
                     except:
                         pass
                 if repeat:
-                    count = repeat
+                    # Prepare the source dest pointers (2)
+                    # In repeat: Copy (1)
+                    # In repeat: Check (1)
+                    count = repeat * 2 + 2
                     self.instruction_count += count
                 else:
                     error('could not determine the size of memcpy')
+                    assert 0, 'This path is dead for now'
             else:
                 error('We do not know the implementation of the function what should I do?', inst.name)
         elif inst.kind == clang.CursorKind.IF_STMT:
-            count_cond   = self.do_measure(inst.cond)
+            count_cond  = self.do_measure(inst.cond)
             count1 = self.do_measure(inst.body)
             count2 = self.do_measure(inst.other_body)
             self.instruction_count += count_cond
-            self.instruction_count += max(count1, count2)
-            print('if complexity:', count_cond + max(count1, count2))
+            # self.instruction_count += max(count1, count2)
+            # The constant is for jump
+            self.instruction_count += count1 + count2 + 1
             self.skip_children()
         elif inst.kind == clang.CursorKind.FOR_STMT:
             repeat = inst.repeat
@@ -110,10 +122,12 @@ class MeasureProgramComplexity(Pass):
                 tmp_cond_count = self.do_measure(inst.cond)
                 tmp_post_count = self.do_measure(inst.post)
                 tmp_body_count = self.do_measure(inst.body)
-                count = tmp_pre_count + repeat * (tmp_cond_count + tmp_post_count + tmp_body_count)
+                # The constant (2) is for comparing and then jump
+                count = tmp_pre_count + repeat * (tmp_cond_count
+                                             + tmp_post_count + tmp_body_count + 2)
                 text, _ = gen_code([inst,], info)
-                debug(text)
-                print('loop complexity:', count)
+                # debug(text)
+                # debug('loop complexity:', count)
                 self.instruction_count += count
             else:
                 debug('does not know the upper bound of the loop')
@@ -121,16 +135,19 @@ class MeasureProgramComplexity(Pass):
                 debug(text)
                 debug('-------------------------------------------')
             self.skip_children()
-        elif inst.kind in (clang.CursorKind.DO_STMT, clang.CursorKind.WHILE_STMT):
+        elif inst.kind in (clang.CursorKind.DO_STMT,
+                                clang.CursorKind.WHILE_STMT):
             debug('we do not expect the while statements')
         elif inst.kind == clang.CursorKind.DECL_REF_EXPR:
             self.instruction_count += 1
         elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
             self.instruction_count += 1 + len(inst.owner)
         elif inst.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
+            self.instruction_count += 3
+        elif inst.kind in (clang.CursorKind.CSTYLE_CAST_EXPR, clang.CursorKind.VAR_DECL, clang.CursorKind.PAREN_EXPR):
+            pass
+        else:
             self.instruction_count += 1
-        # else:
-            # debug('do not know', inst.kind)
         # Do not remove any instruction
         return inst
 

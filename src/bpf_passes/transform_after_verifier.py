@@ -62,8 +62,36 @@ def _known_function_substitution(inst, info):
     """
     Replace some famous functions with implementations that work in BPF
     """
-    if inst.name in ('strlen', 'strncmp'):
+    if inst.name in ('strlen',):
         new_name = 'bpf_' + inst.name
+        return _rename_func_to_a_known_one(inst, info, new_name)
+    elif inst.name == 'strncmp':
+        prerequisite = Literal('''struct my_bpf_strncmp_loop_ctx {
+  int i;
+  char *str1;
+  char *str2;
+  unsigned short len;
+  int ret;
+};
+
+static long
+my_bpf_strncmp_loop(unsigned int index, void *arg)
+{
+  struct my_bpf_strncmp_loop_ctx *ll = arg;
+  if (ll->i == ll->len) {
+    ll->ret = 0;
+    return 1;
+  }
+  if (ll->str1[ll->i] != ll->str2[ll->i] || ll->str1[ll->i] == '\\0') {
+    ll->ret = (ll->str1[ll->i] - ll->str2[ll->i]);
+    return 1;
+  }
+  return 0;
+}
+''', CODE_LITERAL)
+        if not Function.directory['my_bpf_strncmp'].is_used_in_bpf_code:
+            info.prog.add_declaration(prerequisite)
+        new_name = 'my_bpf_' + inst.name
         return _rename_func_to_a_known_one(inst, info, new_name)
     elif inst.name == 'strncpy':
         assert len(inst.args) == 3, 'Assumption on the number of arguments'
@@ -115,6 +143,32 @@ def _known_function_substitution(inst, info):
         if is_constant:
             # No change is needed the builtin memcpy would work
             return inst
+
+        prerequisite = Literal('''struct bpf_memcpy_ctx {
+  unsigned short i;
+  char *dest;
+  char *src;
+  unsigned short n;
+  void *end_dest;
+  void *end_src;
+};
+
+static long
+bpf_memcpy_loop(unsigned int index, void *arg)
+{
+  struct bpf_memcpy_ctx *ll = arg;
+  if ((void *)(ll->dest + ll->i + 1) > ll->end_dest)
+    return 1;
+  if ((void *)(ll->src  + ll->i + 1) > ll->end_src)
+    return 1;
+  ll->dest[ll->i] = ll->src[ll->i];
+  if (ll->i >= ll->n - 1) {
+    return 1;
+  }
+  ll->i++;
+}''', CODE_LITERAL)
+        if not Function.directory['bpf_memcpy'].is_used_in_bpf_code:
+            info.prog.add_declaration(prerequisite)
 
         src = inst.args[0]
         dest = inst.args[1]

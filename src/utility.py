@@ -175,7 +175,7 @@ def generate_struct_with_fields(name, fields):
     fields: an array of type StateObject
     """
     body = indent('\n'.join([f.get_c_code() for f in fields]), 1)
-    struct = f'struct {name} {{\n' + body + '\n}'
+    struct = f'struct {name} {{\n{body}\n}};'
     return struct
 
 

@@ -264,7 +264,7 @@ for (unsigned short i = 0; i < 256; i++) {
     _declare_func(info, func_name, args, return_type, code, 1792)
 
     # STRNCMP
-    func_name = 'bpf_strncmp'
+    func_name = 'my_bpf_strncmp'
     count_args = 3
     args = [StateObject(None) for i in range(count_args)]
     args[0].name = 'str1'
@@ -275,17 +275,28 @@ for (unsigned short i = 0; i < 256; i++) {
     args[2].type_ref = BASE_TYPES[clang.TypeKind.USHORT]
     return_type = BASE_TYPES[clang.TypeKind.INT]
     code = '''
-int i;
-for(i = 0; i < 256; (i)++) {
-  if (i == len) {
-    return (0);
-  }
-  if (str1[i] != str2[i] || str1[i] == '\\0') {
-    return (str1[i] - str2[i]);
-  }
-}
-return (-(10000));
+struct my_bpf_strncmp_loop_ctx ll = {
+  .i = 0,
+  .str1 = str1,
+  .str2 = str2,
+  .len = len,
+  .ret = -(10000),
+};
+bpf_loop(256, my_bpf_strncmp_loop, &ll, 0);
+return ll.ret;
 '''
+    # code = '''
+# int i;
+# for(i = 0; i < 256; (i)++) {
+  # if (i == len) {
+    # return (0);
+  # }
+  # if (str1[i] != str2[i] || str1[i] == '\\0') {
+    # return (str1[i] - str2[i]);
+  # }
+# }
+# return (-(10000));
+# '''
     _declare_func(info, func_name, args, return_type, code, 1024)
 
     # FNV_HASH
@@ -317,15 +328,26 @@ return 0;
     args[4].name = 'end_src'
     args[4].type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
     return_type = BASE_TYPES[clang.TypeKind.VOID]
-    code = '''
-if (n == 0) return;
-for (unsigned short i = 0; i < 256; i++) {
-  if ((void *)(dest + i + 1) > end_dest) break;
-  if ((void *)(src  + i + 1) > end_src ) break;
-  dest[i] = src[i];
-  if (i >= n - 1) {
-    break;
-  }
-}
-'''
+    code = '''if (n == 0) return;
+struct bpf_memcpy_ctx ll = {
+  .i = 0,
+  .dest = dest,
+  .src = src,
+  .n = n,
+  .end_dest = end_dest,
+  .end_src = end_src,
+};
+bpf_loop(256, bpf_memcpy_loop, &ll, 0);'''
+
+    # code = '''
+# if (n == 0) return;
+# for (unsigned short i = 0; i < 256; i++) {
+  # if ((void *)(dest + i + 1) > end_dest) break;
+  # if ((void *)(src  + i + 1) > end_src ) break;
+  # dest[i] = src[i];
+  # if (i >= n - 1) {
+    # break;
+  # }
+# }
+# '''
     _declare_func(info, func_name, args, return_type, code, 2560)

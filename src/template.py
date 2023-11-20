@@ -101,16 +101,6 @@ def bpf_ctx_bound_check_bytes(ref, size, data_end, return_value=None):
     #     '}\n'])
 
 
-def memcpy_internal_defs():
-    return '''#ifndef memcpy
-#define memcpy(d, s, len) __builtin_memcpy(d, s, len)
-#endif
-
-#ifndef memmove
-#define memmove(d, s, len) __builtin_memmove(d, s, len)
-#endif'''
-
-
 def license_text(license):
     return f'char _license[] SEC("license") = "{license}";'
 
@@ -180,8 +170,7 @@ def define_bpf_map(map_name, map_type, key_type, val_type, entries):
   __type(key,   {key_type});
   __type(value, {val_type});
   __uint(max_entries, {entries});
-}} {map_name} SEC(".maps")
-''', CODE_LITERAL)
+}} {map_name} SEC(".maps");''', CODE_LITERAL)
 
 
 def define_bpf_arr_map(map_name, val_type, entries):

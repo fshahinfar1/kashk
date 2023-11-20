@@ -11,7 +11,23 @@ MODULE_TAG = '[BPF Prog]'
 
 class BPF_PROG:
     def __init__(self):
-        self.declarations = [Literal(' #define PKT_OFFSET_MASK 0xfff;', CODE_LITERAL),]
+        self.declarations = [
+                Literal('''#ifndef memcpy
+#define memcpy(d, s, len) __builtin_memcpy(d, s, len)
+#endif
+
+#ifndef memmove
+#define memmove(d, s, len) __builtin_memmove(d, s, len)
+#endif''', CODE_LITERAL),
+                Literal('typedef char bool;', CODE_LITERAL),
+                Literal('#define PKT_OFFSET_MASK 0xfff', CODE_LITERAL),
+                Literal('''#ifndef bpf_loop
+static long (*bpf_loop)(__u32 nr_loops, void *callback_fn, void *callback_ctx, __u64 flags) = (void *) 181;
+#endif
+#ifndef bpf_strncmp
+static long (*bpf_strncmp)(const char *s1, __u32 s1_sz, const char *s2) = (void *) 182;
+#endif''', CODE_LITERAL),
+                ]
         self.headers = [
                 '#include <linux/bpf.h>',
                 '#include <bpf/bpf_helpers.h>',
@@ -91,6 +107,30 @@ class BPF_PROG:
             if not func.is_used_in_bpf_code:
                 func.is_used_in_bpf_code = True
                 info.prog.declarations.insert(0, func)
+                prerequisite = Literal('''struct bpf_memcpy_ctx {
+  unsigned short i;
+  char *dest;
+  char *src;
+  unsigned short n;
+  void *end_dest;
+  void *end_src;
+};
+
+static long
+bpf_memcpy_loop(unsigned int index, void *arg)
+{
+  struct bpf_memcpy_ctx *ll = arg;
+  if ((void *)(ll->dest + ll->i + 1) > ll->end_dest)
+    return 1;
+  if ((void *)(ll->src  + ll->i + 1) > ll->end_src)
+    return 1;
+  ll->dest[ll->i] = ll->src[ll->i];
+  if (ll->i >= ll->n - 1) {
+    return 1;
+  }
+  ll->i++;
+}''', CODE_LITERAL)
+                info.prog.add_declaration(prerequisite)
 
         inst = self.adjust_pkt(write_size, info)
         if do_copy:

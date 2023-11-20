@@ -5,7 +5,7 @@ from instruction import *
 from utility import (indent, INDENT, report_on_cursor)
 from prune import READ_PACKET, WRITE_PACKET
 
-from template import (memcpy_internal_defs, license_text, shared_map_decl)
+from template import (license_text, shared_map_decl)
 
 MODULE_TAG = '[BPF Code Gen]'
 
@@ -359,8 +359,7 @@ def gen_code(list_instructions, info, context=BODY):
             if not text:
                 # We do not want this definition
                 continue
-            if isinstance(inst, Record):
-                text += ';\n'
+            text += '\n\n'
         else:
             # Some special rules
             if inst.kind == clang.CursorKind.CALL_EXPR and inst.name == 'operator<<':
@@ -382,9 +381,10 @@ def gen_code(list_instructions, info, context=BODY):
                 elif inst.kind in GOTO_NEXT_LINE:
                     text += '\n'
             elif context == DEF:
-                text += ';\n'
-
-
+                if inst.kind != CODE_LITERAL:
+                    text += ';\n'
+                else:
+                    text += '\n'
         code.append(text)
     text = ''.join(code)
     return text, modified
@@ -414,11 +414,11 @@ def __generate_code_type_definition(inst, info):
             # debug('out of',inst.name, 'scope')
 
         body = indent(body)
-        text = f'static inline\n{inst.return_type.spelling} {inst.name} ({text_args}) {{\n{body}\n}}\n\n'
+        text = f'static inline\n{inst.return_type.spelling} {inst.name} ({text_args}) {{\n{body}\n}}'
         return text
     else:
         text = inst.get_c_code()
-        return '\n\n' + text
+        return text
 
 
 def __generate_global_shared_state(info):
@@ -434,9 +434,11 @@ def __generate_global_shared_state(info):
     if fields:
         shared_state = Record('shared_state', fields)
         shared_state_struct_decl = (
-                '\n/* The globaly shared state is in this structure */\n'
-                + shared_state.get_c_code() + ';\n\n'
-                + shared_map_decl() + '\n'
+                '/* The globaly shared state is in this structure */\n'
+                + shared_state.get_c_code()
+                + '\n'
+                + shared_map_decl()
+                + '\n'
                 )
     else:
         shared_state_struct_decl = ''
@@ -461,12 +463,12 @@ def generate_bpf_prog(info):
 
     func_decs = __sort_by_function_depandancy(func_decs)
     func_declarations, _ = gen_code(func_decs, info, context=ARG)
-    declarations = (non_func_declarations + '\n' + func_declarations)
+    declarations = (non_func_declarations + func_declarations)
 
     bpf_code = info.prog.gen_code(info)
     code = ([]
             + info.prog.headers
-            + ['typedef char bool;', memcpy_internal_defs()]
+            + ['']
             + [declarations]
             + ['']
             + [bpf_code]
