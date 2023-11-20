@@ -93,6 +93,14 @@ class CodeBlockRef:
 
 class StateObject:
     __slots__ = ('cursor', 'name', 'kind', 'type_ref')
+    @classmethod
+    def build(cls, name, T):
+        obj = StateObject(None)
+        obj.name = name
+        obj.type_ref = T
+        obj.kind = T.kind
+        return obj
+
     def __init__(self, c):
         if c:
             self.cursor = c
@@ -421,6 +429,10 @@ class Record(TypeDefinition):
         #     raise Exception('Unexpected error')
         Record.directory[self.name] = self
 
+    @property
+    def type(self):
+        return MyType.make_simple(self.get_name(), clang.TypeKind.RECORD)
+
     def get_c_code(self):
         return generate_struct_with_fields(self.name, self.fields)
 
@@ -557,6 +569,20 @@ class Function(TypeDefinition):
 
     def get_arguments(self):
         return list(self.args)
+
+    def update_symbol_table(self, sym_tbl):
+        scope_key = self.name
+        if scope_key in sym_tbl.scope_mapping:
+            debug('The function scope alread exists!')
+        T = self.return_type
+        sym_tbl.insert_entry(scope_key, T, clang.CursorKind.FUNCTION_DECL, None)
+        with sym_tbl.new_scope() as scope:
+            sym_tbl.scope_mapping[scope_key] = scope
+            e = sym_tbl.insert_entry('__func__', T, clang.CursorKind.FUNCTION_DECL, None)
+            e.name = self.name
+            # Add function parameters to the scope
+            for arg in self.args:
+                e = sym_tbl.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
 
 
 BASE_TYPES = {}

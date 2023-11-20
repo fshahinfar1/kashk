@@ -10,6 +10,7 @@ CODE_LITERAL = 8081
 BLOCK_OF_CODE = 8082
 TO_USERSPACE_INST = 8083
 ANNOTATION_INST = 8084
+PAIR_INST = 8085
 
 BODY = 0
 ARG = 1
@@ -106,6 +107,55 @@ class Instruction:
         return self.__str__()
 
 
+# class Pair(Instruction):
+#     def __init__(self, name, value):
+#         super().__init__()
+#         self.name = name
+#         self.value = value
+#         self.kind = PAIR_INST
+
+#     def has_children(self):
+#         return False
+
+#     def get_children(self):
+#         return []
+
+#     def get_children_context_marked(self):
+#         return []
+
+
+# class StructInit(Instruction):
+#     def __init__(self):
+#         super().__init__()
+#         # mapping (str --> Instruction) , field name --> Value
+#         self.fields = {}
+#         self.kind = clang.CursorKind.COMPOUND_LITERAL_EXPR
+
+#     def add(self, field_name, field_value):
+#         assert isinstance(field_value, Instruction)
+#         assert isinstance(field_name, str)
+#         self.fields[field_name] = field_value
+
+#     def has_children(self):
+#         return len(self.fields.keys()) > 0
+
+#     def get_children(self):
+#         children = []
+#         for k, v in self.fields.items():
+#             children.append(Pair(k, v))
+#         return children
+
+#     def get_children_context_marked(self):
+#         count = len(self.fields.keys())
+#         tag = [ARG] * count
+#         return list(zip(self.fields.values() ,tag))
+
+#     def clone(self, children)
+#         new 
+#         new.bpf_ignore = self.bpf_ignore
+#         new.change_applied = self.change_applied
+
+
 class Return(Instruction):
     @classmethod
     def build(cls, values):
@@ -130,6 +180,8 @@ class Return(Instruction):
     def clone(self, children):
         new = Return()
         new.body  = children[0]
+        new.bpf_ignore = self.bpf_ignore
+        new.change_applied = self.change_applied
         return new
 
 
@@ -216,7 +268,6 @@ class Call(Instruction):
         new.is_method = self.is_method
         new.is_operator = self.is_operator
         new.bpf_ignore = self.bpf_ignore
-        new.change_applied = self.change_applied
         new.rd_buf = self.rd_buf
         new.wr_buf = self.wr_buf
         new.change_applied = self.change_applied
@@ -654,7 +705,7 @@ class Ref(Instruction):
         return f'<Ref {self.name}>'
 
     def is_func_ptr(self):
-        return self.type.kind == clang.TypeKind.FUNCTIONPROTO
+        return self.type.is_func_ptr()
 
     def is_member(self):
         return self.kind == clang.CursorKind.MEMBER_REF_EXPR

@@ -5,23 +5,27 @@ from passes.pass_obj import PassObject
 from passes.clone import clone_pass
 
 class Pass:
+    __slots__ = ('current_function', 'visited_functions', 'cb_ref', 'info',
+            'result', '_may_remove', '_skip_children')
     @classmethod
     def do(cls, inst, info, more=None, func=None):
         obj = cls.__new__(cls)
         obj.__init__(info)
+        res = None
         with obj.set_current_func(func):
             if more is None:
                 more = PassObject()
-            obj.do_pass(inst, more)
+            res = obj.do_pass(inst, more)
+        obj.result = res
         return obj
 
     def __init__(self, info):
-        self.module_tag = '[Not Set]'
         self.current_function = None
         self.visited_functions = set()
         self.cb_ref = CodeBlockRef()
         self.info = info
-        self._may_remove = True
+        self.result = None
+        self._may_remove = False
         self._skip_children = False
 
     @contextmanager

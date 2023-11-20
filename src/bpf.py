@@ -41,7 +41,10 @@ static long (*bpf_strncmp)(const char *s1, __u32 s1_sz, const char *s2) = (void 
         self.ctx = 'ctx'
         self.ctx_type = MyType()
         self.server_config = ('127.0.0.1', '8080')
-        self.index_mask = Literal('PKT_OFFSET_MASK', clang.CursorKind.MACRO_INSTANTIATION)
+        self.index_mask = Literal('PKT_OFFSET_MASK',
+                clang.CursorKind.MACRO_INSTANTIATION)
+        self.max_loop_iteration = Literal('256',
+                clang.CursorKind.INTEGER_LITERAL)
 
     def get_ctx_ref(self):
         return Ref.build(self.ctx, self.ctx_type)
@@ -90,9 +93,13 @@ static long (*bpf_strncmp)(const char *s1, __u32 s1_sz, const char *s2) = (void 
         T = self.ctx_type
         xdp_entry = scope.insert_entry(self.ctx, T, clang.CursorKind.PARM_DECL, None)
         xdp_entry.is_bpf_ctx = True
-        entry = xdp_entry.fields.insert_entry('data', BASE_TYPES[clang.TypeKind.UINT], clang.CursorKind.MEMBER_REF_EXPR, None)
+        entry = xdp_entry.fields.insert_entry('data',
+                BASE_TYPES[clang.TypeKind.UINT],
+                clang.CursorKind.MEMBER_REF_EXPR, None)
         entry.is_bpf_ctx = True
-        entry = xdp_entry.fields.insert_entry('data_end', BASE_TYPES[clang.TypeKind.UINT], clang.CursorKind.MEMBER_REF_EXPR, None)
+        entry = xdp_entry.fields.insert_entry('data_end',
+                BASE_TYPES[clang.TypeKind.UINT],
+                clang.CursorKind.MEMBER_REF_EXPR, None)
         entry.is_bpf_ctx = True
 
     def send(self, buf, write_size, info, failure_return, ret=True, do_copy=True):

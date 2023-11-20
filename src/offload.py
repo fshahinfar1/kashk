@@ -33,6 +33,7 @@ from bpf_passes.transform_after_verifier import transform_func_after_verifier
 from bpf_passes.reduce_params import reduce_params_pass
 from bpf_passes.remove_everything_not_used import remove_everything_not_used
 from bpf_passes.prog_complexity import mitiage_program_comlexity
+from bpf_passes.change_bpf_loop import change_to_bpf_loop
 
 from user_passes.select_user import select_user_pass
 from user_passes.number_fallback_graph import number_fallback_graph_pass
@@ -364,6 +365,10 @@ def gen_bpf_code(bpf, info, out_bpf):
 
     debug('[2nd] remove everything that is not used in BPF')
     remove_everything_not_used(bpf, info, None)
+    debug('~~~~~~~~~~~~~~~~~~~~~')
+
+    debug('Change loop to bpf_loop')
+    bpf = change_to_bpf_loop(bpf, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
     debug('Program Complexity Pass')
