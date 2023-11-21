@@ -446,9 +446,36 @@ def __generate_global_shared_state(info):
 
 
 def __sort_by_function_depandancy(funcs):
+    def _calc_rank(func, visited, table):
+        if func.name in visited:
+            return
+        visited.add(func.name)
+        assert func.__rank == -1
+        func.__rank = 1
+        if len(func.function_dependancy) == 0:
+            # Base case
+            return
+        for dep_name in func.function_dependancy:
+            if dep_name not in table:
+                continue
+            dep_func = table[dep_name]
+            if dep_func.__rank == -1:
+                _calc_rank(dep_func, visited, table)
+            func.__rank += dep_func.__rank
+
+
+
     # TODO: the sorting should consider the graph of dependancy not the number
     # of functions.
     new = sorted(funcs, key=lambda x: len(x.function_dependancy))
+    table = {}
+    for f in new:
+        f.__rank = -1
+        table[f.name] = f
+    visited = set()
+    for f in new:
+        _calc_rank(f, visited, table)
+    new.sort(key=lambda f: f.__rank)
     return new
 
 
