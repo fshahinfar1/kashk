@@ -680,7 +680,7 @@ class Ref(Instruction):
         return ref
 
     @classmethod
-    def build(cls, name, T, is_member = False):
+    def build(cls, name, T, is_member=False):
         kind = clang.CursorKind.MEMBER_REF_EXPR if is_member else clang.CursorKind.DECL_REF_EXPR
         ref = Ref(None, kind)
         ref.name = name
@@ -739,6 +739,11 @@ class Ref(Instruction):
                 error(info.sym_tbl.scope_mapping)
             struct_scope = info.sym_tbl.scope_mapping[key]
             sym = struct_scope.lookup(name)
+            if sym is None:
+                error('Failed to find the field in the struct! field name:', name)
+                debug('debug info:')
+                debug(struct_scope.symbols)
+                debug('-------------------')
             assert sym is not None
             ref.type = sym.type
             assert isinstance(ref.type, MyType)

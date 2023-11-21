@@ -8,9 +8,11 @@ class Pass:
     __slots__ = ('current_function', 'visited_functions', 'cb_ref', 'info',
             'result', '_may_remove', '_skip_children')
     @classmethod
-    def do(cls, inst, info, more=None, func=None):
+    def do(cls, inst, info, more=None, func=None, **kwargs):
         obj = cls.__new__(cls)
         obj.__init__(info)
+        for k, v in kwargs.items():
+            setattr(obj, k, v)
         res = None
         with obj.set_current_func(func):
             if more is None:
@@ -61,13 +63,13 @@ class Pass:
         new_children = []
         with self.cb_ref.new_ref(ctx, parent_list):
             inst = self.process_current_inst(inst, more)
+            if inst is None:
+                assert self._may_remove, 'This pass is not allowed to remove instructions'
+                return None
             if self._skip_children:
                 self._skip_children = False
                 new_inst = clone_pass(inst, info, PassObject())
                 return new_inst
-            if inst is None:
-                assert self._may_remove, 'This pass is not allowed to remove instructions'
-                return None
             # Continue deeper
             for child, tag in inst.get_children_context_marked():
                 if isinstance(child, list):

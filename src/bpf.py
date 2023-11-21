@@ -136,6 +136,7 @@ bpf_memcpy_loop(unsigned int index, void *arg)
     return 1;
   }
   ll->i++;
+  return 0;
 }''', CODE_LITERAL)
                 info.prog.add_declaration(prerequisite)
 

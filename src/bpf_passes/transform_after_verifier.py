@@ -166,6 +166,7 @@ bpf_memcpy_loop(unsigned int index, void *arg)
     return 1;
   }
   ll->i++;
+  return 0;
 }''', CODE_LITERAL)
         if not Function.directory['bpf_memcpy'].is_used_in_bpf_code:
             info.prog.add_declaration(prerequisite)
