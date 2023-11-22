@@ -294,8 +294,12 @@ class BPFLoopPass(Pass):
                 blk.append(assingnment)
 
     def _should_transform_loop(self, inst):
-        if inst.repeat > 32:
-            return True
+        # TODO: The BPF helper function bpf_loop has some verification bugs
+        # which are very annoying. Although it is nice to use it, due to this
+        # issue, I am avoiding it.
+
+        # if inst.repeat > 32:
+        #     return True
         return False
 
     def process_current_inst(self, inst, more):
