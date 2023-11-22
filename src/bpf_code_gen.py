@@ -414,7 +414,10 @@ def __generate_code_type_definition(inst, info):
             # debug('out of',inst.name, 'scope')
 
         body = indent(body)
-        text = f'static inline\n{inst.return_type.spelling} {inst.name} ({text_args}) {{\n{body}\n}}'
+        before = f'{inst.attributes}'
+        if before:
+            before += '\n'
+        text = f'{before}{inst.return_type.spelling} {inst.name} ({text_args}) {{\n{body}\n}}'
         return text
     else:
         text = inst.get_c_code()

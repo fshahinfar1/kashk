@@ -2,8 +2,15 @@
 set -e
 set -x
 
-CC=clang
-LLC=llc
+# CC=clang
+# LLC=llc
+
+CC=clang-16
+LLC=llc-16
+
+# CC=/home/farbod/clang/clang+llvm-17.0.5-x86_64-linux-gnu-ubuntu-22.04/bin/clang
+# LLC=/home/farbod/clang/clang+llvm-17.0.5-x86_64-linux-gnu-ubuntu-22.04/bin/llc
+
 OUTPUT_DIR_BPF=/tmp
 LL_FILE="$OUTPUT_DIR_BPF/bpf.ll"
 

@@ -530,6 +530,8 @@ class Function(TypeDefinition):
             raise Exception(f'Function is already defined ({self.name})')
         directory[self.name] = self
 
+        self.attributes = 'static inline'
+
     @property
     def body(self):
         if callable(self._body):

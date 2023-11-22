@@ -14,7 +14,7 @@ LOG_FILE=./test_log.txt
 rm $BINARY
 rm $LOG_FILE
 
-bash $COMPILE_SCRIPT $SOURCE $BINARY &> /dev/null
+bash $COMPILE_SCRIPT $SOURCE $BINARY 2>&1 | tee -a $LOG_FILE &> /dev/null
 RETCODE=$?
 # echo compile return code $RETCODE
 if [ $RETCODE -ne 0 ]; then
@@ -22,17 +22,21 @@ if [ $RETCODE -ne 0 ]; then
 	exit 1
 fi
 
-bash $LOAD_SCRIPT $BINARY &> $LOG_FILE
+echo 'LINKER ----------------' | tee -a $LOG_FILE &> /dev/null
+bash $LOAD_SCRIPT $BINARY 2>&1 | tee -a $LOG_FILE &> /dev/null
 RETCODE=$?
 # echo load return code $RETCODE
 if [ $RETCODE -eq 255 ]; then
-	grep "!read_ok" $LOG_FILE &> /dev/null
-	RETCODE=$?
-	# echo grep return code $RETCODE
-	if [ $RETCODE -ne 0 ]; then
-		# The error changed not interesting
-		exit 1
-	fi
+	phrases=( "!read_ok" "; shared = bpf_map_lookup_elem(&shared_map, &zero);" )
+	for p in ${phrases[@]}; do
+		grep $p $LOG_FILE &> /dev/null
+		RETCODE=$?
+		# echo grep return code $RETCODE
+		if [ $RETCODE -ne 0 ]; then
+			# The error changed not interesting
+			exit 1
+		fi
+	done
 	exit 0
 fi
 # Not interesting anymore

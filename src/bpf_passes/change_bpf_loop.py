@@ -202,6 +202,7 @@ def _define_loop_func(for_inst, ctx_struct, loop_name, info):
     func.body.children = body
     # Add function to symbol table
     func.is_used_in_bpf_code = True
+    func.attributes = 'static'
     info.prog.declarations.insert(0, func)
     func.update_symbol_table(info.sym_tbl)
     # Apply transformation needed for instruction on the body of this function
@@ -292,13 +293,21 @@ class BPFLoopPass(Pass):
                 assingnment = BinOp.build(lhs, '=', rhs)
                 blk.append(assingnment)
 
+    def _should_transform_loop(self, inst):
+        if inst.repeat > 32:
+            return True
+        return False
+
     def process_current_inst(self, inst, more):
         info = self.info
         if inst.kind == clang.CursorKind.FOR_STMT:
-            self._process_for_loop(inst, more)
-            self.skip_children()
-            # Remove the for loop
-            return None
+            if self._should_transform_loop(inst):
+                self._process_for_loop(inst, more)
+                self.skip_children()
+                # Remove the for loop
+                return None
+            else:
+                return inst
         return inst
 
 def change_to_bpf_loop(bpf, info, more):

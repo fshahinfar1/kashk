@@ -117,23 +117,34 @@ def shared_map_decl():
 
 def prepare_shared_state_var(ret_val=None):
     NULL = Literal('NULL', clang.CursorKind.MACRO_INSTANTIATION)
-    shared_struct = MyType.make_simple('struct shared_state', clang.TypeKind.RECORD)
+    ZERO = Literal('0', clang.CursorKind.INTEGER_LITERAL)
+    SHARED_MAP_PTR = Literal('&shared_map', CODE_LITERAL)
+
+    shared_struct = MyType.make_simple('struct shared_state',
+            clang.TypeKind.RECORD)
     T = MyType.make_pointer(shared_struct)
     var_decl = VarDecl.build('shared',T)
     var_decl.init.add_inst(NULL)
-    tmp_text = '''{
-  int zero = 0;
-  shared = bpf_map_lookup_elem(&shared_map, &zero);
-}'''
-    lookup = Literal(tmp_text, CODE_LITERAL)
+    var_ref = var_decl.get_ref()
 
-    shared_ref = var_decl.get_ref()
-    cond  = BinOp.build(shared_ref, '==', NULL)
+    zero_decl = VarDecl.build(get_tmp_var_name(),
+            BASE_TYPES[clang.TypeKind.INT])
+    zero_decl.init.add_inst(ZERO)
+    zero_ref = zero_decl.get_ref()
+    zero_ptr = UnaryOp('&', zero_ref)
+
+    call_lookup = Call(None)
+    call.name = 'bpf_map_lookup_elem'
+    call.args = [SHARED_MAP_PTR, zero_ptr]
+
+    lookup_assign = BinOp.build(var_ref, '=', call)
+
+    cond  = BinOp.build(var_ref, '==', NULL)
     check = ControlFlowInst.build_if_inst(cond)
     if ret_val is None:
         ret_val = Return.build([])
     check.body.add_inst(ret_val)
-    insts = [var_decl, lookup, check]
+    insts = [var_decl, zero_decl, lookup_assign,  check]
     return insts
 
 
