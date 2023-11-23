@@ -9,7 +9,8 @@ from passes.pass_obj import PassObject
 
 
 RETURN_FIELD_POISON = '999'
-RETURN_FIELD_NAME = '__loop_ret'
+RETURN_FIELD_FLAG_NAME = '__loop_ret_flag'
+RETURN_FIELD_VAL_NAME = '__loop_ret_val'
 
 ZERO = Literal('0', clang.CursorKind.INTEGER_LITERAL)
 ONE  = Literal('1', clang.CursorKind.INTEGER_LITERAL)
@@ -56,15 +57,18 @@ class _ConverLoopFuncInst(Pass):
             if hasattr(inst, '_this_is_new'):
                 # TODO: this is a hack to ignore the return instruction I generated my self.
                 return inst
-            # store return value on the map and break
             blk = self.cb_ref.get(BODY)
-            lhs = self.ctx_ref.get_ref_field(RETURN_FIELD_NAME, self.info)
+            # set the return flag
+            lhs = self.ctx_ref.get_ref_field(RETURN_FIELD_FLAG_NAME, self.info)
+            rhs = ONE
+            set_flag = BinOp.build(lhs, '=', rhs)
+            blk.append(set_flag)
+            # store return value on the map and break
+            lhs = self.ctx_ref.get_ref_field(RETURN_FIELD_VAL_NAME, self.info)
             rhs = inst.body.children[0]
-            # TODO: rhs needs to be processed by the transformation pass!
             obj = _ConverLoopFuncInst.do(rhs, self.info,
                     names_on_struct=self.names_on_struct, ctx_ref=self.ctx_ref)
             rhs = obj.result
-            # -----------------------------------------
             assign = BinOp.build(lhs, '=', rhs)
             blk.append(assign)
             ret = Return.build([ONE,])
@@ -133,7 +137,10 @@ def _define_type_for_passing_state(inst, loop_name, ret_type):
     # does the for loop return
     ret_list = find_elems_of_kind(inst.body, clang.CursorKind.RETURN_STMT)
     if len(ret_list) > 0:
-        ret_ref = Ref.build(RETURN_FIELD_NAME, ret_type)
+        ret_ref = Ref.build(RETURN_FIELD_FLAG_NAME,
+                BASE_TYPES[clang.TypeKind.UCHAR])
+        unique_refs.append(ret_ref)
+        ret_ref = Ref.build(RETURN_FIELD_VAL_NAME, ret_type)
         unique_refs.append(ret_ref)
 
     type_name = loop_name + '_ctx'
@@ -246,8 +253,8 @@ class BPFLoopPass(Pass):
         ctx_ref = var_decl.get_ref()
         initialization = []
         for field in struct.fields:
-            if field.name == RETURN_FIELD_NAME:
-                line = f'.{field.name} = ({field.type_ref.spelling}){RETURN_FIELD_POISON}'
+            if field.name in (RETURN_FIELD_FLAG_NAME, RETURN_FIELD_VAL_NAME):
+                line = f'.{field.name} = ({field.type_ref.spelling})0'
             else:
                 line = f'.{field.name} = {field.name}'
             initialization.append(line)
@@ -273,13 +280,18 @@ class BPFLoopPass(Pass):
         for field in struct.fields:
             # TODO: only values that have actually changed
             # Check if the variable gets out of scope?
-            if field.name == RETURN_FIELD_NAME:
+            if field.name == RETURN_FIELD_VAL_NAME:
+                continue
+            if field.name == RETURN_FIELD_FLAG_NAME:
                 lhs = ctx_ref.get_ref_field(field.name, self.info)
-                rhs = Literal(RETURN_FIELD_POISON, clang.CursorKind.INTEGER_LITERAL)
-                rhs_cast = Cast.build(rhs, lhs.type)
-                cond = BinOp.build(lhs, '!=', rhs_cast)
+                # rhs = Literal(RETURN_FIELD_POISON, clang.CursorKind.INTEGER_LITERAL)
+                # rhs_cast = Cast.build(rhs, lhs.type)
+                # cond = BinOp.build(lhs, '!=', rhs_cast)
+                rhs = ZERO
+                cond = BinOp.build(lhs, '!=', rhs)
                 check = ControlFlowInst.build_if_inst(cond)
-                ret = Return.build([lhs,])
+                ret_ref = ctx_ref.get_ref_field(RETURN_FIELD_VAL_NAME, self.info)
+                ret = Return.build([ret_ref,])
                 check.body.add_inst(ret)
                 blk.append(check)
             else:
@@ -298,8 +310,8 @@ class BPFLoopPass(Pass):
         # which are very annoying. Although it is nice to use it, due to this
         # issue, I am avoiding it.
 
-        # if inst.repeat > 32:
-        #     return True
+        if inst.repeat > 32:
+            return True
         return False
 
     def process_current_inst(self, inst, more):
