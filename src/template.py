@@ -131,13 +131,13 @@ def prepare_shared_state_var(ret_val=None):
             BASE_TYPES[clang.TypeKind.INT])
     zero_decl.init.add_inst(ZERO)
     zero_ref = zero_decl.get_ref()
-    zero_ptr = UnaryOp('&', zero_ref)
+    zero_ptr = UnaryOp.build('&', zero_ref)
 
     call_lookup = Call(None)
-    call.name = 'bpf_map_lookup_elem'
-    call.args = [SHARED_MAP_PTR, zero_ptr]
+    call_lookup.name = 'bpf_map_lookup_elem'
+    call_lookup.args = [SHARED_MAP_PTR, zero_ptr]
 
-    lookup_assign = BinOp.build(var_ref, '=', call)
+    lookup_assign = BinOp.build(var_ref, '=', call_lookup)
 
     cond  = BinOp.build(var_ref, '==', NULL)
     check = ControlFlowInst.build_if_inst(cond)

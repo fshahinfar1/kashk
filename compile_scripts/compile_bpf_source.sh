@@ -2,11 +2,11 @@
 set -e
 set -x
 
-CC=clang
-LLC=llc
+# CC=clang
+# LLC=llc
 
-# CC=clang-16
-# LLC=llc-16
+CC=clang-16
+LLC=llc-16
 
 # CC=/home/farbod/clang/clang+llvm-17.0.5-x86_64-linux-gnu-ubuntu-22.04/bin/clang
 # LLC=/home/farbod/clang/clang+llvm-17.0.5-x86_64-linux-gnu-ubuntu-22.04/bin/llc
@@ -21,6 +21,9 @@ else
 	BINARY="$OUTPUT_DIR_BPF/bpf.o"
 fi
 
+$CC --version
+
+
 $CC $INCLUDES \
 	-target bpf \
 	-S \
@@ -32,4 +35,4 @@ $CC $INCLUDES \
 	-Wno-unused-value -Wno-pointer-sign \
 	-Wno-compare-distinct-pointer-types \
 	-O2 -g -emit-llvm -c $SOURCE -o $LL_FILE
-$LLC -mcpu=probe -march=bpf -filetype=obj -o $BINARY $LL_FILE
+$LLC -mcpu=v3 -march=bpf -filetype=obj -o $BINARY $LL_FILE
