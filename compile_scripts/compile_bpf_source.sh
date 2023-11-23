@@ -23,7 +23,6 @@ fi
 
 $CC --version
 
-
 $CC $INCLUDES \
 	-target bpf \
 	-S \
