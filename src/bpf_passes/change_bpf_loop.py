@@ -310,8 +310,8 @@ class BPFLoopPass(Pass):
         # which are very annoying. Although it is nice to use it, due to this
         # issue, I am avoiding it.
 
-        if inst.repeat > 32:
-            return True
+        # if inst.repeat > 32:
+        #     return True
         return False
 
     def process_current_inst(self, inst, more):

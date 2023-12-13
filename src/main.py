@@ -21,6 +21,7 @@ def parse_args():
     parser.add_argument('--out-bpf', help='store generated BPF program in this file', default=None)
     parser.add_argument('--out-user', help='store generated socket program in this file', default=None)
     parser.add_argument('--cflags', help='flags to pass to the compiler', default='')
+    # parser.add_argument('--disable', help='disable a feature of the compiler', default='')
     args = parser.parse_args()
     return args
 

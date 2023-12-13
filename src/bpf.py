@@ -18,7 +18,12 @@ class BPF_PROG:
 
 #ifndef memmove
 #define memmove(d, s, len) __builtin_memmove(d, s, len)
-#endif''', CODE_LITERAL),
+#endif
+
+#ifndef memset
+#define memset(d, c, len) __builtin_memset(d, c, len)
+#endif
+''', CODE_LITERAL),
                 Literal('typedef char bool;', CODE_LITERAL),
                 Literal('#define PKT_OFFSET_MASK 0xfff', CODE_LITERAL),
                 #Literal('''#ifndef bpf_loop
