@@ -22,6 +22,25 @@ cb_ref = None
 fail_ref = None
 _has_processed = set()
 
+_failed_val = None
+_skip_inst = False
+def set_skip(val):
+    global _skip_inst
+    global _failed_val
+    if val:
+        # remember what was the value of fail before going inside the block
+        _failed_val = fail_ref.get(FAILED)
+    else:
+        # restore the failed value before going out of the block
+        fail_ref.set(FAILED, _failed_val)
+        debug('Restore to', _failed_val)
+        _failed_val = None
+    _skip_inst = val
+
+
+def get_skip():
+    return _skip_inst
+
 
 @contextmanager
 def remember_func(func):
@@ -64,6 +83,29 @@ def is_function_call_feasible(inst, info):
                 assert body is not None, 'this pass should not remove anything'
                 func.body = body
     return True
+
+
+def _check_annotation(inst, info, more):
+    """
+    Check and skip the Annotation that create their own blocks (e.g, CACHE).
+    What is inside the ANNOTATED block may be infeasible but the annotations
+    ask for a different implementation which fits BPF.
+
+    But note that if the inner block fail, the function should have may_fail
+    flag set.
+    """
+    if inst.kind != ANNOTATION_INST:
+        return
+
+    if inst.ann_kind in (Annotation.ANN_CACHE_BEGIN,
+            Annotation.ANN_CACHE_BEGIN_UPDATE):
+        # TODO: use the new Pass framework and add the skip option to it
+        # NOTE: skip until end of the block
+        set_skip(True)
+    elif inst.ann_kind in (Annotation.ANN_CACHE_END,
+            Annotation.ANN_CACHE_END_UPDATE):
+        # NOTE: stop skiping instructions
+        set_skip(False)
 
 
 def _process_current_inst(inst, info, more):
@@ -130,6 +172,7 @@ def _do_pass(inst, info, more):
     if current_function and not failed and inst.kind == clang.CursorKind.RETURN_STMT:
         current_function.may_succeed = True
 
+    _check_annotation(inst, info, more)
     if failed or inst.bpf_ignore is True:
         return clone_pass(inst, info, PassObject())
 
