@@ -1,4 +1,7 @@
+#define _GNU_SOURCE
 #include <arpa/inet.h>
+#include <sched.h>
+#include <pthread.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -89,6 +92,12 @@ int main(int argc, char *argv[])
 	struct xdp_md ctx_in;
 	struct xdp_md ctx_out;
 
+
+	cpu_set_t cpu_cores;
+	CPU_ZERO(&cpu_cores);
+	CPU_SET(0, &cpu_cores);
+	pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpu_cores);
+
 	parse_args(argc, argv);
 	printf("BPF binary: %s\n", args.binary_path);
 	bpfobj = bpf_object__open_file(args.binary_path, NULL);
@@ -169,10 +178,10 @@ int main(int argc, char *argv[])
 
 	ret = 0;
 	ret = bpf_prog_test_run_opts(prog_fd, &test_opts);
-	printf("return value: %d\n", ret);
 	if (ret < 0) {
 		perror("something went wrong\n");
 	}
+	printf("return value: %d\n", test_opts.retval);
 
 	bpf_object__close(bpfobj);
 
