@@ -7,6 +7,58 @@ from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
 from helpers.instruction_helper import get_ret_inst
 
 
+ZERO = Literal('0', clang.CursorKind.INTEGER_LITERAL)
+ONE  = Literal('1', clang.CursorKind.INTEGER_LITERAL)
+
+
+def decl_new_var(T, info, decl_list):
+    tmp_name = get_tmp_var_name()
+    tmp_decl = VarDecl.build(tmp_name, T)
+    decl_list.append(tmp_decl)
+    tmp_decl.update_symbol_table(info.sym_tbl)
+    tmp_ref = tmp_decl.get_ref()
+    return tmp_ref
+
+
+def get_var_end(var, upper_bound_inst, info):
+    if is_bpf_ctx_ptr(var, info):
+        end = info.prog.get_pkt_end()
+    else:
+        end = BinOp.build(var, '+', upper_bound_inst)
+        end = Cast.build(end, BASE_TYPES[VOID_PTR])
+    return end
+
+
+def gen_memcpy(info, current_function, dst, src, size, upper_bound):
+    """
+    A helper function for generating code copying values from a pointer/array
+    to another one.
+
+    @param: destination ref
+    @param: source ref
+    @param: variable having the size of data copy
+    @param: upper_bound used for bound checking (bound for dest data structure)
+    """
+    mask_inst = BinOp.build(size, '&', info.prog.index_mask)
+    mask_assign = BinOp.build(size, '=', mask_inst)
+    # > Check that value size does not exceed the cache size
+    upper_bound_inst = Literal(upper_bound, clang.CursorKind.INTEGER_LITERAL)
+    sz_check_cond = BinOp.build(size, '>', upper_bound_inst)
+    sz_check = ControlFlowInst.build_if_inst(sz_check_cond)
+    sz_check.body.add_inst(get_ret_inst(current_function, info))
+    # > Continue by calling memcpy
+    memcpy      = Call(None)
+    memcpy.name = 'bpf_memcpy'
+    dest_end = get_var_end(dst, upper_bound_inst, info)
+    src_end = get_var_end(src, size, info)
+    memcpy.args.extend([dst, src, size, dest_end, src_end])
+    return [mask_assign, sz_check, memcpy]
+
+
+def get_map_name(map_id):
+    return map_id + '_map'
+
+
 def generate_cache_lookup(inst, blk, parent_children, info):
     """
     Process an annotation of type Cache Begin
@@ -55,99 +107,93 @@ def generate_cache_lookup(inst, blk, parent_children, info):
     assert isinstance(end_conf, dict), 'Make sure the end_conf was found'
 
     # Perform Lookup (Define instructions that are needed for lookup)
-    map_name = map_id + '_map'
-    index_name = get_tmp_var_name()
-    val_ptr = get_tmp_var_name()
+    map_name = get_map_name(map_id)
 
     lookup = []
     # Call hash function
     hash_call = Call(None)
     hash_call.name = '__fnv_hash'
-    arg1 = Literal(conf['key'], CODE_LITERAL)
-    arg2 = Literal(conf['key_size'], CODE_LITERAL)
-    hash_call.args.extend([arg1, arg2])
+    key = Literal(conf['key'], CODE_LITERAL)
+    key_size = Literal(conf['key_size'], CODE_LITERAL)
+    arg3 = get_var_end(key, key_size, info)
+    hash_call.args.extend([key, key_size, arg3])
 
     limit_inst = Literal(map_def['entries'], clang.CursorKind.INTEGER_LITERAL)
     modulo_inst = BinOp.build(hash_call, '%', limit_inst)
 
-    # Declare variable which hold the hash value
-    decl_index = VarDecl.build(index_name, BASE_TYPES[clang.TypeKind.INT])
-    declare_at_top_of_func.append(decl_index)
-    decl_index.update_symbol_table(info.sym_tbl)
-
     # Assign hash value to the variable
-    ref_index = decl_index.get_ref()
-    ref_assign     = BinOp.build(ref_index, '=', modulo_inst)
+    ref_index = decl_new_var(BASE_TYPES[clang.TypeKind.INT],
+            info, declare_at_top_of_func)
+    ref_assign = BinOp.build(ref_index, '=', modulo_inst)
     lookup.append(ref_assign)
 
     map_lookup_call = Call(None)
     map_lookup_call.name = 'bpf_map_lookup_elem'
+    # arg1 = UnaryOp.build('&', map_name)
     arg1 = Literal(f'&{map_name}', CODE_LITERAL)
-    arg2 = Literal(f'&{index_name}', CODE_LITERAL)
+    arg2 = UnaryOp.build('&', ref_index)
     map_lookup_call.args.extend([arg1, arg2])
 
-    # Declare the variable which hold the lookup result
-    decl_val_ptr = VarDecl(None)
-    decl_val_ptr.name = val_ptr
-    # decl_val_ptr.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
-    decl_val_ptr.type = MyType.make_pointer(MyType.make_simple(map_def['value_type'], clang.TypeKind.RECORD))
-    # decl_val_ptr.init.add_inst(map_lookup_call)
-    declare_at_top_of_func.append(decl_val_ptr)
-    decl_val_ptr.update_symbol_table(info.sym_tbl)
-
     # Assign lookup result to the variable
-    val_ref = Ref(None)
-    val_ref.name = val_ptr
-    val_ref.kind = clang.CursorKind.DECL_REF_EXPR
-    val_ref.type = decl_val_ptr.type
+    VALUE_TYPE = MyType.make_simple(map_def['value_type'], clang.TypeKind.RECORD)
+    VALUE_TYPE_PTR = MyType.make_pointer(VALUE_TYPE)
+    val_ref = decl_new_var(VALUE_TYPE_PTR, info, declare_at_top_of_func)
     ref_assign = BinOp.build(val_ref, '=', map_lookup_call)
     lookup.append(ref_assign)
 
+    # Create hit flag
+    miss_flag = decl_new_var(BASE_TYPES[clang.TypeKind.INT], info,
+            declare_at_top_of_func)
+    miss_flag_init = BinOp.build(miss_flag, '=', ONE)
+    lookup.append(miss_flag_init)
+
     # Check if the value is valid
-    cond = BinOp.build(val_ref, '==', Literal('NULL', clang.CursorKind.INTEGER_LITERAL))
-    check_miss = ControlFlowInst.build_if_inst(cond)
-    # when miss
-    check_miss.body.extend_inst(on_miss)
+    cond = BinOp.build(val_ref, '!=', Literal('NULL', clang.CursorKind.INTEGER_LITERAL))
+    check = ControlFlowInst.build_if_inst(cond)
+    # check key sizes match
+    key_size_field = val_ref.get_ref_field('key_size', info)
+    check_key_len_cond = BinOp.build(key_size_field, '==', key_size)
+    check_key_len = ControlFlowInst.build_if_inst(check_key_len_cond)
+    check.body.add_inst(check_key_len)
+    # check key matches
+    tmp_var = decl_new_var(BASE_TYPES[clang.TypeKind.INT], info,
+            declare_at_top_of_func)
+    strncmp = Call(None)
+    strncmp.name = 'my_bpf_strncmp'
+    key_field = val_ref.get_ref_field('key', info)
+    strncmp.args.extend([key_field, key, key_size])
+    tmp_assign = BinOp.build(tmp_var, '=', strncmp)
+    check_key_len.body.add_inst(tmp_assign)
+    key_check_cond = BinOp.build(tmp_var, '==', ZERO)
+    key_check = ControlFlowInst.build_if_inst(key_check_cond)
+    check_key_len.body.add_inst(key_check)
     # when hit
-    # actual_val = Literal(conf['value_ref'], CODE_LITERAL)
-    # assign_ref = BinOp.build(actual_val, '=', val_ref)
-    # check_miss.other_body.add_inst(assign_ref)
     template_code = end_conf['code']
     template_code = template_code.replace('%p', val_ref.name)
     template_code_inst = Literal(template_code, CODE_LITERAL)
-    check_miss.other_body.add_inst(template_code_inst)
-    lookup.append(check_miss)
+    unset_miss_flag = BinOp.build(miss_flag, '=', ZERO)
+    key_check.body.extend_inst([template_code_inst, unset_miss_flag])
+    lookup.append(check)
+    # Check if miss flag is set (ON_MISS)
+    miss_flag_check = ControlFlowInst.build_if_inst(miss_flag)
+    miss_flag_check.body.extend_inst(on_miss)
+    lookup.append(miss_flag_check)
 
     # TODO: I need to also run the transform_vars pass on the block of code
     # handling the cache miss (Will implement it later)
 
-    # This should be the result of above instructions
-    # f'''
-    # int {index_name} = __fnv_hash({conf['key']}, {conf['key_size']});
-    # void *{val_ptr}  = bpf_map_lookup_elem(&{map_name}, &{index_name});
-    # if ({val_ptr} == NULL) {{
-    #   {on_miss} <--- This is where cache miss is handled
-    # }} else {{
-    #   # instruction defined in CACHE_END
-    #   # conf['value_ref'] = val_ptr;
-    # }}
-    # '''
-
     # debug('instruction for cache miss:', on_miss)
 
     # Mark the hash function used
-    func = Function.directory['__fnv_hash']
-    if not func.is_used_in_bpf_code:
-        func.is_used_in_bpf_code = True
-        info.prog.declarations.insert(0, func)
-        debug('Add func', func.name)
+    # func = Function.directory['__fnv_hash']
+    # if not func.is_used_in_bpf_code:
+    #     func.is_used_in_bpf_code = True
+    #     info.prog.declarations.insert(0, func)
+    #     debug('Add func', func.name)
+    # NOTE: instead of defining the hash function include the header file
+    info.prog.headers.append(HASH_HELPER_HEADER)
 
     blk.extend(lookup)
-    # new_inst = Block(BODY)
-    # new_inst.extend_inst(lookup)
-    # Replace annotation with the block of instruction we have here
-    # return new_inst
-
     # Remove annotation
     return None, declare_at_top_of_func, skip_target
 
@@ -171,11 +217,12 @@ def generate_cache_update(inst, blk, current_function, info):
     conf = json.loads(inst.msg)
     map_id = conf['id']
     def_conf = info.map_definitions[map_id]
-    map_name = map_id + '_map'
+    map_name = get_map_name(map_id)
 
     val_ref_name = get_tmp_var_name()
     index_name = get_tmp_var_name()
 
+    # This should be the internal caching data type
     value_data_type = def_conf['value_type']
     val_type = MyType.make_simple(value_data_type, clang.TypeKind.RECORD)
     val_decl = VarDecl.build(val_ref_name, MyType.make_pointer(val_type))
@@ -189,6 +236,7 @@ def generate_cache_update(inst, blk, current_function, info):
     insts = []
     key = Literal(conf['key'], CODE_LITERAL)
     key_size = Literal(conf['key_size'], CODE_LITERAL)
+    key_end  = get_var_end(key, key_size, info)
 
     value_annotate = conf['value']
     assert is_identifier(value_annotate), 'To check if the variable is a packet context I need to be an identifier'
@@ -201,52 +249,57 @@ def generate_cache_update(inst, blk, current_function, info):
 
     hash_call = Call(None)
     hash_call.name = '__fnv_hash'
-    hash_call.args.extend([key, key_size])
+    hash_call.args.extend([key, key_size, key_end])
 
     index_ref      = decl_index.get_ref()
     assign_index   = BinOp.build(index_ref, '=', hash_call)
     insts.append(assign_index)
 
-    val_ref = val_decl.get_ref()
+    item_ref = val_decl.get_ref()
     map_lookup_call = Call(None)
     map_lookup_call.name = 'bpf_map_lookup_elem'
     arg1 = Literal(f'&{map_name}', CODE_LITERAL)
     arg2 = UnaryOp.build('&', index_ref)
     map_lookup_call.args.extend([arg1, arg2])
-    assign_val_ref = BinOp.build(val_ref, '=', map_lookup_call)
+    assign_val_ref = BinOp.build(item_ref, '=', map_lookup_call)
     insts.append(assign_val_ref)
 
     # check if ref is not null
-    null_check_cond = BinOp.build(val_ref, '!=', Literal('NULL', clang.CursorKind.INTEGER_LITERAL))
+    null_check_cond = BinOp.build(item_ref, '!=', Literal('NULL', clang.CursorKind.INTEGER_LITERAL))
     null_check = ControlFlowInst.build_if_inst(null_check_cond)
 
+    # compare the key and lookup result's key
+    tmp_var = decl_new_var(BASE_TYPES[clang.TypeKind.INT], info,
+            declare_at_top_of_func)
+    strncmp = Call(None)
+    strncmp.name = 'my_bpf_strncmp'
+    key_field = item_ref.get_ref_field('key', info)
+    strncmp.args.extend([key_field, key, key_size])
+    tmp_assign = BinOp.build(tmp_var, '=', strncmp)
+    null_check.body.add_inst(tmp_assign)
+
+    # check if the key match
+    key_check_cond = BinOp.build(tmp_var, '==', Literal('0', clang.CursorKind.INTEGER_LITERAL))
+    key_check = ControlFlowInst.build_if_inst(key_check_cond)
+    null_check.body.add_inst(key_check)
+
     # Update cache
-    mask_inst = BinOp.build(value_size, '&', info.prog.index_mask)
-    mask_assign = BinOp.build(value_size, '=', mask_inst)
-    # > Check that value size does not exceed the cache size
-    sz_check_cond = BinOp.build(value_size, '>', Literal('1000', clang.CursorKind.INTEGER_LITERAL))
-    sz_check = ControlFlowInst.build_if_inst(sz_check_cond)
-    sz_check.body.add_inst(get_ret_inst(current_function, info))
-    # > Continue by calling memcpy
-    memcpy      = Call(None)
-    memcpy.name = 'bpf_memcpy'
-    dest_ref = val_ref.get_ref_field('data', info)
-    # TODO: 1024 should be sizeof the field
-    if is_bpf_ctx_ptr(dest_ref, info):
-        dest_end = info.prog.get_pkt_end()
-    else:
-        dest_end = BinOp.build(dest_ref, '+', Literal('1024', clang.CursorKind.INTEGER_LITERAL))
-        dest_end = Cast.build(dest_end, MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID]))
+    ## rewrite key
+    dest_ref = item_ref.get_ref_field('key', info)
+    cpy_insts = gen_memcpy(info, current_function,
+            dest_ref, key, key_size, upper_bound='255')
+    key_check.body.extend_inst(cpy_insts)
+    key_size_field = item_ref.get_ref_field('key_size', info)
+    size_assign = BinOp.build(key_size_field, '=', value_size)
+    key_check.body.add_inst(size_assign)
+    ## rewrite value
+    dest_ref = item_ref.get_ref_field('value', info)
+    cpy_insts = gen_memcpy(info, current_function,
+            dest_ref, value, value_size, upper_bound='255')
+    key_check.body.extend_inst(cpy_insts)
+    size_assign = BinOp.build(item_ref.get_ref_field('value_size', info), '=', value_size)
+    key_check.body.add_inst(size_assign)
 
-    if is_bpf_ctx_ptr(value, info):
-        src_end = info.prog.get_pkt_end()
-    else:
-        tmp = BinOp.build(value, '+', value_size)
-        src_end = Cast.build(tmp, MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID]))
-
-    memcpy.args.extend([dest_ref, value, value_size, dest_end, src_end])
-    size_assign = BinOp.build(val_ref.get_ref_field('size', info), '=', value_size)
-    null_check.body.extend_inst([mask_assign, sz_check, memcpy, size_assign])
     insts.append(null_check)
 
     # map_update_call = Call(None)

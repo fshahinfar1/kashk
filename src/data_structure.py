@@ -7,6 +7,10 @@ from log import error, debug
 from sym_table import SymbolTable
 
 
+HASH_HELPER_HEADER = '#include "hash_fn.h"'
+CSUM_HELPER_HEADER = '#include "csum_helper.h"'
+
+
 class Info:
     """
     Represents the general understanding of the program
@@ -587,6 +591,7 @@ class Function(TypeDefinition):
                 e = sym_tbl.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
 
 
+VOID_PTR = 999
 BASE_TYPES = {}
 def prepare_base_types():
     kind_name_map = {
@@ -605,5 +610,7 @@ def prepare_base_types():
 
     for kind, name in kind_name_map.items():
         BASE_TYPES[kind] = MyType.make_simple(name, kind)
+    BASE_TYPES[VOID_PTR] = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+
 
 prepare_base_types()

@@ -299,19 +299,19 @@ return ll.ret;
 # '''
     _declare_func(info, func_name, args, return_type, code, 1024)
 
-    # FNV_HASH
-    func_name = '__fnv_hash'
-    count_args = 2
-    args = [StateObject(None) for i in range(count_args)]
-    args[0].name = 'key'
-    args[0].type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
-    args[1].name = 'size'
-    args[1].type_ref = BASE_TYPES[clang.TypeKind.INT]
-    return_type = BASE_TYPES[clang.TypeKind.INT]
-    code = '''
-return 0;
-'''
-    _declare_func(info, func_name, args, return_type, code, 0)
+    # # FNV_HASH
+    # func_name = '__fnv_hash'
+    # count_args = 2
+    # args = [StateObject(None) for i in range(count_args)]
+    # args[0].name = 'key'
+    # args[0].type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
+    # args[1].name = 'size'
+    # args[1].type_ref = BASE_TYPES[clang.TypeKind.INT]
+    # return_type = BASE_TYPES[clang.TypeKind.INT]
+    # code = '''
+# return 0;
+# '''
+    # _declare_func(info, func_name, args, return_type, code, 0)
 
     # MEMCPY
     func_name = 'bpf_memcpy'
