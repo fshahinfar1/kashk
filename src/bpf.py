@@ -1,12 +1,44 @@
 import clang.cindex as clang
 from utility import generate_struct_with_fields, indent, get_tmp_var_name
-from data_structure import MyType, BASE_TYPES
+from data_structure import MyType, BASE_TYPES, XDP_HELPER_HEADER
 from instruction import *
 from log import debug
 from bpf_code_gen import gen_code
 
 
 MODULE_TAG = '[BPF Prog]'
+
+
+def _use_memcpy(info):
+    func = Function.directory['bpf_memcpy']
+    if not func.is_used_in_bpf_code:
+        func.is_used_in_bpf_code = True
+        info.prog.declarations.insert(0, func)
+        prerequisite = Literal('''struct bpf_memcpy_ctx {
+  unsigned short i;
+  char *dest;
+  char *src;
+  unsigned short n;
+  void *end_dest;
+  void *end_src;
+};
+
+static long
+bpf_memcpy_loop(unsigned int index, void *arg)
+{
+  struct bpf_memcpy_ctx *ll = arg;
+  if ((void *)(ll->dest + ll->i + 1) > ll->end_dest)
+    return 1;
+  if ((void *)(ll->src  + ll->i + 1) > ll->end_src)
+    return 1;
+  ll->dest[ll->i] = ll->src[ll->i];
+  if (ll->i >= ll->n - 1) {
+    return 1;
+  }
+  ll->i++;
+  return 0;
+}''', CODE_LITERAL)
+        info.prog.add_declaration(prerequisite)
 
 
 class BPF_PROG:
@@ -77,7 +109,7 @@ class BPF_PROG:
         ref.owner.append(xdp)
 
         cast1 = Cast()
-        cast1.castee.add_inst(ref)
+        cast1.castee.add_inst(add_off)
         cast1.type = BASE_TYPES[clang.TypeKind.ULONGLONG]
         cast2 = Cast()
         cast2.castee.add_inst(cast1)
@@ -115,35 +147,7 @@ class BPF_PROG:
         else:
             # TODO: I need to check that BPF MEMCPY succeeds
             memcpy = 'bpf_memcpy'
-            func = Function.directory[memcpy]
-            if not func.is_used_in_bpf_code:
-                func.is_used_in_bpf_code = True
-                info.prog.declarations.insert(0, func)
-                prerequisite = Literal('''struct bpf_memcpy_ctx {
-  unsigned short i;
-  char *dest;
-  char *src;
-  unsigned short n;
-  void *end_dest;
-  void *end_src;
-};
-
-static long
-bpf_memcpy_loop(unsigned int index, void *arg)
-{
-  struct bpf_memcpy_ctx *ll = arg;
-  if ((void *)(ll->dest + ll->i + 1) > ll->end_dest)
-    return 1;
-  if ((void *)(ll->src  + ll->i + 1) > ll->end_src)
-    return 1;
-  ll->dest[ll->i] = ll->src[ll->i];
-  if (ll->i >= ll->n - 1) {
-    return 1;
-  }
-  ll->i++;
-  return 0;
-}''', CODE_LITERAL)
-                info.prog.add_declaration(prerequisite)
+            _use_memcpy(info)
 
         inst = self.adjust_pkt(write_size, info)
         if do_copy:
@@ -189,6 +193,9 @@ bpf_memcpy_loop(unsigned int index, void *arg)
         ref.type = self.ctx_type
         return ref
 
+    def before_send(self):
+        return []
+
 
 class XDP_PROG(BPF_PROG):
 
@@ -196,6 +203,10 @@ class XDP_PROG(BPF_PROG):
         super().__init__()
         self.ctx = 'xdp'
         self.ctx_type = MyType.make_pointer(MyType.make_simple('struct xdp_md', clang.TypeKind.RECORD))
+        self.declarations.extend([
+                Literal('#define MAX_PACKET_SIZE 1472', CODE_LITERAL),
+                Literal('#define DATA_OFFSET (sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr))', CODE_LITERAL),
+            ])
         self.headers.extend([
             '#include <linux/in.h>',
             '#include <linux/if_ether.h>',
@@ -248,6 +259,27 @@ int xdp_prog(struct xdp_md *xdp)
 '''
         return text
 
+    def get_pkt_buf(self):
+        xdp = Ref(None, clang.CursorKind.DECL_REF_EXPR)
+        xdp.name = self.ctx
+        xdp.type = self.ctx_type
+
+        ref = Ref(None, clang.CursorKind.MEMBER_REF_EXPR)
+        ref.name = 'data'
+        ref.type = BASE_TYPES[clang.TypeKind.UINT]
+        ref.owner.append(xdp)
+
+        data_off = Literal('DATA_OFFSET', clang.CursorKind.INTEGER_LITERAL)
+        add_off = BinOp.build(ref, '+', data_off)
+
+        cast1 = Cast()
+        cast1.castee.add_inst(add_off)
+        cast1.type = BASE_TYPES[clang.TypeKind.ULONGLONG]
+        cast2 = Cast()
+        cast2.castee.add_inst(cast1)
+        cast2.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+        return cast2
+
     def get_pkt_end(self):
         xdp = Ref(None, clang.CursorKind.DECL_REF_EXPR)
         xdp.name = 'xdp'
@@ -267,29 +299,21 @@ int xdp_prog(struct xdp_md *xdp)
         return cast2
 
     def get_pkt_size(self):
-        xdp      = Ref(None, clang.CursorKind.DECL_REF_EXPR)
-        xdp.name = 'xdp'
-        xdp.type = self.ctx_type
-
-        data      = Ref(None, clang.CursorKind.MEMBER_REF_EXPR)
-        data.name = 'data'
-        data.type = BASE_TYPES[clang.TypeKind.UINT]
-        data.owner.append(xdp)
-
-        data_end      = Ref(None, clang.CursorKind.MEMBER_REF_EXPR)
-        data_end.name = 'data_end'
-        data_end.type = BASE_TYPES[clang.TypeKind.UINT]
-        data_end.owner.append(xdp)
-
-        end = Cast.build(data_end, BASE_TYPES[clang.TypeKind.ULONGLONG])
-        beg = Cast.build(data,     BASE_TYPES[clang.TypeKind.ULONGLONG])
+        end = self.get_pkt_end()
+        beg = self.get_pkt_buf()
 
         delta = BinOp.build(end, '-', beg)
         size  = Cast.build(delta,  BASE_TYPES[clang.TypeKind.USHORT])
         return size
 
-    def adjust_pkt(self, final_size, info):
-        decl         = VarDecl.build(get_tmp_var_name(), BASE_TYPES[clang.TypeKind.INT])
+    def adjust_pkt(self, req_size, info):
+        # NOTE: in xdp we do not want to modify the eth/ip/udp headers. We are
+        # targeting network APPLICATIONS. They do not operate on transport
+        # header.
+        header_size = Literal('DATA_OFFSET', clang.CursorKind.INTEGER_LITERAL)
+        final_size = BinOp.build(req_size, '+', header_size)
+        tmp_name = get_tmp_var_name()
+        decl         = VarDecl.build(tmp_name, BASE_TYPES[clang.TypeKind.INT])
         delta_ref    = decl.get_ref()
         compute_size = BinOp.build(final_size, '-', self.get_pkt_size())
         delta_assign = BinOp.build(delta_ref, '=', compute_size)
@@ -309,6 +333,15 @@ int xdp_prog(struct xdp_md *xdp)
 
     def get_send(self):
         return 'XDP_TX'
+
+    def before_send(self):
+        if XDP_HELPER_HEADER not in self.headers:
+            self.headers.append(XDP_HELPER_HEADER)
+        xdp = Ref.build(self.ctx, self.ctx_type)
+        call = Call(None)
+        call.name = '__prepare_headers_before_send'
+        call.args.append(xdp)
+        return [call,]
 
 
 class SK_SKB_PROG(BPF_PROG):
@@ -408,10 +441,13 @@ if (!sock_ctx) {
         parser_code, _ = gen_code(self.parser_code, info)
         parser_code = indent(parser_code, 1)
         verdict_code, _ = gen_code(self.verdict_code, info)
-        verdict_code = (self._pull_packet_data() + self._load_connection_state() + verdict_code)
+        verdict_code = (self._pull_packet_data() +
+                self._load_connection_state() + verdict_code)
         verdict_code = indent(verdict_code, 1)
 
-        return '\n'.join(info.prog._parser_prog([per_conn] + [''] + [parser_code]) + [''] + info.prog._verdict_prog([verdict_code]))
+        return '\n'.join(info.prog._parser_prog([per_conn] +
+            [''] + [parser_code]) + [''] +
+            info.prog._verdict_prog([verdict_code]))
 
     def send(self, buf, write_size, info, failure_return, ret=True, do_copy=True):
         if not do_copy:

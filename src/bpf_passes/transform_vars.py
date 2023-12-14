@@ -205,10 +205,15 @@ def _process_call_needing_send_flag(inst, blk, current_function, info):
     cond  = BinOp.build(flag_val, '!=', ZERO)
     check = ControlFlowInst.build_if_inst(cond)
     if current_function is None:
+        # Do we need modify the packet before sending? (e.g., swap IP address)
+        before_send_insts = info.prog.before_send()
+        check.body.extend_inst(before_send_insts)
+        # Return the verdict
         ret_val  = Literal(info.prog.get_send(), clang.CursorKind.INTEGER_LITERAL)
         ret_inst = Return.build([ret_val,])
         check.body.add_inst(ret_inst)
     else:
+        # Return to the caller func
         assert sym.type.is_pointer()
         ret_inst = get_ret_inst(current_function, info)
         check.body.add_inst(ret_inst)

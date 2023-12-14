@@ -191,7 +191,8 @@ def generate_cache_lookup(inst, blk, parent_children, info):
     #     info.prog.declarations.insert(0, func)
     #     debug('Add func', func.name)
     # NOTE: instead of defining the hash function include the header file
-    info.prog.headers.append(HASH_HELPER_HEADER)
+    if HASH_HELPER_HEADER not in info.prog.headers:
+        info.prog.headers.append(HASH_HELPER_HEADER)
 
     blk.extend(lookup)
     # Remove annotation

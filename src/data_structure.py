@@ -9,6 +9,7 @@ from sym_table import SymbolTable
 
 HASH_HELPER_HEADER = '#include "hash_fn.h"'
 CSUM_HELPER_HEADER = '#include "csum_helper.h"'
+XDP_HELPER_HEADER  = '#include "xdp_helper.h"'
 
 
 class Info:
