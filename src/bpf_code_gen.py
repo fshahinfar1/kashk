@@ -265,7 +265,13 @@ def handle_return_stmt(inst, info, more):
 def handle_to_userspace(inst, info, more):
     lvl = more[0]
     if inst.is_bpf_main:
-        tmp_stmt = f'return {info.prog.get_pass()};'
+        from bpf import XDP_PROG
+        if isinstance(info.prog, XDP_PROG):
+            if XDP_HELPER_HEADER not in info.prog.headers:
+                info.prog.headers.append(XDP_HELPER_HEADER)
+            tmp_stmt = f'__prepare_headers_before_pass(xdp)\nreturn {info.prog.get_pass()};'
+        else:
+            tmp_stmt = f'return {info.prog.get_pass()};'
     elif inst.return_type.spelling == 'void':
         tmp_stmt = 'return;'
     else:
