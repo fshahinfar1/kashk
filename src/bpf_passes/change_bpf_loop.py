@@ -225,6 +225,7 @@ class BPFLoopPass(Pass):
         self._may_remove = True
 
     def _process_for_loop(self, inst, more):
+        assert inst.kind == clang.CursorKind.FOR_STMT
         # debug('Visiting a for loop:', name)
         blk = self.cb_ref.get(BODY)
         name = _get_loop_name()
@@ -245,9 +246,9 @@ class BPFLoopPass(Pass):
         iter_func = _define_loop_func(inst, struct, name, self.info)
         # Move instruction in PRE part of the for loop out
         # for (PRE; COND; POST) {BODY}
-        for inst in inst.pre.children:
-            new_inst = clone_pass(inst, self.info, PassObject())
-            blk.append(inst)
+        for i in inst.pre.children:
+            new_inst = clone_pass(i, self.info, PassObject())
+            blk.append(new_inst)
         # Declare context on the stack
         var_decl = VarDecl.build(get_tmp_var_name(), struct.type)
         ctx_ref = var_decl.get_ref()
@@ -267,7 +268,8 @@ class BPFLoopPass(Pass):
         # Call bpf_loop
         call = Call(None)
         call.name = 'bpf_loop'
-        iters = self.info.prog.max_loop_iteration
+        # iters = self.info.prog.max_loop_iteration
+        iters = Literal(str(inst.repeat), clang.CursorKind.INTEGER_LITERAL)
         ref_t = MyType.make_simple(None, clang.TypeKind.FUNCTIONPROTO)
         func_ref = Ref.build(iter_func.name, ref_t)
         ctx_pointer = UnaryOp.build('&', ctx_ref)
@@ -310,8 +312,8 @@ class BPFLoopPass(Pass):
         # which are very annoying. Although it is nice to use it, due to this
         # issue, I am avoiding it.
 
-        # if inst.repeat > 32:
-        #     return True
+        if inst.repeat > 32:
+            return True
         return False
 
     def process_current_inst(self, inst, more):

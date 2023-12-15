@@ -107,8 +107,9 @@ def _generate_failure_flag_check_in_main_func_if_else(flag_ref, func, info):
 
 def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
     """
-    Generate checks after calling a function (@param func) that may fail from the BPF main function.
-    This function generates a Switch-Case on the value of failure_number.
+    Generate checks after calling a function (@param func) that may fail from
+    the BPF main function. This function generates a Switch-Case on the value
+    of failure_number.
     @param flag_ref: the reference to the failure number variable
     @param func:     the func that was called and may fail.
     @param info:
@@ -120,7 +121,16 @@ def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
     switch      = ControlFlowInst()
     switch.kind = clang.CursorKind.SWITCH_STMT
     switch.cond.add_inst(flag_ref)
+
+    break_inst = Instruction()
+    break_inst.kind = clang.CursorKind.BREAK_STMT
+    case = CaseSTMT(None)
+    case.case.add_inst(ZERO)
+    case.body.add_inst(break_inst)
+    switch.body.add_inst(case)
+
     for failure_number in set(func.path_ids):
+        assert failure_number != 0, 'The zero can not be a failure id'
         # TODO: change declaration to a dictionary instead of array
         meta = info.user_prog.declarations[failure_number-1]
         prepare_meta_code = prepare_meta_data(failure_number, meta, info)
@@ -189,10 +199,11 @@ def _handle_function_may_fail(inst, func, info, more):
             flag_val = UnaryOp.build('*', flag_ref)
         else:
             flag_val = flag_ref
-        cond = BinOp.build(flag_val, '!=', ZERO)
-        if_inst = ControlFlowInst.build_if_inst(cond)
-        if_inst.body.add_inst(return_stmt)
-        after_func_call.append(if_inst)
+        # cond = BinOp.build(flag_val, '!=', ZERO)
+        # if_inst = ControlFlowInst.build_if_inst(cond)
+        # if_inst.body.add_inst(return_stmt)
+        # after_func_call.append(if_inst)
+        after_func_call.append(return_stmt)
 
         # Analyse the called function.
         if func.name not in _has_processed:
