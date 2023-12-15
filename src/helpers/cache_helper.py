@@ -252,8 +252,11 @@ def generate_cache_update(inst, blk, current_function, info):
     hash_call.name = '__fnv_hash'
     hash_call.args.extend([key, key_size, key_end])
 
+    limit_inst = Literal(def_conf['entries'], clang.CursorKind.INTEGER_LITERAL)
+    modulo_inst = BinOp.build(hash_call, '%', limit_inst)
+
     index_ref      = decl_index.get_ref()
-    assign_index   = BinOp.build(index_ref, '=', hash_call)
+    assign_index   = BinOp.build(index_ref, '=', modulo_inst)
     insts.append(assign_index)
 
     item_ref = val_decl.get_ref()
