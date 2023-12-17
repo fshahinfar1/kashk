@@ -150,9 +150,11 @@ def prepare_shared_state_var(ret_val=None):
 
 def prepare_meta_data(failure_number, meta_declaration, info):
     type_name = f'struct {meta_declaration.name}'
-    T = MyType.make_pointer(MyType.make_simple(type_name, clang.TypeKind.RECORD))
+    req_type = MyType.make_simple(type_name, clang.TypeKind.RECORD)
+    T = MyType.make_pointer(req_type)
 
-    adjust_inst = info.prog.adjust_pkt(Literal(f'sizeof({T.spelling})', CODE_LITERAL), info)
+    target_size_inst = Literal(f'sizeof({req_type.spelling})', CODE_LITERAL)
+    adjust_inst = info.prog.adjust_pkt(target_size_inst, info)
 
     meta_var_name = get_tmp_var_name()
     decl = VarDecl.build(meta_var_name, T)
