@@ -269,7 +269,7 @@ def handle_to_userspace(inst, info, more):
         if isinstance(info.prog, XDP_PROG):
             if XDP_HELPER_HEADER not in info.prog.headers:
                 info.prog.headers.append(XDP_HELPER_HEADER)
-            tmp_stmt = f'__prepare_headers_before_pass(xdp)\nreturn {info.prog.get_pass()};'
+            tmp_stmt = f'__prepare_headers_before_pass(xdp);\nreturn {info.prog.get_pass()};'
         else:
             tmp_stmt = f'return {info.prog.get_pass()};'
     elif inst.return_type.spelling == 'void':
