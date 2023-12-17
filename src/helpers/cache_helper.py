@@ -294,7 +294,7 @@ def generate_cache_update(inst, blk, current_function, info):
             dest_ref, key, key_size, upper_bound='255')
     key_check.body.extend_inst(cpy_insts)
     key_size_field = item_ref.get_ref_field('key_size', info)
-    size_assign = BinOp.build(key_size_field, '=', value_size)
+    size_assign = BinOp.build(key_size_field, '=', key_size)
     key_check.body.add_inst(size_assign)
     ## rewrite value
     dest_ref = item_ref.get_ref_field('value', info)
