@@ -86,6 +86,7 @@ my_bpf_strncmp_loop(unsigned int index, void *arg)
     ll->ret = (ll->str1[ll->i] - ll->str2[ll->i]);
     return 1;
   }
+  ll->i += 1;
   return 0;
 }
 ''', CODE_LITERAL)
