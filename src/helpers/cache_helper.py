@@ -273,36 +273,36 @@ def generate_cache_update(inst, blk, current_function, info):
     null_check = ControlFlowInst.build_if_inst(null_check_cond)
 
     # compare the key and lookup result's key
-    tmp_var = decl_new_var(BASE_TYPES[clang.TypeKind.INT], info,
-            declare_at_top_of_func)
-    strncmp = Call(None)
-    strncmp.name = 'my_bpf_strncmp'
-    key_field = item_ref.get_ref_field('key', info)
-    strncmp.args.extend([key_field, key, key_size])
-    tmp_assign = BinOp.build(tmp_var, '=', strncmp)
-    null_check.body.add_inst(tmp_assign)
+    # tmp_var = decl_new_var(BASE_TYPES[clang.TypeKind.INT], info,
+    #         declare_at_top_of_func)
+    # strncmp = Call(None)
+    # strncmp.name = 'my_bpf_strncmp'
+    # key_field = item_ref.get_ref_field('key', info)
+    # strncmp.args.extend([key_field, key, key_size])
+    # tmp_assign = BinOp.build(tmp_var, '=', strncmp)
+    # null_check.body.add_inst(tmp_assign)
 
     # check if the key match
-    key_check_cond = BinOp.build(tmp_var, '==', Literal('0', clang.CursorKind.INTEGER_LITERAL))
-    key_check = ControlFlowInst.build_if_inst(key_check_cond)
-    null_check.body.add_inst(key_check)
+    # key_check_cond = BinOp.build(tmp_var, '==', Literal('0', clang.CursorKind.INTEGER_LITERAL))
+    # key_check = ControlFlowInst.build_if_inst(key_check_cond)
+    # null_check.body.add_inst(key_check)
 
     # Update cache
     ## rewrite key
     dest_ref = item_ref.get_ref_field('key', info)
     cpy_insts = gen_memcpy(info, current_function,
             dest_ref, key, key_size, upper_bound='255')
-    key_check.body.extend_inst(cpy_insts)
+    null_check.body.extend_inst(cpy_insts)
     key_size_field = item_ref.get_ref_field('key_size', info)
     size_assign = BinOp.build(key_size_field, '=', key_size)
-    key_check.body.add_inst(size_assign)
+    null_check.body.add_inst(size_assign)
     ## rewrite value
     dest_ref = item_ref.get_ref_field('value', info)
     cpy_insts = gen_memcpy(info, current_function,
             dest_ref, value, value_size, upper_bound='255')
-    key_check.body.extend_inst(cpy_insts)
+    null_check.body.extend_inst(cpy_insts)
     size_assign = BinOp.build(item_ref.get_ref_field('value_size', info), '=', value_size)
-    key_check.body.add_inst(size_assign)
+    null_check.body.add_inst(size_assign)
 
     insts.append(null_check)
 
