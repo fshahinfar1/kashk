@@ -129,7 +129,7 @@ class BPF_PROG:
         """
         T = self.ctx_type
         xdp_entry = scope.insert_entry(self.ctx, T, clang.CursorKind.PARM_DECL, None)
-        xdp_entry.is_bpf_ctx = True
+        xdp_entry.is_bpf_ctx = False
         entry = xdp_entry.fields.insert_entry('data',
                 BASE_TYPES[clang.TypeKind.UINT],
                 clang.CursorKind.MEMBER_REF_EXPR, None)
@@ -221,7 +221,7 @@ class XDP_PROG(BPF_PROG):
         T = self.ctx_type.under_type
         scope_key = f'class_{T.spelling}'
         entry = sym_tbl.global_scope.insert_entry(scope_key, T, clang.CursorKind.CLASS_DECL, None)
-        entry.is_bpf_ctx = True
+        entry.is_bpf_ctx = False
         with sym_tbl.new_scope() as scope:
             sym_tbl.scope_mapping[scope_key] = scope
             U32 = BASE_TYPES[clang.TypeKind.UINT]
@@ -310,12 +310,15 @@ int xdp_prog(struct xdp_md *xdp)
         # NOTE: in xdp we do not want to modify the eth/ip/udp headers. We are
         # targeting network APPLICATIONS. They do not operate on transport
         # header.
-        header_size = Literal('DATA_OFFSET', clang.CursorKind.INTEGER_LITERAL)
-        final_size = BinOp.build(req_size, '+', header_size)
+        # header_size = Literal('DATA_OFFSET', clang.CursorKind.INTEGER_LITERAL)
+        # final_size = BinOp.build(req_size, '+', header_size)
+        # NOTE 2: since we have updated the get_pkt_size to not include the
+        # header size we do not need to update here! (got a bit complex :) )
+
         tmp_name = get_tmp_var_name()
         decl         = VarDecl.build(tmp_name, BASE_TYPES[clang.TypeKind.INT])
         delta_ref    = decl.get_ref()
-        compute_size = BinOp.build(final_size, '-', self.get_pkt_size())
+        compute_size = BinOp.build(req_size, '-', self.get_pkt_size())
         delta_assign = BinOp.build(delta_ref, '=', compute_size)
         decl.update_symbol_table(info.sym_tbl)
 
