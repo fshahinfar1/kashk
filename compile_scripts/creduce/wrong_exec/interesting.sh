@@ -10,7 +10,7 @@ set -e
 
 echo "YOU CAN NOT RUN THIS SCRIPT IN PARALLEL"
 CURDIR=$(realpath $(dirname $0))
-TESTER=$CURDIR/build/tester
+TESTER=$CURDIR/tester
 
 
 # Compiling the BPF program
@@ -24,36 +24,49 @@ if [ ! -f $TESTER ]; then
 	exit 1
 fi
 BPF_COMPILE_SCRIPT=$KASHK_DIR/compile_scripts/compile_bpf_source.sh
-bash $BPF_COMPILE_SCRIPT ./bpf.c ./bpf.o
-sudo $TESTER -b ./bpf.o
 
-sudo cat /sys/kernel/debug/tracing/trace | grep "n="
-tmp=( $(sudo cat /sys/kernel/debug/tracing/trace | grep "n=" | head -n 2 | cut -d ";" -f 2) )
-x1=$(printf ${tmp[0]} | cut -d "-" -f 1)
-x2=$(printf ${tmp[1]} | cut -d "-" -f 1)
-v1=$(printf ${tmp[0]} | cut -d "=" -f 2)
-v2=$(printf ${tmp[1]} | cut -d "=" -f 2)
+if [ -f ./bpf.o ]; then
+	echo "Removing the old bpf.o"
+	rm ./bpf.o
+fi
+echo Compiling...
+bash $BPF_COMPILE_SCRIPT ./bpf.c ./bpf.o
+echo Testing...
+sudo $TESTER -b ./bpf.o
+echo After test
+sudo cat /sys/kernel/debug/tracing/trace
+echo "Found the line in the log"
+if [ $? -ne 0 ]; then
+	echo "Does not have BOOM"
+	exit 1;
+fi
+left=$(sudo cat /sys/kernel/debug/tracing/trace | grep "BOOM" | tail -n 1 | cut -d ';' -f 2)
+right=$(sudo cat /sys/kernel/debug/tracing/trace | grep "BOOM" | tail -n 1 | cut -d ';' -f 3)
+
+if [ -z "$left" -o -z "$right" ]; then
+	echo "Do not have left or right?"
+	exit 1;
+fi
+echo "Checking.."
+
+
+if [ $left -ge $right ]; then
+	echo "left is greater-than-equal than right"
+	echo "i=$left value_size=$right"
+	exit 1;
+fi
+echo "Should be fine"
+
+if [ $left -ne 0 -o $right -ne 24 ]; then
+	echo "Wrong values are being printed! we want the loop index and value size"
+	exit 1;
+fi
+echo "Everything is fine"
 
 # Clear the pipe for the next run
 # It is okay if the timeout kicks in. That is why there is the `true' in the
 # end.
 sudo timeout 1 cat /sys/kernel/debug/tracing/trace_pipe 2>&1 > /dev/null || true
 
-echo line1: $x1 $v1
-echo line2: $x2 $v2
-
-# Check if it is interesting execution
-if [ "x$x1" == "xs1" -a "x$x2" == "xs2" ]; then
-	if [ $v1 != $v2 ]; then
-		if [ $v1 == "10" -a $v2 == "0" ]; then
-			echo interesting!
-			exit 0
-		fi
-	fi
-	echo here
-fi
-
-# not interesting
-printf "line 1: %s\n" ${tmp[0]}
-printf "line 2: %s\n" ${tmp[1]}
-exit 1
+echo "It is interesting!"
+exit 0

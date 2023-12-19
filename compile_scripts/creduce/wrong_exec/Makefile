@@ -18,7 +18,7 @@ default: ./build/tester
 ./build/tester: ./tester.c
 	echo Compiling tester program
 	if [ ! -d ./build/ ]; then mkdir -p ./build/ ; fi
-	$(CC) $(CFLAGS) -o ./build/tester ./tester.c -lbpf -lelf -lz
+	$(CC) $(CFLAGS) -o ./build/tester ./tester.c -lbpf -lelf -lz -lpthread
 
 run: default
 	sudo ./build/tester -b ./build/bpf.o
