@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
 	/* Load the program to the kernel */
 	ret = bpf_object__load(bpfobj);
 	if (ret != 0) {
-		fprintf(stderr, "Failed to load program to the kernel");
+		fprintf(stderr, "Failed to load program to the kernel\n");
 		return 1;
 	}
 
@@ -148,12 +148,12 @@ int main(int argc, char *argv[])
 	/* TEST */
 	prog = bpf_object__find_program_by_name(bpfobj, args.progname);
 	if (prog == NULL) {
-		fprintf(stderr, "Failed to find xdp_prog");
+		fprintf(stderr, "Failed to find xdp_prog\n");
 		return 1;
 	}
 	prog_fd = bpf_program__fd(prog);
 	if (prog_fd < 1) {
-		fprintf(stderr, "Failed to find the program file descriptor");
+		fprintf(stderr, "Failed to find the program file descriptor\n");
 		return 1;
 	}
 	printf("Program fd: %d\n", prog_fd);
