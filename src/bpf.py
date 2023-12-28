@@ -269,14 +269,15 @@ int xdp_prog(struct xdp_md *xdp)
         ref.type = BASE_TYPES[clang.TypeKind.UINT]
         ref.owner.append(xdp)
 
-        data_off = Literal('DATA_OFFSET', clang.CursorKind.INTEGER_LITERAL)
-        add_off = BinOp.build(ref, '+', data_off)
-
         cast1 = Cast()
-        cast1.castee.add_inst(add_off)
+        cast1.castee.add_inst(ref)
         cast1.type = BASE_TYPES[clang.TypeKind.ULONGLONG]
+
+        data_off = Literal('DATA_OFFSET', clang.CursorKind.INTEGER_LITERAL)
+        add_off = BinOp.build(cast1, '+', data_off)
+
         cast2 = Cast()
-        cast2.castee.add_inst(cast1)
+        cast2.castee.add_inst(add_off)
         cast2.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
         return cast2
 
