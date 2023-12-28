@@ -10,8 +10,10 @@
  * This is the structure I have defined for doing the caching
  * */
 struct cached_resp {
-	char data[1024];
-	int size;
+	char key[32];
+	int key_size;
+	char value[32];
+	int value_size;
 };
 
 struct resp {
@@ -24,6 +26,14 @@ struct conn {
 	int rsize;
 	struct resp resp;
 };
+
+#ifndef __ANNOTATE
+#define __ANNOTATE_DEFINE_CACHE(id, key_kind, key_t, key_size, value_kind, value_t, value_size)
+#define __ANNOTATE_BEGIN_CACHE(id, key, key_size, value_ref)
+#define __ANNOTATE_END_CACHE(id, code)
+#define __ANNOTATE_BEGIN_UPDATE_CACHE(id, key, key_size, value, value_size)
+#define __ANNOTATE_END_UPDATE_CACHE(id, code)
+#endif
 
 /* This is the function we want to memoize.
  *
@@ -68,15 +78,12 @@ void event_handler(int fd, short which, void *arg)
 	key_len = *(unsigned short *)&c->rbuf[1];
 	key = &c->rbuf[3];
 
-	/* TODO: what should I do about this? I should automaticall add these instructions */
-	/* key_len = key_len & 0xfff; */
-
 	switch (proto) {
 		case 'G':
 			/* Get request */
 			__ANNOTATE_BEGIN_CACHE("main_cache", "key", "key_len", "val")
 			lookup_hashtable(key, key_len, (void **)&val, &val_len);
-			__ANNOTATE_END_CACHE("main_cache", "val = (char *)%p->data; val_len = %p->size;")
+			__ANNOTATE_END_CACHE("main_cache", "val = (char *)%p->value; val_len = %p->value_size;")
 			if (val == NULL) {
 				strncpy(c->rbuf, "Miss END\r\n", 10);
 				sendto(fd, c->rbuf, 10, 0, (struct sockaddr *)&addr, sock_addr_size);
