@@ -97,6 +97,10 @@ def _do_pass(inst, info, more):
 
 flag = None
 def mark_used_funcs(bpf, info, more):
+    """
+    Mark used functions and types. This helps to only consider the relevant
+    codes and data-types when processing.
+    """
     global flag
     # global _has_processed
     # _has_processed = set()

@@ -2,11 +2,11 @@
 set -e
 # set -x
 
-# CC=clang
-# LLC=llc
+CC=clang
+LLC=llc
 
-CC=clang-18
-LLC=llc-18
+# CC=clang-18
+# LLC=llc-18
 
 # CC=/home/farbod/clang/clang+llvm-17.0.5-x86_64-linux-gnu-ubuntu-22.04/bin/clang
 # LLC=/home/farbod/clang/clang+llvm-17.0.5-x86_64-linux-gnu-ubuntu-22.04/bin/llc

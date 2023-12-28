@@ -919,6 +919,7 @@ class Annotation(Instruction):
     ANN_CACHE_END_UPDATE   = 'ANN_CACHE_END_UPDATE'
 
     ANN_LOOP          = 'ANN_LOOP'
+    ANN_IGNORE_INST   = 'ANN_IGNORE_INST'
 
     def __init__(self, msg, ann_kind):
         super().__init__()
@@ -927,7 +928,8 @@ class Annotation(Instruction):
                 Annotation.ANN_CACNE_DEFINE, Annotation.ANN_CACHE_BEGIN,
                 Annotation.ANN_CACHE_END, Annotation.ANN_EXCLUDE_BEGIN,
                 Annotation.ANN_EXCLUDE_END, Annotation.ANN_CACHE_BEGIN_UPDATE,
-                Annotation.ANN_CACHE_END_UPDATE, Annotation.ANN_LOOP,)
+                Annotation.ANN_CACHE_END_UPDATE, Annotation.ANN_LOOP,
+                Annotation.ANN_IGNORE_INST)
         # self.msg = msg[1:-1]
         self.msg = eval(msg)
         self.ann_kind = ann_kind

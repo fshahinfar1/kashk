@@ -9,7 +9,6 @@ from passes.clone import clone_pass
 
 MODULE_TAG = '[Replace Func Ptr]'
 exclude_inst_flag = False
-skip_path_flag = False
 func_ptr_mapping = {}
 
 loop_ann = None
@@ -19,10 +18,6 @@ def _set_exclude_flag(val):
     global exclude_inst_flag
     exclude_inst_flag = val
 
-
-def _set_skip_path(val):
-    global skip_path_flag
-    skip_path_flag = val
 
 def _set_loop_ann(val):
     global loop_ann
@@ -51,8 +46,6 @@ def _process_current_inst(inst, info):
         elif inst.ann_kind == Annotation.ANN_LOOP:
             repeat = int(inst.msg)
             _set_loop_ann(repeat)
-        # elif inst.ann_kind == Annotation.ANN_SKIP:
-        #     _set_skip_path(True)
     elif inst.kind == clang.CursorKind.CALL_EXPR:
         if inst.is_func_ptr:
             actual = func_ptr_mapping.get(inst.name)
