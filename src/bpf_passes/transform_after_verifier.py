@@ -10,8 +10,10 @@ from bpf_code_gen import gen_code
 from passes.pass_obj import PassObject
 from bpf_passes.transform_vars import SEND_FLAG_NAME
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr, is_value_from_bpf_ctx
-from helpers.instruction_helper import get_ret_inst, get_ret_value_text
+from helpers.instruction_helper import (get_ret_inst, get_ret_value_text,
+        decl_new_var, ZERO)
 from helpers.cache_helper import generate_cache_update
+import template
 
 
 MODULE_TAG = '[2nd Transform]'
@@ -145,45 +147,49 @@ my_bpf_strncmp_loop(unsigned int index, void *arg)
             # No change is needed the builtin memcpy would work
             return inst
 
-        prerequisite = Literal('''struct bpf_memcpy_ctx {
-  unsigned short i;
-  char *dest;
-  char *src;
-  unsigned short n;
-  void *end_dest;
-  void *end_src;
-};
 
-static long
-bpf_memcpy_loop(unsigned int index, void *arg)
-{
-  struct bpf_memcpy_ctx *ll = arg;
-  if ((void *)(ll->dest + ll->i + 1) > ll->end_dest)
-    return 1;
-  if ((void *)(ll->src  + ll->i + 1) > ll->end_src)
-    return 1;
-  ll->dest[ll->i] = ll->src[ll->i];
-  if (ll->i >= ll->n - 1) {
-    return 1;
-  }
-  ll->i++;
-  return 0;
-}''', CODE_LITERAL)
-        if not Function.directory['bpf_memcpy'].is_used_in_bpf_code:
-            info.prog.add_declaration(prerequisite)
-
+        assert isinstance(inst.repeat, int), 'The max bound is not set for variable-sized memcpy'
+        max_bound = Literal(str(inst.repeat), clang.CursorKind.INTEGER_LITERAL)
         src = inst.args[0]
-        dest = inst.args[1]
-        if is_bpf_ctx_ptr(src, info):
-            end_src = info.prog.get_pkt_end()
-        else:
-            end_src = BinOp.build(src, '+', inst.args[2])
-        if is_bpf_ctx_ptr(dest, info):
-            end_dest = info.prog.get_pkt_end()
-        else:
-            end_dest = BinOp.build(dest, '+', inst.args[2])
-        inst.args.extend([end_src, end_dest,])
-        return _rename_func_to_a_known_one(inst, info, 'bpf_memcpy')
+        dst = inst.args[1]
+
+        bound_check_src = is_bpf_ctx_ptr(src, info)
+        bound_check_dst = is_bpf_ctx_ptr(dst, info)
+
+        T = BASE_TYPES[clang.TypeKind.USHORT]
+        loop_var = decl_new_var(T, info, declare_at_top_of_func)
+        initialize = BinOp.build(loop_var, '=', ZERO)
+
+        max_bound_check = BinOp.build(loop_var, '<', max_bound)
+        var_bound_check = BinOp.build(loop_var, '<', size)
+        condition = BinOp.build(max_bound_check, '&&', var_bound_check)
+
+        post = UnaryOp.build('++', loop_var)
+        loop = ForLoop.build(initialize, condition, post)
+        loop.repeat = max_bound
+
+        if bound_check_src:
+            data_end = info.prog.get_pkt_end()
+            ret = None
+            tmp_check = template.bpf_ctx_bound_check(src,
+                    loop_var, data_end, ret)
+            loop.body.add_inst(tmp_check)
+
+        if bound_check_dst:
+            data_end = info.prog.get_pkt_end()
+            ret = None
+            tmp_check = template.bpf_ctx_bound_check(dst,
+                    loop_var, data_end, ret)
+            loop.body.add_inst(tmp_check)
+
+        at_src = ArrayAccess.build(src, loop_var)
+        at_dst = ArrayAccess.build(dst, loop_var)
+        copy = BinOp.build(at_src, '=', at_dst)
+
+        loop.body.add_inst(copy)
+
+        # blk = cb_ref.get(BODY)
+        return loop
     elif inst.name in ('ntohs', 'ntohl', 'htons', 'htonl'):
         inst.name = 'bpf_'+inst.name
         return inst
@@ -193,7 +199,7 @@ bpf_memcpy_loop(unsigned int index, void *arg)
     elif inst.name == 'ntohll':
         inst.name = 'bpf_be64_to_cpu'
         return inst
-    error(f'Know function {inst.name} is not implemented yet')
+    error(f'Known function {inst.name} is not implemented yet')
     return inst
 
 

@@ -371,9 +371,9 @@ def gen_bpf_code(bpf, info, out_bpf):
     bpf = change_to_bpf_loop(bpf, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~')
 
-    debug('Program Complexity Pass')
-    list_bpf_progs = mitiage_program_comlexity(bpf, info, None)
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    # debug('Program Complexity Pass')
+    # list_bpf_progs = mitiage_program_comlexity(bpf, info, None)
+    # debug('~~~~~~~~~~~~~~~~~~~~~')
 
     # TODO: split the code between parser and verdict
     debug('[Parser/Verdict Split Code]')

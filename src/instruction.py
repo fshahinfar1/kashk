@@ -238,6 +238,7 @@ class Call(Instruction):
 
         self.rd_buf = None
         self.wr_buf = None
+        self.repeat = None
 
     def __str__(self):
         return f'<Call {self.name} ({self.args})>'
@@ -271,6 +272,7 @@ class Call(Instruction):
         new.rd_buf = self.rd_buf
         new.wr_buf = self.wr_buf
         new.change_applied = self.change_applied
+        new.repeat = self.repeat
         return new
 
     @property
@@ -527,6 +529,16 @@ class BinOp(Instruction):
         self.op = tokens[lhs_tokens].spelling
         assert self.op in BinOp.ALL_OP, f'Unexpected binary operation requseted ({self.op})'
 
+    @property
+    def type(self):
+        if self.op in (BinOp.REL_OP + BinOp.LOGICAL_OP):
+            # Boolean result
+            return  BASE_TYPES[clang.TypeKind.UCHAR]
+        else:
+            # Otherwise what ever is the type of first operand
+            T = self.lhs.children[0].type
+            return T
+
     def has_children(self):
         return True
 
@@ -578,6 +590,14 @@ class CaseSTMT(Instruction):
 
 
 class ArrayAccess(Instruction):
+    @classmethod
+    def build(cls, ref, index):
+        obj = ArrayAccess(ref.type)
+        obj.array_ref = ref
+        assert isinstance(index, Instruction)
+        obj.index.add_inst(index)
+        return obj
+
     def __init__(self, T):
         super().__init__()
         self.kind = clang.CursorKind.ARRAY_SUBSCRIPT_EXPR
@@ -779,6 +799,14 @@ class Literal(Instruction):
         return new
 
 class ForLoop(Instruction):
+    @classmethod
+    def build(cls, pre, cond, post):
+        obj = ForLoop()
+        obj.pre.add_inst(pre)
+        obj.cond.add_inst(cond)
+        obj.post.add_inst(post)
+        return obj
+
     def __init__(self):
         super().__init__()
         self.cursor = None
@@ -929,7 +957,7 @@ class Annotation(Instruction):
                 Annotation.ANN_CACHE_END, Annotation.ANN_EXCLUDE_BEGIN,
                 Annotation.ANN_EXCLUDE_END, Annotation.ANN_CACHE_BEGIN_UPDATE,
                 Annotation.ANN_CACHE_END_UPDATE, Annotation.ANN_LOOP,
-                Annotation.ANN_IGNORE_INST)
+                Annotation.ANN_IGNORE_INST,)
         # self.msg = msg[1:-1]
         self.msg = eval(msg)
         self.ann_kind = ann_kind

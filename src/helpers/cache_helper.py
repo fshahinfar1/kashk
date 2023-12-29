@@ -1,23 +1,10 @@
 import json
-from utility import get_tmp_var_name
+from utility import get_tmp_var_name 
 from instruction import *
 from data_structure import *
 from parser.parse_helper import is_identifier
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
-from helpers.instruction_helper import get_ret_inst
-
-
-ZERO = Literal('0', clang.CursorKind.INTEGER_LITERAL)
-ONE  = Literal('1', clang.CursorKind.INTEGER_LITERAL)
-
-
-def decl_new_var(T, info, decl_list):
-    tmp_name = get_tmp_var_name()
-    tmp_decl = VarDecl.build(tmp_name, T)
-    decl_list.append(tmp_decl)
-    tmp_decl.update_symbol_table(info.sym_tbl)
-    tmp_ref = tmp_decl.get_ref()
-    return tmp_ref
+from helpers.instruction_helper import get_ret_inst, decl_new_var, ZERO, ONE
 
 
 def get_var_end(var, upper_bound_inst, info):

@@ -1,6 +1,7 @@
 from instruction import *
 from data_structure import *
-from helpers.instruction_helper import symbol_for_inst
+from helpers.instruction_helper import symbol_for_inst, simplify_inst_to_ref, ZERO
+from bpf_code_gen import gen_code
 
 
 def is_value_from_bpf_ctx(inst, info, R=None):
@@ -19,8 +20,18 @@ def is_value_from_bpf_ctx(inst, info, R=None):
         Access is to ptr from off to off+size.
     """
     # TODO: the cases are incomplete
-    ZERO = Literal('0', CODE_LITERAL)
-    if inst.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
+    if inst.kind == clang.CursorKind.DECL_REF_EXPR:
+        T = inst.type
+        if T.is_pointer() or T.is_array():
+            # It is a pointer and not an actual value
+            return False
+        sym = info.sym_tbl.lookup(inst.name)
+        if sym is not None and sym.is_bpf_ctx:
+            if R is not None:
+                R.append((inst, ZERO, ZERO))
+            return True
+        return False
+    elif inst.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
         if is_bpf_ctx_ptr(inst.array_ref, info):
             if R is not None:
                 ref = inst.array_ref
@@ -76,6 +87,9 @@ def is_bpf_ctx_ptr(inst, info):
     """
     # TODO: this is incomplete
     if inst.kind == clang.CursorKind.DECL_REF_EXPR:
+        T = inst.type
+        if not (T.is_pointer() or T.is_array()):
+            return False
         # A simple variable reference
         sym = info.sym_tbl.lookup(inst.name)
         # assert sym is not None, 'What does it mean there is no symbol table entry  ??'
@@ -94,6 +108,7 @@ def is_bpf_ctx_ptr(inst, info):
                     or is_bpf_ctx_ptr(inst.rhs.children[0], info)):
                 return True
     elif inst.kind == clang.CursorKind.UNARY_OPERATOR and inst.op == '&':
+        text, _ = gen_code([inst, ], info)
         if is_value_from_bpf_ctx(inst.child.children[0], info):
             return True
     elif inst.kind == clang.CursorKind.CSTYLE_CAST_EXPR:
@@ -109,8 +124,11 @@ def is_bpf_ctx_ptr(inst, info):
         # debug("THERE IS A BUG HERE, WHAT IF THERE ARE MULTIPLE NESTED STRUCTS? I NEED A RECURSION HERE.")
         owner = inst.owner[-1]
         if not isinstance(owner, Ref):
-            error('Owner is not a reference and handling this case is not implemented yet [2]')
-            return
+            tmp = simplify_inst_to_ref(owner)
+            if tmp is None:
+                error('Owner is not a reference and handling this case is not implemented yet [2]')
+                return
+            owner = tmp
         owner_symbol = info.sym_tbl.lookup(owner.name)
         if owner_symbol is None:
             error(f'We do not recognize the owner of member access instruction! ({owner.name})')

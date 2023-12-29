@@ -1,5 +1,10 @@
-from data_structure import StateObject
+from data_structure import *
 from instruction import *
+from utility import get_tmp_var_name
+
+
+ZERO = Literal('0', clang.CursorKind.INTEGER_LITERAL)
+ONE  = Literal('1', clang.CursorKind.INTEGER_LITERAL)
 
 
 def show_insts(lst, depth=0):
@@ -164,3 +169,29 @@ def add_flag_to_func(flag, func, info):
         info.prog.add_args_to_scope(scope)
     else:
         raise Exception('Not implemented yet!')
+
+
+def decl_new_var(T: MyType, info: Info, decl_list: list[Instruction]) -> Ref:
+    """
+    Declare a new variable. The variable declaration will be added to the
+    `decl_list` param.
+    @returns a Ref object of the new variable
+    """
+    tmp_name = get_tmp_var_name()
+    tmp_decl = VarDecl.build(tmp_name, T)
+    decl_list.append(tmp_decl)
+    tmp_decl.update_symbol_table(info.sym_tbl)
+    tmp_ref = tmp_decl.get_ref()
+    return tmp_ref
+
+
+def simplify_inst_to_ref(inst):
+    if isinstance(inst, Ref):
+        return inst
+    if isinstance(inst, UnaryOp):
+        if inst.op not in ('*', '&'):
+            # The result is not a reference
+            return None
+        child = inst.child.children[0]
+        return simplify_inst_to_ref(child)
+    return None

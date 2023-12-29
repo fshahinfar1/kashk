@@ -1,6 +1,7 @@
 from log import debug
 from instruction import *
 from data_structure import *
+from prune import MEMORY_ACCESS_FUNC
 
 from passes.pass_obj import PassObject
 from passes.mark_used_funcs import mark_used_funcs
@@ -24,28 +25,41 @@ def _set_loop_ann(val):
     loop_ann = val
 
 
+def _process_annotation(inst, info):
+    if inst.ann_kind == Annotation.ANN_FUNC_PTR:
+        ptr, actual = inst.msg.split(Annotation.FUNC_PTR_DELIMITER)
+        func_ptr_mapping[ptr] = actual
+        # debug(MODULE_TAG, ptr, '-->', actual)
+        return None
+    elif inst.ann_kind == Annotation.ANN_EXCLUDE_BEGIN:
+        _set_exclude_flag(True)
+        return None
+    elif inst.ann_kind == Annotation.ANN_EXCLUDE_END:
+        _set_exclude_flag(False)
+        return None
+    elif inst.ann_kind == Annotation.ANN_LOOP:
+        repeat = int(inst.msg)
+        _set_loop_ann(repeat)
+        return None
+    # Do not remove the rest of annotations
+    return inst
+
+
 def _process_current_inst(inst, info):
     if loop_ann is not None:
-        assert inst.kind in MAY_HAVE_BACKWARD_JUMP_INSTRUCTIONS
-        inst.repeat = loop_ann
+        # Apply the loop annotation
+        if inst.kind in MAY_HAVE_BACKWARD_JUMP_INSTRUCTIONS:
+            inst.repeat = loop_ann
+        elif (inst.kind == clang.CursorKind.CALL_EXPR and
+                inst.name in MEMORY_ACCESS_FUNC):
+            inst.repeat = loop_ann
+        else:
+            raise Exception('The Loop annotation is not set to a currect instruction')
         _set_loop_ann(None)
         return inst
 
     if inst.kind == ANNOTATION_INST:
-        if inst.ann_kind == Annotation.ANN_FUNC_PTR:
-            ptr, actual = inst.msg.split(Annotation.FUNC_PTR_DELIMITER)
-            func_ptr_mapping[ptr] = actual
-            # debug(MODULE_TAG, ptr, '-->', actual)
-            return None
-        elif inst.ann_kind == Annotation.ANN_EXCLUDE_BEGIN:
-            _set_exclude_flag(True)
-            return None
-        elif inst.ann_kind == Annotation.ANN_EXCLUDE_END:
-            _set_exclude_flag(False)
-            return None
-        elif inst.ann_kind == Annotation.ANN_LOOP:
-            repeat = int(inst.msg)
-            _set_loop_ann(repeat)
+        return _process_annotation(inst, info)
     elif inst.kind == clang.CursorKind.CALL_EXPR:
         if inst.is_func_ptr:
             actual = func_ptr_mapping.get(inst.name)
@@ -98,6 +112,7 @@ def replace_func_pointers(bpf, info, more):
     Apply some of the annotations
     1. Function pointer
     2. Exclude regions
+    3. Loops, Memcpy, ... bounds
     """
     global func_ptr_mapping
     func_ptr_mapping = {}
