@@ -26,17 +26,11 @@ def bpf_ctx_bound_check(ref, index, data_end, return_value=None):
     lhs_cast.castee.add_inst(pkt_off)
     lhs_cast.type = VOID_PTR
 
-    # (void *)(data_end)
-    rhs_cast = Cast()
-    rhs_cast.castee.add_inst(data_end)
-    rhs_cast.type = VOID_PTR
-
-
     # (void *)(ref + size + 1) > (void *)(data_end)
     cond = BinOp(None)
     cond.op = '>'
     cond.lhs.add_inst(lhs_cast)
-    cond.rhs.add_inst(rhs_cast)
+    cond.rhs.add_inst(data_end)
 
     # return 0
     ret = Return()
@@ -72,16 +66,11 @@ def bpf_ctx_bound_check_bytes(ref, size, data_end, return_value=None):
     pkt_off.lhs.add_inst(lhs_cast)
     pkt_off.rhs.add_inst(size_plus_one)
 
-    # (void *)(data_end)
-    rhs_cast = Cast()
-    rhs_cast.castee.add_inst(data_end)
-    rhs_cast.type = VOID_PTR
-
     # (void *)(ref + size + 1) > (void *)(data_end)
     cond = BinOp(None)
     cond.op = '>'
     cond.lhs.add_inst(pkt_off)
-    cond.rhs.add_inst(rhs_cast)
+    cond.rhs.add_inst(data_end)
 
     # return 0
     ret = Return()
