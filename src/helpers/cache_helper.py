@@ -5,6 +5,7 @@ from data_structure import *
 from parser.parse_helper import is_identifier
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
 from helpers.instruction_helper import get_ret_inst, decl_new_var, ZERO, ONE
+import template
 
 
 def get_var_end(var, upper_bound_inst, info):
@@ -16,7 +17,7 @@ def get_var_end(var, upper_bound_inst, info):
     return end
 
 
-def gen_memcpy(info, current_function, dst, src, size, upper_bound):
+def gen_bpf_memcpy(info, current_function, dst, src, size, upper_bound):
     """
     A helper function for generating code copying values from a pointer/array
     to another one.
@@ -40,6 +41,10 @@ def gen_memcpy(info, current_function, dst, src, size, upper_bound):
     src_end = get_var_end(src, size, info)
     memcpy.args.extend([dst, src, size, dest_end, src_end])
     return [mask_assign, sz_check, memcpy]
+
+
+def gen_memcpy(info, current_function, dst, src, size, upper_bound):
+    return template.variable_memcpy(dst, src, size, upper_bound, info)
 
 
 def get_map_name(map_id):
@@ -259,49 +264,24 @@ def generate_cache_update(inst, blk, current_function, info):
     null_check_cond = BinOp.build(item_ref, '!=', Literal('NULL', clang.CursorKind.INTEGER_LITERAL))
     null_check = ControlFlowInst.build_if_inst(null_check_cond)
 
-    # compare the key and lookup result's key
-    # tmp_var = decl_new_var(BASE_TYPES[clang.TypeKind.INT], info,
-    #         declare_at_top_of_func)
-    # strncmp = Call(None)
-    # strncmp.name = 'my_bpf_strncmp'
-    # key_field = item_ref.get_ref_field('key', info)
-    # strncmp.args.extend([key_field, key, key_size])
-    # tmp_assign = BinOp.build(tmp_var, '=', strncmp)
-    # null_check.body.add_inst(tmp_assign)
-
-    # check if the key match
-    # key_check_cond = BinOp.build(tmp_var, '==', Literal('0', clang.CursorKind.INTEGER_LITERAL))
-    # key_check = ControlFlowInst.build_if_inst(key_check_cond)
-    # null_check.body.add_inst(key_check)
-
     # Update cache
     ## rewrite key
     dest_ref = item_ref.get_ref_field('key', info)
-    cpy_insts = gen_memcpy(info, current_function,
+    cpy, decl = gen_memcpy(info, current_function,
             dest_ref, key, key_size, upper_bound='255')
-    null_check.body.extend_inst(cpy_insts)
+    declare_at_top_of_func.extend(decl)
+    null_check.body.add_inst(cpy)
     key_size_field = item_ref.get_ref_field('key_size', info)
     size_assign = BinOp.build(key_size_field, '=', key_size)
     null_check.body.add_inst(size_assign)
     ## rewrite value
     dest_ref = item_ref.get_ref_field('value', info)
-    cpy_insts = gen_memcpy(info, current_function,
+    cpy, decl = gen_memcpy(info, current_function,
             dest_ref, value, value_size, upper_bound='255')
-    null_check.body.extend_inst(cpy_insts)
+    declare_at_top_of_func.extend(decl)
+    null_check.body.add_inst(cpy)
     size_assign = BinOp.build(item_ref.get_ref_field('value_size', info), '=', value_size)
     null_check.body.add_inst(size_assign)
-
     insts.append(null_check)
-
-    # map_update_call = Call(None)
-    # map_update_call.name = 'bpf_map_update_elem'
-    # arg1 = Literal(f'&{map_name}', CODE_LITERAL)
-    # arg2 = Literal(f'&{index_name}', CODE_LITERAL)
-    # arg3 = value
-    # arg4 = Literal('BPF_ANY', CODE_LITERAL)
-    # map_update_call.args.extend([arg1, arg2, arg3, arg4])
-    # TODO: do I need to check update_elem return code?
-    # insts.append(map_update_call)
-
     blk.extend(insts)
     return None, declare_at_top_of_func

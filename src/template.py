@@ -1,6 +1,8 @@
 from instruction import *
 from data_structure import *
 from utility import get_tmp_var_name
+from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
+from helpers.instruction_helper import decl_new_var, ZERO, NULL, CHAR_PTR
 
 VOID_PTR = 'void *'
 
@@ -105,8 +107,6 @@ def shared_map_decl():
 
 
 def prepare_shared_state_var(ret_val=None):
-    NULL = Literal('NULL', clang.CursorKind.MACRO_INSTANTIATION)
-    ZERO = Literal('0', clang.CursorKind.INTEGER_LITERAL)
     SHARED_MAP_PTR = Literal('&shared_map', CODE_LITERAL)
 
     shared_struct = MyType.make_simple('struct shared_state',
@@ -221,3 +221,47 @@ def malloc_lookup(name, info, return_val):
     ref.owner.append(owner)
 
     return [var_decl, lookup_inst], ref
+
+
+def variable_memcpy(dst, src, size, up_bound, info):
+    declare_at_top_of_func = []
+    max_bound = Literal(str(up_bound), clang.CursorKind.INTEGER_LITERAL)
+    bound_check_src = is_bpf_ctx_ptr(src, info)
+    bound_check_dst = is_bpf_ctx_ptr(dst, info)
+
+    if not hasattr(src, 'type'):
+        src = Cast.build(src, CHAR_PTR)
+    if not hasattr(dst, 'type'):
+        dst = Cast.build(dst, CHAR_PTR)
+
+    T = BASE_TYPES[clang.TypeKind.USHORT]
+    loop_var = decl_new_var(T, info, declare_at_top_of_func)
+    initialize = BinOp.build(loop_var, '=', ZERO)
+
+    max_bound_check = BinOp.build(loop_var, '<', max_bound)
+    var_bound_check = BinOp.build(loop_var, '<', size)
+    condition = BinOp.build(max_bound_check, '&&', var_bound_check)
+
+    post = UnaryOp.build('++', loop_var)
+    loop = ForLoop.build(initialize, condition, post)
+    loop.repeat = max_bound
+
+    if bound_check_src:
+        data_end = info.prog.get_pkt_end()
+        # TODO: may return appropriate value based on function
+        ret = None
+        tmp_check = bpf_ctx_bound_check(src, loop_var, data_end, ret)
+        loop.body.add_inst(tmp_check)
+
+    if bound_check_dst:
+        data_end = info.prog.get_pkt_end()
+        # TODO: may return appropriate value based on function
+        ret = None
+        tmp_check = bpf_ctx_bound_check(dst, loop_var, data_end, ret)
+        loop.body.add_inst(tmp_check)
+
+    at_src = ArrayAccess.build(src, loop_var)
+    at_dst = ArrayAccess.build(dst, loop_var)
+    copy = BinOp.build(at_src, '=', at_dst)
+    loop.body.add_inst(copy)
+    return loop, declare_at_top_of_func

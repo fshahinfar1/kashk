@@ -1,7 +1,6 @@
 from instruction import *
 from data_structure import *
 from helpers.instruction_helper import symbol_for_inst, simplify_inst_to_ref, ZERO
-from bpf_code_gen import gen_code
 
 
 def is_value_from_bpf_ctx(inst, info, R=None):
@@ -108,7 +107,6 @@ def is_bpf_ctx_ptr(inst, info):
                     or is_bpf_ctx_ptr(inst.rhs.children[0], info)):
                 return True
     elif inst.kind == clang.CursorKind.UNARY_OPERATOR and inst.op == '&':
-        text, _ = gen_code([inst, ], info)
         if is_value_from_bpf_ctx(inst.child.children[0], info):
             return True
     elif inst.kind == clang.CursorKind.CSTYLE_CAST_EXPR:

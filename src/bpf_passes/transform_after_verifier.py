@@ -10,8 +10,7 @@ from bpf_code_gen import gen_code
 from passes.pass_obj import PassObject
 from bpf_passes.transform_vars import SEND_FLAG_NAME
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr, is_value_from_bpf_ctx
-from helpers.instruction_helper import (get_ret_inst, get_ret_value_text,
-        decl_new_var, ZERO)
+from helpers.instruction_helper import (get_ret_inst, get_ret_value_text)
 from helpers.cache_helper import generate_cache_update
 import template
 
@@ -146,49 +145,12 @@ my_bpf_strncmp_loop(unsigned int index, void *arg)
         if is_constant:
             # No change is needed the builtin memcpy would work
             return inst
-
-
         assert isinstance(inst.repeat, int), 'The max bound is not set for variable-sized memcpy'
-        max_bound = Literal(str(inst.repeat), clang.CursorKind.INTEGER_LITERAL)
+        max_bound = inst.repeat
         src = inst.args[0]
         dst = inst.args[1]
-
-        bound_check_src = is_bpf_ctx_ptr(src, info)
-        bound_check_dst = is_bpf_ctx_ptr(dst, info)
-
-        T = BASE_TYPES[clang.TypeKind.USHORT]
-        loop_var = decl_new_var(T, info, declare_at_top_of_func)
-        initialize = BinOp.build(loop_var, '=', ZERO)
-
-        max_bound_check = BinOp.build(loop_var, '<', max_bound)
-        var_bound_check = BinOp.build(loop_var, '<', size)
-        condition = BinOp.build(max_bound_check, '&&', var_bound_check)
-
-        post = UnaryOp.build('++', loop_var)
-        loop = ForLoop.build(initialize, condition, post)
-        loop.repeat = max_bound
-
-        if bound_check_src:
-            data_end = info.prog.get_pkt_end()
-            ret = None
-            tmp_check = template.bpf_ctx_bound_check(src,
-                    loop_var, data_end, ret)
-            loop.body.add_inst(tmp_check)
-
-        if bound_check_dst:
-            data_end = info.prog.get_pkt_end()
-            ret = None
-            tmp_check = template.bpf_ctx_bound_check(dst,
-                    loop_var, data_end, ret)
-            loop.body.add_inst(tmp_check)
-
-        at_src = ArrayAccess.build(src, loop_var)
-        at_dst = ArrayAccess.build(dst, loop_var)
-        copy = BinOp.build(at_src, '=', at_dst)
-
-        loop.body.add_inst(copy)
-
-        # blk = cb_ref.get(BODY)
+        loop, decl = template.variable_memcpy(dst, src, size, max_bound, info)
+        declare_at_top_of_func.extend(decl)
         return loop
     elif inst.name in ('ntohs', 'ntohl', 'htons', 'htonl'):
         inst.name = 'bpf_'+inst.name
