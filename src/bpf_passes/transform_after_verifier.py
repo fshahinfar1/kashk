@@ -22,6 +22,14 @@ _has_processed_func = set()
 declare_at_top_of_func = None
 
 
+def _add_paranthesis_if_needed(inst):
+    if isinstance(inst, (UnaryOp, BinOp)):
+        new = Parenthesis.build(inst)
+        return new
+    return inst
+
+
+
 @contextmanager
 def set_current_func(func):
     global current_function
@@ -147,8 +155,8 @@ my_bpf_strncmp_loop(unsigned int index, void *arg)
             return inst
         assert isinstance(inst.repeat, int), 'The max bound is not set for variable-sized memcpy'
         max_bound = inst.repeat
-        src = inst.args[0]
-        dst = inst.args[1]
+        dst = _add_paranthesis_if_needed(inst.args[0])
+        src = _add_paranthesis_if_needed(inst.args[1])
         loop, decl = template.variable_memcpy(dst, src, size, max_bound, info)
         declare_at_top_of_func.extend(decl)
         return loop

@@ -637,10 +637,22 @@ class ArrayAccess(Instruction):
 
 
 class Parenthesis(Instruction):
+    @classmethod
+    def build(cls, inst):
+        obj = Parenthesis()
+        obj.body.add_inst(inst)
+        return obj
+
     def __init__(self):
         super().__init__()
         self.kind = clang.CursorKind.PAREN_EXPR
         self.body = Block(ARG)
+
+    @property
+    def type(self):
+        assert len(self.body.children) == 1
+        inner_inst = self.body.children[0]
+        return inner_inst.type
 
     def has_children(self):
         return True
