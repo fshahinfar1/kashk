@@ -139,32 +139,34 @@ def prepare_shared_state_var(ret_val=None):
 
 
 def prepare_meta_data(failure_number, meta_declaration, info):
+    decl = []
     type_name = f'struct {meta_declaration.name}'
     req_type = MyType.make_simple(type_name, clang.TypeKind.RECORD)
     T = MyType.make_pointer(req_type)
 
     target_size_inst = Literal(f'sizeof({req_type.spelling})', CODE_LITERAL)
-    adjust_inst = info.prog.adjust_pkt(target_size_inst, info)
+    adjust_inst, tmp_decl = info.prog.adjust_pkt(target_size_inst, info)
+    decl.extend(tmp_decl)
 
-    meta_var_name = get_tmp_var_name()
-    decl = VarDecl.build(meta_var_name, T)
-    decl.update_symbol_table(info.sym_tbl)
-
-    ref = decl.get_ref()
+    # meta_var_name = get_tmp_var_name()
+    # decl = VarDecl.build(meta_var_name, T)
+    # decl.update_symbol_table(info.sym_tbl)
+    # ref = decl.get_ref()
+    ref = decl_new_var(T, info, decl)
     assign = BinOp.build(ref, '=', info.prog.get_pkt_buf())
 
     DROP = Literal(info.prog.get_drop(), clang.CursorKind.INTEGER_LITERAL)
     ZERO = Literal('0', clang.CursorKind.INTEGER_LITERAL)
     bound_check = bpf_ctx_bound_check(ref, ZERO, info.prog.get_pkt_end(), DROP)
 
-    store = [f'{meta_var_name}->failure_number = {failure_number};', ]
+    store = [f'{ref.name}->failure_number = {failure_number};', ]
     for f in meta_declaration.fields[1:]:
-        store.append(f'{meta_var_name}->{f.name} = {f.name};')
+        store.append(f'{ref.name}->{f.name} = {f.name};')
     code = '\n'.join(store) + '\n'
     populate = Literal(code, CODE_LITERAL)
 
-    insts = adjust_inst + [decl, assign, bound_check, populate]
-    return insts
+    insts = adjust_inst + [assign, bound_check, populate]
+    return insts, decl
 
 
 def define_bpf_map(map_name, map_type, key_type, val_type, entries):

@@ -5,7 +5,7 @@ from instruction import *
 from log import debug
 from bpf_code_gen import gen_code
 
-from helpers.instruction_helper import CHAR_PTR
+from helpers.instruction_helper import decl_new_var, CHAR_PTR, INT
 import template
 
 
@@ -153,7 +153,8 @@ class BPF_PROG:
             # I will use a simple for loop with an upper bound.
             # _use_memcpy(info)
 
-        inst = self.adjust_pkt(write_size, info)
+        inst, decl = self.adjust_pkt(write_size, info)
+        inst = decl + inst
         if do_copy:
             if memcpy == 'memcpy':
                 off          = BinOp.build(self.get_pkt_buf(), '+', write_size)
@@ -324,18 +325,17 @@ int xdp_prog(struct xdp_md *xdp)
         # NOTE 2: since we have updated the get_pkt_size to not include the
         # header size we do not need to update here! (got a bit complex :) )
 
-        tmp_name = get_tmp_var_name()
-        decl         = VarDecl.build(tmp_name, BASE_TYPES[clang.TypeKind.INT])
-        delta_ref    = decl.get_ref()
+        decl = []
+
+        delta_ref = decl_new_var(INT, info, decl)
         compute_size = BinOp.build(req_size, '-', self.get_pkt_size())
         delta_assign = BinOp.build(delta_ref, '=', compute_size)
-        decl.update_symbol_table(info.sym_tbl)
 
         adjust_pkt   = Call(None)
         adjust_pkt.name = 'bpf_xdp_adjust_tail'
         adjust_pkt.args = [self.get_ctx_ref(), delta_ref]
-        insts = [decl, delta_assign, adjust_pkt]
-        return insts
+        insts = [delta_assign, adjust_pkt]
+        return insts, decl
 
     def get_drop(self):
         return 'XDP_DROP'
@@ -482,7 +482,7 @@ if (!sock_ctx) {
         adjust_pkt.name = '__adjust_skb_size'
         adjust_pkt.args = [self.get_ctx_ref(), final_size]
         insts = [adjust_pkt]
-        return insts
+        return insts, []
 
     def get_drop(self):
         return 'SK_DROP'

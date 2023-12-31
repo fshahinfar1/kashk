@@ -83,11 +83,13 @@ def _generate_failure_flag_check_in_main_func_if_else(flag_ref, func, info):
     current_function = None
     first_failure_case = None
     prev_failure_case = None
+    decl = []
 
     for failure_number in set(func.path_ids):
         # TODO: change declaration to a dictionary instead of array
         meta = info.user_prog.declarations[failure_number-1]
-        prepare_meta_code = prepare_meta_data(failure_number, meta, info)
+        prepare_meta_code, tmp_decl = prepare_meta_data(failure_number, meta, info)
+        decl.extend(tmp_decl)
 
         # Check the failure number
         int_literal = Literal(str(failure_number), clang.CursorKind.INTEGER_LITERAL)
@@ -102,7 +104,7 @@ def _generate_failure_flag_check_in_main_func_if_else(flag_ref, func, info):
             first_failure_case = if_inst
         prev_failure_case = if_inst
     return_stmt = first_failure_case
-    return return_stmt
+    return return_stmt, decl
 
 
 def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
@@ -117,6 +119,8 @@ def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
     """
     # We must be in BPF main function
     current_function = None
+
+    decl = []
 
     switch      = ControlFlowInst()
     switch.kind = clang.CursorKind.SWITCH_STMT
@@ -133,7 +137,8 @@ def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
         assert failure_number != 0, 'The zero can not be a failure id'
         # TODO: change declaration to a dictionary instead of array
         meta = info.user_prog.declarations[failure_number-1]
-        prepare_meta_code = prepare_meta_data(failure_number, meta, info)
+        prepare_meta_code, tmp_decl = prepare_meta_data(failure_number, meta, info)
+        decl.extend(tmp_decl)
 
         # Check the failure number
         int_literal = Literal(str(failure_number), clang.CursorKind.INTEGER_LITERAL)
@@ -142,7 +147,7 @@ def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
         case.body.extend_inst(prepare_meta_code)
         case.body.add_inst(ToUserspace.from_func_obj(current_function))
         switch.body.add_inst(case)
-    return switch
+    return switch, decl
 
 
 def _handle_function_may_fail(inst, func, info, more):
@@ -192,7 +197,8 @@ def _handle_function_may_fail(inst, func, info, more):
 
         if current_function == None:
             assert len(func.path_ids) > 0
-            return_stmt = _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info)
+            return_stmt, tmp_decl = _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info)
+            declare_at_top_of_func.extend(tmp_decl)
 
         # The code that should run when there is a failure
         if flag_ref.type.is_pointer():
@@ -267,7 +273,8 @@ def _process_current_inst(inst, info, more):
         if current_function is None:
             # Found a split point on the BPF entry function
             meta = info.user_prog.declarations[failure_number - 1]
-            prepare_pkt = prepare_meta_data(failure_number, meta, info)
+            prepare_pkt, tmp_decl = prepare_meta_data(failure_number, meta, info)
+            declare_at_top_of_func.extend(tmp_decl)
             blk.extend(prepare_pkt)
         else:
             sym = info.sym_tbl.lookup(FAIL_FLAG_NAME)
