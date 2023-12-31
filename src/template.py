@@ -37,7 +37,8 @@ def bpf_ctx_bound_check(ref, index, data_end, return_value=None):
     # return 0
     ret = Return()
     if return_value is None:
-        ret.body.add_inst(Literal('0', kind=clang.CursorKind.INTEGER_LITERAL))
+        # ret.body.add_inst(Literal('0', kind=clang.CursorKind.INTEGER_LITERAL))
+        pass
     else:
         ret.body.add_inst(return_value)
 
@@ -238,11 +239,21 @@ def new_bounded_loop(var_bound, max_bound, info, loop_var_type=INT):
     return loop, decl, loop_var
 
 
-def variable_memcpy(dst, src, size, up_bound, info):
+def _add_paranthesis_if_needed(inst):
+    if isinstance(inst, (UnaryOp, BinOp, Cast)):
+        new = Parenthesis.build(inst)
+        return new
+    return inst
+
+
+def variable_memcpy(dst, src, size, up_bound, info, fail_return_inst=None):
     declare_at_top_of_func = []
     max_bound = Literal(str(up_bound), clang.CursorKind.INTEGER_LITERAL)
     bound_check_src = is_bpf_ctx_ptr(src, info)
     bound_check_dst = is_bpf_ctx_ptr(dst, info)
+
+    src = _add_paranthesis_if_needed(src)
+    dst = _add_paranthesis_if_needed(dst)
 
     if not hasattr(src, 'type'):
         src = Cast.build(src, CHAR_PTR)
@@ -255,15 +266,13 @@ def variable_memcpy(dst, src, size, up_bound, info):
 
     if bound_check_src:
         data_end = info.prog.get_pkt_end()
-        # TODO: may return appropriate value based on function
-        ret = None
+        ret = fail_return_inst
         tmp_check = bpf_ctx_bound_check(src, loop_var, data_end, ret)
         loop.body.add_inst(tmp_check)
 
     if bound_check_dst:
         data_end = info.prog.get_pkt_end()
-        # TODO: may return appropriate value based on function
-        ret = None
+        ret = fail_return_inst
         tmp_check = bpf_ctx_bound_check(dst, loop_var, data_end, ret)
         loop.body.add_inst(tmp_check)
 
@@ -283,6 +292,9 @@ def strncmp(s1, s2, size, upper_bound, info):
     assert s1.type.under_type.spelling == 'char'
     assert s2.type.is_pointer() or s2.type.is_array()
     assert s2.type.under_type.spelling == 'char'
+
+    s1 = _add_paranthesis_if_needed(s1)
+    s2 = _add_paranthesis_if_needed(s2)
 
     decl = []
     max_bound = Literal(str(upper_bound), clang.CursorKind.INTEGER_LITERAL)

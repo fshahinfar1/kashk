@@ -4,6 +4,7 @@ set -e
 
 CC=clang
 LLC=llc
+CFLAGS="$CFLAGS -Wall"
 
 # CC=clang-18
 # LLC=llc-18
@@ -35,6 +36,7 @@ fi
 $CC -S \
 	-target bpf \
 	-D __BPF_TRACING__ \
+	$CFLAGS \
 	-Wall \
 	-Wno-unused-value \
 	-Wno-pointer-sign \

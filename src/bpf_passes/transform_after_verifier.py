@@ -22,14 +22,6 @@ _has_processed_func = set()
 declare_at_top_of_func = None
 
 
-def _add_paranthesis_if_needed(inst):
-    if isinstance(inst, (UnaryOp, BinOp)):
-        new = Parenthesis.build(inst)
-        return new
-    return inst
-
-
-
 @contextmanager
 def set_current_func(func):
     global current_function
@@ -79,8 +71,8 @@ def _known_function_substitution(inst, info):
         max_bound = inst.repeat
         # TODO: check if the size is integer literal, then the annotation is not needed
         assert max_bound is not None, 'The strncmp should have annotation declaring max number of iterations'
-        s1 = _add_paranthesis_if_needed(inst.args[0])
-        s2 = _add_paranthesis_if_needed(inst.args[1])
+        s1 = inst.args[0]
+        s2 = inst.args[1]
         size = inst.args[2]
         tmp_insts, tmp_decl, tmp_res = template.strncmp(s1, s2, size, max_bound, info)
         declare_at_top_of_func.extend(tmp_decl)
@@ -140,8 +132,8 @@ def _known_function_substitution(inst, info):
         assert isinstance(inst.repeat, int), 'The max bound is not set for variable-sized memcpy'
         max_bound = inst.repeat
         assert max_bound is not None, 'The variable memcpy should have annotation declaring max number of iterations'
-        dst = _add_paranthesis_if_needed(inst.args[0])
-        src = _add_paranthesis_if_needed(inst.args[1])
+        dst = inst.args[0]
+        src = inst.args[1]
         loop, decl = template.variable_memcpy(dst, src, size, max_bound, info)
         declare_at_top_of_func.extend(decl)
         return loop

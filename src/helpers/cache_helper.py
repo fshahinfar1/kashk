@@ -52,7 +52,11 @@ def gen_bpf_memcpy(info, current_function, dst, src, size, upper_bound):
 
 
 def gen_memcpy(info, current_function, dst, src, size, upper_bound):
-    return template.variable_memcpy(dst, src, size, upper_bound, info)
+    ret = get_ret_inst(current_function, info)
+    ret_val = None
+    if len(ret.body.children) > 0:
+        ret_val = ret.body.children[0]
+    return template.variable_memcpy(dst, src, size, upper_bound, info, ret_val)
 
 
 def get_map_name(map_id):
