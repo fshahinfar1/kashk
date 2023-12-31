@@ -158,15 +158,23 @@ def generate_cache_lookup(inst, blk, parent_children, info):
     check_key_len = ControlFlowInst.build_if_inst(check_key_len_cond)
     check.body.add_inst(check_key_len)
     # check key matches
-    tmp_var = decl_new_var(BASE_TYPES[clang.TypeKind.INT], info,
-            declare_at_top_of_func)
-    strncmp = Call(None)
-    strncmp.name = 'my_bpf_strncmp'
+    # tmp_var = decl_new_var(BASE_TYPES[clang.TypeKind.INT], info,
+    #         declare_at_top_of_func)
+    # strncmp = Call(None)
+    # strncmp.name = 'my_bpf_strncmp'
     key_field = val_ref.get_ref_field('key', info)
-    strncmp.args.extend([key_field, key, key_size])
-    tmp_assign = BinOp.build(tmp_var, '=', strncmp)
-    check_key_len.body.add_inst(tmp_assign)
-    key_check_cond = BinOp.build(tmp_var, '==', ZERO)
+    # strncmp.args.extend([key_field, key, key_size])
+    # tmp_assign = BinOp.build(tmp_var, '=', strncmp)
+    # check_key_len.body.add_inst(tmp_assign)
+
+    # TODO: 16 is the max key size which should be determined based on the
+    # internal cache data strucutre
+    tmp_insts, tmp_decl, tmp_cmp_res = template.strncmp(key_field, key,
+            key_size, 16, info)
+    declare_at_top_of_func.extend(tmp_decl)
+    check_key_len.body.extend_inst(tmp_insts)
+
+    key_check_cond = BinOp.build(tmp_cmp_res, '==', ZERO)
     key_check = ControlFlowInst.build_if_inst(key_check_cond)
     check_key_len.body.add_inst(key_check)
     # when hit

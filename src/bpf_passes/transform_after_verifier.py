@@ -75,34 +75,18 @@ def _known_function_substitution(inst, info):
         new_name = 'bpf_' + inst.name
         return _rename_func_to_a_known_one(inst, info, new_name)
     elif inst.name == 'strncmp':
-        prerequisite = Literal('''struct my_bpf_strncmp_loop_ctx {
-  int i;
-  char *str1;
-  char *str2;
-  unsigned short len;
-  int ret;
-};
-
-static long
-my_bpf_strncmp_loop(unsigned int index, void *arg)
-{
-  struct my_bpf_strncmp_loop_ctx *ll = arg;
-  if (ll->i == ll->len) {
-    ll->ret = 0;
-    return 1;
-  }
-  if (ll->str1[ll->i] != ll->str2[ll->i] || ll->str1[ll->i] == '\\0') {
-    ll->ret = (ll->str1[ll->i] - ll->str2[ll->i]);
-    return 1;
-  }
-  ll->i += 1;
-  return 0;
-}
-''', CODE_LITERAL)
-        if not Function.directory['my_bpf_strncmp'].is_used_in_bpf_code:
-            info.prog.add_declaration(prerequisite)
-        new_name = 'my_bpf_' + inst.name
-        return _rename_func_to_a_known_one(inst, info, new_name)
+        assert len(inst.args) == 3
+        max_bound = inst.repeat
+        # TODO: check if the size is integer literal, then the annotation is not needed
+        assert max_bound is not None, 'The strncmp should have annotation declaring max number of iterations'
+        s1 = _add_paranthesis_if_needed(inst.args[0])
+        s2 = _add_paranthesis_if_needed(inst.args[1])
+        size = inst.args[2]
+        tmp_insts, tmp_decl, tmp_res = template.strncmp(s1, s2, size, max_bound, info)
+        declare_at_top_of_func.extend(tmp_decl)
+        blk = cb_ref.get(BODY)
+        blk.extend(tmp_insts)
+        return tmp_res
     elif inst.name == 'strncpy':
         assert len(inst.args) == 3, 'Assumption on the number of arguments'
         buf = inst.args[0]
@@ -155,6 +139,7 @@ my_bpf_strncmp_loop(unsigned int index, void *arg)
             return inst
         assert isinstance(inst.repeat, int), 'The max bound is not set for variable-sized memcpy'
         max_bound = inst.repeat
+        assert max_bound is not None, 'The variable memcpy should have annotation declaring max number of iterations'
         dst = _add_paranthesis_if_needed(inst.args[0])
         src = _add_paranthesis_if_needed(inst.args[1])
         loop, decl = template.variable_memcpy(dst, src, size, max_bound, info)

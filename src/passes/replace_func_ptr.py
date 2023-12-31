@@ -54,7 +54,7 @@ def _process_current_inst(inst, info):
                 inst.name in MEMORY_ACCESS_FUNC):
             inst.repeat = loop_ann
         else:
-            raise Exception('The Loop annotation is not set to a currect instruction')
+            raise Exception('The Loop annotation is not set to a correct instruction')
         _set_loop_ann(None)
         return inst
 

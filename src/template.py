@@ -2,7 +2,7 @@ from instruction import *
 from data_structure import *
 from utility import get_tmp_var_name
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
-from helpers.instruction_helper import decl_new_var, ZERO, NULL, CHAR_PTR
+from helpers.instruction_helper import decl_new_var, ZERO, NULL, CHAR_PTR, INT
 
 VOID_PTR = 'void *'
 
@@ -223,6 +223,21 @@ def malloc_lookup(name, info, return_val):
     return [var_decl, lookup_inst], ref
 
 
+def new_bounded_loop(var_bound, max_bound, info, loop_var_type=INT):
+    decl = []
+    loop_var = decl_new_var(loop_var_type, info, decl)
+    initialize = BinOp.build(loop_var, '=', ZERO)
+
+    max_bound_check = BinOp.build(loop_var, '<', max_bound)
+    var_bound_check = BinOp.build(loop_var, '<', var_bound)
+    condition = BinOp.build(max_bound_check, '&&', var_bound_check)
+
+    post = UnaryOp.build('++', loop_var)
+    loop = ForLoop.build(initialize, condition, post)
+    loop.repeat = max_bound
+    return loop, decl, loop_var
+
+
 def variable_memcpy(dst, src, size, up_bound, info):
     declare_at_top_of_func = []
     max_bound = Literal(str(up_bound), clang.CursorKind.INTEGER_LITERAL)
@@ -235,16 +250,8 @@ def variable_memcpy(dst, src, size, up_bound, info):
         dst = Cast.build(dst, CHAR_PTR)
 
     T = BASE_TYPES[clang.TypeKind.USHORT]
-    loop_var = decl_new_var(T, info, declare_at_top_of_func)
-    initialize = BinOp.build(loop_var, '=', ZERO)
-
-    max_bound_check = BinOp.build(loop_var, '<', max_bound)
-    var_bound_check = BinOp.build(loop_var, '<', size)
-    condition = BinOp.build(max_bound_check, '&&', var_bound_check)
-
-    post = UnaryOp.build('++', loop_var)
-    loop = ForLoop.build(initialize, condition, post)
-    loop.repeat = max_bound
+    loop, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info, T)
+    declare_at_top_of_func.extend(tmp_decl)
 
     if bound_check_src:
         data_end = info.prog.get_pkt_end()
@@ -265,3 +272,40 @@ def variable_memcpy(dst, src, size, up_bound, info):
     copy = BinOp.build(at_dst, '=', at_src)
     loop.body.add_inst(copy)
     return loop, declare_at_top_of_func
+
+
+def strncmp(s1, s2, size, upper_bound, info):
+    assert hasattr(s1, 'type')
+    assert hasattr(s2, 'type')
+
+
+    assert s1.type.is_pointer() or s1.type.is_array()
+    assert s1.type.under_type.spelling == 'char'
+    assert s2.type.is_pointer() or s2.type.is_array()
+    assert s2.type.under_type.spelling == 'char'
+
+    decl = []
+    max_bound = Literal(str(upper_bound), clang.CursorKind.INTEGER_LITERAL)
+    bound_check_s1 = is_bpf_ctx_ptr(s1, info)
+    bound_check_s2 = is_bpf_ctx_ptr(s2, info)
+
+    res_var = decl_new_var(INT, info, decl)
+    init_res = BinOp.build(res_var, '=', ZERO)
+
+    loop, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info, INT)
+    decl.extend(tmp_decl)
+
+    at_s1 = ArrayAccess.build(s1, loop_var)
+    at_s2 = ArrayAccess.build(s2, loop_var)
+    cmp = BinOp.build(at_s1, '-', at_s2)
+    assign = BinOp.build(res_var, '=', cmp)
+
+    tmp_cond = BinOp.build(res_var, '!=', ZERO)
+    check = ControlFlowInst.build_if_inst(tmp_cond)
+    tmp_brk = Instruction()
+    tmp_brk.kind = clang.CursorKind.BREAK_STMT
+    check.body.add_inst(tmp_brk)
+    loop.body.extend_inst([assign, check])
+
+    insts = [init_res, loop]
+    return insts, decl, res_var
