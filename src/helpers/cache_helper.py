@@ -1,11 +1,19 @@
 import json
-from utility import get_tmp_var_name 
+from utility import get_tmp_var_name
 from instruction import *
 from data_structure import *
 from parser.parse_helper import is_identifier
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
-from helpers.instruction_helper import get_ret_inst, decl_new_var, ZERO, ONE
+from helpers.instruction_helper import (get_ret_inst, decl_new_var, ZERO, ONE)
 import template
+
+
+def get_ref_from_name(name, info):
+    tmp_sym = info.sym_tbl.lookup(name)
+    if tmp_sym is None:
+        raise Exception('Name passed to the cache annotation needs to be a valid variable name')
+    ref = Ref.from_sym(tmp_sym)
+    return ref
 
 
 def get_var_end(var, upper_bound_inst, info):
@@ -105,7 +113,9 @@ def generate_cache_lookup(inst, blk, parent_children, info):
     # Call hash function
     hash_call = Call(None)
     hash_call.name = '__fnv_hash'
-    key = Literal(conf['key'], CODE_LITERAL)
+    # Check if key variable name is valid
+    # key = Literal(conf['key'], CODE_LITERAL)
+    key = get_ref_from_name(conf['key'], info)
     key_size = Literal(conf['key_size'], CODE_LITERAL)
     arg3 = get_var_end(key, key_size, info)
     hash_call.args.extend([key, key_size, arg3])
@@ -227,17 +237,14 @@ def generate_cache_update(inst, blk, current_function, info):
     decl_index.update_symbol_table(info.sym_tbl)
 
     insts = []
-    key = Literal(conf['key'], CODE_LITERAL)
+    # key = Literal(conf['key'], CODE_LITERAL)
+    key = get_ref_from_name(conf['key'], info)
     key_size = Literal(conf['key_size'], CODE_LITERAL)
     key_end  = get_var_end(key, key_size, info)
 
-    value_annotate = conf['value']
-    assert is_identifier(value_annotate), 'To check if the variable is a packet context I need to be an identifier'
-    val_sym = info.sym_tbl.lookup(value_annotate)
-    assert val_sym is not None, 'The variable holding the value is not found in this scope'
-    value = Ref(None, clang.CursorKind.DECL_REF_EXPR)
-    value.name = value_annotate
-    value.type = val_sym.type
+    value_var_name = conf['value']
+    assert is_identifier(value_var_name), 'To check if the variable is a packet context I need to be an identifier'
+    value = get_ref_from_name(value_var_name, info)
     value_size = Literal(conf['value_size'], clang.CursorKind.INTEGER_LITERAL)
 
     hash_call = Call(None)
