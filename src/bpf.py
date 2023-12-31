@@ -5,6 +5,9 @@ from instruction import *
 from log import debug
 from bpf_code_gen import gen_code
 
+from helpers.instruction_helper import CHAR_PTR
+import template
+
 
 MODULE_TAG = '[BPF Prog]'
 
@@ -140,33 +143,38 @@ class BPF_PROG:
         entry.is_bpf_ctx = True
 
     def send(self, buf, write_size, info, failure_return, ret=True, do_copy=True):
-        #TODO: The arguments of this function are crayz ???
+        #TODO: The arguments of this function are crazy ???
         is_size_integer = write_size.kind == clang.CursorKind.INTEGER_LITERAL
         if is_size_integer:
             memcpy = 'memcpy'
         else:
-            # TODO: I need to check that BPF MEMCPY succeeds
             memcpy = 'bpf_memcpy'
-            _use_memcpy(info)
+            # The BPF_MEMCPY with bpf_loop does not work very well for now.
+            # I will use a simple for loop with an upper bound.
+            # _use_memcpy(info)
 
         inst = self.adjust_pkt(write_size, info)
         if do_copy:
-            off          = BinOp.build(self.get_pkt_buf(), '+', write_size)
-            cond         = BinOp.build(off, '>', self.get_pkt_end())
-            check        = ControlFlowInst.build_if_inst(cond)
-            ret_inst     = failure_return
-            check.body.add_inst(ret_inst)
+            if memcpy == 'memcpy':
+                off          = BinOp.build(self.get_pkt_buf(), '+', write_size)
+                cond         = BinOp.build(off, '>', self.get_pkt_end())
+                check        = ControlFlowInst.build_if_inst(cond)
+                ret_inst     = failure_return
+                check.body.add_inst(ret_inst)
 
-            copy         = Call(None)
-            copy.name    = memcpy
-            args         = [self.get_pkt_buf(), buf, write_size]
-            if memcpy == 'bpf_memcpy':
-                src_end = BinOp.build(buf, '+', write_size)
-                dst_end = self.get_pkt_end()
-                args.extend([dst_end, src_end])
-            copy.args = args
-
-            inst.extend([check, copy])
+                copy         = Call(None)
+                copy.name    = memcpy
+                args         = [self.get_pkt_buf(), buf, write_size]
+                copy.args = args
+                inst.extend([check, copy])
+            else:
+                # variable copy
+                dst = self.get_pkt_buf()
+                dst.type = CHAR_PTR
+                loop, decl = template.variable_memcpy(dst, buf, write_size,
+                        1470, info)
+                inst.extend(decl)
+                inst.append(loop)
 
         if ret is True:
             ret_val  = Literal(self.get_send(), clang.CursorKind.INTEGER_LITERAL)

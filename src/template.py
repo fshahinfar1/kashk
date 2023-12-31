@@ -262,6 +262,6 @@ def variable_memcpy(dst, src, size, up_bound, info):
 
     at_src = ArrayAccess.build(src, loop_var)
     at_dst = ArrayAccess.build(dst, loop_var)
-    copy = BinOp.build(at_src, '=', at_dst)
+    copy = BinOp.build(at_dst, '=', at_src)
     loop.body.add_inst(copy)
     return loop, declare_at_top_of_func
