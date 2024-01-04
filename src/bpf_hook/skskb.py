@@ -1,5 +1,5 @@
 from bpf import BPF_PROG
-from data_structure import MyType, BASE_TYPES
+from data_structure import MyType, BASE_TYPES, Record, StateObject
 from instruction import *
 from helpers.instruction_helper import *
 from bpf_code_gen import gen_code
@@ -25,7 +25,7 @@ class SK_SKB_PROG(BPF_PROG):
     def set_bpf_context_struct_sym_tbl(self, sym_tbl):
         T = self.ctx_type.under_type
         scope_key = f'class_{T.spelling}'
-        sym_tbl.insert_entry(scope_key, T, clang.CursorKind.CLASS_DECL, None)
+        sym_tbl.global_scope.insert_entry(scope_key, T, clang.CursorKind.CLASS_DECL, None)
         with sym_tbl.new_scope() as scope:
             sym_tbl.scope_mapping[scope_key] = scope
             # # map __class__ identifier to the class representing current scope -
@@ -40,6 +40,11 @@ class SK_SKB_PROG(BPF_PROG):
             entry.is_bpf_ctx = True
             entry = sym_tbl.insert_entry('len', U32, clang.CursorKind.FIELD_DECL, None)
             entry.is_bpf_ctx = False
+            # Just creat a record object for the sk_skb context
+            fields = [StateObject.build('data', U32),
+                    StateObject.build('data_end', U32),
+                    StateObject.build('len', U32)]
+            rec = Record('__sk_skb', fields)
 
     def set_code(self, code):
         self.verdict_code = code

@@ -1,5 +1,6 @@
 from bpf import BPF_PROG
-from data_structure import MyType, BASE_TYPES, XDP_HELPER_HEADER
+from data_structure import (MyType, BASE_TYPES, XDP_HELPER_HEADER, Record,
+        StateObject)
 from instruction import *
 from helpers.instruction_helper import *
 from bpf_code_gen import gen_code
@@ -37,6 +38,10 @@ class XDP_PROG(BPF_PROG):
             entry.is_bpf_ctx = True
             entry = sym_tbl.insert_entry('data_end', U32, clang.CursorKind.FIELD_DECL, None)
             entry.is_bpf_ctx = True
+            # Just creat a record object for the sk_skb context
+            fields = [StateObject.build('data', U32),
+                    StateObject.build('data_end', U32),]
+            rec = Record('xdp_md', fields)
 
     def set_code(self, code):
         self.main_code = code

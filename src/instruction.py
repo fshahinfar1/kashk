@@ -5,6 +5,8 @@ from utility import get_owner, report_on_cursor, get_actual_type
 from data_structure import StateObject, Function, MyType
 from log import error, debug, report
 
+from data_structure import MyType, BASE_TYPES
+
 
 CODE_LITERAL = 8081
 BLOCK_OF_CODE = 8082
@@ -151,7 +153,7 @@ class Instruction:
 #         return list(zip(self.fields.values() ,tag))
 
 #     def clone(self, children)
-#         new 
+#         new
 #         new.bpf_ignore = self.bpf_ignore
 #         new.change_applied = self.change_applied
 
@@ -791,6 +793,16 @@ class Literal(Instruction):
         super().__init__()
         self.kind = kind
         self.text = text
+
+    @property
+    def type(self):
+        if self.kind == clang.CursorKind.INTEGER_LITERAL:
+            return BASE_TYPES[clang.TypeKind.INT]
+        elif self.kind == clang.CursorKind.STRING_LITERAL:
+            return MyType.make_pointer(BASE_TYPES[clang.TypeKind.UCHAR])
+        else:
+            debug('Trying to guess the type for', self)
+            raise Exception('I do not know the type')
 
     def __str__(self):
         return f'<Literal {self.text}>'
