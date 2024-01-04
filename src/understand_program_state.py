@@ -4,9 +4,7 @@ import clang.cindex as clang
 from log import *
 from utility import (find_elem, get_code, generate_struct_with_fields,
         PRIMITIVE_TYPES, report_on_cursor, get_actual_type)
-from bpf import SK_SKB_PROG
 from data_structure import *
-
 from prune import get_namespace_of_cursor, should_process_this_cursor
 
 

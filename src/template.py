@@ -107,13 +107,12 @@ def shared_map_decl():
 '''
 
 
+shared_struct = MyType.make_simple('struct shared_state',
+        clang.TypeKind.RECORD)
+SHARED_OBJ_PTR = MyType.make_pointer(shared_struct)
+SHARED_MAP_PTR = Literal('&shared_map', CODE_LITERAL)
 def prepare_shared_state_var(ret_val=None):
-    SHARED_MAP_PTR = Literal('&shared_map', CODE_LITERAL)
-
-    shared_struct = MyType.make_simple('struct shared_state',
-            clang.TypeKind.RECORD)
-    T = MyType.make_pointer(shared_struct)
-    var_decl = VarDecl.build('shared',T)
+    var_decl = VarDecl.build('shared', SHARED_OBJ_PTR)
     var_decl.init.add_inst(NULL)
     var_ref = var_decl.get_ref()
 

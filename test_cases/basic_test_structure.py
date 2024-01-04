@@ -14,7 +14,6 @@ from understand_logic_handler import create_func_objs, add_known_func_objs
 from data_structure import Info, Function
 from instruction import BODY
 from framework_support import InputOutputContext
-from bpf import SK_SKB_PROG
 
 from offload import load_other_sources, _prepare_event_handler_args, BPF_MAIN
 from find_ev_loop import get_entry_code

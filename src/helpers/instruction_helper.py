@@ -9,6 +9,8 @@ NULL = Literal('NULL', clang.CursorKind.MACRO_INSTANTIATION)
 
 CHAR_PTR = MyType.make_pointer(BASE_TYPES[clang.TypeKind.UCHAR])
 INT = BASE_TYPES[clang.TypeKind.INT]
+U64 = BASE_TYPES[clang.TypeKind.ULONGLONG]
+VOID_PTR = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
 
 
 def show_insts(lst, depth=0):

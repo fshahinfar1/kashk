@@ -19,11 +19,12 @@ class Info:
 
     @classmethod
     def from_io_ctx(cls, io_ctx):
-        from bpf import SK_SKB_PROG, XDP_PROG
         info = Info()
         if io_ctx.bpf_hook == 'sk_skb':
+            from bpf_hook.skskb import SK_SKB_PROG
             info.prog = SK_SKB_PROG()
         elif io_ctx.bpf_hook == 'xdp':
+            from bpf_hook.xdp import XDP_PROG
             info.prog = XDP_PROG()
         else:
             raise Exception(f'Unknown BPF hook ({io_ctx.bpf_hook})')

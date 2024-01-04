@@ -265,7 +265,9 @@ def handle_return_stmt(inst, info, more):
 def handle_to_userspace(inst, info, more):
     lvl = more[0]
     if inst.is_bpf_main:
-        from bpf import XDP_PROG
+        # TODO: we should add the __prepare... call as an instruction.
+        # Currently we are adding the code while generating the text.
+        from bpf_hook.xdp import XDP_PROG
         if isinstance(info.prog, XDP_PROG):
             if XDP_HELPER_HEADER not in info.prog.headers:
                 info.prog.headers.append(XDP_HELPER_HEADER)

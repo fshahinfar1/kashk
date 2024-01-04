@@ -34,7 +34,6 @@ from user_passes.select_user import select_user_pass
 
 class TestCase(BasicTest):
     def test(self, insts):
-        assert 0, 'This test case is very broken'
         info = self.info
         bpf = Block(BODY)
         bpf.extend_inst(insts)
@@ -62,7 +61,13 @@ class TestCase(BasicTest):
         print('Function do_read:')
         print(text)
 
-        print('Reduce Params Pass Test: Okay')
+        for i in range(1, 6):
+            var_name = f'req{i}'
+            sym = self.info.sym_tbl.lookup(var_name)
+            assert sym is not None, f'Did not found the symbol for the variable {var_name}'
+            assert sym.is_bpf_ctx, f'The variable was not recognized as pointer to BPF ctx'
+
+        print('Tracking BPF context from callee to caller: Okay')
 
 
 if __name__ == '__main__':
