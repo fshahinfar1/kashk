@@ -39,7 +39,6 @@ class TestCase(BasicTest):
         # Generate the code and show it for debuging
         # text, _ = gen_code(bpf, self.info)
         # print(text)
-
         # show_insts([bpf])
 
         expected_state = {
@@ -61,16 +60,26 @@ class TestCase(BasicTest):
 
         failure_paths = get_number_of_failure_paths()
         assert  failure_paths == 3, f'Expect 3 failure paths found {failure_paths}'
-        # Find the first breaking point
+        # Find the first failure point
         ifs = find_elems_of_kind(bpf, clang.CursorKind.IF_STMT)
         first_if = ifs[0]
         first_if_first_inst = first_if.body.children[0]
         assert first_if_first_inst.kind == TO_USERSPACE_INST
 
-        # Check the second breaking point
-        f2 = Function.directory['f2']
-        second_inst = f2.body.children[1]
-        assert second_inst.kind == TO_USERSPACE_INST
+        # NOTE: previously we would fallback exactly on the isntruction that
+        # failed. At somepoint I change the logic to fallback before calling a
+        # function that may never succeed. I am not sure which approach is
+        # better.
+        # # Check the second breaking point
+        # f2 = Function.directory['f2']
+        # second_inst = f2.body.children[1]
+        # assert second_inst.kind == TO_USERSPACE_INST
+
+        # Check if the second failure point is marekd
+        inst = ifs[1].body.children[1]
+        assert inst.kind == TO_USERSPACE_INST
+        inst = ifs[2].body.children[0]
+        assert inst.kind == TO_USERSPACE_INST
 
         print('Feasibility Pass Test: Okay')
 

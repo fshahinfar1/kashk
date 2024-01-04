@@ -28,11 +28,15 @@ class TestCase(BasicTest):
         func = Function.directory['fancy']
         # Generate the code and show it for debuging
         text, _ = gen_code(func.body, self.info)
-        print(text)
+        # print(text)
         # show_insts([func.body,])
 
         # Tests
-
+        if_stmt_list = find_elems_of_kind(func.body, clang.CursorKind.IF_STMT)
+        assert len(if_stmt_list) > 0
+        if_stmt = if_stmt_list[0]
+        if_cond = if_stmt.cond.children[0]
+        assert if_cond.kind == clang.CursorKind.BINARY_OPERATOR, "The parser has failed to parse the macro correctly"
 
         print('Parse Macro Test: Okay')
 

@@ -79,9 +79,10 @@ def is_function_call_feasible(inst, info):
         _has_processed.add(func.get_name())
         with remember_func(func):
             with info.sym_tbl.with_func_scope(func.name):
-                body = _do_pass(func.body, info, PassObject())
-                assert body is not None, 'this pass should not remove anything'
-                func.body = body
+                with cb_ref.new_ref(PARENT_INST, None):
+                    body = _do_pass(func.body, info, PassObject())
+                    assert body is not None, 'this pass should not remove anything'
+                    func.body = body
     return True
 
 
@@ -229,6 +230,7 @@ def feasibilty_analysis_pass(inst, info, more):
         if func.may_succeed or func.may_fail:
             continue
         if func.is_empty():
+            # debug(func.name, 'does not have implementation')
             if func.name in KNOWN_FUNCS:
                 func.may_fail = False
                 func.may_succeed = True
