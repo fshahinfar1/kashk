@@ -45,8 +45,12 @@ class TestCase(BasicTest):
         # print(text)
 
 
-        assert func.args[-1].type == 'struct __ex_func *'
-        assert func2.args[-1].type == 'struct __ex_func2 *'
+        type_name = func.args[-1].type_ref.spelling
+        err = f'Unexpected type for last argument of func. received {type_name} expected struct __ex_func *'
+        assert  type_name == 'struct __ex_func *', err
+        type_name = func2.args[-1].type_ref.spelling
+        err = f'Unexpected type for last argument of func2: {type_name}'
+        assert type_name == 'struct __ex_func2 *', err
 
         ret_inst = func.body.children[0]
         ref = ret_inst.body.children[0].rhs.children[0]

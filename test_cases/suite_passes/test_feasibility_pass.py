@@ -27,13 +27,6 @@ class TestCase(BasicTest):
 
         mark_used_funcs(bpf, self.info, None)
         bpf = linear_code_pass(bpf, self.info, PassObject())
-        for f in Function.directory.values():
-            if not f.is_empty():
-                with self.info.sym_tbl.with_func_scope(f.name):
-                    body = linear_code_pass(f.body, self.info, PassObject())
-                    assert body is not None
-                    f.body = body
-
         bpf = feasibilty_analysis_pass(bpf, self.info, PassObject())
 
         # Generate the code and show it for debuging
@@ -41,11 +34,16 @@ class TestCase(BasicTest):
         # print(text)
         # show_insts([bpf])
 
+        f4 = Function.directory['f4']
+        # text, _ = gen_code([f4, ], self.info)
+        # print(text)
+
         expected_state = {
                 #      Succeed, Fail
                 'f1': (False, True),
                 'f2': (False, True),
                 'f3': (True, False),
+                'f4': (True, True),
                 # 'main': (True, True),
                 'calloc': (False, True),
                 'pthread_mutex_init': (False, True),
@@ -59,7 +57,7 @@ class TestCase(BasicTest):
             assert (func.may_succeed, func.may_fail) == expected_state[func.name], f'For funct {func.name} the expectation does not match (s:{func.may_succeed}, f:{func.may_fail})'
 
         failure_paths = get_number_of_failure_paths()
-        assert  failure_paths == 3, f'Expect 3 failure paths found {failure_paths}'
+        assert  failure_paths == 4, f'Expect 4 failure paths found {failure_paths}'
         # Find the first failure point
         ifs = find_elems_of_kind(bpf, clang.CursorKind.IF_STMT)
         first_if = ifs[0]
@@ -75,11 +73,14 @@ class TestCase(BasicTest):
         # second_inst = f2.body.children[1]
         # assert second_inst.kind == TO_USERSPACE_INST
 
-        # Check if the second failure point is marekd
         inst = ifs[1].body.children[1]
         assert inst.kind == TO_USERSPACE_INST
         inst = ifs[2].body.children[0]
         assert inst.kind == TO_USERSPACE_INST
+
+        ifs = find_elems_of_kind(f4.body, clang.CursorKind.IF_STMT)
+        assert len(ifs) == 1
+        assert ifs[0].body.children[0].kind == TO_USERSPACE_INST
 
         print('Feasibility Pass Test: Okay')
 

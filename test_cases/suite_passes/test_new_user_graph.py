@@ -14,6 +14,7 @@ from instruction import *
 from sym_table import *
 
 from passes.pass_obj import PassObject
+from passes.mark_used_funcs import mark_used_funcs
 from passes.linear_code import linear_code_pass
 from bpf_passes.feasibility_analysis import feasibilty_analysis_pass
 from bpf_passes.mark_user_boundary import get_number_of_failure_paths
@@ -33,17 +34,10 @@ class TestCase(BasicTest):
         bpf.extend_inst(insts)
 
         # Linear pass
+        mark_used_funcs(bpf, self.info, None)
         bpf = linear_code_pass(bpf, self.info, PassObject())
-        for f in Function.directory.values():
-            if not f.is_empty():
-                with self.info.sym_tbl.with_func_scope(f.name):
-                    body = linear_code_pass(f.body, self.info, PassObject())
-                    assert body is not None
-                    f.body = body
-
         # Feasibility pass
         bpf = feasibilty_analysis_pass(bpf, self.info, PassObject())
-
         # Create user graph
         select_user_pass(bpf, self.info, PassObject())
 
@@ -52,8 +46,8 @@ class TestCase(BasicTest):
         # # Show information
         tree = draw_tree(self.info.user_prog.graph, fn=lambda x: str(id(x)))
         print('\n---- Begining of the Tree ----')
-        # print(tree)
-        # print('---- End of the Tree ----\n')
+        print(tree)
+        print('---- End of the Tree ----\n')
         # _print_node_code(root, self.info)
         # for c in root.children:
         #     _print_node_code(c, self.info)
@@ -61,9 +55,11 @@ class TestCase(BasicTest):
         #         _print_node_code(x, self.info)
 
         # Check the structure of found tree
-        assert len(root.children) == 2
+        assert len(root.children) == 4
         assert len(root.children[0].children) == 0
-        assert len(root.children[1].children) == 2
+        assert len(root.children[1].children) == 0
+        assert len(root.children[2].children) == 0
+        assert len(root.children[3].children) == 1
         # Check the selected instructions to offload
 
         second_path = root.children[1]

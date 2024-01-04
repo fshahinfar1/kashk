@@ -19,16 +19,17 @@ from passes.linear_code import linear_code_pass
 
 class TestCase(BasicTest):
     def test(self, insts):
+        info = self.info
         # Get ready for a pass
         third_arg = PassObject()
         bpf = Block(BODY)
         bpf.extend_inst(insts)
         # Move function calls out of the ARG context!
         mark_used_funcs(bpf, info, PassObject())
-        bpf = linear_code_pass(bpf, self.info, third_arg)
+        bpf = linear_code_pass(bpf, info, third_arg)
 
         # Generate the code and show it for debuging
-        # text, _ = gen_code(bpf, self.info)
+        # text, _ = gen_code(bpf, info)
         # print(text)
 
         # Check the pass is correct

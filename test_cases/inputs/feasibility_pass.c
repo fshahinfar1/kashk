@@ -35,6 +35,15 @@ void f3(char *c)
 	*c = (a + b) * 30;
 }
 
+void f4(int a) {
+	/* This function may fail but it can also succeed */
+	if (a % 2 == 0) {
+		f2();
+	} else {
+		a = a * 2;
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	int a;
@@ -43,14 +52,14 @@ int main(int argc, char *argv[])
 	a = 10;
 	b = a * a;
 
-	if (b % 4 == 1) {
+	if (b % 5 == 1) {
 		/* should fail on this path right here */
 		pthread_mutex_init(&m, NULL);
 		f1();
-	} else if (b % 4 == 2) {
+	} else if (b % 5 == 2) {
 		b *= 30;
 		f2();
-	} else if (b % 4 == 3) {
+	} else if (b % 5 == 3) {
 		/* If a function defenately is going to fail then we should not */
 		/* investigate the other failuers of this path. (we have failed */
 		/* at f1 do not create a new path for the pthread_mutex_init). */
@@ -59,6 +68,8 @@ int main(int argc, char *argv[])
 		f1();
 		b = a;
 		pthread_mutex_init(&m, NULL);
+	} else if (b % 5 == 4) {
+		f4(b);
 	} else {
 		int c = a + b;
 		/* we ignore prints so this is fine */

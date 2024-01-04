@@ -24,7 +24,7 @@ enum {
 #define __ANNOTATE_SKIP __ANNOTATE("SKIP", ANN_SKIP)
 #define __ANNOTATE_FUNC_PTR_IS(x, y) __ANNOTATE(x "-->" y, ANN_FUNC_PTR)
 
-#define JSON_FIELD(k,v) "\""k"\": \""v"\""
+#define JSON_FIELD(k,v) "\"" k "\": \"" v "\""
 #define JSON_COMMA ","
 #define JSON_FIELD_MID(k,v) JSON_FIELD(k,v) JSON_COMMA
 

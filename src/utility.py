@@ -79,7 +79,7 @@ def parse_file(file_path, args):
         # This is a C file
         compiler_args = (args + ' -DHAVE_CONFIG_H=1').split()
     else:
-        # THis is a C++ file
+        # This is a C++ file
         compiler_args = (args + ' -std=c++20').split()
     report('Compiler args:', compiler_args)
 
