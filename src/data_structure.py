@@ -288,7 +288,7 @@ class MyType:
             tmp_hack = self.spelling[len('struct '):]
             record = Record.directory.get(tmp_hack)
             if record is None:
-                error(f'did not found declaration for struct {tmp_hack} (is it a type I do not track in the compiler?)')
+                debug(f'did not found declaration for struct {tmp_hack} (is it a type I do not track in the compiler?)')
                 return 0
             # debug(Record.directory)
             assert record is not None, f'did not found declaration for {tmp_hack}'

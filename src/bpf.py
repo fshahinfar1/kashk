@@ -172,10 +172,17 @@ class BPF_PROG:
                 # variable copy
                 dst = self.get_pkt_buf()
                 dst.type = CHAR_PTR
+                ret_value = None
+                if failure_return.body.has_children():
+                    ret_value = failure_return.body.children[0]
                 loop, decl = template.variable_memcpy(dst, buf, write_size,
-                        1470, info)
+                        1470, info, ret_value)
                 inst.extend(decl)
                 inst.append(loop)
+
+        # Do anything that is needed before sending
+        before_send_insts = self.before_send()
+        inst.extend(before_send_insts)
 
         if ret is True:
             ret_val  = Literal(self.get_send(), clang.CursorKind.INTEGER_LITERAL)

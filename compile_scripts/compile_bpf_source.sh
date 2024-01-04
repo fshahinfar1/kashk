@@ -2,9 +2,12 @@
 set -e
 # set -x
 
+CURDIR=$(realpath $(dirname $0))
+KASHK_SPECIFIC_HEADERS=$(realpath "$CURDIR/../src/headers/my_bpf_headers")
+
 CC=clang
 LLC=llc
-CFLAGS="$CFLAGS -Wall"
+CFLAGS="$CFLAGS -Wall -I $KASHK_SPECIFIC_HEADERS"
 
 # CC=clang-18
 # LLC=llc-18
