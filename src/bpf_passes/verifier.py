@@ -248,7 +248,7 @@ def _check_passing_bpf_context(inst, func, info):
             # First check if the argument it self is a pointer to BPF ctx
             # debug(f'Passing BPF_CTX as argument {param.name} <-- {a.name}')
             sym = callee_scope.lookup(param.name)
-            sym.is_bpf_ctx = True
+            sym.set_is_bpf_ctx(True)
             receives_bpf_ctx = True
         else:
             # Otherwise, check if the argument has a field, which is a pointer
@@ -304,7 +304,7 @@ def _check_passing_bpf_context(inst, func, info):
                         if sym is None:
                                 sym = scope.insert_entry(ref.name, ref.type, clang.CursorKind.MEMBER_REF_EXPR, None)
                         scope = sym.fields
-                    sym.is_bpf_ctx = True
+                    sym.set_is_bpf_ctx(True)
                     receives_bpf_ctx = True
                     # debug(f'Set the {param.name} .. {sym.name} to BPF_CTX')
             else:
@@ -350,14 +350,17 @@ def _check_setting_bpf_context_in_callee(inst, func, info):
             continue
 
         if param_sym.is_bpf_ctx:
-            argum_sym.is_bpf_ctx = True
+            argum_sym.set_is_bpf_ctx(True)
             # report(ref.owner, ref.name, 'is bpf context')
 
             if backward_jmp_ctx:
                 # TODO: check if this should be argum or ref
                 backward_jmp_ctx.append(argum)
 
-        if param.type_ref.spelling != argum.type.spelling:
+        one_type_is_record = (param.type_ref.under_type.is_record() or
+                argum.type.under_type.is_record())
+        if (one_type_is_record and
+                param.type_ref.spelling != argum.type.spelling):
             error('There is a type cast when passing the argument. I lose track of BPF context when there is a type cast!')
             debug('argument type:', argum.type.spelling, 'parameter type:',
                     param.type_ref.spelling)
@@ -375,7 +378,7 @@ def _check_setting_bpf_context_in_callee(inst, func, info):
                     e2 = argum_sym.fields.lookup(key)
                     if e2 is None:
                         e2 = argum_sym.fields.insert_entry(entry.name, entry.type, entry.kind, None)
-                    e2.is_bpf_ctx = entry.is_bpf_ctx
+                    e2.set_is_bpf_ctx(entry.is_bpf_ctx)
                     # report(argum.name, e2.name, 'is bpf ctx:', entry.is_bpf_ctx)
                     if backward_jmp_ctx and e2.is_bpf_ctx:
                         field = argum.get_ref_field(key, info)

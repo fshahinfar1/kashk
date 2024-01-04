@@ -6,6 +6,7 @@ from log import error, debug
 from utility import get_code, report_on_cursor, visualize_ast, skip_unexposed_stmt, get_token_from_source_code, token_to_str
 from data_structure import *
 from instruction import *
+from sym_table import MemoryRegion
 from prune import (should_process_this_cursor, should_ignore_cursor, READ_PACKET, WRITE_PACKET)
 
 from parser.for_loop import parse_for_loop_stmt
@@ -296,7 +297,9 @@ def __convert_cursor_to_inst(c, info, _state):
         # Add variable to the scope
         if info.sym_tbl.lookup(c.spelling) is not None:
             error(f'{MODULE_TAG} Shadowing variables are not supported and can cause issues! ({c.spelling})')
-        inst.update_symbol_table(info.sym_tbl)
+        entry = inst.update_symbol_table(info.sym_tbl)
+        entry.memory_region = MemoryRegion.STACK
+        entry.referencing_memory_region = MemoryRegion.STACK
         return inst
     elif c.kind == clang.CursorKind.MEMBER_REF_EXPR:
         inst = Ref(c)

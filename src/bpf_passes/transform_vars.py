@@ -3,7 +3,7 @@ import clang.cindex as clang
 from log import error, debug, report
 from bpf_code_gen import gen_code
 from template import (prepare_shared_state_var, define_bpf_arr_map,
-        define_bpf_hash_map, malloc_lookup)
+        SHARED_OBJ_PTR)
 from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS
 from utility import get_tmp_var_name
 from helpers.cache_helper import generate_cache_lookup
@@ -11,6 +11,7 @@ from helpers.instruction_helper import get_ret_inst, add_flag_to_func
 
 from data_structure import *
 from instruction import *
+from sym_table import MemoryRegion
 from passes.pass_obj import PassObject
 
 
@@ -43,8 +44,6 @@ def _check_if_ref_is_global_state(inst, info):
     sym, scope = info.sym_tbl.lookup2(inst.name)
     is_shared = scope == info.sym_tbl.shared_scope
     if is_shared:
-        # TODO: what if a variable named shared is already defined but it is
-        # not our variable?
         sym = info.sym_tbl.lookup('shared')
         # debug(MODULE_TAG, 'shared symbol is defined:', sym is not None)
         if sym is None:
@@ -53,13 +52,14 @@ def _check_if_ref_is_global_state(inst, info):
             new_insts = prepare_shared_state_var(ret_val=ret_inst)
             code = cb_ref.get(BODY)
             code.extend(new_insts)
-            T = MyType.make_simple('struct shared_state', clang.TypeKind.RECORD)
-            T = MyType.make_pointer(T)
             # Update the symbol table
             # TODO: because I am not handling blocks as separate scopes (as
             # they should). I will introduce bugs when shared is defined in an
             # inner scope.
-            info.sym_tbl.insert_entry('shared', T, None, None)
+            entry = info.sym_tbl.insert_entry('shared', SHARED_OBJ_PTR,
+                    None, None)
+            entry.set_mem_region(MemoryRegion.STACK)
+            entry.set_ref_region(MemoryRegion.BPF_MAP)
     return inst
 
 
@@ -226,7 +226,8 @@ def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.DECL_REF_EXPR:
         return _check_if_ref_is_global_state(inst, info)
     elif inst.kind == clang.CursorKind.VAR_DECL:
-        current_func_name = current_function.name if current_function else '[[main]]'
+        current_func_name = \
+                current_function.name if current_function else '[[main]]'
         names = info.read_decl.get(current_func_name, set())
         if inst.name in names:
             # This will become a packet pointer, change the type if needed!
@@ -286,7 +287,6 @@ def _do_pass(inst, info, more):
             # debug(MODULE_TAG, 'remove instruction:', inst)
             return None
         # Continue deeper
-        gather = False
         for child, tag in inst.get_children_context_marked():
             is_list = isinstance(child, list)
             if not is_list:
@@ -359,6 +359,7 @@ def transform_vars_pass(inst, info, more):
     """
     Transformations in this pass
 
+    * Pass flags to the functions
     * Global variables
     * Read/Recv instruction
     * Write/Send instructions

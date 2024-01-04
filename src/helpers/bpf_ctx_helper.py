@@ -162,4 +162,4 @@ def set_ref_bpf_ctx_state(ref, state, info):
     if sym is None:
         error('Setting BPF Context Flag for the given Instruction is not implemented!')
         return
-    sym.is_bpf_ctx = state
+    sym.set_is_bpf_ctx(state)
