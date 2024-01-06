@@ -49,7 +49,7 @@ BPF_MAIN = 'BPF_MAIN_SCOPE'
 
 def _print_code(prog, info):
     text, _ =  gen_code(prog, info)
-    debug('code:\n', text, '\n---', sep='')
+    debug('code:\n', text, '\n---', sep='', tag=MODULE_TAG)
 
 
 def _prepare_event_handler_args(cursor, info):
@@ -86,9 +86,9 @@ def _prepare_event_handler_args(cursor, info):
 def _move_vars_before_event_loop_to_shared_scope(entry_func, main, info):
     list_vars = get_variable_declaration_before_elem(entry_func, main)
     # if list_vars:
-    #     debug('This is the list of variables before event loop:')
-    #     debug(tuple(map(lambda x: f'{x.name}:{x.type.spelling}', list_vars)))
-    #     debug('-------------------------------------------------')
+    #     debug('This is the list of variables before event loop:', tag=MODULE_TAG)
+    #     debug(tuple(map(lambda x: f'{x.name}:{x.type.spelling}', list_vars)), tag=MODULE_TAG)
+    #     debug('-------------------------------------------------', tag=MODULE_TAG)
     for var in list_vars:
         var.update_symbol_table(info.sym_tbl.shared_scope)
 
@@ -104,6 +104,8 @@ def load_other_sources(io_ctx, info):
 
 
 def generate_offload(io_ctx):
+    # filter_log(MODULE_TAG, '[Select Userspace Pass]', '[Var Dependency]')
+
     info = Info.from_io_ctx(io_ctx)
     # Parse the main file
     index, tu, cursor = parse_file(info.io_ctx.input_file, io_ctx.cflags)
@@ -123,14 +125,14 @@ def generate_offload(io_ctx):
     _move_vars_before_event_loop_to_shared_scope(entry_func, main, info)
 
     # Start the passes
-    debug('First pass on the AST (initializing...)')
+    debug('First pass on the AST (initializing...)', tag=MODULE_TAG)
     insts = gather_instructions_from(main, info, BODY)
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Gather Infromation About Functions')
+    debug('Gather Infromation About Functions', tag=MODULE_TAG)
     create_func_objs(info)
     add_known_func_objs(info)
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Prepare the event handler arguments
     prepare_insts = _prepare_event_handler_args(cursor, info)
@@ -141,64 +143,64 @@ def generate_offload(io_ctx):
     bpf.extend_inst(insts)
 
     # Mark which type or func definitions should be placed in generated code
-    debug('Mark Functions used in BPF')
+    debug('Mark Functions used in BPF', tag=MODULE_TAG)
     mark_used_funcs(bpf, info, PassObject())
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('[1st] Annotation')
+    debug('[1st] Annotation', tag=MODULE_TAG)
     bpf = replace_func_pointers(bpf, info, None)
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Mark Read/Write Inst & Buf')
+    debug('Mark Read/Write Inst & Buf', tag=MODULE_TAG)
     mark_io(bpf, info)
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Linear Code')
+    debug('Linear Code', tag=MODULE_TAG)
     bpf = linear_code_pass(bpf, info, PassObject())
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Feasibility Analysis')
+    debug('Feasibility Analysis', tag=MODULE_TAG)
     bpf = feasibilty_analysis_pass(bpf, info, PassObject())
     # for func in sorted(Function.directory.values(), key=lambda x: x.name):
-    #     debug(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_fail, func.path_ids)
+    #     debug(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_fail, func.path_ids, tag=MODULE_TAG)
     # code, _ = gen_code(bpf, info)
     # print(code)
     # show_insts([bpf])
 
     # func = Function.directory.get('strlen')
     # assert func is not None
-    # debug(func.name, func.may_succeed, func.may_fail)
+    # debug(func.name, func.may_succeed, func.may_fail, tag=MODULE_TAG)
 
     # func = Function.directory.get('tokenize_command')
     # assert func is not None
-    # debug(func.name, func.may_succeed, func.may_fail)
+    # debug(func.name, func.may_succeed, func.may_fail, tag=MODULE_TAG)
     # assert 0
 
     # func = Function.directory.get('try_read_udp')
     # assert func
     # show_insts(func.body)
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Create User Code Graph')
+    debug('Create User Code Graph', tag=MODULE_TAG)
     select_user_pass(bpf, info, PassObject())
-    # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
+    tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
     # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)) + str(x.path_ids))
-    # debug(tree)
+    debug('\n', tree, tag=MODULE_TAG)
     # root = info.user_prog.graph
     # code = root.paths.code
-    # debug(id(root), root.children, code)
+    # debug(id(root), root.children, code, tag=MODULE_TAG)
     # text, _ =  gen_code(code, info)
-    # debug('code:\n', text, '\n---', sep='')
-    # debug('is user empty:', root.is_empty())
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    # debug('code:\n', text, '\n---', sep='', tag=MODULE_TAG)
+    # debug('is user empty:', root.is_empty(), tag=MODULE_TAG)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Clone All State')
+    debug('Clone All State', tag=MODULE_TAG)
     user = clone_pass(bpf, info, PassObject())
     info.user_prog.sym_tbl = info.sym_tbl.clone()
     info.user_prog.func_dir = {}
     for func in Function.directory.values():
         new_f = func.clone(info.user_prog.func_dir)
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # NOTE: the order of generating the userspace and then BPF is important
     if not info.user_prog.graph.is_empty():
@@ -270,29 +272,29 @@ def gen_user_code(user, info, out_user):
     # Switch the symbol table and functions to the snapshot suitable for
     # userspace analysis
     with info.user_prog.select_context(info):
-        debug('User Prog: Handle Fallback')
+        debug('User Prog: Handle Fallback', tag=MODULE_TAG)
         create_fallback_pass(user, info, PassObject())
-        debug('~~~~~~~~~~~~~~~~~~~~~')
-        debug('User Prog: Calculate Variable Deps')
+        debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+        debug('User Prog: Calculate Variable Deps', tag=MODULE_TAG)
         var_dependency_pass(info)
-        debug('~~~~~~~~~~~~~~~~~~~~~')
+        debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
         # What graph looks like
         # report_user_program_graph(info)
 
         # Look at var deps
-        # debug(MODULE_TAG, 'Tree of variable dependencies')
-        # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(x.paths.var_deps))
-        # debug(tree)
+        # debug(MODULE_TAG, 'Tree of variable dependencies', tag=MODULE_TAG)
+        tree = draw_tree(info.user_prog.graph, fn=lambda x: str(x.paths.var_deps))
+        debug('\n', tree, tag=MODULE_TAG)
         # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
-        # debug(MODULE_TAG, info.user_prog.graph.paths.var_deps)
-        # debug(tree)
+        # debug(MODULE_TAG, info.user_prog.graph.paths.var_deps, tag=MODULE_TAG)
+        # debug(tree, tag=MODULE_TAG)
         # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(x.path_ids))
-        # debug(tree)
+        # debug(tree, tag=MODULE_TAG)
         # ----
 
         meta_structs = dfs_over_deps_vars(info.user_prog.graph)
-        # debug(MODULE_TAG, 'Metadata structures:', pformat(meta_structs))
+        # debug(MODULE_TAG, 'Metadata structures:', pformat(meta_structs), tag=MODULE_TAG)
 
         for x in meta_structs:
             state_obj = StateObject(None)
@@ -300,7 +302,7 @@ def gen_user_code(user, info, out_user):
             state_obj.type_ref = BASE_TYPES[clang.TypeKind.INT]
             fields = [state_obj,]
             for var in x['vars']:
-                # debug(MODULE_TAG, 'bpf/user-shared:', f'{var.name}:{var.type.spelling}')
+                # debug(MODULE_TAG, 'bpf/user-shared:', f'{var.name}:{var.type.spelling}', tag=MODULE_TAG)
                 # TODO: do I need to clone?
                 T = var.type.clone()
                 state_obj = StateObject(None)
@@ -317,10 +319,10 @@ def gen_user_code(user, info, out_user):
             info.sym_tbl.current_scope = info.sym_tbl.global_scope
             meta.update_symbol_table(info.sym_tbl)
             info.sym_tbl.current_scope = __scope
-            # debug('Meta', path_id, 'at index:', len(info.user_prog.declarations))
+            # debug('Meta', path_id, 'at index:', len(info.user_prog.declarations), tag=MODULE_TAG)
 
         text = generate_user_prog(info)
-        debug('~~~~~~~~~~~~~~~~~~~~~')
+        debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     with open(out_user, 'w') as f:
         f.write(text)
@@ -328,61 +330,61 @@ def gen_user_code(user, info, out_user):
 
 def gen_bpf_code(bpf, info, out_bpf):
     # End event loop with packet drop
-    debug('Loop End')
+    debug('Loop End', tag=MODULE_TAG)
     bpf = loop_end_pass(bpf, info, PassObject())
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Transform access to variables and read/write buffers.
-    debug('Transform Vars')
+    debug('Transform Vars', tag=MODULE_TAG)
     bpf = transform_vars_pass(bpf, info, PassObject())
     # code, _ = gen_code(bpf, info)
     # print(code)
     # show_insts([bpf])
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Handle moving to userspace and removing the instruction not possible in
     # BPF
-    debug('Userspace Fallback')
+    debug('Userspace Fallback', tag=MODULE_TAG)
     bpf = userspace_fallback_pass(bpf, info, PassObject())
     # code, _ = gen_code(bpf, info)
     # print(code)
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Verifier
-    debug('Verifier')
+    debug('Verifier', tag=MODULE_TAG)
     bpf = verifier_pass(bpf, info, PassObject())
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Second transform
-    debug('[2nd] Transform')
+    debug('[2nd] Transform', tag=MODULE_TAG)
     bpf = transform_func_after_verifier(bpf, info, PassObject())
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Reduce number of parameters
-    debug('Reduce Params')
+    debug('Reduce Params', tag=MODULE_TAG)
     bpf = reduce_params_pass(bpf, info, PassObject())
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('[2nd] remove everything that is not used in BPF')
+    debug('[2nd] remove everything that is not used in BPF', tag=MODULE_TAG)
     remove_everything_not_used(bpf, info, None)
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Change loop to bpf_loop')
+    debug('Change loop to bpf_loop', tag=MODULE_TAG)
     bpf = change_to_bpf_loop(bpf, info, None)
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    # debug('Program Complexity Pass')
+    # debug('Program Complexity Pass', tag=MODULE_TAG)
     # list_bpf_progs = mitiage_program_comlexity(bpf, info, None)
-    # debug('~~~~~~~~~~~~~~~~~~~~~')
+    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # TODO: split the code between parser and verdict
-    debug('[Parser/Verdict Split Code]')
+    debug('[Parser/Verdict Split Code]', tag=MODULE_TAG)
     info.prog.set_code(bpf)
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Write the code we have generated
-    debug('BPF Code Generation')
+    debug('BPF Code Generation', tag=MODULE_TAG)
     text = generate_bpf_prog(info)
     with open(out_bpf, 'w') as f:
         f.write(text)
-    debug('~~~~~~~~~~~~~~~~~~~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)

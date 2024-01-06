@@ -162,7 +162,8 @@ def _do_pass(inst, info, more):
             for child, tag in inst.get_children_context_marked():
                 with fail_ref.new_ref(FAILED, failed):
                     obj = PassObject.pack(lvl + 1, tag, parent_list)
-                    with cb_ref.new_ref(PARENT_INST, inst):
+                    parent = inst if inst.kind != BLOCK_OF_CODE else cb_ref.get(PARENT_INST)
+                    with cb_ref.new_ref(PARENT_INST, parent):
                         new_child = _process_child(child, inst, info, obj)
                         assert new_child is not None, 'This pass should not remove any instruction'
                     failed = fail_ref.get(FAILED)

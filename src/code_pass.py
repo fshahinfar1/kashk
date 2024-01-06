@@ -4,6 +4,8 @@ from instruction import *
 from passes.pass_obj import PassObject
 from passes.clone import clone_pass
 
+PARENT_INST = 1000
+
 class Pass:
     __slots__ = ('current_function', 'visited_functions', 'cb_ref', 'info',
             'result', '_may_remove', '_skip_children')
@@ -29,6 +31,17 @@ class Pass:
         self.result = None
         self._may_remove = False
         self._skip_children = False
+        self.parent_stack = CodeBlockRef()
+
+    @property
+    def parent_inst(self):
+        """
+        Returns the parent instruction of the currently investigated
+        instruction.
+
+        The parent instruction is the one this instruction is its child.
+        """
+        return self.parent_stack.get(PARENT_INST)
 
     @contextmanager
     def set_current_func(self, func, change_scope=True):
@@ -71,20 +84,22 @@ class Pass:
                 new_inst = clone_pass(inst, info, PassObject())
                 return new_inst
             # Continue deeper
-            for child, tag in inst.get_children_context_marked():
-                if isinstance(child, list):
-                    new_child = []
-                    for i in child:
-                        obj = PassObject.pack(lvl+1, tag, new_child)
-                        new_inst = self.do_pass(i, obj)
-                        if new_inst is not None:
-                            new_child.append(new_inst)
-                else:
-                    obj = PassObject.pack(lvl+1, tag, parent_list)
-                    new_child = self.do_pass(child, obj)
-                    if new_child is None:
-                        assert self._may_remove, 'This pass is not allowed to remove instructions'
-                        return None
-                new_children.append(new_child)
+            parent = inst if inst.kind != BLOCK_OF_CODE else self.parent_inst
+            with self.parent_stack.new_ref(PARENT_INST, inst):
+                for child, tag in inst.get_children_context_marked():
+                    if isinstance(child, list):
+                        new_child = []
+                        for i in child:
+                            obj = PassObject.pack(lvl+1, tag, new_child)
+                            new_inst = self.do_pass(i, obj)
+                            if new_inst is not None:
+                                new_child.append(new_inst)
+                    else:
+                        obj = PassObject.pack(lvl+1, tag, parent_list)
+                        new_child = self.do_pass(child, obj)
+                        if new_child is None:
+                            assert self._may_remove, 'This pass is not allowed to remove instructions'
+                            return None
+                    new_children.append(new_child)
         new_inst = inst.clone(new_children)
         return new_inst

@@ -4,176 +4,251 @@ import clang.cindex as clang
 from log import error, debug
 from data_structure import *
 from instruction import *
+from code_pass import Pass
+from user import FallbackRegionGraph
 
 
 MODULE_TAG = '[Select Userspace Pass]'
 
 
-NODE = 128
-cb_ref = CodeBlockRef()
-node_ref = CodeBlockRef()
-to_user_ref = CodeBlockRef()
+# NODE = 128
+# cb_ref = CodeBlockRef()
+# node_ref = CodeBlockRef()
+# to_user_ref = CodeBlockRef()
 
 
-def _propagate_userland_signal(old, new):
-    old.in_user_land = new.in_user_land
-    old.remember = new.remember
+# def _propagate_userland_signal(old, new):
+#     old.in_user_land = new.in_user_land
+#     old.remember = new.remember
 
 
-def _set_in_userland(obj):
-    obj.in_user_land = True
-    obj.remember = []
+# def _set_in_userland(obj):
+#     obj.in_user_land = True
+#     obj.remember = []
 
 
-def _init_userland_signal(obj):
-    obj.in_user_land = False
-    obj.remember = None
+# def _init_userland_signal(obj):
+#     obj.in_user_land = False
+#     obj.remember = None
 
 
-def _includes_inst(inst, target):
-    if inst == target:
-        return True
-    for c in inst.get_children():
-        if _includes_inst(c, target):
-            return True
-    return False
+# def _includes_inst(inst, target):
+#     if inst == target:
+#         return True
+#     for c in inst.get_children():
+#         if _includes_inst(c, target):
+#             return True
+#     return False
 
 
-def _get_the_rest_of_the_code(inst, blk):
-    instructions = []
-    for child in blk.get_children():
-        if _includes_inst(child, inst):
-            instructions.append(child)
-    return instructions
+# def _get_the_rest_of_the_code(inst, blk):
+#     instructions = []
+#     for child in blk.get_children():
+#         if _includes_inst(child, inst):
+#             instructions.append(child)
+#     return instructions
 
 
-def _process_call_inst(inst, info, more):
-    func = inst.get_function_def()
-    if not func or func.is_empty():
-        return
-    parent_node = node_ref.get(NODE)
-    node = parent_node.new_child()
-    node_used = False
-    # Step inside the function
-    # debug('Investigate:', inst.name)
-    obj = more.repack(0, None, None)
-    with node_ref.new_ref(NODE, node):
-        with info.sym_tbl.with_func_scope(func.name):
-            ret = _do_pass(func.body, info, obj)
-        # It is important that the code which check the user_graph_node
-        # be in the context of "graph_node(node)"
-        tmp_node = node_ref.get(NODE)
-        if tmp_node.is_empty():
-            tmp_node.remove()
-        else:
-            node_used = True
+# def _process_call_inst(inst, info, more):
+#     func = inst.get_function_def()
+#     if not func or func.is_empty():
+#         return
+#     parent_node = node_ref.get(NODE)
+#     node = parent_node.new_child()
+#     node_used = False
+#     # Step inside the function
+#     # debug('Investigate:', inst.name, tag=MODULE_TAG)
+#     obj = more.repack(0, None, None)
+#     with node_ref.new_ref(NODE, node):
+#         with info.sym_tbl.with_func_scope(func.name):
+#             ret = _do_pass(func.body, info, obj)
+#         # It is important that the code which check the user_graph_node
+#         # be in the context of "graph_node(node)"
+#         tmp_node = node_ref.get(NODE)
+#         if tmp_node.is_empty():
+#             tmp_node.remove()
+#         else:
+#             node_used = True
 
-        if func.may_fail:
-            # debug(MODULE_TAG, f'function {func.name} may fail!')
-            # TODO: I am trying to add the instruction after a function
-            # that may fail. But this is just an approximation. I need
-            # to do it properly. Maybe I need a CFG for this!
-            blk = cb_ref.get(BLOCK_OF_CODE)
-            assert blk.kind == BLOCK_OF_CODE
-            rest_of_the_code = _get_the_rest_of_the_code(inst, blk)
-            # debug(MODULE_TAG, 'Code selected for after calling the failing function:', rest_of_the_code)
-            node = node_ref.get(NODE)
-            node.paths.code.extend_inst(rest_of_the_code)
-            # _set_in_userland(more)
+#         if func.may_fail:
+#             # debug(MODULE_TAG, f'function {func.name} may fail!', tag=MODULE_TAG)
+#             # TODO: I am trying to add the instruction after a function
+#             # that may fail. But this is just an approximation. I need
+#             # to do it properly. Maybe I need a CFG for this!
+#             blk = cb_ref.get(BLOCK_OF_CODE)
+#             assert blk.kind == BLOCK_OF_CODE
+#             rest_of_the_code = _get_the_rest_of_the_code(inst, blk)
+#             # debug(MODULE_TAG, 'Code selected for after calling the failing function:', rest_of_the_code, tag=MODULE_TAG)
+#             node = node_ref.get(NODE)
+#             node.paths.code.extend_inst(rest_of_the_code)
+#             # _set_in_userland(more)
 
-    if node_used:
-        node = node_ref.get(NODE)
-        new_node = node.parent.new_child()
-        node_ref.set(NODE, new_node)
+#     if node_used:
+#         node = node_ref.get(NODE)
+#         new_node = node.parent.new_child()
+#         node_ref.set(NODE, new_node)
 
-    # debug (f'step out of function: {inst.name} and userland state in function is: {obj.in_user_land}')
+#     # debug (f'step out of function: {inst.name} and userland state in function is: {obj.in_user_land}')
 
 
-def _do_pass(inst, info, more):
-    lvl = more.lvl
-    ctx = more.ctx
+# def _do_pass(inst, info, more):
+#     lvl = more.lvl
+#     ctx = more.ctx
 
-    assert more.in_user_land is False
+#     assert more.in_user_land is False
 
-    with cb_ref.new_ref(inst.kind, inst):
+#     with cb_ref.new_ref(inst.kind, inst):
+#         if inst.kind == TO_USERSPACE_INST:
+#             # debug('reach "to user space inst"', tag=MODULE_TAG)
+#             _set_in_userland(more)
+#             to_user_ref.push(TO_USERSPACE_INST, inst)
+#             return
+#         elif inst.kind == clang.CursorKind.CALL_EXPR:
+#             _process_call_inst(inst, info, more)
+
+#         for child, tag in inst.get_children_context_marked():
+#             if not isinstance(child, list):
+#                 child = [child]
+
+#             boundy_begin_flag = False
+#             for i in child:
+#                 if not more.in_user_land:
+#                     # Look deeper
+#                     obj = more.repack(lvl+1, tag, None)
+#                     ret = _do_pass(i, info, obj)
+
+#                     prev_signal = more.in_user_land
+#                     cur_signal =  obj.in_user_land
+
+#                     _propagate_userland_signal(more, obj)
+
+#                     # We have transitioned into userland and this is the
+#                     # nearest BLOCK which contains the failure
+#                     if tag == BODY and cur_signal and not prev_signal:
+#                         boundy_begin_flag = True
+#                         # debug(MODULE_TAG, 'new boundry era', tag=MODULE_TAG)
+
+#                 # We are in userland, add these instructions to a list which
+#                 # will be instructions associated with a node of the graph.
+#                 if more.in_user_land and boundy_begin_flag:
+#                     if i.kind == TO_USERSPACE_INST:
+#                         # do not add this instruction to the list
+#                         continue
+#                     more.remember.append(i)
+
+#             # Processing children has been finished, if a userland was found,
+#             # it finishes here.
+#             if boundy_begin_flag:
+#                 # The userland boundy was found in this block. And this block
+#                 # has ended.
+
+#                 # TODO: I might want to postpone this to the upper block
+#                 #       What does this mean ? ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+#                 user_inst = Block(BODY)
+#                 user_inst.extend_inst(more.remember)
+#                 node = node_ref.get(NODE)
+#                 path = node.append(user_inst)
+#                 path.original_scope = info.sym_tbl.current_scope
+
+#                 to_user_inst_ref = to_user_ref.get(TO_USERSPACE_INST)
+#                 if to_user_inst_ref is not None:
+#                     path.to_user_inst = to_user_inst_ref
+#                     node.set_id(to_user_inst_ref.path_id)
+#                     # TODO: this type of managing the state is very tricky. what the hell!
+#                     to_user_ref.pop() # the TO_USERSPACE_INST was consumed!
+#                     # debug(MODULE_TAG, 'TO USERSPACE dead', to_user_inst_ref.path_id, tag=MODULE_TAG)
+#                 else:
+#                     raise Exception('End of userland region without a reference to the ToUserspace instruction.')
+
+#                 # Set the signal off! do not propagate.
+#                 _init_userland_signal(more)
+#                 # Create a new node
+#                 new_node = node.parent.new_child()
+#                 node_ref.set(NODE, new_node)
+
+
+# def select_user_pass_orig(inst, info, more):
+#     # Initialize the pass
+#     _init_userland_signal(more)
+#     node = info.user_prog.graph.new_child()
+#     with node_ref.new_ref(NODE, node):
+#         # Performe the pass
+#         _do_pass(inst, info, more)
+#         # Clean up
+#         node = node_ref.get(NODE)
+#         if node.is_empty():
+#             node.remove()
+
+
+class SelectUserPass(Pass):
+    @classmethod
+    def do(cls, inst, info, *args, **kwargs):
+        obj = super().do(inst, info, *args, **kwargs)
+        if obj.gathered_insts:
+            obj._end_of_failure_path()
+        return obj
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.node_ref = CodeBlockRef()
+
+        self.failed = False
+        self.gathered_insts = None
+        self.root = FallbackRegionGraph()
+        self.cur_node_stack = [(self.root, None), ]
+
+    @property
+    def cur_node(self):
+        return self.cur_node_stack[-1][0]
+
+    def _end_of_failure_path(self):
+        node, to_user_inst_ref = self.cur_node_stack[-1]
+        assert to_user_inst_ref is not None, 'End of userland region without a reference to the ToUserspace instruction.'
+        user_inst = Block(BODY)
+        user_inst.children = self.gathered_insts
+        path = node.append(user_inst)
+        path.original_scope = self.info.sym_tbl.current_scope
+        path.to_user_inst = to_user_inst_ref
+        node.set_id(to_user_inst_ref.path_id)
+        self.cur_node_stack.pop()
+
+    def process_current_inst(self, inst, more):
         if inst.kind == TO_USERSPACE_INST:
-            # debug('reach "to user space inst"')
-            _set_in_userland(more)
-            to_user_ref.push(TO_USERSPACE_INST, inst)
-            return
-        elif inst.kind == clang.CursorKind.CALL_EXPR:
-            _process_call_inst(inst, info, more)
+            # Entering the userland
+            assert self.failed is False, 'Overlapping TO_USERSPACE_INST was not expected'
+            self.failed = True
+            self.gathered_insts = []
+            new_node = self.cur_node.new_child()
+            tmp = (new_node, inst)
+            self.cur_node_stack.append(tmp)
+            return inst
 
-        for child, tag in inst.get_children_context_marked():
-            if not isinstance(child, list):
-                child = [child]
+        if self.failed:
+            self.gathered_insts.append(inst)
+            self.skip_children()
+            return inst
 
-            boundy_begin_flag = False
-            for i in child:
-                if not more.in_user_land:
-                    # Look deeper
-                    obj = more.repack(lvl+1, tag, None)
-                    ret = _do_pass(i, info, obj)
+        # If we have not failed, and we are calling a function which might fail
+        if inst.kind == clang.CursorKind.CALL_EXPR:
+            func = inst.get_function_def()
+            if not func.may_fail:
+                return inst
+            with self.set_current_func(func):
+                tmp_res = SelectUserPass.do(func.body, self.info)
+                func_root = tmp_res.root
+                # debug('@', inst.name, tag=MODULE_TAG)
+                # debug(func.may_fail, func.may_succeed, tag=MODULE_TAG)
+                # debug(func_root, func_root.children, tag=MODULE_TAG)
+                assert not func_root.is_empty(), 'The function may fail, there should be a failure path!'
+                assert not func_root.paths.code.has_children(), 'The root of the failure graph should not have any code associated with it'
+                for child in func_root.children:
+                    self.cur_node.add_child(child)
 
-                    prev_signal = more.in_user_land
-                    cur_signal =  obj.in_user_land
-
-                    _propagate_userland_signal(more, obj)
-
-                    # We have transitioned into userland and this is the
-                    # nearest BLOCK which contains the failure
-                    if tag == BODY and cur_signal and not prev_signal:
-                        boundy_begin_flag = True
-                        # debug(MODULE_TAG, 'new boundry era')
-
-                # We are in userland, add these instructions to a list which
-                # will be instructions associated with a node of the graph.
-                if more.in_user_land and boundy_begin_flag:
-                    if i.kind == TO_USERSPACE_INST:
-                        # do not add this instruction to the list
-                        continue
-                    more.remember.append(i)
-
-            # Processing children has been finished, if a userland was found,
-            # it finishes here.
-            if boundy_begin_flag:
-                # The userland boundy was found in this block. And this block
-                # has ended.
-
-                # TODO: I might want to postpone this to the upper block
-                #       What does this mean ? ^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-                user_inst = Block(BODY)
-                user_inst.extend_inst(more.remember)
-                node = node_ref.get(NODE)
-                path = node.append(user_inst)
-                path.original_scope = info.sym_tbl.current_scope
-
-                to_user_inst_ref = to_user_ref.get(TO_USERSPACE_INST)
-                if to_user_inst_ref is not None:
-                    path.to_user_inst = to_user_inst_ref
-                    node.set_id(to_user_inst_ref.path_id)
-                    # TODO: this type of managing the state is very tricky. what the hell!
-                    to_user_ref.pop() # the TO_USERSPACE_INST was consumed!
-                    # debug(MODULE_TAG, 'TO USERSPACE dead', to_user_inst_ref.path_id)
-                else:
-                    raise Exception('End of userland region without a reference to the ToUserspace instruction.')
-
-                # Set the signal off! do not propagate.
-                _init_userland_signal(more)
-                # Create a new node
-                new_node = node.parent.new_child()
-                node_ref.set(NODE, new_node)
+        return inst
 
 
 def select_user_pass(inst, info, more):
-    # Initialize the pass
-    _init_userland_signal(more)
-    node = info.user_prog.graph.new_child()
-    with node_ref.new_ref(NODE, node):
-        # Performe the pass
-        _do_pass(inst, info, more)
-        # Clean up
-        node = node_ref.get(NODE)
-        if node.is_empty():
-            node.remove()
+    obj = SelectUserPass.do(inst, info, more)
+    root = obj.root
+    info.user_prog.graph = root

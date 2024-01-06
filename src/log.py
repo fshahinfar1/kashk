@@ -58,16 +58,16 @@ def clear_repeating():
     g_counter = 1
 
 
-def filter_log(TAG):
+def filter_log(*args):
     global g_filter
-    g_filter = TAG
+    g_filter = set(args)
 
 
 def core_print_fn(mode, *args, **kwargs):
     tag = kwargs.get('tag')
     if 'tag' in kwargs:
         del kwargs['tag']
-    if g_filter is not None and tag != g_filter:
+    if g_filter is not None and tag not in g_filter:
         return
 
     clr = colors[mode]

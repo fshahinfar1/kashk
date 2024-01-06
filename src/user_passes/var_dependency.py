@@ -16,7 +16,7 @@ def _is_ref_local(ref, info):
     sym, scope = info.sym_tbl.lookup2(ref.name)
     if not scope:
         # is not defined
-        error(MODULE_TAG, f'variable `{ref.name}\' not defined in any scope! it was not expected.')
+        error(f'variable `{ref.name}\' not defined in any scope! it was not expected.', tag=MODULE_TAG)
         return False
     if scope != info.sym_tbl.current_scope:
         # variable is from another (parent) scope
@@ -73,9 +73,9 @@ def _handle_reference(path, inst, info, ctx, parent_bin_op):
         blk = cb_ref.get(BODY)
         orig_sym = path.original_scope.lookup(inst.name)
         if orig_sym is None:
-            error(MODULE_TAG, f'Variable {inst.name} was not found in the symbol table! Assuming it is not needed in userspace', inst.kind)
+            error(f'Variable {inst.name} was not found in the symbol table! Assuming it is not needed in userspace', inst.kind, tag=MODULE_TAG)
         elif _should_not_share_variable(inst, orig_sym, info):
-            debug(MODULE_TAG, 'not share:', inst.name, 'type:', orig_sym.type.spelling)
+            debug('not share:', inst.name, 'type:', orig_sym.type.spelling, tag=MODULE_TAG)
             decl = VarDecl(None)
             decl.name = inst.name
             decl.type = orig_sym.type
@@ -85,7 +85,7 @@ def _handle_reference(path, inst, info, ctx, parent_bin_op):
             sym = path.scope.insert_entry(inst.name, orig_sym.type, orig_sym.kind, None)
             if ctx == LHS and parent_bin_op.op == '=':
                 # writing to this unknow variable --> I do not need to share the result
-                debug(MODULE_TAG, f'not caring about {sym.name}')
+                debug(f'not caring about {sym.name}', tag=MODULE_TAG)
                 sym.is_accessed = SymbolAccessMode.FIRST_WRITE
 
                 decl = VarDecl(None)
@@ -96,13 +96,13 @@ def _handle_reference(path, inst, info, ctx, parent_bin_op):
                 sym.is_accessed = SymbolAccessMode.HAS_READ
                 path.var_deps.add(sym)
                 if sym.name == 'num_messages':
-                    debug(MODULE_TAG, 'adding:', sym.name)
+                    debug('adding:', sym.name, tag=MODULE_TAG)
                     scp = path.scope
                     while scp is not None:
                         print(scp)
                         scp = scp.parent
     else:
-        if ctx == LHS and parent_bin_op.op == '=':
+        if ctx == LHS and parent_bin_op and parent_bin_op.op == '=':
             sym.is_accessed = SymbolAccessMode.FIRST_WRITE
         else:
             sym.is_accessed = SymbolAccessMode.HAS_READ
