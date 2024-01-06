@@ -2,15 +2,15 @@ from sys import stderr, stdout
 
 """
 Color Table (16 bit)
- 	Normal 	Bright
-Black 	0 	8
-Red 	1 	9
-Green 	2 	10
-Yellow 	3 	11
-Blue 	4 	12
-Purple 	5 	13
-Cyan 	6 	14
-White 	7 	15
+	Normal	Bright
+Black	0	8
+Red 	1	9
+Green	2	10
+Yellow	3	11
+Blue	4	12
+Purple	5	13
+Cyan	6	14
+White	7	15
 """
 
 DEBUG  = 0
@@ -19,6 +19,21 @@ REPORT = 2
 
 g_counter = 0
 g_last_line = (None, '')
+g_filter = None
+
+
+colors = {
+        DEBUG:  '\033[33m',
+        ERROR:  '\033[31m',
+        REPORT: '\033[36m'
+        }
+
+output_file = {
+        DEBUG:  stdout,
+        ERROR:  stderr,
+        REPORT: stdout,
+        }
+
 
 def is_repeating(kind, args, kwargs):
     global g_counter
@@ -42,24 +57,35 @@ def clear_repeating():
         g_last_line = None, ''
     g_counter = 1
 
-def error(*args, **kwargs):
-    if is_repeating(ERROR, args, kwargs):
-        print(f'\r(x{g_counter}) ', end='', sep='', file=stderr)
+
+def filter_log(TAG):
+    global g_filter
+    g_filter = TAG
+
+
+def core_print_fn(mode, *args, **kwargs):
+    tag = kwargs.get('tag')
+    if 'tag' in kwargs:
+        del kwargs['tag']
+    if g_filter is not None and tag != g_filter:
+        return
+
+    clr = colors[mode]
+    out = output_file[mode]
+    if is_repeating(mode, args, kwargs):
+        print(f'\r(x{g_counter}) ', end='', sep='', file=stdout)
     else:
         clear_repeating()
-        print('\033[31m', *args, '\033[0m', file=stderr, **kwargs)
+        print(clr, tag, *args, '\033[0m', file=stdout, **kwargs)
+
+
+def error(*args, **kwargs):
+    core_print_fn(ERROR, *args, **kwargs)
 
 
 def debug(*args, **kwargs):
-    if is_repeating(DEBUG, args, kwargs):
-        print(f'\r(x{g_counter}) ', end='', sep='', file=stdout)
-    else:
-        clear_repeating()
-        print('\033[33m', *args, '\033[0m', file=stdout, **kwargs)
+    core_print_fn(DEBUG, *args, **kwargs)
+
 
 def report(*args, **kwargs):
-    if is_repeating(REPORT, args, kwargs):
-        print(f'\r(x{g_counter}) ', end='', sep='', file=stdout)
-    else:
-        clear_repeating()
-        print('\033[36m', *args, '\033[0m', file=stdout, **kwargs)
+    core_print_fn(REPORT, *args, **kwargs)
