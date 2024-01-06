@@ -126,6 +126,12 @@ def _do_recursive_var_analysis(inst, info, more):
     elif inst.kind == clang.CursorKind.DECL_REF_EXPR:
         bin_op = cb_ref.get(PARENT_BIN_OP)
         _handle_reference(path, inst, info, ctx, bin_op)
+    elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
+        # TODO: I do not need to copy all the struct, just the fields used.
+        # TODO: will it work with multiple level of member referencing?
+        owner = inst.owner[-1]
+        bin_op = cb_ref.get(PARENT_BIN_OP)
+        _handle_reference(path, owner, info, ctx, bin_op)
     elif inst.kind == clang.CursorKind.BINARY_OPERATOR:
         cb_ref.push(PARENT_BIN_OP, inst)
 
@@ -194,7 +200,6 @@ def _process_node(node, info):
                 # Add it to scope because the child needs it and parent does
                 # not have. So it is declaring it as needed.
                 node.paths.scope.insert(d)
-                pass
 
         child_p = child.paths
         if child_p.func_obj is not None:
@@ -218,6 +223,3 @@ def var_dependency_pass(info):
     # new functions. So, some the nodes are not directly converted to the code!
     root = info.user_prog.graph
     _process_node(root, info)
-
-    # print('test:', root.paths.code.children)
-    # print('end')
