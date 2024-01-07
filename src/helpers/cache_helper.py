@@ -7,6 +7,8 @@ from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
 from helpers.instruction_helper import (get_ret_inst, decl_new_var, ZERO, ONE)
 import template
 
+TAG = '[Cache Helper]'
+
 
 def get_ref_from_name(name, info):
     tmp_sym = info.sym_tbl.lookup(name)
@@ -23,32 +25,6 @@ def get_var_end(var, upper_bound_inst, info):
         end = BinOp.build(var, '+', upper_bound_inst)
         end = Cast.build(end, BASE_TYPES[VOID_PTR])
     return end
-
-
-def gen_bpf_memcpy(info, current_function, dst, src, size, upper_bound):
-    """
-    A helper function for generating code copying values from a pointer/array
-    to another one.
-
-    @param: destination ref
-    @param: source ref
-    @param: variable having the size of data copy
-    @param: upper_bound used for bound checking (bound for dest data structure)
-    """
-    mask_inst = BinOp.build(size, '&', info.prog.index_mask)
-    mask_assign = BinOp.build(size, '=', mask_inst)
-    # > Check that value size does not exceed the cache size
-    upper_bound_inst = Literal(upper_bound, clang.CursorKind.INTEGER_LITERAL)
-    sz_check_cond = BinOp.build(size, '>', upper_bound_inst)
-    sz_check = ControlFlowInst.build_if_inst(sz_check_cond)
-    sz_check.body.add_inst(get_ret_inst(current_function, info))
-    # > Continue by calling memcpy
-    memcpy      = Call(None)
-    memcpy.name = 'bpf_memcpy'
-    dest_end = get_var_end(dst, upper_bound_inst, info)
-    src_end = get_var_end(src, size, info)
-    memcpy.args.extend([dst, src, size, dest_end, src_end])
-    return [mask_assign, sz_check, memcpy]
 
 
 def gen_memcpy(info, current_function, dst, src, size, upper_bound):
@@ -72,43 +48,23 @@ def generate_cache_lookup(inst, blk, parent_children, info):
     @param parent_children The origin list of instructions in the parent block
     @param info
 
-    @returns (an instruction, a list of variables to be declared at the top of function, skip_target the instructions to be skipped in this block because we have processed it here)
+    @returns (an instruction, a list of variables to be declared at the top of
+    function, skip_target the instructions to be skipped in this block because
+    we have processed it here)
     """
     assert inst.kind == ANNOTATION_INST
     assert inst.ann_kind == Annotation.ANN_CACHE_BEGIN
     declare_at_top_of_func = []
-    skip_target = None
 
     conf = json.loads(inst.msg)
     map_id = conf['id']
     assert map_id in info.map_definitions
     map_def = info.map_definitions[map_id]
 
-    # Gather instructions between BEGIN & END
-    begin = False
-    on_miss = []
-    # debug('Block:', parent_children)
-    found_end_annotation = False
-    end_conf = None
-    for child in parent_children:
-        if child == inst:
-            # debug('*** Start gathering')
-            begin = True
-            continue
-        if child.kind == ANNOTATION_INST and child.ann_kind == Annotation.ANN_CACHE_END:
-            end_conf = json.loads(child.msg)
-            assert end_conf['id'] == map_id, 'The begining and end cache id should match'
-            # Notify the DFS to skip until the CACHE END
-            skip_target = child
-            found_end_annotation = True
-            # debug('*** Stop gathering')
-            break
-        if not begin:
-            continue
-        # debug('   Gather:', child)
-        on_miss.append(child)
-    assert found_end_annotation, 'The end of cache block should be specified'
-    assert isinstance(end_conf, dict), 'Make sure the end_conf was found'
+    on_miss = inst.block.get_children()
+    end_ann_inst = parent_children[parent_children.index(inst) + 1]
+    end_conf = json.loads(end_ann_inst.msg)
+    assert end_conf['id'] == map_id, 'The begining and end cache id should match'
 
     # Perform Lookup (Define instructions that are needed for lookup)
     map_name = get_map_name(map_id)
@@ -161,16 +117,7 @@ def generate_cache_lookup(inst, blk, parent_children, info):
     check_key_len_cond = BinOp.build(key_size_field, '==', key_size)
     check_key_len = ControlFlowInst.build_if_inst(check_key_len_cond)
     check.body.add_inst(check_key_len)
-    # check key matches
-    # tmp_var = decl_new_var(BASE_TYPES[clang.TypeKind.INT], info,
-    #         declare_at_top_of_func)
-    # strncmp = Call(None)
-    # strncmp.name = 'my_bpf_strncmp'
     key_field = val_ref.get_ref_field('key', info)
-    # strncmp.args.extend([key_field, key, key_size])
-    # tmp_assign = BinOp.build(tmp_var, '=', strncmp)
-    # check_key_len.body.add_inst(tmp_assign)
-
     # TODO: 16 is the max key size which should be determined based on the
     # internal cache data strucutre
     tmp_insts, tmp_decl, tmp_cmp_res = template.strncmp(key_field, key,
@@ -193,24 +140,12 @@ def generate_cache_lookup(inst, blk, parent_children, info):
     miss_flag_check.body.extend_inst(on_miss)
     lookup.append(miss_flag_check)
 
-    # TODO: I need to also run the transform_vars pass on the block of code
-    # handling the cache miss (Will implement it later)
-
-    # debug('instruction for cache miss:', on_miss)
-
-    # Mark the hash function used
-    # func = Function.directory['__fnv_hash']
-    # if not func.is_used_in_bpf_code:
-    #     func.is_used_in_bpf_code = True
-    #     info.prog.declarations.insert(0, func)
-    #     debug('Add func', func.name)
-    # NOTE: instead of defining the hash function include the header file
     if HASH_HELPER_HEADER not in info.prog.headers:
         info.prog.headers.append(HASH_HELPER_HEADER)
 
     blk.extend(lookup)
     # Remove annotation
-    return None, declare_at_top_of_func, skip_target
+    return None, declare_at_top_of_func
 
 
 def generate_cache_update(inst, blk, current_function, info):

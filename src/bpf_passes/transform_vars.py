@@ -6,14 +6,12 @@ from template import (prepare_shared_state_var, define_bpf_arr_map,
         SHARED_OBJ_PTR)
 from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS
 from utility import get_tmp_var_name
-from helpers.cache_helper import generate_cache_lookup
-from helpers.instruction_helper import get_ret_inst, add_flag_to_func
+from helpers.instruction_helper import get_ret_inst, add_flag_to_func, ZERO
 
 from data_structure import *
 from instruction import *
 from sym_table import MemoryRegion
 from passes.pass_obj import PassObject
-
 
 
 MODULE_TAG = '[Transform Vars Pass]'
@@ -22,22 +20,13 @@ SEND_FLAG_NAME = '__send_flag'
 FAIL_FLAG_NAME = '__fail_flag'
 
 cb_ref = CodeBlockRef()
-parent_block = CodeBlockRef()
 current_function = None
-# Skip until the cache END
-skip_to_end = None
 declare_at_top_of_func = []
-ZERO = Literal('0', clang.CursorKind.INTEGER_LITERAL)
 
 
 class After:
     def __init__(self, box):
         self.box = box
-
-
-def _set_skip(val):
-    global skip_to_end
-    skip_to_end = val
 
 
 def _check_if_ref_is_global_state(inst, info):
@@ -89,23 +78,18 @@ def _process_annotation(inst, info):
         assert map_id not in info.map_definitions, 'Multiple deffinition of the same map id'
         info.map_definitions[map_id] = conf
         # report('Declare map', m, 'for malloc')
-    elif inst.ann_kind == Annotation.ANN_CACHE_END:
-        # Nothing to do
-        pass
     elif inst.ann_kind == Annotation.ANN_CACHE_BEGIN:
-        blk = cb_ref.get(BODY)
-        parent_node = parent_block.get(BODY)
-        parent_children = parent_node.get_children()
-        new_inst, to_be_declared, skip_target = generate_cache_lookup(inst, blk, parent_children, info)
-        declare_at_top_of_func.extend(to_be_declared)
-        _set_skip(skip_target)
-        return new_inst
+        # Moved to 2nd Transformation
+        return inst
+    elif inst.ann_kind == Annotation.ANN_CACHE_END:
+        # Moved to 2nd Transformation
+        return inst
     elif inst.ann_kind == Annotation.ANN_CACHE_BEGIN_UPDATE:
         # Moved to 2nd Transformation
         return inst
     elif inst.ann_kind == Annotation.ANN_CACHE_END_UPDATE:
-        # TODO: do I want to have some code after update ??
-        pass
+        # Moved to 2nd Transformation
+        return inst
     # Remove annotation
     return None
 
@@ -292,27 +276,18 @@ def _do_pass(inst, info, more):
             if not is_list:
                 child = [child]
             new_child = []
+            for i in child:
+                obj = PassObject.pack(lvl+1, tag, new_child)
+                new_inst = _do_pass(i, info, obj)
+                if new_inst is None:
+                    continue
 
-            # TODO: is there no other/better way for doing BFS in middle of DFS?
-            with parent_block.new_ref(tag, inst):
-                for i in child:
-                    # Check if we are skipping
-                    if skip_to_end is not None:
-                        if skip_to_end == i:
-                            _set_skip(None)
-                        continue
-
-                    obj = PassObject.pack(lvl+1, tag, new_child)
-                    new_inst = _do_pass(i, info, obj)
-                    if new_inst is None:
-                        continue
-
-                    after = []
-                    while new_child and isinstance(new_child[-1], After):
-                        after.append(new_child.pop())
-                    new_child.append(new_inst)
-                    for a in reversed(after):
-                        new_child.extend(a.box)
+                after = []
+                while new_child and isinstance(new_child[-1], After):
+                    after.append(new_child.pop())
+                new_child.append(new_inst)
+                for a in reversed(after):
+                    new_child.extend(a.box)
             if not is_list:
                 if len(new_child) < 1:
                     # debug(MODULE_TAG, 'remove instruction:', inst)

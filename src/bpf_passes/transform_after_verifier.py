@@ -11,15 +11,23 @@ from passes.pass_obj import PassObject
 from bpf_passes.transform_vars import SEND_FLAG_NAME
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr, is_value_from_bpf_ctx
 from helpers.instruction_helper import (get_ret_inst, get_ret_value_text)
-from helpers.cache_helper import generate_cache_update
+from helpers.cache_helper import generate_cache_lookup, generate_cache_update
 import template
 
 
 MODULE_TAG = '[2nd Transform]'
 cb_ref = CodeBlockRef()
+parent_block = CodeBlockRef()
 current_function = None
 _has_processed_func = set()
 declare_at_top_of_func = None
+# Skip until the cache END
+skip_to_end = None
+
+
+def _set_skip(val):
+    global skip_to_end
+    skip_to_end = val
 
 
 @contextmanager
@@ -204,6 +212,19 @@ def _process_annotation(inst, info):
         new_inst, to_be_declared = generate_cache_update(inst, blk, current_function, info)
         declare_at_top_of_func.extend(to_be_declared)
         return new_inst
+    elif inst.ann_kind == Annotation.ANN_CACHE_END_UPDATE:
+        return None
+    elif inst.ann_kind == Annotation.ANN_CACHE_BEGIN:
+        blk = cb_ref.get(BODY)
+        parent_node = parent_block.get(BODY)
+        parent_children = parent_node.get_children()
+        new_inst, to_be_declared = generate_cache_lookup(inst, blk, parent_children, info)
+        declare_at_top_of_func.extend(to_be_declared)
+        return new_inst
+    elif inst.ann_kind == Annotation.ANN_CACHE_END:
+        return None
+    # Remove annotation
+    return None
 
 
 def _process_var_decl(inst, info):
@@ -279,19 +300,26 @@ def _do_pass(inst, info, more):
             return None
         # Continue deeper
         for child, tag in inst.get_children_context_marked():
-            if isinstance(child, list):
-                new_child = []
-                for i in child:
-                    obj = PassObject.pack(lvl+1, tag, new_child)
-                    new_inst = _do_pass(i, info, obj)
-                    if new_inst is not None:
-                        new_child.append(new_inst)
-            else:
-                obj = PassObject.pack(lvl+1, tag, parent_list)
-                new_child = _do_pass(child, info, obj)
-                if new_child is None:
-                    return None
-            new_children.append(new_child)
+            # TODO: try to refactor this module into a Pass class
+            with parent_block.new_ref(tag, inst):
+                if isinstance(child, list):
+                    new_child = []
+                    for i in child:
+                        obj = PassObject.pack(lvl+1, tag, new_child)
+                        new_inst = _do_pass(i, info, obj)
+                        # Check if we are skipping
+                        if skip_to_end is not None:
+                            if skip_to_end == i:
+                                _set_skip(None)
+                            continue
+                        if new_inst is not None:
+                            new_child.append(new_inst)
+                else:
+                    obj = PassObject.pack(lvl+1, tag, parent_list)
+                    new_child = _do_pass(child, info, obj)
+                    if new_child is None:
+                        return None
+                new_children.append(new_child)
     new_inst = inst.clone(new_children)
     return new_inst
 
