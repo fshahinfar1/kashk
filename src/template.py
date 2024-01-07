@@ -284,7 +284,7 @@ def variable_memcpy(dst, src, size, up_bound, info, fail_return_inst=None):
     return loop, declare_at_top_of_func
 
 
-def strncmp(s1, s2, size, upper_bound, info):
+def strncmp(s1, s2, size, upper_bound, info, fail_return_inst=None):
     assert hasattr(s1, 'type')
     assert hasattr(s2, 'type')
 
@@ -302,11 +302,30 @@ def strncmp(s1, s2, size, upper_bound, info):
     bound_check_s1 = is_bpf_ctx_ptr(s1, info)
     bound_check_s2 = is_bpf_ctx_ptr(s2, info)
 
+
+    debug('strncmp, inputs:')
+    debug('s1:', s1, s1.owner)
+    debug('s2:', s2, s2.owner)
+    debug('bound check needed:', bound_check_s1, bound_check_s2)
+    debug('++++++++++++++++++++++++++++')
+
     res_var = decl_new_var(INT, info, decl)
     init_res = BinOp.build(res_var, '=', ZERO)
 
     loop, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info, INT)
     decl.extend(tmp_decl)
+
+    if bound_check_s1:
+        data_end = info.prog.get_pkt_end()
+        ret = fail_return_inst
+        tmp_check = bpf_ctx_bound_check(s1, loop_var, data_end, ret)
+        loop.body.add_inst(tmp_check)
+
+    if bound_check_s2:
+        data_end = info.prog.get_pkt_end()
+        ret = fail_return_inst
+        tmp_check = bpf_ctx_bound_check(s2, loop_var, data_end, ret)
+        loop.body.add_inst(tmp_check)
 
     at_s1 = ArrayAccess.build(s1, loop_var)
     at_s2 = ArrayAccess.build(s2, loop_var)
