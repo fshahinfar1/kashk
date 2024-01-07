@@ -166,7 +166,8 @@ def _do_pass(inst, info):
                             if i == skip_target:
                                 _set_skip_target(None)
                                 debug('found skip target', i, tag=MODULE_TAG)
-                            continue
+                            else:
+                                continue
 
                         if exclude_inst_flag:
                             continue
