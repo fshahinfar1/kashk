@@ -87,7 +87,7 @@ def _check_if_variable_index_should_be_masked(ref, index, blk, info):
     the BPF context. blk is the current block of code to add the masking operation to.
     """
     set_of_variables_to_be_masked = get_scalar_variables(ref) + get_scalar_variables(index)
-    # debug('these are scalar variables:', set_of_variables_to_be_masked)
+    # debug('these are scalar variables:', set_of_variables_to_be_masked, tag=MODULE_TAG)
     for var in  set_of_variables_to_be_masked:
         # TODO: should I keep the variable intact and define a tmp value for
         # masking? Then I should replace the access instruction and use the
@@ -96,8 +96,8 @@ def _check_if_variable_index_should_be_masked(ref, index, blk, info):
         sym = get_ref_symbol(var, info)
         if sym is None:
             error('Failed to find symbol!')
-            debug(MODULE_TAG, var)
-            debug(info.sym_tbl.current_scope.symbols)
+            debug(MODULE_TAG, var, tag=MODULE_TAG)
+            debug(info.sym_tbl.current_scope.symbols, tag=MODULE_TAG)
             raise Exception('Failure')
         if sym.is_bpf_ctx:
             continue
@@ -133,17 +133,17 @@ def _add_bound_check(blk, R, current_function, info, bytes_mode, more):
     # check.ref = ref
     # check.index = index
 
-    # debug('Adding bound check. previous check:', lst)
-    # debug('New bound check:', check)
+    # debug('Adding bound check. previous check:', lst, tag=MODULE_TAG)
+    # debug('New bound check:', check, tag=MODULE_TAG)
     # if lst is None:
-    #     debug('can merge?: No')
+    #     debug('can merge?: No', tag=MODULE_TAG)
     # else:
-    #     debug('can merge?:', lst.can_merge(check))
+    #     debug('can merge?:', lst.can_merge(check), tag=MODULE_TAG)
 
     # if (lst is None or lst.can_merge(check)):
     #     # Update/Merge the bound checks
     #     more.last_bound_check = check
-    #     debug('have to decide which bound check to keep')
+    #     debug('have to decide which bound check to keep', tag=MODULE_TAG)
     # else:
     #     # Can not merge!
     #     # create the previous bound check and pospone the last bound check for
@@ -162,7 +162,7 @@ def _handle_binop(inst, info, more):
         # Check if we are assigning a reference
         if T.is_pointer() or T.is_array():
             rhs_is_ptr = is_bpf_ctx_ptr(rhs, info)
-            # debug("***", gen_code([inst,], info), '|| LHS kind:', lhs.kind, '|| RHS kind:', rhs.kind, '|| is rhs ctx:', rhs_is_ptr)
+            # debug("***", gen_code([inst,], info), '|| LHS kind:', lhs.kind, '|| RHS kind:', rhs.kind, '|| is rhs ctx:', rhs_is_ptr, tag=MODULE_TAG)
             set_ref_bpf_ctx_state(lhs, rhs_is_ptr, info)
             # assert is_bpf_ctx_ptr(lhs, info) == rhs_is_ptr, 'Check if set_ref_bpf_ctx_state and is_bpf_ctx_ptr work correctly'
             if is_bpf_ctx_ptr(lhs, info) != rhs_is_ptr:
@@ -190,7 +190,7 @@ def _handle_binop(inst, info, more):
 
             # Report for debuging
             # tmp,_ = gen_code([inst], info)
-            # debug(f'Add a bound check before:\n    {tmp}')
+            # debug(f'Add a bound check before:\n    {tmp}', tag=MODULE_TAG)
     # Keep the instruction unchanged
     return inst
 
@@ -224,9 +224,9 @@ def _has_bpf_ctx_in_field(ref, info, field_name=None):
                     field_name.fields.append([ref_field,])
                     found = True
                     field_name.count_bpf_fields += 1
-                    debug(MODULE_TAG, ref, field.name, 'is BPF CTX')
+                    debug(MODULE_TAG, ref, field.name, 'is BPF CTX', tag=MODULE_TAG)
             else:
-                debug('The field is not BPF', ref_field)
+                debug('The field is not BPF', ref_field, tag=MODULE_TAG)
 
         # Check if any of the field has an object which is BPF context
         # for field in decl.fields:
@@ -246,7 +246,7 @@ def _check_passing_bpf_context(inst, func, info):
         param = func.args[pos]
         if is_bpf_ctx_ptr(a, info):
             # First check if the argument it self is a pointer to BPF ctx
-            # debug(f'Passing BPF_CTX as argument {param.name} <-- {a.name}')
+            # debug(f'Passing BPF_CTX as argument {param.name} <-- {a.name}', tag=MODULE_TAG)
             sym = callee_scope.lookup(param.name)
             sym.set_is_bpf_ctx(True)
             receives_bpf_ctx = True
@@ -277,26 +277,26 @@ def _check_passing_bpf_context(inst, func, info):
             # structure here).
             if param.type_ref.spelling != a.type.spelling:
                 warn('There is a type cast when passing the argument. I lose track of BPF context when there is a type cast! [1]')
-                debug(f'param: {param.type_ref.spelling}    argument: {a.type.spelling}')
+                debug(f'param: {param.type_ref.spelling}    argument: {a.type.spelling}', tag=MODULE_TAG)
                 continue
 
             # if not isinstance(a, Ref):
-            #     debug('I am not checking whether the argument which are not simple references (e.g, are operations) have BPF context as a field or not')
-            #     debug('debug info:')
+            #     debug('I am not checking whether the argument which are not simple references (e.g, are operations) have BPF context as a field or not', tag=MODULE_TAG)
+            #     debug('debug info:', tag=MODULE_TAG)
             #     text, _ = gen_code([a,], info)
-            #     debug(a)
-            #     debug(text)
-            #     debug('--------')
+            #     debug(a, tag=MODULE_TAG)
+            #     debug(text, tag=MODULE_TAG)
+            #     debug('--------', tag=MODULE_TAG)
             #     continue
 
             fields = FoundFields()
-            # debug(callee_scope.symbols)
+            # debug(callee_scope.symbols, tag=MODULE_TAG)
             if _has_bpf_ctx_in_field(a, info, fields):
                 text, _ = gen_code([a, ], info)
-                debug('Has bpf context in the field:', a, '|', text)
+                debug('Has bpf context in the field:', a, '|', text, tag=MODULE_TAG)
                 param_sym = callee_scope.lookup(param.name)
                 assert param_sym is not None, 'We should have all the parameters in the scope of functions'
-                # debug('fields:', field)
+                # debug('fields:', field, tag=MODULE_TAG)
                 for field in fields.fields:
                     scope = param_sym.fields
                     for ref in reversed(field):
@@ -306,16 +306,16 @@ def _check_passing_bpf_context(inst, func, info):
                         scope = sym.fields
                     sym.set_is_bpf_ctx(True)
                     receives_bpf_ctx = True
-                    # debug(f'Set the {param.name} .. {sym.name} to BPF_CTX')
+                    # debug(f'Set the {param.name} .. {sym.name} to BPF_CTX', tag=MODULE_TAG)
             else:
                 text, _ = gen_code([a, ], info)
-                debug(f'Does not have BPF CTX in its field', a, '|', text)
+                debug(f'Does not have BPF CTX in its field', a, '|', text, tag=MODULE_TAG)
                 pass
     return receives_bpf_ctx
 
 
 def _check_setting_bpf_context_in_callee(inst, func, info):
-    print('checking func:', inst.name)
+    debug('checking func:', inst.name, tag=MODULE_TAG)
     callee_scope = info.sym_tbl.scope_mapping[func.name]
 
     # Check if value of pointers passed to this function was changed to point
@@ -337,7 +337,7 @@ def _check_setting_bpf_context_in_callee(inst, func, info):
                 continue
             ref = tmp
 
-        debug(f'Parameter {param.name} ({param.type_ref.kind}) is given argument {ref.owner} {ref.name} ({ref.type})')
+        debug(f'Parameter {param.name} ({param.type_ref.kind}) is given argument {ref.owner} {ref.name} ({ref.type})', tag=MODULE_TAG)
 
         # If the pointer it self is set to be BPF context, then the pointer
         # will be BPF context in this scope too.
@@ -440,9 +440,9 @@ def _handle_call(inst, info, more):
 
             blk = cb_ref.get(BODY)
             # text, _ = gen_code(blk, info)
-            # debug(text)
+            # debug(text, tag=MODULE_TAG)
             # text, _ = gen_code([inst,], info)
-            # debug(text)
+            # debug(text, tag=MODULE_TAG)
             _check_if_variable_index_should_be_masked(ref, size, blk, info)
             # Add the check a line before this access
             _add_bound_check(blk, (ref, size, ZERO), current_function, info, bytes_mode=True, more=more)
@@ -451,7 +451,7 @@ def _handle_call(inst, info, more):
             error(MODULE_TAG, 'function:', inst.name,
                 'receives BPF context but is not accessible for modification')
         else:
-            # debug('<><><>', inst.name, 'I only considered some functions, also check for other mem access functions')
+            # debug('<><><>', inst.name, 'I only considered some functions, also check for other mem access functions', tag=MODULE_TAG)
             pass
     return inst
 
@@ -490,14 +490,14 @@ def _do_pass(inst, info, more):
         #     # remember which fields my be BPF Context
         #     with new_backward_jump_context() as marked_refs:
         #         _do_pass(inst.body, info, PassObject())
-        #         debug('in a loop these were marked:')
+        #         debug('in a loop these were marked:', tag=MODULE_TAG)
         #         tmp_sym = info.sym_tbl.lookup('head')
         #         if tmp_sym:
-        #             debug('&&', tmp_sym.name, tmp_sym.is_bpf_ctx)
+        #             debug('&&', tmp_sym.name, tmp_sym.is_bpf_ctx, tag=MODULE_TAG)
         #         for ref in marked_refs:
-        #             debug('jump back mark', ref)
+        #             debug('jump back mark', ref, tag=MODULE_TAG)
         #             set_ref_bpf_ctx_state(ref, True, info)
-        #         debug('----------------------------')
+        #         debug('----------------------------', tag=MODULE_TAG)
 
         # Continue deeper
         for child, tag in inst.get_children_context_marked():

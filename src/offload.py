@@ -176,7 +176,7 @@ def generate_offload(io_ctx):
     # debug(func.name, func.may_succeed, func.may_fail, tag=MODULE_TAG)
     # assert 0
 
-    # func = Function.directory.get('try_read_udp')
+    # func = Function.directory.get('handle_set')
     # assert func
     # show_insts(func.body)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
