@@ -986,19 +986,36 @@ class Annotation(Instruction):
         self.msg = eval(msg)
         self.ann_kind = ann_kind
         self.kind = ANNOTATION_INST
+        self.block = Block(BODY)
+
+    def is_block_annotation(self):
+        return self.ann_kind in (Annotation.ANN_CACHE_BEGIN,
+                Annotation.ANN_CACHE_BEGIN_UPDATE)
+
+    def end_block_ann_kind(self):
+        if not self.is_block_annotation():
+            return None
+        m = {
+                Annotation.ANN_CACHE_BEGIN: Annotation.ANN_CACHE_END,
+                Annotation.ANN_CACHE_BEGIN_UPDATE: Annotation.ANN_CACHE_END_UPDATE,
+                }
+        return m[self.ann_kind]
 
     def __str__(self):
         return f'<Annotation `{self.ann_kind}\' >'
 
-    def clone(self, _):
+    def clone(self, list_child):
         # TODO: Do not need to clone :) ?! (it is goofy)
-        return self
+        new = Annotation('"xxx"', self.ann_kind)
+        new.msg = self.msg
+        new.block = list_child[0]
+        return new
 
     def has_children(self):
-        return False
+        return self.block.has_children()
 
     def get_children(self):
-        return []
+        return [self.block, ]
 
     def get_children_context_marked(self):
-        return []
+        return [(self.block, self.block.tag), ]

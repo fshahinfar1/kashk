@@ -374,7 +374,9 @@ def gen_code(list_instructions, info, context=BODY):
                 text = f'// removing a call to "<<" operator'
                 modified = CHANGE_BUFFER_DEF
             elif inst.kind == ANNOTATION_INST:
-                continue
+                if not inst.is_block_annotation() or not inst.has_children():
+                    continue
+                text, _ = gen_code(inst.block, info, BODY)
             else:
                 handler = jump_table.get(inst.kind, lambda x,y,z: '')
                 text = handler(inst, info, [lvl])

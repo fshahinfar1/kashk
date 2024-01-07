@@ -4,13 +4,10 @@ from log import error, debug, report
 from prune import READ_PACKET, WRITE_PACKET, COROUTINE_FUNC_NAME
 from data_structure import *
 from instruction import *
-from understand_logic import gather_instructions_from, gather_instructions_under
+from understand_logic import gather_instructions_from, gather_instructions_under, MODULE_TAG
 from sym_table import *
 
 from prune import should_process_this_cursor
-
-
-MODULE_TAG = 'LOGIC HANDLER'
 
 
 def __function_is_of_interest(inst):

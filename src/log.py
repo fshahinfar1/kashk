@@ -76,7 +76,10 @@ def core_print_fn(mode, *args, **kwargs):
         print(f'\r(x{g_counter}) ', end='', sep='', file=stdout)
     else:
         clear_repeating()
-        print(clr, tag, *args, '\033[0m', file=stdout, **kwargs)
+        if tag:
+            print(clr, tag, *args, '\033[0m', file=stdout, **kwargs)
+        else:
+            print(clr, *args, '\033[0m', file=stdout, **kwargs)
 
 
 def error(*args, **kwargs):
