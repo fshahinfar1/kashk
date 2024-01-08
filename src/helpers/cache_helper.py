@@ -121,7 +121,7 @@ def generate_cache_lookup(inst, blk, parent_children, info):
     # TODO: 16 is the max key size which should be determined based on the
     # internal cache data strucutre
     tmp_insts, tmp_decl, tmp_cmp_res = template.strncmp(key_field, key,
-            key_size, 16, info)
+            key_size, 255, info)
     declare_at_top_of_func.extend(tmp_decl)
     check_key_len.body.extend_inst(tmp_insts)
 
