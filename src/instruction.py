@@ -989,8 +989,7 @@ class Annotation(Instruction):
         self.block = Block(BODY)
 
     def is_block_annotation(self):
-        return self.ann_kind in (Annotation.ANN_CACHE_BEGIN,
-                Annotation.ANN_CACHE_BEGIN_UPDATE)
+        return self.ann_kind in (Annotation.ANN_CACHE_BEGIN,)
 
     def end_block_ann_kind(self):
         if not self.is_block_annotation():
