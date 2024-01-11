@@ -103,8 +103,8 @@ def _starts_with_func_call(node, info):
 
 
 def _process_node(node, info):
-    debug('node:', id(node), 'count children:', len(node.children), tag=MODULE_TAG)
-    debug('path ids:', node.path_ids, tag=MODULE_TAG)
+    # debug('node:', id(node), 'count children:', len(node.children), tag=MODULE_TAG)
+    # debug('path ids:', node.path_ids, tag=MODULE_TAG)
     # debug('code:', node.paths.code.children, tag=MODULE_TAG)
     blk = Block(BODY)
     assert not node.is_empty()
@@ -115,27 +115,35 @@ def _process_node(node, info):
         call_inst, new_func, first_inst = _starts_with_func_call(node, info)
 
         if new_func:
-            debug('starts with a call to', new_func.name, tag=MODULE_TAG)
+            # debug('starts with a call to', new_func.name, tag=MODULE_TAG)
             with info.sym_tbl.with_func_scope(call_inst.name):
                 body = _process_node(child, info)
             child.paths.func_obj = new_func
             child.paths.call_inst.append(call_inst)
             child.paths.code = body
         else:
-            debug('just code', tag=MODULE_TAG)
+            # debug('just code', tag=MODULE_TAG)
             cur = info.sym_tbl.current_scope
             info.sym_tbl.current_scope = node.paths.scope
             body = _process_node(child, info)
             info.sym_tbl.current_scope = cur
 
         # Check if there are multiple failure path or just one!
-        debug('still processing node:', id(node),
-                'count children:', len(node.children), tag=MODULE_TAG)
-        debug(node.path_ids, tag=MODULE_TAG)
+        # debug('still processing node:', id(node),
+        #         'count children:', len(node.children), tag=MODULE_TAG)
+        # debug(node.path_ids, tag=MODULE_TAG)
         if len(node.path_ids) > 1:
-            debug('Generating a id check', tag=MODULE_TAG)
+            # debug('Generating a id check', tag=MODULE_TAG)
             if_inst = _generate_id_check(child.path_ids)
             if new_func is None:
+                # TODO: if the child does not represent a function call, are we
+                # inlining the code? If so we need to cast the reference and
+                # load the variables here.
+                # TODO: Since we are chaning the code of this node, then when
+                # we are going to analize the dependencies, the same
+                # dependencies of the child would be find for this node. Remove
+                # the child if it is not needed anymore.
+                # BUG: BUG!
                 if_inst.body = body
                 # TODO: what is this?
                 origin_symbols = child.paths.original_scope.symbols
@@ -145,7 +153,7 @@ def _process_node(node, info):
                 if_inst.body.add_inst(first_inst)
             blk.add_inst(if_inst)
         else:
-            debug('no check was added', tag=MODULE_TAG)
+            # debug('no check was added', tag=MODULE_TAG)
             if new_func is None:
                 blk.extend_inst(body.children)
                 # TODO: what is this?

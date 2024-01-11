@@ -1,42 +1,17 @@
 import clang.cindex as clang
 from log import error, debug
 from sym_table import SymbolAccessMode
-from data_structure import MyType, CodeBlockRef
+from data_structure import CodeBlockRef
 from instruction import *
 
+from code_pass import Pass
 from passes.pass_obj import PassObject
+
+from bpf_code_gen import gen_code
 
 
 PARENT_BIN_OP = 560
 MODULE_TAG = '[Var Dependency]'
-cb_ref = CodeBlockRef()
-
-
-def _is_ref_local(ref, info):
-    sym, scope = info.sym_tbl.lookup2(ref.name)
-    if not scope:
-        # is not defined
-        error(f'variable `{ref.name}\' not defined in any scope! it was not expected.', tag=MODULE_TAG)
-        return False
-    if scope != info.sym_tbl.current_scope:
-        # variable is from another (parent) scope
-        return False
-    return True
-
-
-def _get_children(obj, *args):
-    src = obj.get_children_context_marked()
-    res = []
-    for child, tag in src:
-        if isinstance(child, list):
-            more_fields = []
-            for x in args:
-                more_fields.append([x] * len(child))
-            res.extend(zip(child, [tag] * len(child), *more_fields))
-        else:
-            res.append((child, tag, *args))
-    res.reverse()
-    return res
 
 
 def _should_not_share_variable(inst, sym, info):
@@ -50,7 +25,7 @@ def _should_not_share_variable(inst, sym, info):
     return False
 
 
-def __is_local(path, inst, info):
+def _is_local(path, inst, info):
     sym, scope = path.scope.lookup2(inst.name)
     if sym is None:
         return False, sym
@@ -61,102 +36,89 @@ def __is_local(path, inst, info):
     return False, sym
 
 
-def _handle_reference(path, inst, info, ctx, parent_bin_op):
-    # TODO: since the scope is built before hand, the definitions that
-    # come later are also present in this scope.
-    # TODO: or if the variable is define before the failure region but
-    # in this scope!
+class VarAnalysis(Pass):
+    def __init__(self, info):
+        super().__init__(info)
+        self.path = None
+        self.bin_stack = CodeBlockRef()
 
-    # debug(path.code.children)
-    is_local, sym = __is_local(path, inst, info)
-    if not is_local:
-        blk = cb_ref.get(BODY)
-        orig_sym = path.original_scope.lookup(inst.name)
-        if orig_sym is None:
-            error(f'Variable {inst.name} was not found in the symbol table! Assuming it is not needed in userspace', inst.kind, tag=MODULE_TAG)
-        elif _should_not_share_variable(inst, orig_sym, info):
-            debug('not share:', inst.name, 'type:', orig_sym.type.spelling, tag=MODULE_TAG)
-            decl = VarDecl(None)
-            decl.name = inst.name
-            decl.type = orig_sym.type
-            blk.append(decl)
-            sym = path.scope.insert_entry(inst.name, orig_sym.type, orig_sym.kind, None)
-        else:
-            sym = path.scope.insert_entry(inst.name, orig_sym.type, orig_sym.kind, None)
-            if ctx == LHS and parent_bin_op.op == '=':
-                # writing to this unknow variable --> I do not need to share the result
-                debug(f'not caring about {sym.name}', tag=MODULE_TAG)
-                sym.is_accessed = SymbolAccessMode.FIRST_WRITE
+    def _handle_reference(self, inst, ctx):
+        # TODO: since the scope is built before hand, the definitions that
+        # come later are also present in this scope.
+        # TODO: or if the variable is define before the failure region but
+        # in this scope!
 
+        info = self.info
+        path = self.path
+        parent_bin_op = self.bin_stack.get(PARENT_BIN_OP)
+        is_local, sym = _is_local(path, inst, info)
+        if not is_local:
+            blk = self.cb_ref.get(BODY)
+            orig_sym = path.original_scope.lookup(inst.name)
+            if orig_sym is None:
+                error(f'Variable {inst.name} was not found in the symbol table! Assuming it is not needed in userspace', inst.kind, tag=MODULE_TAG)
+            elif _should_not_share_variable(inst, orig_sym, info):
+                debug('not share:', inst.name, 'type:', orig_sym.type.spelling, tag=MODULE_TAG)
                 decl = VarDecl(None)
                 decl.name = inst.name
                 decl.type = orig_sym.type
                 blk.append(decl)
+                sym = path.scope.insert_entry(inst.name, orig_sym.type, orig_sym.kind, None)
+            else:
+                sym = path.scope.insert_entry(inst.name, orig_sym.type, orig_sym.kind, None)
+                if ctx == LHS and parent_bin_op.op == '=':
+                    # writing to this unknow variable --> I do not need to share the result
+                    debug(f'not caring about {sym.name}', tag=MODULE_TAG)
+                    sym.is_accessed = SymbolAccessMode.FIRST_WRITE
+                    decl = VarDecl.build(inst.name, orig_sym.type)
+                    blk.append(decl)
+                else:
+                    sym.is_accessed = SymbolAccessMode.HAS_READ
+                    path.var_deps.add(sym)
+                    if sym.name == 'num_messages':
+                        debug('adding:', sym.name, tag=MODULE_TAG)
+                        scp = path.scope
+                        while scp is not None:
+                            print(scp)
+                            scp = scp.parent
+        else:
+            if ctx == LHS and parent_bin_op and parent_bin_op.op == '=':
+                sym.is_accessed = SymbolAccessMode.FIRST_WRITE
             else:
                 sym.is_accessed = SymbolAccessMode.HAS_READ
-                path.var_deps.add(sym)
-                if sym.name == 'num_messages':
-                    debug('adding:', sym.name, tag=MODULE_TAG)
-                    scp = path.scope
-                    while scp is not None:
-                        print(scp)
-                        scp = scp.parent
-    else:
-        if ctx == LHS and parent_bin_op and parent_bin_op.op == '=':
-            sym.is_accessed = SymbolAccessMode.FIRST_WRITE
-        else:
-            sym.is_accessed = SymbolAccessMode.HAS_READ
 
-
-def _do_recursive_var_analysis(inst, info, more):
-    lvl, ctx, parent_list = more.unpack()
-    path = more.path
-    new_children = []
-
-    # Process instruction
-    if inst.kind == clang.CursorKind.VAR_DECL:
-        sym = path.original_scope.lookup(inst.name)
-        if sym is not None:
-            path.scope.insert_entry(inst.name, sym.type, inst.kind, None)
-        else:
-            T = MyType()
-            T.spelling = inst.type
-            path.scope.insert_entry(inst.name, T, inst.kind, None)
-        # debug('learn about:', sym.name)
-    elif inst.kind == clang.CursorKind.DECL_REF_EXPR:
-        bin_op = cb_ref.get(PARENT_BIN_OP)
-        _handle_reference(path, inst, info, ctx, bin_op)
-    elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
-        # TODO: I do not need to copy all the struct, just the fields used.
-        # TODO: will it work with multiple level of member referencing?
-        owner = inst.owner[-1]
-        bin_op = cb_ref.get(PARENT_BIN_OP)
-        _handle_reference(path, owner, info, ctx, bin_op)
-    elif inst.kind == clang.CursorKind.BINARY_OPERATOR:
-        cb_ref.push(PARENT_BIN_OP, inst)
-
-    with cb_ref.new_ref(ctx, parent_list):
-        for child, tag in inst.get_children_context_marked():
-            if isinstance(child, list):
-                new_child = []
-                for i in child:
-                    obj = more.repack(lvl+1, tag, new_child)
-                    new_inst = _do_recursive_var_analysis(i, info, obj)
-                    if new_inst is None:
-                        continue
-                    new_child.append(new_inst)
+    def process_current_inst(self, inst, more):
+        # Process instruction
+        lvl, ctx, parent_list = more.unpack()
+        info = self.info
+        path = self.path
+        if inst.kind == clang.CursorKind.VAR_DECL:
+            sym = path.original_scope.lookup(inst.name)
+            if sym is not None:
+                path.scope.insert_entry(inst.name, sym.type, inst.kind, None)
             else:
-                obj = more.repack(lvl+1, tag, None)
-                new_child = _do_recursive_var_analysis(child, info, obj)
-                assert new_child is not None
-            new_children.append(new_child)
+                assert 0, 'The variable was not found in the origin scope'
+                # T = inst.type
+                # path.scope.insert_entry(inst.name, T, inst.kind, None)
+            # debug('learn about:', sym.name, tag=MODULE_TAG)
+        elif inst.kind == clang.CursorKind.DECL_REF_EXPR:
+            self._handle_reference(inst, ctx)
+        elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
+            # TODO: I do not need to copy all the struct, just the fields used.
+            # TODO: will it work with multiple level of member referencing?
+            owner = inst.owner[-1]
+            self._handle_reference(owner, ctx)
+        elif inst.kind == clang.CursorKind.BINARY_OPERATOR:
+            self.bin_stack.push(PARENT_BIN_OP, inst)
+        # do not remove the instruction
+        return inst
 
-    # Pop the parent binary operator
-    if inst.kind == clang.CursorKind.BINARY_OPERATOR:
-        cb_ref.pop()
-
-    new_inst = inst.clone(new_children)
-    return new_inst
+    def end_current_inst(self, inst, more):
+        if inst.kind == clang.CursorKind.BINARY_OPERATOR:
+            # Pop the parent binary operator
+            self.bin_stack.pop()
+        # do not remove the instruction
+        return inst
 
 
 def _remove_unused_args(func_obj, call_inst, scope):
@@ -166,19 +128,19 @@ def _remove_unused_args(func_obj, call_inst, scope):
         # print(arg.name, p.code.children, p.scope, func_obj.name)
         assert sym is not None
         if sym.is_accessed != SymbolAccessMode.HAS_READ:
-            # debug(f'The variable {sym.name} is not needed in function argument of {func_obj.name}')
+            # debug(f'The variable {sym.name} is not needed in function argument of {func_obj.name}', tag=MODULE_TAG)
             remove.append(i)
         else:
-            # debug(f'The variable {sym.name} is needed at {func_obj.name}')
+            # debug(f'The variable {sym.name} is needed at {func_obj.name}', tag=MODULE_TAG)
             pass
 
-    debug('removing unsed args:', remove, func_obj.args, call_inst)
+    debug('removing unsed args:', remove, func_obj.args, call_inst, tag=MODULE_TAG)
     for already_poped, pos in enumerate(remove):
-        # debug('Function Object:', func_obj.name)
+        # debug('Function Object:', func_obj.name, tag=MODULE_TAG)
         pop_index = pos - already_poped
         func_obj.args.pop(pop_index)
         for tmp_c in call_inst:
-            # debug('Call instruction:', tmp_c.name)
+            # debug('Call instruction:', tmp_c.name, tag=MODULE_TAG)
             if len(tmp_c.args) <= pop_index:
                 error('We are trying to remove more arguments than already exists!')
                 continue
@@ -186,32 +148,21 @@ def _remove_unused_args(func_obj, call_inst, scope):
 
 
 def _process_node(node, info):
+    # First process all the child nodes
     for child in node.children:
         _process_node(child, info)
-
-        # TODO: seperate it for different paths.
-        # Every variable that is needed in a child node is also needed in the
-        # parent because parent does not know about them.
-        for d in child.paths.var_deps:
-            if node.paths.scope.lookup(d.name) is None:
-                # TODO: I do not want to propagate the var dependency up
-                # node.paths.var_deps.add(d)
-
-                # Add it to scope because the child needs it and parent does
-                # not have. So it is declaring it as needed.
-                node.paths.scope.insert(d)
-
         child_p = child.paths
         if child_p.func_obj is not None:
             _remove_unused_args(child_p.func_obj, child_p.call_inst, child_p.scope)
 
     if node.has_code():
         path = node.paths
-        obj = PassObject.pack(0, None, None)
-        obj.path = path
-        new_block = _do_recursive_var_analysis(path.code, info, obj)
+        tmp = VarAnalysis.do(path.code, info, path=path)
+        # debug('Just processed node with id:', id(node), tag=MODULE_TAG)
+        new_block = tmp.result 
         path.code = new_block
-        # print(new_block.children)
+        # text, _ = gen_code(path.code, info)
+        # debug(text, tag=MODULE_TAG)
 
 
 def var_dependency_pass(info):
