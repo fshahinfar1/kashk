@@ -12,12 +12,12 @@ from passes.pass_obj import PassObject
 from passes.clone import clone_pass
 
 
-MODULE_TAG = '[Create Fallback Pass]'
+MODULE_TAG = '[Create Fallback]'
 new_functions = []
 
 
 fnum = 1
-def _get_func_name():
+def _get_tmp_func_name():
     global fnum
     name = f'__f{fnum}'
     fnum += 1
@@ -63,15 +63,14 @@ def _generate_id_check(ids):
 
 
 def _get_call_inst(inst):
-    call_inst = None
     if inst.kind == clang.CursorKind.CALL_EXPR:
-        call_inst = inst
+        return inst
     elif inst.kind == clang.CursorKind.BINARY_OPERATOR:
         if inst.op == '=' and inst.rhs.has_children():
             tmp_inst = inst.rhs.children[0]
             if tmp_inst.kind == clang.CursorKind.CALL_EXPR:
-                call_inst = tmp_inst
-    return call_inst
+                return tmp_inst
+    return None
 
 
 def _starts_with_func_call(node, info):
@@ -80,7 +79,6 @@ def _starts_with_func_call(node, info):
 
     code = node.paths.code
     first_inst = code.children[0]
-    func = None
     call_inst = _get_call_inst(first_inst)
 
     if not call_inst:
@@ -92,29 +90,24 @@ def _starts_with_func_call(node, info):
     assert func.may_fail
 
     # Define a new function
-    clone_first_inst = clone_pass(first_inst, info, PassObject())
+    clone_first_inst = clone_pass(first_inst)
     call_inst = _get_call_inst(clone_first_inst)
     assert call_inst is not None
 
-    call_inst.name = _get_func_name()
+    call_inst.name = _get_tmp_func_name()
     new_func = func.clone2(call_inst.name, Function.directory)
     new_func.body = Block(BODY)
     new_functions.append(new_func)
-
-    # Create a new empty scope for the new function we want to define
-    new_scope = Scope(info.sym_tbl.global_scope)
-    info.sym_tbl.scope_mapping[call_inst.name] = new_scope
-    for arg in new_func.args:
-        # The upper function will provide the arguments. Add them as known
-        # values. We will remove the unused arguments later.
-        new_scope.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
-
+    func.update_symbol_table(info.sym_tbl.global_scope)
     return call_inst, new_func, clone_first_inst
 
 
 def _process_node(node, info):
+    debug('node:', id(node), 'count children:', len(node.children), tag=MODULE_TAG)
+    debug('path ids:', node.path_ids, tag=MODULE_TAG)
+    # debug('code:', node.paths.code.children, tag=MODULE_TAG)
     blk = Block(BODY)
-    assert len(node.children) > 0 or node.has_code()
+    assert not node.is_empty()
     remove_first_inst = False
 
     for child in node.children:
@@ -122,33 +115,42 @@ def _process_node(node, info):
         call_inst, new_func, first_inst = _starts_with_func_call(node, info)
 
         if new_func:
+            debug('starts with a call to', new_func.name, tag=MODULE_TAG)
             with info.sym_tbl.with_func_scope(call_inst.name):
                 body = _process_node(child, info)
             child.paths.func_obj = new_func
             child.paths.call_inst.append(call_inst)
             child.paths.code = body
         else:
+            debug('just code', tag=MODULE_TAG)
             cur = info.sym_tbl.current_scope
             info.sym_tbl.current_scope = node.paths.scope
             body = _process_node(child, info)
             info.sym_tbl.current_scope = cur
 
         # Check if there are multiple failure path or just one!
-        if len(child.path_ids) > 1:
+        debug('still processing node:', id(node),
+                'count children:', len(node.children), tag=MODULE_TAG)
+        debug(node.path_ids, tag=MODULE_TAG)
+        if len(node.path_ids) > 1:
+            debug('Generating a id check', tag=MODULE_TAG)
             if_inst = _generate_id_check(child.path_ids)
             if new_func is None:
                 if_inst.body = body
                 # TODO: what is this?
-                node.paths.original_scope.symbols.update(child.paths.original_scope.symbols)
+                origin_symbols = child.paths.original_scope.symbols
+                node.paths.original_scope.symbols.update(origin_symbols)
             else:
                 remove_first_inst = True
                 if_inst.body.add_inst(first_inst)
             blk.add_inst(if_inst)
         else:
+            debug('no check was added', tag=MODULE_TAG)
             if new_func is None:
                 blk.extend_inst(body.children)
                 # TODO: what is this?
-                node.paths.original_scope.symbols.update(child.paths.original_scope.symbols)
+                origin_symbols = child.paths.original_scope.symbols
+                node.paths.original_scope.symbols.update(origin_symbols)
             else:
                 remove_first_inst = True
                 blk.add_inst(first_inst)
@@ -176,10 +178,8 @@ def create_fallback_pass(inst, info, more):
     names are used for handling fallback/failure paths.
     """
     root = info.user_prog.graph
-
     new_scope = Scope(info.sym_tbl.global_scope)
     info.sym_tbl.scope_mapping[USER_EVENT_LOOP_ENTRY] = new_scope
-
     with info.sym_tbl.with_func_scope(USER_EVENT_LOOP_ENTRY):
         _process_node(root, info)
     info.user_prog.fallback_funcs_def = new_functions

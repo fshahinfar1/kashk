@@ -36,7 +36,6 @@ from bpf_passes.prog_complexity import mitiage_program_comlexity
 from bpf_passes.change_bpf_loop import change_to_bpf_loop
 
 from user_passes.select_user import select_user_pass
-from user_passes.number_fallback_graph import number_fallback_graph_pass
 from user_passes.var_dependency import var_dependency_pass
 from user_passes.create_fallback import create_fallback_pass
 
@@ -105,6 +104,8 @@ def load_other_sources(io_ctx, info):
 
 def generate_offload(io_ctx):
     # filter_log(MODULE_TAG, '[Select Userspace Pass]', '[Var Dependency]')
+    filter_log(MODULE_TAG, '[Var Dependency]', '[Create Fallback]',
+            '[User Code]', '[Select Userspace]')
 
     info = Info.from_io_ctx(io_ctx)
     # Parse the main file
@@ -184,7 +185,8 @@ def generate_offload(io_ctx):
     debug('Create User Code Graph', tag=MODULE_TAG)
     select_user_pass(bpf, info, PassObject())
     tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
-    # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)) + str(x.path_ids))
+    debug('\n', tree, tag=MODULE_TAG)
+    tree = draw_tree(info.user_prog.graph, fn=lambda x: str(x.path_ids))
     debug('\n', tree, tag=MODULE_TAG)
     # root = info.user_prog.graph
     # code = root.paths.code

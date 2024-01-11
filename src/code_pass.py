@@ -68,6 +68,15 @@ class Pass:
         self._skip_children = True
 
     def process_current_inst(self, inst, more):
+        """
+        When a new instruction is observed
+        """
+        return inst
+
+    def end_current_inst(self, inst, more):
+        """
+        When current instructionis finished processing
+        """
         return inst
 
     def do_pass(self, inst, more):
@@ -101,5 +110,9 @@ class Pass:
                             assert self._may_remove, 'This pass is not allowed to remove instructions'
                             return None
                     new_children.append(new_child)
+        new_inst = self.end_current_inst(inst, more)
+        if inst is None:
+            assert self._may_remove, 'This pass is not allowed to remove instructions'
+            return None
         new_inst = inst.clone(new_children)
         return new_inst

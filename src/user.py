@@ -54,6 +54,8 @@ class FallbackRegionGraph:
 
     def add_child(self, node):
         self.children.append(node)
+        for i in node.path_ids:
+            self.set_id(i)
 
     def is_empty(self):
         # return len(self.children) == 0 and len(self.paths) == 0
@@ -83,6 +85,7 @@ class FallbackRegionGraph:
     def set_id(self, i):
         self.path_ids.add(i)
         # traves up toward root and tag the nodes
+        # debug('user graph node recieves id:', i, 'its parent is:', self.parent, tag=MODULE_TAG)
         if self.parent is not None:
             self.parent.set_id(i)
 
