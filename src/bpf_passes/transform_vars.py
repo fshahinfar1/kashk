@@ -70,7 +70,7 @@ def _process_annotation(inst, info):
                 break
         else:
             # The value type is not declared yet
-            from passes.mark_used_funcs import _add_type_to_declarations
+            from passes.mark_relevant_code import _add_type_to_declarations
             T = MyType.make_simple(val_type, clang.TypeKind.RECORD)
             _add_type_to_declarations(T, info)
 

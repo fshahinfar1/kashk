@@ -16,13 +16,13 @@ from sym_table import *
 from passes.pass_obj import PassObject
 from passes.clone import clone_pass
 from passes.linear_code import linear_code_pass
-from passes.replace_func_ptr import replace_func_pointers
+from passes.mark_annotation_pass import mark_annotation_pass
 from bpf_passes.feasibility_analysis import feasibilty_analysis_pass
 from bpf_passes.mark_user_boundary import get_number_of_failure_paths
 from user_passes.select_user import select_user_pass
 from user_passes.create_fallback import create_fallback_pass
 
-from passes.mark_used_funcs import mark_used_funcs
+from passes.mark_relevant_code import mark_relevant_code
 from passes.mark_io import mark_io
 
 
@@ -42,8 +42,8 @@ class TestCase(BasicTest):
         bpf = Block(BODY)
         bpf.extend_inst(insts)
 
-        mark_used_funcs(bpf, info, PassObject())
-        bpf = replace_func_pointers(bpf, info, None)
+        mark_relevant_code(bpf, info, PassObject())
+        bpf = mark_annotation_pass(bpf, info, None)
         mark_io(bpf, info)
         bpf = linear_code_pass(bpf, info, PassObject())
         bpf = feasibilty_analysis_pass(bpf, info, PassObject())

@@ -14,7 +14,7 @@ from instruction import *
 from sym_table import *
 
 from passes.pass_obj import PassObject
-from passes.mark_used_funcs import mark_used_funcs
+from passes.mark_relevant_code import mark_relevant_code
 from passes.linear_code import linear_code_pass
 from bpf_passes.feasibility_analysis import feasibilty_analysis_pass
 from bpf_passes.mark_user_boundary import get_number_of_failure_paths
@@ -25,7 +25,7 @@ class TestCase(BasicTest):
         bpf = Block(BODY)
         bpf.extend_inst(insts)
 
-        mark_used_funcs(bpf, self.info, None)
+        mark_relevant_code(bpf, self.info, None)
         bpf = linear_code_pass(bpf, self.info, PassObject())
         bpf = feasibilty_analysis_pass(bpf, self.info, PassObject())
 

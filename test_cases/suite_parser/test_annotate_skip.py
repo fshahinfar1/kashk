@@ -13,7 +13,7 @@ from data_structure import *
 from instruction import *
 from sym_table import *
 
-from passes.mark_used_funcs import mark_used_funcs
+from passes.mark_relevant_code import mark_relevant_code 
 from passes.pass_obj import PassObject
 from passes.linear_code import linear_code_pass
 from bpf_passes.feasibility_analysis import feasibilty_analysis_pass
@@ -26,7 +26,7 @@ class TestCase(BasicTest):
         bpf = Block(BODY)
         bpf.extend_inst(insts)
 
-        mark_used_funcs(bpf, info, None)
+        mark_relevant_code(bpf, info, None)
 
         bpf = linear_code_pass(bpf, info, PassObject())
         for f in Function.directory.values():

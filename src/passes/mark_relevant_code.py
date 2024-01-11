@@ -96,7 +96,7 @@ def _do_pass(inst, info, more):
         d.go_deep()
 
 flag = None
-def mark_used_funcs(bpf, info, more):
+def mark_relevant_code(bpf, info, more):
     """
     Mark used functions and types. This helps to only consider the relevant
     codes and data-types when processing.

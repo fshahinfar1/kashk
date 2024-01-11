@@ -18,8 +18,8 @@ from bpf_code_gen import generate_bpf_prog, gen_code
 from user import generate_user_prog
 
 from passes.pass_obj import PassObject
-from passes.mark_used_funcs import mark_used_funcs
-from passes.replace_func_ptr import replace_func_pointers
+from passes.mark_relevant_code import mark_relevant_code
+from passes.primary_annotation_pass import primary_annotation_pass
 from passes.mark_io import mark_io
 from passes.clone import clone_pass
 from passes.linear_code import linear_code_pass
@@ -143,12 +143,12 @@ def generate_offload(io_ctx):
     bpf.extend_inst(insts)
 
     # Mark which type or func definitions should be placed in generated code
-    debug('Mark Functions used in BPF', tag=MODULE_TAG)
-    mark_used_funcs(bpf, info, PassObject())
+    debug('Mark relevant code', tag=MODULE_TAG)
+    mark_relevant_code(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('[1st] Annotation', tag=MODULE_TAG)
-    bpf = replace_func_pointers(bpf, info, None)
+    bpf = primary_annotation_pass(bpf, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('Mark Read/Write Inst & Buf', tag=MODULE_TAG)

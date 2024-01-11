@@ -15,8 +15,8 @@ from sym_table import *
 
 
 from passes.pass_obj import PassObject
-from passes.mark_used_funcs import mark_used_funcs
-from passes.replace_func_ptr import replace_func_pointers
+from passes.mark_relevant_code import mark_relevant_code
+from passes.primary_annotation_pass import primary_annotation_pass
 from passes.mark_io import mark_io
 from passes.clone import clone_pass
 from passes.linear_code import linear_code_pass
@@ -38,8 +38,8 @@ class TestCase(BasicTest):
         bpf = Block(BODY)
         bpf.extend_inst(insts)
 
-        mark_used_funcs(bpf, info, None)
-        bpf = replace_func_pointers(bpf, info, None)
+        mark_relevant_code(bpf, info, None)
+        bpf = primary_annotation_pass(bpf, info, None)
         mark_io(bpf, info)
         bpf = linear_code_pass(bpf, info, PassObject())
         bpf = feasibilty_analysis_pass(bpf, info, PassObject())

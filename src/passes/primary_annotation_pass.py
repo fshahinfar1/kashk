@@ -5,7 +5,7 @@ from data_structure import *
 from prune import MEMORY_ACCESS_FUNC
 
 from passes.pass_obj import PassObject
-from passes.mark_used_funcs import mark_used_funcs
+from passes.mark_relevant_code import mark_relevant_code
 from passes.clone import clone_pass
 
 
@@ -142,9 +142,9 @@ def _process_current_inst(inst, info):
                     info.prog.declarations.insert(0, func)
 
                     # NOTE: I am not putting this pass before
-                    # mark_used_funcs pass because I do not want to analyse
+                    # mark_relevant_code pass because I do not want to analyse
                     # all the functions.
-                    mark_used_funcs(func.body, info, None)
+                    mark_relevant_code(func.body, info, None)
                 return new_inst
     return inst
 
@@ -181,7 +181,7 @@ def _do_pass(inst, info):
     return new_inst
 
 
-def replace_func_pointers(bpf, info, more):
+def primary_annotation_pass(bpf, info, more):
     """
     Apply some of the annotations
     1. Function pointer
