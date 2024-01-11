@@ -174,12 +174,14 @@ def _process_write_call(inst, info):
     return_val = get_ret_inst(current_function, info)
     if current_function is None:
         # On the main BPF program. feel free to return the verdict value
-        insts = info.prog.send(ref, write_size, info, return_val, do_copy=should_copy)
+        insts = info.prog.send(ref, write_size, info, return_val,
+                do_copy=should_copy)
         blk.extend(insts[:-1])
         inst = insts[-1]
     else:
         # On a function which is not the main. Do not return
-        copy_inst = info.prog.send(ref, write_size, info, return_val, ret=False, do_copy=should_copy)
+        copy_inst = info.prog.send(ref, write_size, info, return_val,
+                ret=False, do_copy=should_copy)
         # set the flag
         flag_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
         flag_ref.name = SEND_FLAG_NAME

@@ -111,14 +111,15 @@ if (!sock_ctx) {
                 self._load_connection_state() + verdict_code)
         verdict_code = indent(verdict_code, 1)
 
-        return '\n'.join(info.prog._parser_prog([per_conn] +
-            [''] + [parser_code]) + [''] +
-            info.prog._verdict_prog([verdict_code]))
+        tmp = (info.prog._parser_prog(per_conn + [''] + [parser_code]) + ['']
+                + info.prog._verdict_prog([verdict_code]))
+        return '\n'.join(tmp)
 
     def send(self, buf, write_size, info, failure_return, ret=True, do_copy=True):
         if not do_copy:
             raise Exception('The sk_skb adjust size would not adjust tail but the head of the packet and this makes issues when the send buffer is already on the packet')
-        super().send(buf, write_size, info, failure_return, ret, do_copy)
+        return super().send(buf, write_size, info, failure_return, ret,
+                do_copy)
 
     def get_pkt_size(self):
         skb      = Ref(None, clang.CursorKind.DECL_REF_EXPR)
