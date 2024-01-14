@@ -31,32 +31,6 @@ clang.TypeKind.LONGDOUBLE,
 clang.TypeKind.VOID,
 ]
 
-PRIMITIVE_TYPE_SIZE = {
-    clang.TypeKind.BOOL: 1,
-    clang.TypeKind.CHAR_U: 1,
-    clang.TypeKind.SCHAR: 1,
-    clang.TypeKind.UCHAR: 1,
-    clang.TypeKind.CHAR16: 2,
-    clang.TypeKind.USHORT: 2,
-    clang.TypeKind.SHORT: 2,
-    clang.TypeKind.CHAR32: 4,
-    clang.TypeKind.UINT: 4,
-    clang.TypeKind.INT: 4,
-    clang.TypeKind.ULONG: 8,
-    clang.TypeKind.LONG: 8,
-    clang.TypeKind.ULONGLONG: 8,
-    clang.TypeKind.LONGLONG: 8,
-    clang.TypeKind.UINT128: 16,
-    clang.TypeKind.CHAR_S: 1,
-    clang.TypeKind.WCHAR: 1,
-    clang.TypeKind.INT128: 16,
-    clang.TypeKind.FLOAT: 4,
-    clang.TypeKind.DOUBLE: 8,
-    clang.TypeKind.LONGDOUBLE: 16,
-    clang.TypeKind.VOID: 0,
-}
-
-
 def try_get_definition(cursor):
     if cursor.is_definition():
         return cursor

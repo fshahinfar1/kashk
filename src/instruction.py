@@ -6,6 +6,7 @@ from data_structure import StateObject, Function, MyType
 from log import error, debug, report
 
 from data_structure import MyType, BASE_TYPES
+from dfs import DFSPass
 
 
 CODE_LITERAL = 8081
@@ -398,7 +399,11 @@ class ControlFlowInst(Instruction):
 
 
 class UnaryOp(Instruction):
-    OPS = ('!', '-', '++', '--', '&', '*', 'sizeof', '__extension__', '~')
+    BIT_OPS = ('~')
+    BOOL_OPS =  ('!',)
+    ARITH_OPS = ('-', '++', '--',)
+    ADDR_OPS = ('&', '*',)
+    OPS = ('~', '!', '-', '++', '--', '&', '*', 'sizeof', '__extension__', )
 
     @classmethod
     def build(cls, op, inst):
@@ -906,6 +911,14 @@ class Block(Instruction):
         new.bpf_ignore = self.bpf_ignore
         new.change_applied = self.change_applied
         return new
+
+    def __contains__(self, other):
+        d = DFSPass(self, inside=True)
+        for inst, _ in d:
+            if inst == other:
+                return True
+            d.go_deep()
+        return False
 
 
 class ToUserspace(Instruction):

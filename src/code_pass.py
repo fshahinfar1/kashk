@@ -94,7 +94,7 @@ class Pass:
                 return new_inst
             # Continue deeper
             parent = inst if inst.kind != BLOCK_OF_CODE else self.parent_inst
-            with self.parent_stack.new_ref(PARENT_INST, inst):
+            with self.parent_stack.new_ref(PARENT_INST, parent):
                 for child, tag in inst.get_children_context_marked():
                     if isinstance(child, list):
                         new_child = []

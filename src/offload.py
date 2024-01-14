@@ -41,6 +41,8 @@ from user_passes.create_fallback import create_fallback_pass
 
 from helpers.instruction_helper import show_insts
 
+from perf_model.static_high_level_perf_model import gen_static_high_level_perf_model
+
 
 MODULE_TAG = '[Gen Offload]'
 BPF_MAIN = 'BPF_MAIN_SCOPE'
@@ -104,8 +106,8 @@ def load_other_sources(io_ctx, info):
 
 def generate_offload(io_ctx):
     # filter_log(MODULE_TAG, '[Select Userspace Pass]', '[Var Dependency]')
-    filter_log(MODULE_TAG, '[Var Dependency]', '[Create Fallback]',
-            '[User Code]', '[Select Userspace]')
+    # filter_log(MODULE_TAG, '[Var Dependency]', '[Create Fallback]',
+    #         '[User Code]', '[Select Userspace]')
 
     info = Info.from_io_ctx(io_ctx)
     # Parse the main file
@@ -202,6 +204,17 @@ def generate_offload(io_ctx):
     info.user_prog.func_dir = {}
     for func in Function.directory.values():
         new_f = func.clone(info.user_prog.func_dir)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    debug('Original Program Performance Modeling', tag=MODULE_TAG)
+    tmp_text, _ = gen_code(bpf, info)
+    debug('\n', tmp_text, tag=MODULE_TAG)
+    model = gen_static_high_level_perf_model(bpf, info)
+    tmp = model.dump()
+    debug('\n', tmp, tag=MODULE_TAG)
+
+    # f = Function.directory['is_match']
+    # debug('-- is_match: ', f.perf_model.dump())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # NOTE: the order of generating the userspace and then BPF is important

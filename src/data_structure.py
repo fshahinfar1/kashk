@@ -2,7 +2,7 @@ from contextlib import contextmanager
 import clang.cindex as clang
 
 from utility import (get_code, get_owner, generate_struct_with_fields,
-        report_on_cursor, indent, PRIMITIVE_TYPE_SIZE)
+        report_on_cursor, indent)
 from log import error, debug
 from sym_table import SymbolTable
 
@@ -10,6 +10,32 @@ from sym_table import SymbolTable
 HASH_HELPER_HEADER = '#include "hash_fn.h"'
 CSUM_HELPER_HEADER = '#include "csum_helper.h"'
 XDP_HELPER_HEADER  = '#include "xdp_helper.h"'
+
+
+PRIMITIVE_TYPE_SIZE = {
+    clang.TypeKind.BOOL: 1,
+    clang.TypeKind.CHAR_U: 1,
+    clang.TypeKind.SCHAR: 1,
+    clang.TypeKind.UCHAR: 1,
+    clang.TypeKind.CHAR16: 2,
+    clang.TypeKind.USHORT: 2,
+    clang.TypeKind.SHORT: 2,
+    clang.TypeKind.CHAR32: 4,
+    clang.TypeKind.UINT: 4,
+    clang.TypeKind.INT: 4,
+    clang.TypeKind.ULONG: 8,
+    clang.TypeKind.LONG: 8,
+    clang.TypeKind.ULONGLONG: 8,
+    clang.TypeKind.LONGLONG: 8,
+    clang.TypeKind.UINT128: 16,
+    clang.TypeKind.CHAR_S: 1,
+    clang.TypeKind.WCHAR: 1,
+    clang.TypeKind.INT128: 16,
+    clang.TypeKind.FLOAT: 4,
+    clang.TypeKind.DOUBLE: 8,
+    clang.TypeKind.LONGDOUBLE: 16,
+    clang.TypeKind.VOID: 0,
+}
 
 
 class Info:
@@ -81,6 +107,19 @@ class CodeBlockRef:
 
     def get(self, name, default=None):
         return self.code_block_reference.get(name, default)
+
+    def get2(self, name, at, default=None):
+        assert isinstance(at, int) and at >= 0
+        if at == 0:
+            return self.get(name)
+        count = 1
+        for x in self.stack:
+            if x[0] == name:
+                count += 1
+                if count > at:
+                    # Found the result
+                    return x[1]
+        return None
 
     def set(self, name, value):
         """
@@ -176,6 +215,9 @@ class FunctionPrototypeType:
         self.ret = None
 
 class MyType:
+    POINTER_SIZE = 8
+    INT_SIZE = 4
+
     @classmethod
     def make_array(cls, name, T, count):
         obj = MyType()
@@ -276,9 +318,10 @@ class MyType:
     def mem_size(self):
         """
         Return amount of memory this type requires
+        @returns int
         """
         if self.is_pointer() or self.is_func_proto():
-            return 8
+            return MyType.POINTER_SIZE 
         elif self.is_array():
             return self.element_count * self.element_type.mem_size
         elif self.is_record():
@@ -297,8 +340,7 @@ class MyType:
                 size += field.type_ref.mem_size
             return size
         elif self.is_enum():
-            # sizeof(int)
-            return 4
+            return MyType.INT_SIZE
         elif self.kind in PRIMITIVE_TYPE_SIZE:
             return PRIMITIVE_TYPE_SIZE[self.kind]
         elif self.kind == clang.TypeKind.TYPEDEF:
@@ -312,6 +354,9 @@ class MyType:
 
     def is_pointer(self):
         return self.kind == clang.TypeKind.POINTER
+
+    def is_mem_ref(self):
+        return self.is_array() or self.is_pointer()
 
     def is_record(self):
         return self.kind == clang.TypeKind.RECORD
@@ -537,6 +582,7 @@ class Function(TypeDefinition):
         directory[self.name] = self
 
         self.attributes = 'static inline'
+        self.perf_model = None
 
     @property
     def body(self):
