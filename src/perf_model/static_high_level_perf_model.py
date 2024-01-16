@@ -21,11 +21,19 @@ def _get_new_param():
     return f'N{_model_param_counter}'
 
 
+_model_bool_param = 0
+def _get_new_bool_param():
+    global _model_bool_param
+    _model_bool_param += 1
+    return f'B{_model_bool_param}'
+
+
 class PerfStats:
     LOAD = 'load'
     STORE = 'store'
     ALU_OP = 'alu_op'
     JUMP = 'jmp'
+    CTX_SW = 'ctx_sw'
 
 
 class StaticHighLevelPerfModel:
@@ -103,6 +111,7 @@ class GenStaticHighLevelPerfModelPass(Pass):
         super().__init__(info)
         self.processing_bin_op = []
         self.model = StaticHighLevelPerfModel()
+        self.model_cache = {}
 
     def _increment(self, stat, value=1):
         self.model._increment(stat, value)
@@ -175,11 +184,13 @@ class GenStaticHighLevelPerfModelPass(Pass):
         func = inst.get_function_def()
         if func is None or func.is_empty():
             return
-        if func.perf_model is None:
+        func_model = self.model_cache.get(func.name)
+        if func_model is None:
             body = func.body
             obj = GenStaticHighLevelPerfModelPass.do(body, self.info, func=func)
-            func.perf_model = obj.model
-        self.model._extend(func.perf_model)
+            func_model = obj.model
+            self.model_cache[func.name] = func_model
+        self.model._extend(func_model)
 
     def process_current_inst(self, inst, more):
         tag = more.ctx
@@ -252,12 +263,31 @@ class GenStaticHighLevelPerfModelPass(Pass):
             self._handle_func(inst, more)
             return inst
         elif inst.kind == clang.CursorKind.IF_STMT:
-            self._increment(PerfStats.JUMP)
+            # Cost of evalutating condition statement
+            cond = GenStaticHighLevelPerfModelPass.do(inst.cond, self.info)
+            self.model._extend(cond.model)
+            B = _get_new_bool_param()
+            tmp_text, _ = gen_code([inst,], self.info)
+            debug('Flag:', B, 'is for', tmp_text, tag=MODULE_TAG)
+            # Each the metrics are different depending on whether we are taking
+            # the branch or not
+            b_true  = GenStaticHighLevelPerfModelPass.do(inst.body, self.info)
+            b_true._increment(PerfStats.JUMP)
+            self.model._add_parametric_measure(B, b_true.model)
+            if inst.other_body.has_children():
+                b_false = GenStaticHighLevelPerfModelPass.do(inst.other_body, self.info)
+                b_false._increment(PerfStats.JUMP)
+                self.model._add_parametric_measure(f'1-{B}', b_false.model)
+            self.skip_children()
             return inst
         elif inst.kind == clang.CursorKind.SWITCH_STMT:
             # There will be a jump to one of the cases
             self._increment(PerfStats.JUMP)
             return inst
+        elif inst.kind == clang.CursorKind.GOTO_STMT:
+            raise Exception('Did not expected to see goto statment')
+        elif inst.kind == TO_USERSPACE_INST:
+            self._increment(PerfStats.CTX_SW)
         return inst
 
 

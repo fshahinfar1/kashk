@@ -222,7 +222,19 @@ def generate_offload(io_ctx):
         gen_user_code(user, info, io_ctx.user_out_file)
     else:
         report("No user space program was generated. The tool has offloaded everything to BPF.")
-    gen_bpf_code(bpf, info, io_ctx.bpf_out_file)
+    bpf = gen_bpf_code(bpf, info, io_ctx.bpf_out_file)
+
+
+    debug('BPF Program Performance Modeling', tag=MODULE_TAG)
+    tmp_text, _ = gen_code(bpf, info)
+    debug('\n', tmp_text, tag=MODULE_TAG)
+    model2 = gen_static_high_level_perf_model(bpf, info)
+    tmp = model2.dump()
+    debug('\n', tmp, tag=MODULE_TAG)
+
+    # f = Function.directory['is_match']
+    # debug('-- is_match: ', f.perf_model.dump())
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
     return info
 
 
@@ -403,3 +415,4 @@ def gen_bpf_code(bpf, info, out_bpf):
     with open(out_bpf, 'w') as f:
         f.write(text)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+    return bpf

@@ -582,7 +582,6 @@ class Function(TypeDefinition):
         directory[self.name] = self
 
         self.attributes = 'static inline'
-        self.perf_model = None
 
     @property
     def body(self):
