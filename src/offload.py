@@ -42,6 +42,7 @@ from user_passes.create_fallback import create_fallback_pass
 from helpers.instruction_helper import show_insts
 
 from perf_model.static_high_level_perf_model import gen_static_high_level_perf_model
+from cfg import make_cfg, HTMLWriter
 
 
 MODULE_TAG = '[Gen Offload]'
@@ -206,7 +207,14 @@ def generate_offload(io_ctx):
         new_f = func.clone(info.user_prog.func_dir)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Original Program Performance Modeling', tag=MODULE_TAG)
+    debug('Original: Create CFG', tag=MODULE_TAG)
+    cfg = make_cfg(bpf)
+    with open('/tmp/index.html', 'w') as f:
+        tmp = HTMLWriter().cfg_to_html(cfg, info)
+        f.write(tmp)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    debug('Original: Create Performance Modeling', tag=MODULE_TAG)
     tmp_text, _ = gen_code(bpf, info)
     debug('\n', tmp_text, tag=MODULE_TAG)
     model = gen_static_high_level_perf_model(bpf, info)

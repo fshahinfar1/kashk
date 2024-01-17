@@ -4,11 +4,13 @@ from instruction import *
 from data_structure import *
 from bpf_code_gen import gen_code
 
+
 class CFGBaseNode:
     node_id = 0
     def __init__(self):
         self._id = CFGBaseNode.node_id
         CFGBaseNode.node_id += 1
+
 
 class CFGSwitch(CFGBaseNode):
     def __init__(self):
@@ -16,12 +18,14 @@ class CFGSwitch(CFGBaseNode):
         self.cond = None
         self.jmps = []
 
+
 class CFGBranch(CFGBaseNode):
     def __init__(self):
         super().__init__()
         self.cond = None
         self.if_true = None
         self.if_false = None
+
 
 class CFGNode(CFGBaseNode):
     def __init__(self):
@@ -46,7 +50,7 @@ class CFGNode(CFGBaseNode):
 
         self.next = node
         return node
-    
+
     def is_empty(self):
         return len(self.insts) == 0 and self.next is None
 
@@ -64,7 +68,7 @@ class HTMLWriter:
         self.used_ids.add(node._id)
 
         if isinstance(node, CFGNode):
-            
+
             insts = [f'<p class="codetext">"{gen_code([i], info)[0]}"</p>' for i in node.insts]
             text = [
                     f'<div id={node._id} class="node">',
@@ -89,7 +93,7 @@ class HTMLWriter:
             return text
         if isinstance(node, CFGSwitch):
             cases = []
-            other_nodes_text = [] 
+            other_nodes_text = []
             for cond, n in node.jmps:
                 cond_text, _ = gen_code(cond, info)
                 cases.append(f'<p>on "{cond_text}": {n._id if n._id else "-"}</p>')
@@ -139,7 +143,7 @@ def _leafs(node, visited=None):
             else:
                 return [ptr]
         node = ptr
-    
+
     if isinstance(node, CFGSwitch):
         """
         Gather all leaf nodes from all cases. Remove duplicates and return the
@@ -151,11 +155,11 @@ def _leafs(node, visited=None):
         l = list(set(l))
         return l
 
-    
+
     assert isinstance(node, CFGBranch)
     l = list(set(_leafs(node.if_true, visited) + _leafs(node.if_false, visited)))
     return l
-        
+
 
 def make_cfg(inst):
     assert inst.kind not in (clang.CursorKind.WHILE_STMT, clang.CursorKind.DO_STMT)
@@ -167,7 +171,7 @@ def make_cfg(inst):
         cur = cur.connect(branch_node)
         cur.if_true = make_cfg(inst.body)
         cur.if_false = make_cfg(inst.other_body)
-        
+
         after_node = CFGNode()
         l = _leafs(cur.if_true) + _leafs(cur.if_false)
         for x in l:
@@ -177,7 +181,7 @@ def make_cfg(inst):
         del root
         del cur
         after_node = CFGNode()
-        swt = CFGSwitch()    
+        swt = CFGSwitch()
         swt.cond = inst.cond
         body = inst.body.get_children()
         # Group instructions for each case

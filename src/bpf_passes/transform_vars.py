@@ -230,6 +230,8 @@ def _process_current_inst(inst, info, more):
             return inst
     elif inst.kind == clang.CursorKind.CALL_EXPR:
         if inst.name in READ_PACKET:
+            # TODO: if the return value of the function call is ignored, we
+            # should remove this instruction.
             return _process_read_call(inst, info)
         elif inst.name in WRITE_PACKET:
             # NOTE: the write calls are transformed after verifer pass
