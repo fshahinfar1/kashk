@@ -329,9 +329,13 @@ class VarDecl(Instruction):
         return False
 
     def get_children(self):
+        if not self.has_children():
+            return []
         return [self.init, ]
 
     def get_children_context_marked(self):
+        if not self.has_children():
+            return []
         return ((self.init, ARG),)
 
     def clone(self, children):

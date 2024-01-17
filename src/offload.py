@@ -40,6 +40,7 @@ from user_passes.var_dependency import var_dependency_pass
 from user_passes.create_fallback import create_fallback_pass
 
 from helpers.instruction_helper import show_insts
+from helpers.ast_graphviz import ASTGraphviz
 
 from perf_model.static_high_level_perf_model import gen_static_high_level_perf_model
 from cfg import make_cfg, HTMLWriter
@@ -205,6 +206,12 @@ def generate_offload(io_ctx):
     info.user_prog.func_dir = {}
     for func in Function.directory.values():
         new_f = func.clone(info.user_prog.func_dir)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    debug('Original: AST')
+    tmp = ASTGraphviz.do(bpf, info)
+    tmp.save_file('/tmp/ast.dot')
+    tmp.dot.render(filename='ast', directory='/tmp/', format='svg')
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('Original: Create CFG', tag=MODULE_TAG)
