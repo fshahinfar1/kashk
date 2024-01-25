@@ -41,13 +41,14 @@ from user_passes.create_fallback import create_fallback_pass
 
 from helpers.instruction_helper import show_insts
 from helpers.ast_graphviz import ASTGraphviz
+from helpers.cfg_graphviz import CFGGraphviz
 
 from perf_model.static_high_level_perf_model import gen_static_high_level_perf_model
 from cfg import make_cfg, HTMLWriter
 
 
 MODULE_TAG = '[Gen Offload]'
-BPF_MAIN = 'BPF_MAIN_SCOPE'
+BPF_MAIN = 'MAIN_SCOPE'
 
 
 def _print_code(prog, info):
@@ -112,14 +113,12 @@ def generate_offload(io_ctx):
     #         '[User Code]', '[Select Userspace]')
 
     info = Info.from_io_ctx(io_ctx)
-    # Parse the main file
+    build_sym_table(info)
+    # Parse source files
     index, tu, cursor = parse_file(info.io_ctx.input_file, io_ctx.cflags)
-    # Parse other files. Collect information about classes, functions,
-    # variables, ...
-    build_sym_table(cursor, info)
-    # Load other source files
+    process_source_file(cursor, info)
     load_other_sources(io_ctx, info)
-    # Activate the main scope
+    # Build and select the entry function scope
     scope = Scope(info.sym_tbl.global_scope)
     info.sym_tbl.scope_mapping[BPF_MAIN] = scope
     info.sym_tbl.current_scope = scope
@@ -139,38 +138,37 @@ def generate_offload(io_ctx):
     add_known_func_objs(info)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    # Prepare the event handler arguments
     prepare_insts = _prepare_event_handler_args(cursor, info)
 
     # We have our own AST now, continue processing ...
-    bpf = Block(BODY)
-    bpf.extend_inst(prepare_insts)
-    bpf.extend_inst(insts)
+    prog = Block(BODY)
+    prog.extend_inst(prepare_insts)
+    prog.extend_inst(insts)
 
     # Mark which type or func definitions should be placed in generated code
     debug('Mark relevant code', tag=MODULE_TAG)
-    mark_relevant_code(bpf, info, PassObject())
+    mark_relevant_code(prog, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('[1st] Annotation', tag=MODULE_TAG)
-    bpf = primary_annotation_pass(bpf, info, None)
+    prog = primary_annotation_pass(prog, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('Mark Read/Write Inst & Buf', tag=MODULE_TAG)
-    mark_io(bpf, info)
+    mark_io(prog, info)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('Linear Code', tag=MODULE_TAG)
-    bpf = linear_code_pass(bpf, info, PassObject())
+    prog = linear_code_pass(prog, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('Feasibility Analysis', tag=MODULE_TAG)
-    bpf = feasibilty_analysis_pass(bpf, info, PassObject())
+    prog = feasibilty_analysis_pass(prog, info, PassObject())
     # for func in sorted(Function.directory.values(), key=lambda x: x.name):
     #     debug(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_fail, func.path_ids, tag=MODULE_TAG)
-    # code, _ = gen_code(bpf, info)
+    # code, _ = gen_code(prog, info)
     # print(code)
-    # show_insts([bpf])
+    # show_insts([prog])
 
     # func = Function.directory.get('strlen')
     # assert func is not None
@@ -187,7 +185,7 @@ def generate_offload(io_ctx):
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('Create User Code Graph', tag=MODULE_TAG)
-    select_user_pass(bpf, info, PassObject())
+    select_user_pass(prog, info, PassObject())
     tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
     debug('\n', tree, tag=MODULE_TAG)
     tree = draw_tree(info.user_prog.graph, fn=lambda x: str(x.path_ids))
@@ -201,7 +199,7 @@ def generate_offload(io_ctx):
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('Clone All State', tag=MODULE_TAG)
-    user = clone_pass(bpf, info, PassObject())
+    user = clone_pass(prog, info, PassObject())
     info.user_prog.sym_tbl = info.sym_tbl.clone()
     info.user_prog.func_dir = {}
     for func in Function.directory.values():
@@ -209,47 +207,46 @@ def generate_offload(io_ctx):
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('Original: AST')
-    tmp = ASTGraphviz.do(bpf, info)
+    tmp = ASTGraphviz.do(prog, info)
     tmp.save_file('/tmp/ast.dot')
     tmp.dot.render(filename='ast', directory='/tmp/', format='svg')
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('Original: Create CFG', tag=MODULE_TAG)
-    cfg = make_cfg(bpf)
+    # handle_get = Function.directory.get('strncpy_bpf')
+    # cfg = make_cfg(handle_get.body)
+    cfg = make_cfg(prog)
+    tmp = CFGGraphviz.do(cfg, info)
+    tmp.dot.save('/tmp/cfg.dot')
+    tmp.dot.render(filename='cfg', directory='/tmp/', format='svg')
     with open('/tmp/index.html', 'w') as f:
         tmp = HTMLWriter().cfg_to_html(cfg, info)
         f.write(tmp)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Original: Create Performance Modeling', tag=MODULE_TAG)
-    tmp_text, _ = gen_code(bpf, info)
-    debug('\n', tmp_text, tag=MODULE_TAG)
-    model = gen_static_high_level_perf_model(bpf, info)
-    tmp = model.dump()
-    debug('\n', tmp, tag=MODULE_TAG)
-
-    # f = Function.directory['is_match']
-    # debug('-- is_match: ', f.perf_model.dump())
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+    # debug('Original: Create Performance Modeling', tag=MODULE_TAG)
+    # tmp_text, _ = gen_code(prog, info)
+    # debug('\n', tmp_text, tag=MODULE_TAG)
+    # model = gen_static_high_level_perf_model(prog, info)
+    # tmp = model.dump()
+    # debug('\n', tmp, tag=MODULE_TAG)
+    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # NOTE: the order of generating the userspace and then BPF is important
     if not info.user_prog.graph.is_empty():
         gen_user_code(user, info, io_ctx.user_out_file)
     else:
         report("No user space program was generated. The tool has offloaded everything to BPF.")
-    bpf = gen_bpf_code(bpf, info, io_ctx.bpf_out_file)
+    prog = gen_bpf_code(prog, info, io_ctx.bpf_out_file)
 
 
-    debug('BPF Program Performance Modeling', tag=MODULE_TAG)
-    tmp_text, _ = gen_code(bpf, info)
-    debug('\n', tmp_text, tag=MODULE_TAG)
-    model2 = gen_static_high_level_perf_model(bpf, info)
-    tmp = model2.dump()
-    debug('\n', tmp, tag=MODULE_TAG)
-
-    # f = Function.directory['is_match']
-    # debug('-- is_match: ', f.perf_model.dump())
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+    # debug('BPF Program Performance Modeling', tag=MODULE_TAG)
+    # tmp_text, _ = gen_code(prog, info)
+    # debug('\n', tmp_text, tag=MODULE_TAG)
+    # model2 = gen_static_high_level_perf_model(prog, info)
+    # tmp = model2.dump()
+    # debug('\n', tmp, tag=MODULE_TAG)
+    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
     return info
 
 

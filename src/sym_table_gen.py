@@ -222,13 +222,11 @@ def process_source_file(cursor, info):
     __pass_over_source_file(cursor, info)
 
 
-def build_sym_table(cursor, info):
+def build_sym_table(info):
     """
     Boot strap the symbol table
-    @param cursor: the main file AST
     """
     # Define the field of BPF context
     info.sym_tbl.current_scope = info.sym_tbl.global_scope
     info.sym_tbl.scope_mapping['__global__'] = info.sym_tbl.current_scope
     info.prog.set_bpf_context_struct_sym_tbl(info.sym_tbl)
-    process_source_file(cursor, info)

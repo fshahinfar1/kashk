@@ -6,9 +6,10 @@ from passes.clone import clone_pass
 
 PARENT_INST = 1000
 
+
 class Pass:
     __slots__ = ('current_function', 'visited_functions', 'cb_ref', 'info',
-            'result', '_may_remove', '_skip_children')
+            'result', '_may_remove', '_skip_children', '_visited_ids')
     @classmethod
     def do(cls, inst, info, more=None, func=None, **kwargs):
         obj = cls.__new__(cls)
@@ -32,6 +33,7 @@ class Pass:
         self._may_remove = False
         self._skip_children = False
         self.parent_stack = CodeBlockRef()
+        self._visited_ids = set()
 
     @property
     def parent_inst(self):
@@ -84,13 +86,16 @@ class Pass:
         lvl, ctx, parent_list = more.unpack()
         new_children = []
         with self.cb_ref.new_ref(ctx, parent_list):
-            inst = self.process_current_inst(inst, more)
+            tmp = self.process_current_inst(inst, more)
+            if inst.node_id is not None:
+                self._visited_ids.add(inst.node_id)
+            inst = tmp
             if inst is None:
                 assert self._may_remove, 'This pass is not allowed to remove instructions'
                 return None
             if self._skip_children:
                 self._skip_children = False
-                new_inst = clone_pass(inst, info, PassObject())
+                new_inst = clone_pass(inst)
                 return new_inst
             # Continue deeper
             parent = inst if inst.kind != BLOCK_OF_CODE else self.parent_inst

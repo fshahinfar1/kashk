@@ -7,7 +7,7 @@ code_under_test_dir = os.path.join(current_file_dir, '../src/')
 
 sys.path.insert(0, code_under_test_dir)
 from utility import parse_file, find_elem
-from sym_table_gen import build_sym_table
+from sym_table_gen import build_sym_table, process_source_file
 from understand_logic import gather_instructions_under
 from understand_logic_handler import create_func_objs, add_known_func_objs
 
@@ -32,7 +32,8 @@ class BasicTest:
         # This is the AST generated with Clang
         index, tu, cursor = parse_file(self.info.io_ctx.input_file, self.info.io_ctx.cflags)
         # Collect information about classes, functions, variables, ...
-        build_sym_table(cursor, self.info)
+        build_sym_table(self.info)
+        process_source_file(cursor, self.info)
         # Load other source files
         load_other_sources(self.info.io_ctx, self.info)
         # Select the main scope

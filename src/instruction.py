@@ -8,6 +8,8 @@ from log import error, debug, report
 from data_structure import MyType, BASE_TYPES
 from dfs import DFSPass
 
+from passes.passable import PassableObject
+
 
 CODE_LITERAL = 8081
 BLOCK_OF_CODE = 8082
@@ -46,7 +48,7 @@ def _generate_marked_children(groups, context):
     return tuple(map(lambda x: (x, x.tag), groups))
 
 
-class Instruction:
+class Instruction(PassableObject):
     BOUND_CHECK_FLAG = 1 << 3
     OFFSET_MASK_FLAG = 1 << 4
 
@@ -54,6 +56,7 @@ class Instruction:
             clang.CursorKind.CONTINUE_STMT,
             clang.CursorKind.GOTO_STMT, clang.CursorKind.LABEL_STMT, clang.CursorKind.INIT_LIST_EXPR)
     def __init__(self):
+        super().__init__()
         self.kind = None
         self.bpf_ignore = False
         # Mark which arguments are added to the code
