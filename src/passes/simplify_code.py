@@ -203,9 +203,9 @@ def simplify_code_structure(inst, info, more):
     operation in each path of this operation need a check then we would like to
     add it in a block of code. The ternary operation does no allow this.
 
-    4. Make sure all void functions terminate with a return statement (It is
+    4. Make sure all void functions terminate with a return statement. It is
     valid for a void function to not have return instruction, but we are using
-    return instruction as a sign of end of the function in future passes.)
+    return instruction as a sign of end of the function in future passes.
     """
     res = _do_pass(inst, info, more)
     # Make sure all the void functions are terminated with Return instructions

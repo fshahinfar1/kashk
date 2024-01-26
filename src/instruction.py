@@ -48,54 +48,57 @@ def _generate_marked_children(groups, context):
     return tuple(map(lambda x: (x, x.tag), groups))
 
 
+def _default_clone_operation(new, old):
+    new.bpf_ignore     = old.bpf_ignore
+    new.change_applied = old.change_applied
+    new.color          = old.color
+
+
 class Instruction(PassableObject):
+    __slots__ = ('kind', 'bpf_ignore', 'change_applied', 'color', 'body')
+    BLUE = 300  # Original Instruction
+    RED  = 301  # Modification
+
     BOUND_CHECK_FLAG = 1 << 3
     OFFSET_MASK_FLAG = 1 << 4
 
     MAY_NOT_OVERLOAD = (clang.CursorKind.BREAK_STMT,
-            clang.CursorKind.CONTINUE_STMT,
-            clang.CursorKind.GOTO_STMT, clang.CursorKind.LABEL_STMT, clang.CursorKind.INIT_LIST_EXPR)
+            clang.CursorKind.CONTINUE_STMT, clang.CursorKind.GOTO_STMT,
+            clang.CursorKind.LABEL_STMT, clang.CursorKind.INIT_LIST_EXPR)
+
     def __init__(self):
         super().__init__()
         self.kind = None
         self.bpf_ignore = False
         # Mark which arguments are added to the code
         self.change_applied = 0
+        self.color = Instruction.BLUE
+        self.body  = None
 
     def has_children(self):
         if self.kind not in Instruction.MAY_NOT_OVERLOAD:
             error('Function of base class (Instruction) is running for object of kind:', self.kind, 'has_children')
-
-        if hasattr(self, 'body'):
-            b = getattr(self, 'body')
-            if b:
-                return True
+        if self.body is not None:
+            return True
         return False
 
     def get_children(self):
         if self.kind not in Instruction.MAY_NOT_OVERLOAD:
             error('base get children is running for:', self.kind)
-
-        if hasattr(self, 'body'):
-            b = getattr(self, 'body')
-            if b:
-                return b
+        if self.body is not None:
+            return [self.body,]
         return []
 
     def get_children_context_marked(self):
         if self.kind not in Instruction.MAY_NOT_OVERLOAD:
             error('base get children context marked is running for:', self.kind)
-
-        if hasattr(self, 'body'):
-            b = getattr(self, 'body')
-            if b:
-                return [(b, BODY)]
+        if self.body is not None:
+            return [(self.body, BODY)]
         return []
 
     def clone(self, children):
         if self.kind not in Instruction.MAY_NOT_OVERLOAD:
-            error('clone Instruction:', self.kind)
-
+            error('Instruction clone method uses parent implementation:', self.kind)
         new = Instruction()
         # new.kind = self.kind
         for name, val in vars(self).items():
@@ -111,55 +114,6 @@ class Instruction(PassableObject):
 
     def __repr__(self):
         return self.__str__()
-
-
-# class Pair(Instruction):
-#     def __init__(self, name, value):
-#         super().__init__()
-#         self.name = name
-#         self.value = value
-#         self.kind = PAIR_INST
-
-#     def has_children(self):
-#         return False
-
-#     def get_children(self):
-#         return []
-
-#     def get_children_context_marked(self):
-#         return []
-
-
-# class StructInit(Instruction):
-#     def __init__(self):
-#         super().__init__()
-#         # mapping (str --> Instruction) , field name --> Value
-#         self.fields = {}
-#         self.kind = clang.CursorKind.COMPOUND_LITERAL_EXPR
-
-#     def add(self, field_name, field_value):
-#         assert isinstance(field_value, Instruction)
-#         assert isinstance(field_name, str)
-#         self.fields[field_name] = field_value
-
-#     def has_children(self):
-#         return len(self.fields.keys()) > 0
-
-#     def get_children(self):
-#         children = []
-#         for k, v in self.fields.items():
-#             children.append(Pair(k, v))
-#         return children
-
-#     def get_children_context_marked(self):
-#         count = len(self.fields.keys())
-#         tag = [ARG] * count
-#         return list(zip(self.fields.values() ,tag))
-
-#     def clone(self, children)
-#         new
-#         new.bpf_ignore = self.bpf_ignore
-#         new.change_applied = self.change_applied
 
 
 class Return(Instruction):
@@ -185,25 +139,23 @@ class Return(Instruction):
 
     def clone(self, children):
         new = Return()
+        _default_clone_operation(new, self)
         new.body  = children[0]
-        new.bpf_ignore = self.bpf_ignore
-        new.change_applied = self.change_applied
         return new
 
 
 class Call(Instruction):
+    __slots__ = ('cursor', 'name', 'args', 'func_ptr', 'owner', 'is_func_ptr',
+            'is_operator', 'is_method', 'rd_buf', 'wr_buf', 'repeat')
     def __init__(self, cursor):
         super().__init__()
-
         self.cursor = cursor
         self.kind = clang.CursorKind.CALL_EXPR
         if cursor is None:
             self.name = '_not_set_'
         else:
             self.name = cursor.spelling
-
         self.func_ptr = None
-
         self.args = []
         # The last element of owner should be an object accesible from
         # local or global scope. The other elements would recursivly show the
@@ -267,17 +219,15 @@ class Call(Instruction):
 
     def clone(self, children):
         new = Call(self.cursor)
+        _default_clone_operation(new, self)
         new.name  = self.name
-        # new.args  = list(self.args)
         new.args  = children
         new.owner = list(self.owner)
         new.is_func_ptr = self.is_func_ptr
         new.is_method = self.is_method
         new.is_operator = self.is_operator
-        new.bpf_ignore = self.bpf_ignore
         new.rd_buf = self.rd_buf
         new.wr_buf = self.wr_buf
-        new.change_applied = self.change_applied
         new.repeat = self.repeat
         return new
 
@@ -289,6 +239,7 @@ class Call(Instruction):
 
 
 class VarDecl(Instruction):
+    __slots__ = ('cursor', 'type', 'name', 'init')
     @classmethod
     def build(cls, name, T):
         obj = VarDecl(None)
@@ -343,13 +294,12 @@ class VarDecl(Instruction):
 
     def clone(self, children):
         new = VarDecl(self.cursor)
+        _default_clone_operation(new, self)
         new.type = self.type
         new.name = self.name
         new.kind = self.kind
         if children:
             new.init = children[0]
-        new.bpf_ignore = self.bpf_ignore
-        new.change_applied = self.change_applied
         return new
 
     def get_ref(self):
@@ -363,6 +313,7 @@ class VarDecl(Instruction):
 
 
 class ControlFlowInst(Instruction):
+    __slots__ = ('cond', 'other_body', 'repeat')
 
     @classmethod
     def build_if_inst(cls, condition_inst):
@@ -395,17 +346,18 @@ class ControlFlowInst(Instruction):
 
     def clone(self, children):
         new = ControlFlowInst()
+        _default_clone_operation(new, self)
         new.kind = self.kind
         new.cond = children[0]
         new.body = children[1]
         new.other_body = children[2]
-        new.bpf_ignore = self.bpf_ignore
-        new.change_applied = self.change_applied
         new.repeat = self.repeat
         return new
 
 
 class UnaryOp(Instruction):
+    __slots__ = ('child', 'cursor', 'comes_after', 'op')
+
     BIT_OPS = ('~')
     BOOL_OPS =  ('!',)
     ARITH_OPS = ('-', '++', '--',)
@@ -483,15 +435,16 @@ class UnaryOp(Instruction):
         @returns a new UnaryOp object with representing the same instruction is this object.
         """
         new = UnaryOp(self.cursor)
+        _default_clone_operation(new, self)
         new.op = self.op
         new.child = children[0]
         new.comes_after = self.comes_after
-        new.bpf_ignore = self.bpf_ignore
-        new.change_applied = self.change_applied
         return new
 
 
 class BinOp(Instruction):
+    __slots__ = ('lhs', 'rhs', 'op')
+
     REL_OP = ('>', '>=', '<', '<=', '==', '!=')
     ARITH_OP = ('+', '-', '*', '/', '%')
     ASSIGN_OP = ('=', '+=', '-=', '*=', '/=', '<<=', '>>=', '&=', '|=')
@@ -566,16 +519,17 @@ class BinOp(Instruction):
 
     def clone(self, children):
         new = BinOp(None)
+        _default_clone_operation(new, self)
         new.op = self.op
         assert isinstance(children[0], Block)
         new.rhs = children[0]
         new.lhs = children[1]
-        new.bpf_ignore = self.bpf_ignore
-        new.change_applied = self.change_applied
         return new
 
 
 class CaseSTMT(Instruction):
+    __slots__ = ('cursor', 'case')
+
     def __init__(self, cursor, kind=clang.CursorKind.CASE_STMT):
         super().__init__()
         self.kind = kind
@@ -596,14 +550,15 @@ class CaseSTMT(Instruction):
 
     def clone(self, children):
         new = CaseSTMT(self.cursor, self.kind)
+        _default_clone_operation(new, self)
         new.case = children[0]
         new.body = children[1]
-        new.bpf_ignore = self.bpf_ignore
-        new.change_applied = self.change_applied
         return new
 
 
 class ArrayAccess(Instruction):
+    __slots__ = ('array_ref', 'type', 'index')
+
     @classmethod
     def build(cls, ref, index):
         obj = ArrayAccess(ref.type)
@@ -640,10 +595,9 @@ class ArrayAccess(Instruction):
 
     def clone(self, children):
         new = ArrayAccess(self.type)
+        _default_clone_operation(new, self)
         new.array_ref = children[0]
         new.index = children[1]
-        new.bpf_ignore = self.bpf_ignore
-        new.change_applied = self.change_applied
         return new
 
     def __str__(self):
@@ -679,13 +633,14 @@ class Parenthesis(Instruction):
 
     def clone(self, children):
         new = Parenthesis()
+        _default_clone_operation(new, self)
         new.body = children[0]
-        new.bpf_ignore = self.bpf_ignore
-        new.change_applied = self.change_applied
         return new
 
 
 class Cast(Instruction):
+    __slots__ = ('castee', 'type')
+
     @classmethod
     def build(cls, inst, T):
         cast = Cast()
@@ -710,14 +665,15 @@ class Cast(Instruction):
 
     def clone(self, children):
         new = Cast()
+        _default_clone_operation(new, self)
         new.type = self.type
         new.castee = children[0]
-        new.bpf_ignore = self.bpf_ignore
-        new.change_applied = self.change_applied
         return new
 
 
 class Ref(Instruction):
+    __slots__ = ('name', 'type', 'owner')
+
     @classmethod
     def from_sym(cls, sym):
         ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
@@ -767,11 +723,10 @@ class Ref(Instruction):
 
     def clone(self, _):
         new = Ref(self.cursor, self.kind)
+        _default_clone_operation(new, self)
         new.name = self.name
         new.type = self.type
         new.owner  = list(self.owner)
-        new.bpf_ignore = self.bpf_ignore
-        new.change_applied = self.change_applied
         return new
 
     def get_ref_field(self, name, info=None):
@@ -801,6 +756,7 @@ class Ref(Instruction):
 
 
 class Literal(Instruction):
+    __slots__ = ('text',)
     def __init__(self, text, kind):
         super().__init__()
         self.kind = kind
@@ -830,11 +786,13 @@ class Literal(Instruction):
 
     def clone(self, _):
         new = Literal(self.text, self.kind)
-        new.bpf_ignore = self.bpf_ignore
-        new.change_applied = self.change_applied
+        _default_clone_operation(new, self)
+        new.text = self.text
         return new
 
 class ForLoop(Instruction):
+    __slots__ = ('cursor', 'pre', 'cond', 'post', 'repeat')
+
     @classmethod
     def build(cls, pre, cond, post):
         obj = ForLoop()
@@ -866,28 +824,24 @@ class ForLoop(Instruction):
 
     def clone(self, children):
         new = ForLoop()
+        _default_clone_operation(new, self)
         new.cursor = self.cursor
         new.pre = children[0]
         new.cond = children[1]
         new.post = children[2]
         new.body = children[3]
-        new.bpf_ignore = self.bpf_ignore
-        new.change_applied = self.change_applied
         new.repeat = self.repeat
         return new
 
 
 class Block(Instruction):
+    __slots__ = ('tag', 'children')
+
     def __init__(self, tag):
         super().__init__()
         self.kind = BLOCK_OF_CODE
         self.tag = tag
         self.children = []
-        # TODO: it is not used yet, the idea is to also annotate block of codes
-        # which fail so we can know which jumps will fail and which would not.
-        # If all branches fail then we should not continue the code. Helps to
-        # remove dead code.
-        self.fails = False
 
     def __str__(self):
         return f'<Block>'
@@ -914,9 +868,8 @@ class Block(Instruction):
 
     def clone(self, children):
         new = Block(self.tag)
+        _default_clone_operation(new, self)
         new.children = children[0]
-        new.bpf_ignore = self.bpf_ignore
-        new.change_applied = self.change_applied
         return new
 
     def __contains__(self, other):
@@ -929,6 +882,7 @@ class Block(Instruction):
 
 
 class ToUserspace(Instruction):
+    __slots__ = ('is_bpf_main', 'return_type', 'path_id')
 
     @classmethod
     def from_func_obj(cls, func, path_id=None):
@@ -955,11 +909,10 @@ class ToUserspace(Instruction):
 
     def clone(self, _):
         new = ToUserspace()
+        _default_clone_operation(new, self)
         new.is_bpf_main = self.is_bpf_main
         new.return_type = self.return_type
         new.path_id = self.path_id
-        new.bpf_ignore = self.bpf_ignore
-        new.change_applied = self.change_applied
         return new
 
     def has_children(self):
@@ -973,6 +926,8 @@ class ToUserspace(Instruction):
 
 
 class Annotation(Instruction):
+    __slots__ = ('msg', 'ann_kind', 'block')
+
     ANNOTATION_TYPE_NAME = 'struct __annotation'
     MESSAGE_FIELD_NAME = 'message'
     KIND_FIELD_NAME = 'kind'
@@ -1006,6 +961,7 @@ class Annotation(Instruction):
         self.msg = eval(msg)
         self.ann_kind = ann_kind
         self.kind = ANNOTATION_INST
+        # TODO: rename block to body
         self.block = Block(BODY)
 
     def is_block_annotation(self):
@@ -1026,6 +982,7 @@ class Annotation(Instruction):
     def clone(self, list_child):
         # TODO: Do not need to clone :) ?! (it is goofy)
         new = Annotation('"xxx"', self.ann_kind)
+        _default_clone_operation(new, self)
         new.msg = self.msg
         new.block = list_child[0]
         return new

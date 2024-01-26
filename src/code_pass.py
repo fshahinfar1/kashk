@@ -6,6 +6,10 @@ from passes.clone import clone_pass
 
 PARENT_INST = 1000
 
+# TODO: support declare_at_top_of_func
+# TODO: support After objects (adding some instructions after the current
+#                               instruction being investigated)
+
 
 class Pass:
     __slots__ = ('current_function', 'visited_functions', 'cb_ref', 'info',
