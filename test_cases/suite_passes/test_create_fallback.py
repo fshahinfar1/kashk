@@ -17,10 +17,10 @@ from passes.pass_obj import PassObject
 from passes.clone import clone_pass
 from passes.simplify_code import simplify_code_structure
 from passes.mark_annotation_pass import mark_annotation_pass
-from bpf_passes.feasibility_analysis import feasibilty_analysis_pass
-from bpf_passes.mark_user_boundary import get_number_of_failure_paths
-from user_passes.select_user import select_user_pass
-from user_passes.create_fallback import create_fallback_pass
+from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
+from passes.bpf_passes.mark_user_boundary import get_number_of_failure_paths
+from passes.user_passes.select_user import select_user_pass
+from passes.user_passes.create_fallback import create_fallback_pass
 
 from passes.mark_relevant_code import mark_relevant_code
 from passes.mark_io import mark_io

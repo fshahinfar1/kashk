@@ -16,9 +16,9 @@ from sym_table import *
 from passes.pass_obj import PassObject
 from passes.mark_relevant_code import mark_relevant_code
 from passes.simplify_code import simplify_code_structure
-from bpf_passes.feasibility_analysis import feasibilty_analysis_pass
-from bpf_passes.mark_user_boundary import get_number_of_failure_paths
-from user_passes.select_user import select_user_pass
+from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
+from passes.bpf_passes.mark_user_boundary import get_number_of_failure_paths
+from passes.user_passes.select_user import select_user_pass
 
 
 def _print_node_code(node, info):

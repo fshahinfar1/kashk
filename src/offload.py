@@ -24,20 +24,20 @@ from passes.mark_io import mark_io
 from passes.clone import clone_pass
 from passes.simplify_code import simplify_code_structure
 
-from bpf_passes.loop_end import loop_end_pass
-from bpf_passes.feasibility_analysis import feasibilty_analysis_pass
-from bpf_passes.transform_vars import transform_vars_pass
-from bpf_passes.userspace_fallback import userspace_fallback_pass
-from bpf_passes.verifier import verifier_pass
-from bpf_passes.transform_after_verifier import transform_func_after_verifier
-from bpf_passes.reduce_params import reduce_params_pass
-from bpf_passes.remove_everything_not_used import remove_everything_not_used
-from bpf_passes.prog_complexity import mitiage_program_comlexity
-from bpf_passes.change_bpf_loop import change_to_bpf_loop
+from passes.bpf_passes.loop_end import loop_end_pass
+from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
+from passes.bpf_passes.transform_vars import transform_vars_pass
+from passes.bpf_passes.userspace_fallback import userspace_fallback_pass
+from passes.bpf_passes.verifier import verifier_pass
+from passes.bpf_passes.transform_after_verifier import transform_func_after_verifier
+from passes.bpf_passes.reduce_params import reduce_params_pass
+from passes.bpf_passes.remove_everything_not_used import remove_everything_not_used
+from passes.bpf_passes.prog_complexity import mitiage_program_comlexity
+from passes.bpf_passes.change_bpf_loop import change_to_bpf_loop
 
-from user_passes.select_user import select_user_pass
-from user_passes.var_dependency import var_dependency_pass
-from user_passes.create_fallback import create_fallback_pass
+from passes.user_passes.select_user import select_user_pass
+from passes.user_passes.var_dependency import var_dependency_pass
+from passes.user_passes.create_fallback import create_fallback_pass
 
 from helpers.instruction_helper import show_insts
 from helpers.ast_graphviz import ASTGraphviz
@@ -206,23 +206,23 @@ def generate_offload(io_ctx):
         new_f = func.clone(info.user_prog.func_dir)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Original: AST')
-    tmp = ASTGraphviz.do(prog, info)
-    tmp.save_file('/tmp/ast.dot')
-    tmp.dot.render(filename='ast', directory='/tmp/', format='svg')
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+    # debug('Original: AST')
+    # tmp = ASTGraphviz.do(prog, info)
+    # tmp.save_file('/tmp/ast.dot')
+    # tmp.dot.render(filename='ast', directory='/tmp/', format='svg')
+    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Original: Create CFG', tag=MODULE_TAG)
-    # handle_get = Function.directory.get('strncpy_bpf')
-    # cfg = make_cfg(handle_get.body)
-    cfg = make_cfg(prog)
-    tmp = CFGGraphviz.do(cfg, info)
-    tmp.dot.save('/tmp/cfg.dot')
-    tmp.dot.render(filename='cfg', directory='/tmp/', format='svg')
-    with open('/tmp/index.html', 'w') as f:
-        tmp = HTMLWriter().cfg_to_html(cfg, info)
-        f.write(tmp)
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+    # debug('Original: Create CFG', tag=MODULE_TAG)
+    # # handle_get = Function.directory.get('strncpy_bpf')
+    # # cfg = make_cfg(handle_get.body)
+    # cfg = make_cfg(prog)
+    # tmp = CFGGraphviz.do(cfg, info)
+    # tmp.dot.save('/tmp/cfg.dot')
+    # tmp.dot.render(filename='cfg', directory='/tmp/', format='svg')
+    # with open('/tmp/index.html', 'w') as f:
+    #     tmp = HTMLWriter().cfg_to_html(cfg, info)
+    #     f.write(tmp)
+    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # debug('Original: Create Performance Modeling', tag=MODULE_TAG)
     # tmp_text, _ = gen_code(prog, info)
@@ -376,17 +376,12 @@ def gen_bpf_code(bpf, info, out_bpf):
     # Transform access to variables and read/write buffers.
     debug('Transform Vars', tag=MODULE_TAG)
     bpf = transform_vars_pass(bpf, info, PassObject())
-    # code, _ = gen_code(bpf, info)
-    # print(code)
-    # show_insts([bpf])
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Handle moving to userspace and removing the instruction not possible in
     # BPF
     debug('Userspace Fallback', tag=MODULE_TAG)
     bpf = userspace_fallback_pass(bpf, info, PassObject())
-    # code, _ = gen_code(bpf, info)
-    # print(code)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Verifier
@@ -408,9 +403,9 @@ def gen_bpf_code(bpf, info, out_bpf):
     remove_everything_not_used(bpf, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Change loop to bpf_loop', tag=MODULE_TAG)
-    bpf = change_to_bpf_loop(bpf, info, None)
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+    # debug('Change loop to bpf_loop', tag=MODULE_TAG)
+    # bpf = change_to_bpf_loop(bpf, info, None)
+    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # debug('Program Complexity Pass', tag=MODULE_TAG)
     # list_bpf_progs = mitiage_program_comlexity(bpf, info, None)

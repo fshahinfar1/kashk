@@ -8,7 +8,7 @@ from prune import WRITE_PACKET, KNOWN_FUNCS
 from template import define_bpf_arr_map, malloc_lookup
 from bpf_code_gen import gen_code
 from passes.pass_obj import PassObject
-from bpf_passes.transform_vars import SEND_FLAG_NAME
+from passes.bpf_passes.transform_vars import SEND_FLAG_NAME
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr, is_value_from_bpf_ctx
 from helpers.instruction_helper import (get_ret_inst, get_ret_value_text)
 from helpers.cache_helper import generate_cache_lookup, generate_cache_update

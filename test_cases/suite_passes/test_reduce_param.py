@@ -16,8 +16,8 @@ from sym_table import *
 from passes.pass_obj import PassObject
 from passes.mark_relevant_code import mark_relevant_code
 from passes.simplify_code import simplify_code_structure
-from bpf_passes.feasibility_analysis import feasibilty_analysis_pass
-from bpf_passes.reduce_params import reduce_params_pass
+from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
+from passes.bpf_passes.reduce_params import reduce_params_pass
 
 
 class TestCase(BasicTest):

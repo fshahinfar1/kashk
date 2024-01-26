@@ -10,7 +10,7 @@ from bpf_code_gen import gen_code
 from passes.pass_obj import PassObject
 from passes.clone import clone_pass
 
-from bpf_passes.mark_user_boundary import mark_user_boundary_pass
+from passes.bpf_passes.mark_user_boundary import mark_user_boundary_pass
 
 
 MODULE_TAG = '[Feasibility Pass]'

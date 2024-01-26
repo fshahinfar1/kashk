@@ -21,15 +21,15 @@ from passes.mark_io import mark_io
 from passes.clone import clone_pass
 from passes.simplify_code import simplify_code_structure
 
-from bpf_passes.loop_end import loop_end_pass
-from bpf_passes.feasibility_analysis import feasibilty_analysis_pass
-from bpf_passes.transform_vars import transform_vars_pass
-from bpf_passes.userspace_fallback import userspace_fallback_pass
-from bpf_passes.verifier import verifier_pass
-from bpf_passes.transform_after_verifier import transform_func_after_verifier
-from bpf_passes.reduce_params import reduce_params_pass
+from passes.bpf_passes.loop_end import loop_end_pass
+from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
+from passes.bpf_passes.transform_vars import transform_vars_pass
+from passes.bpf_passes.userspace_fallback import userspace_fallback_pass
+from passes.bpf_passes.verifier import verifier_pass
+from passes.bpf_passes.transform_after_verifier import transform_func_after_verifier
+from passes.bpf_passes.reduce_params import reduce_params_pass
 
-from user_passes.select_user import select_user_pass
+from passes.user_passes.select_user import select_user_pass
 
 
 class TestCase(BasicTest):

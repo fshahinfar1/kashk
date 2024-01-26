@@ -13,7 +13,7 @@ from passes.pass_obj import PassObject
 
 from bpf_code_gen import gen_code
 
-from bpf_passes.transform_vars import FAIL_FLAG_NAME
+from passes.bpf_passes.transform_vars import FAIL_FLAG_NAME
 
 
 MODULE_TAG = '[Fallback Pass]'
