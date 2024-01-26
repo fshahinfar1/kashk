@@ -3,7 +3,7 @@ from instruction import *
 from data_structure import *
 from log import debug, error
 from utility import indent
-from bpf_code_gen import gen_code
+from code_gen import gen_code
 
 MODULE_TAG = '[Static Perf Model]'
 

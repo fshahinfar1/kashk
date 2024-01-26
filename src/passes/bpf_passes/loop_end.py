@@ -109,7 +109,7 @@ def loop_end_pass(inst, info, more):
     if _has_unterminated_path(res, info):
         res.add_inst(_return_drop_inst(info))
 
-    # from bpf_code_gen import gen_code
+    # from code_gen import gen_code
     # text, _ = gen_code(res, info)
     # debug(text)
     # assert 0

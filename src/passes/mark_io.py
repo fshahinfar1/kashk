@@ -10,7 +10,7 @@ from instruction import Literal, CODE_LITERAL, Ref
 from dfs import DFSPass
 from utility import skip_unexposed_stmt, find_elems_of_kind
 from prune import READ_PACKET, WRITE_PACKET, COROUTINE_FUNC_NAME
-from bpf_code_gen import gen_code
+from code_gen import gen_code
 
 
 MODULE_TAG = '[IO]'

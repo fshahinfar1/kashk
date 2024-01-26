@@ -1,7 +1,7 @@
 import json
 import clang.cindex as clang
 from log import error, debug, report
-from bpf_code_gen import gen_code
+from code_gen import gen_code
 from template import (prepare_shared_state_var, define_bpf_arr_map,
         SHARED_OBJ_PTR)
 from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS

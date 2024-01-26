@@ -6,7 +6,7 @@ from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS
 from data_structure import *
 from instruction import *
 
-from bpf_code_gen import gen_code
+from code_gen import gen_code
 from passes.pass_obj import PassObject
 from passes.clone import clone_pass
 

@@ -2,7 +2,7 @@ from bpf import BPF_PROG
 from data_structure import MyType, BASE_TYPES, Record, StateObject
 from instruction import *
 from helpers.instruction_helper import *
-from bpf_code_gen import gen_code
+from code_gen import gen_code
 
 
 class SK_SKB_PROG(BPF_PROG):

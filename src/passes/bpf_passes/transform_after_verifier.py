@@ -6,7 +6,7 @@ from data_structure import *
 from instruction import *
 from prune import WRITE_PACKET, KNOWN_FUNCS
 from template import define_bpf_arr_map, malloc_lookup
-from bpf_code_gen import gen_code
+from code_gen import gen_code
 from passes.pass_obj import PassObject
 from passes.bpf_passes.transform_vars import SEND_FLAG_NAME
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr, is_value_from_bpf_ctx

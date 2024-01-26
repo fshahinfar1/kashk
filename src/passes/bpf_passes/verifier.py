@@ -7,7 +7,7 @@ from data_structure import *
 from instruction import *
 from utility import get_tmp_var_name, skip_typedef
 
-from bpf_code_gen import gen_code
+from code_gen import gen_code
 from passes.pass_obj import PassObject
 from template import bpf_ctx_bound_check, bpf_ctx_bound_check_bytes
 from prune import WRITE_PACKET, KNOWN_FUNCS, OUR_IMPLEMENTED_FUNC, MEMORY_ACCESS_FUNC

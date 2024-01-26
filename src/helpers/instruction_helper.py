@@ -154,7 +154,7 @@ def symbol_for_inst(inst, info):
         error('Can not determine symbol for given instruction (not implemented?)')
         debug('debug info:')
         debug('inst:', inst)
-        from bpf_code_gen import gen_code
+        from code_gen import gen_code
         text, _ = gen_code([inst,], info)
         debug('text:', text)
         debug('------------------------')

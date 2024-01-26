@@ -7,7 +7,7 @@ from instruction import *
 from utility import get_tmp_var_name
 from helpers.instruction_helper import show_insts
 
-from bpf_code_gen import gen_code
+from code_gen import gen_code
 from passes.pass_obj import PassObject
 from passes.clone import clone_pass
 

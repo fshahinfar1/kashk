@@ -7,7 +7,7 @@ import graphviz
 
 from log import debug
 from code_pass import Pass
-from bpf_code_gen import gen_code
+from code_gen import gen_code
 
 
 MODULE_TAG = '[AST Graphviz]'

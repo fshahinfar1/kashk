@@ -3,7 +3,7 @@ from data_structure import (MyType, BASE_TYPES, XDP_HELPER_HEADER, Record,
         StateObject)
 from instruction import *
 from helpers.instruction_helper import *
-from bpf_code_gen import gen_code
+from code_gen import gen_code
 from . import cast_data
 
 class XDP_PROG(BPF_PROG):

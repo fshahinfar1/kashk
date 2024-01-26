@@ -7,7 +7,7 @@ from instruction import *
 from code_pass import Pass
 from passes.pass_obj import PassObject
 
-from bpf_code_gen import gen_code
+from code_gen import gen_code
 
 
 PARENT_BIN_OP = 560

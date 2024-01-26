@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from data_structure import Function
-from bpf_code_gen import gen_code
+from code_gen import gen_code
 from log import debug
 from sym_table import Scope
 

@@ -11,7 +11,7 @@ from instruction import *
 from sym_table import SymbolTableEntry
 from passes.pass_obj import PassObject
 
-from bpf_code_gen import gen_code
+from code_gen import gen_code
 
 from passes.bpf_passes.transform_vars import FAIL_FLAG_NAME
 

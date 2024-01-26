@@ -2,7 +2,7 @@ import clang.cindex as clang
 from log import *
 from instruction import *
 from data_structure import *
-from bpf_code_gen import gen_code
+from code_gen import gen_code
 from passes.passable import PassableObject
 
 TRUE = Literal('True', CODE_LITERAL)

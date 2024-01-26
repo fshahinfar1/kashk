@@ -393,7 +393,7 @@ def report_user_program_graph(info):
             continue
         debug('lvl:', lvl, node.path_ids)
         debug(node.paths.var_deps)
-        from bpf_code_gen import gen_code
+        from code_gen import gen_code
         text, _ = gen_code(node.paths.code, info)
         debug(text)
         debug('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')

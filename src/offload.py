@@ -14,7 +14,7 @@ from understand_logic import  (gather_instructions_from,
         get_variable_declaration_before_elem)
 from understand_logic_handler import create_func_objs, add_known_func_objs
 
-from bpf_code_gen import generate_bpf_prog, gen_code
+from code_gen import generate_bpf_prog, gen_code
 from user import generate_user_prog
 
 from passes.pass_obj import PassObject
