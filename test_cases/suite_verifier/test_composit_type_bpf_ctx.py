@@ -19,7 +19,7 @@ from passes.mark_relevant_code import mark_relevant_code
 from passes.primary_annotation_pass import primary_annotation_pass
 from passes.mark_io import mark_io
 from passes.clone import clone_pass
-from passes.linear_code import linear_code_pass
+from passes.simplify_code import simplify_code_structure
 
 from bpf_passes.loop_end import loop_end_pass
 from bpf_passes.feasibility_analysis import feasibilty_analysis_pass
@@ -44,7 +44,7 @@ class TestCase(BasicTest):
         mark_relevant_code(bpf, info, None)
         bpf = primary_annotation_pass(bpf, info, None)
         mark_io(bpf, info)
-        bpf = linear_code_pass(bpf, info, PassObject())
+        bpf = simplify_code_structure(bpf, info, PassObject())
         bpf = feasibilty_analysis_pass(bpf, info, PassObject())
         select_user_pass(bpf, info, PassObject())
         bpf = loop_end_pass(bpf, info, PassObject())

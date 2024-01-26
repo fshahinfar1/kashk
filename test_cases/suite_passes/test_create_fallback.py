@@ -15,7 +15,7 @@ from sym_table import *
 
 from passes.pass_obj import PassObject
 from passes.clone import clone_pass
-from passes.linear_code import linear_code_pass
+from passes.simplify_code import simplify_code_structure
 from passes.mark_annotation_pass import mark_annotation_pass
 from bpf_passes.feasibility_analysis import feasibilty_analysis_pass
 from bpf_passes.mark_user_boundary import get_number_of_failure_paths
@@ -45,7 +45,7 @@ class TestCase(BasicTest):
         mark_relevant_code(bpf, info, PassObject())
         bpf = mark_annotation_pass(bpf, info, None)
         mark_io(bpf, info)
-        bpf = linear_code_pass(bpf, info, PassObject())
+        bpf = simplify_code_structure(bpf, info, PassObject())
         bpf = feasibilty_analysis_pass(bpf, info, PassObject())
         select_user_pass(bpf, info, PassObject())
 

@@ -22,7 +22,7 @@ from passes.mark_relevant_code import mark_relevant_code
 from passes.primary_annotation_pass import primary_annotation_pass
 from passes.mark_io import mark_io
 from passes.clone import clone_pass
-from passes.linear_code import linear_code_pass
+from passes.simplify_code import simplify_code_structure
 
 from bpf_passes.loop_end import loop_end_pass
 from bpf_passes.feasibility_analysis import feasibilty_analysis_pass
@@ -158,8 +158,8 @@ def generate_offload(io_ctx):
     mark_io(prog, info)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Linear Code', tag=MODULE_TAG)
-    prog = linear_code_pass(prog, info, PassObject())
+    debug('Simplify Code', tag=MODULE_TAG)
+    prog = simplify_code_structure(prog, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('Feasibility Analysis', tag=MODULE_TAG)

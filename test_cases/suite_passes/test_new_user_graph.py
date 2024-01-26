@@ -15,7 +15,7 @@ from sym_table import *
 
 from passes.pass_obj import PassObject
 from passes.mark_relevant_code import mark_relevant_code
-from passes.linear_code import linear_code_pass
+from passes.simplify_code import simplify_code_structure
 from bpf_passes.feasibility_analysis import feasibilty_analysis_pass
 from bpf_passes.mark_user_boundary import get_number_of_failure_paths
 from user_passes.select_user import select_user_pass
@@ -35,7 +35,7 @@ class TestCase(BasicTest):
 
         # Linear pass
         mark_relevant_code(bpf, self.info, None)
-        bpf = linear_code_pass(bpf, self.info, PassObject())
+        bpf = simplify_code_structure(bpf, self.info, PassObject())
         # Feasibility pass
         bpf = feasibilty_analysis_pass(bpf, self.info, PassObject())
         # Create user graph

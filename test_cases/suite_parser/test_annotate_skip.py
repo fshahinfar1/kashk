@@ -15,7 +15,7 @@ from sym_table import *
 
 from passes.mark_relevant_code import mark_relevant_code 
 from passes.pass_obj import PassObject
-from passes.linear_code import linear_code_pass
+from passes.simplify_code import simplify_code_structure
 from bpf_passes.feasibility_analysis import feasibilty_analysis_pass
 from bpf_passes.mark_user_boundary import get_number_of_failure_paths
 
@@ -28,11 +28,11 @@ class TestCase(BasicTest):
 
         mark_relevant_code(bpf, info, None)
 
-        bpf = linear_code_pass(bpf, info, PassObject())
+        bpf = simplify_code_structure(bpf, info, PassObject())
         for f in Function.directory.values():
             if not f.is_empty():
                 with self.info.sym_tbl.with_func_scope(f.name):
-                    body = linear_code_pass(f.body, self.info, PassObject())
+                    body = simplify_code_structure(f.body, self.info, PassObject())
                     assert body is not None
                     f.body = body
 

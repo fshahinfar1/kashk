@@ -14,7 +14,7 @@ from sym_table import *
 
 from passes.pass_obj import PassObject
 from passes.mark_relevant_code import mark_relevant_code
-from passes.linear_code import linear_code_pass
+from passes.simplify_code import simplify_code_structure
 
 
 class TestCase(BasicTest):
@@ -26,7 +26,7 @@ class TestCase(BasicTest):
         bpf.extend_inst(insts)
         # Move function calls out of the ARG context!
         mark_relevant_code(bpf, info, PassObject())
-        bpf = linear_code_pass(bpf, info, third_arg)
+        bpf = simplify_code_structure(bpf, info, third_arg)
 
         # Generate the code and show it for debuging
         # text, _ = gen_code(bpf, info)

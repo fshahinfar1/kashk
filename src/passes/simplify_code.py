@@ -186,7 +186,7 @@ def _do_pass(inst, info, more):
     return new_inst
 
 
-def linear_code_pass(inst, info, more):
+def simplify_code_structure(inst, info, more):
     """
     The following transformations are performed in this pass
 

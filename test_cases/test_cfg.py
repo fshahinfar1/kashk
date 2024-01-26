@@ -7,7 +7,7 @@ from data_structure import *
 from instruction import *
 from sym_table import *
 
-from passes.linear_code import linear_code_pass
+from passes.simplify_code import simplify_code_structure
 from passes.pass_obj import PassObject
 
 from cfg import make_cfg, HTMLWriter
@@ -20,7 +20,7 @@ class TestCase(BasicTest):
         bpf = Block(BODY)
         bpf.extend_inst(insts)
         # Move function calls out of the ARG context!
-        bpf = linear_code_pass(bpf, self.info, PassObject())
+        bpf = simplify_code_structure(bpf, self.info, PassObject())
 
         # Generate the code and show it for debuging
         # text, _ = gen_code(bpf, self.info)
