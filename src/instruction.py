@@ -145,7 +145,7 @@ class Instruction(PassableObject):
         Mark instruction as modified by the tool
         """
         assert color in INSTRUCTION_COLORS
-        assert self.color == InstructionColor.ORIGINAL, 'we are overriding another red-color'
+        assert self.color == InstructionColor.ORIGINAL or self.color == color, f'we are overriding another red-color {self.color} --> {color}'
         self.color = color
         return self
 

@@ -148,7 +148,7 @@ def _process_call_needing_send_flag(inst, blk, current_function, info):
         assert sym is not None and sym.type.is_pointer()
         flag_ref = Ref.from_sym(sym)
         inst.args.append(flag_ref)
-        inst.set_red(Function.ADD_ARGUMENT)
+        inst.set_red(InstructionColor.ADD_ARGUMENT)
     # Check the flag after the function
     if flag_ref.type.is_pointer():
         flag_val = UnaryOp.build('*', flag_ref)
