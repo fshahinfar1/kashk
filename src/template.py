@@ -10,18 +10,21 @@ VOID_PTR = 'void *'
 def bpf_ctx_bound_check(ref, index, data_end, return_value=None):
     _if = ControlFlowInst()
     _if.kind = clang.CursorKind.IF_STMT
+    _if.set_red(Instruction.CHECK)
 
     # index + 1
     size_plus_one = BinOp(None)
     size_plus_one.op = '+'
     size_plus_one.lhs.add_inst(index)
     size_plus_one.rhs.add_inst(Literal('1', clang.CursorKind.INTEGER_LITERAL))
+    size_plus_one.set_red(Instruction.EXTRA_ALU_OP)
 
     # (ref + index + 1)
     pkt_off = BinOp(None)
     pkt_off.op = '+'
     pkt_off.lhs.add_inst(ref)
     pkt_off.rhs.add_inst(size_plus_one)
+    pkt_off.set_red(Instruction.EXTRA_ALU_OP)
 
     # (void *)(ref + size + 1)
     lhs_cast = Cast()
@@ -33,6 +36,7 @@ def bpf_ctx_bound_check(ref, index, data_end, return_value=None):
     cond.op = '>'
     cond.lhs.add_inst(lhs_cast)
     cond.rhs.add_inst(data_end)
+    cond.set_red(Instruction.EXTRA_ALU_OP)
 
     # return 0
     ret = Return()
@@ -44,19 +48,20 @@ def bpf_ctx_bound_check(ref, index, data_end, return_value=None):
 
     _if.cond.add_inst(cond)
     _if.body.add_inst(ret)
-
     return _if
 
 
 def bpf_ctx_bound_check_bytes(ref, size, data_end, return_value=None):
     _if = ControlFlowInst()
     _if.kind = clang.CursorKind.IF_STMT
+    _if.set_red(Instruction.CHECK)
 
     # size + 1
     size_plus_one = BinOp(None)
     size_plus_one.op = '+'
     size_plus_one.lhs.add_inst(size)
     size_plus_one.rhs.add_inst(Literal('1', clang.CursorKind.INTEGER_LITERAL))
+    size_plus_one.set_red(Instruction.EXTRA_ALU_OP)
 
     # (void *)(ref)
     lhs_cast = Cast()
@@ -68,12 +73,14 @@ def bpf_ctx_bound_check_bytes(ref, size, data_end, return_value=None):
     pkt_off.op = '+'
     pkt_off.lhs.add_inst(lhs_cast)
     pkt_off.rhs.add_inst(size_plus_one)
+    pkt_off.set_Red(Instruction.EXTRA_ALU_OP)
 
     # (void *)(ref + size + 1) > (void *)(data_end)
     cond = BinOp(None)
     cond.op = '>'
     cond.lhs.add_inst(pkt_off)
     cond.rhs.add_inst(data_end)
+    cond.set_red(Instruction.EXTRA_ALU_OP)
 
     # return 0
     ret = Return()
@@ -84,13 +91,7 @@ def bpf_ctx_bound_check_bytes(ref, size, data_end, return_value=None):
 
     _if.cond.add_inst(cond)
     _if.body.add_inst(ret)
-
     return _if
-
-    # return '\n'.join([
-    #     f'if ((void *){ref} + {size} + 1 > (void *){data_end}) {{',
-    #     '  return 0;',
-    #     '}\n'])
 
 
 def license_text(license):
@@ -112,26 +113,30 @@ shared_struct = MyType.make_simple('struct shared_state',
 SHARED_OBJ_PTR = MyType.make_pointer(shared_struct)
 SHARED_MAP_PTR = Literal('&shared_map', CODE_LITERAL)
 def prepare_shared_state_var(ret_val=None):
-    var_decl = VarDecl.build('shared', SHARED_OBJ_PTR)
+    var_decl = VarDecl.build('shared', SHARED_OBJ_PTR, red=True)
     var_decl.init.add_inst(NULL)
     var_ref = var_decl.get_ref()
+    var_ref.set_red()
 
-    zero_decl = VarDecl.build(get_tmp_var_name(),
-            BASE_TYPES[clang.TypeKind.INT])
+    zero_decl = VarDecl.build(get_tmp_var_name(), INT, red=True)
     zero_decl.init.add_inst(ZERO)
     zero_ref = zero_decl.get_ref()
+    zero_ref.set_red()
     zero_ptr = UnaryOp.build('&', zero_ref)
+    zero_ptr.set_red()
 
     call_lookup = Call(None)
     call_lookup.name = 'bpf_map_lookup_elem'
     call_lookup.args = [SHARED_MAP_PTR, zero_ptr]
+    call_lookup.set_red(Instruction.KNOWN_FUNC_IMPL)
 
     lookup_assign = BinOp.build(var_ref, '=', call_lookup)
+    lookup_assign.set_red()
 
-    cond  = BinOp.build(var_ref, '==', NULL)
-    check = ControlFlowInst.build_if_inst(cond)
+    cond  = BinOp.build(var_ref, '==', NULL, red=True)
+    check = ControlFlowInst.build_if_inst(cond, red=True)
     if ret_val is None:
-        ret_val = Return.build([])
+        ret_val = Return.build([], red=True)
     check.body.add_inst(ret_val)
     insts = [var_decl, zero_decl, lookup_assign,  check]
     return insts
@@ -147,15 +152,11 @@ def prepare_meta_data(failure_number, meta_declaration, info):
     adjust_inst, tmp_decl = info.prog.adjust_pkt(target_size_inst, info)
     decl.extend(tmp_decl)
 
-    # meta_var_name = get_tmp_var_name()
-    # decl = VarDecl.build(meta_var_name, T)
-    # decl.update_symbol_table(info.sym_tbl)
-    # ref = decl.get_ref()
     ref = decl_new_var(T, info, decl)
     assign = BinOp.build(ref, '=', info.prog.get_pkt_buf())
+    assign.set_red()
 
     DROP = Literal(info.prog.get_drop(), clang.CursorKind.INTEGER_LITERAL)
-    ZERO = Literal('0', clang.CursorKind.INTEGER_LITERAL)
     bound_check = bpf_ctx_bound_check(ref, ZERO, info.prog.get_pkt_end(), DROP)
 
     store = [f'{ref.name}->failure_number = {failure_number};', ]
@@ -163,6 +164,7 @@ def prepare_meta_data(failure_number, meta_declaration, info):
         store.append(f'{ref.name}->{f.name} = {f.name};')
     code = '\n'.join(store) + '\n'
     populate = Literal(code, CODE_LITERAL)
+    populate.set_red(Instruction.MEM_COPY)
 
     insts = adjust_inst + [assign, bound_check, populate]
     return insts, decl
@@ -187,6 +189,8 @@ def define_bpf_hash_map(map_name, key_type, val_type, entries):
 
 
 def malloc_lookup(name, info, return_val):
+    """
+    """
     tmp_name = get_tmp_var_name()
     type_name = f'struct {name}'
     T = MyType.make_pointer(MyType.make_simple(type_name, clang.TypeKind.RECORD))
@@ -210,6 +214,7 @@ def malloc_lookup(name, info, return_val):
 }}
 '''
     lookup_inst = Literal(text, CODE_LITERAL)
+    lookup_inst.set_red(Instruction.MAP_LOOKUP)
 
     #Inst: tmp->data
     owner = Ref(None)
@@ -221,6 +226,7 @@ def malloc_lookup(name, info, return_val):
     ref.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
     ref.kind = clang.CursorKind.MEMBER_REF_EXPR
     ref.owner.append(owner)
+    ref.set_red()
 
     return [var_decl, lookup_inst], ref
 
@@ -237,6 +243,7 @@ def new_bounded_loop(var_bound, max_bound, info, loop_var_type=INT):
     post = UnaryOp.build('++', loop_var)
     loop = ForLoop.build(initialize, condition, post)
     loop.repeat = max_bound
+    loop.set_red()
     return loop, decl, loop_var
 
 
@@ -280,6 +287,7 @@ def variable_memcpy(dst, src, size, up_bound, info, fail_return_inst=None):
     at_src = ArrayAccess.build(src, loop_var)
     at_dst = ArrayAccess.build(dst, loop_var)
     copy = BinOp.build(at_dst, '=', at_src)
+    copy.set_red()
     loop.body.add_inst(copy)
     return loop, declare_at_top_of_func
 

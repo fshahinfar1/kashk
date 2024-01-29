@@ -120,11 +120,14 @@ int xdp_prog(struct xdp_md *xdp)
 
         delta_ref = decl_new_var(INT, info, decl)
         compute_size = BinOp.build(req_size, '-', self.get_pkt_size())
+        compute_size.set_red(Instruction.EXTRA_ALU_OP)
         delta_assign = BinOp.build(delta_ref, '=', compute_size)
+        delta_assign.set_red()
 
-        adjust_pkt   = Call(None)
+        adjust_pkt      = Call(None)
         adjust_pkt.name = 'bpf_xdp_adjust_tail'
         adjust_pkt.args = [self.get_ctx_ref(), delta_ref]
+        adjust_pkt.set_red(Instruction.KNOWN_FUNC_IMPL)
         insts = [delta_assign, adjust_pkt]
         return insts, decl
 
@@ -144,4 +147,15 @@ int xdp_prog(struct xdp_md *xdp)
         call = Call(None)
         call.name = '__prepare_headers_before_send'
         call.args.append(xdp)
+        call.set_red(Instruction.KNOWN_FUNC_IMPL)
+        return [call,]
+
+    def before_pass(self):
+        if XDP_HELPER_HEADER not in self.headers:
+            self.headers.append(XDP_HELPER_HEADER)
+        xdp = Ref.build(self.ctx, self.ctx_type)
+        call = Call(None)
+        call.name = '__prepare_headers_before_send'
+        call.args.append(xdp)
+        call.set_red(Instruction.KNOWN_FUNC_IMPL)
         return [call,]

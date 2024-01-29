@@ -162,11 +162,13 @@ class BPF_PROG:
                 check        = ControlFlowInst.build_if_inst(cond)
                 ret_inst     = failure_return
                 check.body.add_inst(ret_inst)
+                check.set_red(Instruction.CHECK)
 
                 copy         = Call(None)
                 copy.name    = memcpy
                 args         = [self.get_pkt_buf(), buf, write_size]
                 copy.args = args
+                copy.set_red(Instruction.MEM_COPY)
                 inst.extend([check, copy])
             else:
                 # variable copy
@@ -210,4 +212,7 @@ class BPF_PROG:
         return ref
 
     def before_send(self):
+        return []
+
+    def before_pass(self):
         return []

@@ -20,7 +20,8 @@ class SelectBoundaries(Pass):
         if node.node_id in self._visited_ids:
             self.skip_children()
             return node
-        # TODO: this is not very good
+        # TODO: this is not very good way to find the first node we are
+        # processing in this pass.
         if self.entry_node is None:
             self.entry_node = node
         if isinstance(node, CFGJump):

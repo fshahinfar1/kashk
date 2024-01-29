@@ -12,6 +12,7 @@ from data_structure import *
 from instruction import *
 from sym_table import MemoryRegion
 from passes.pass_obj import PassObject
+from after import After
 
 
 MODULE_TAG = '[Transform Vars Pass]'
@@ -24,17 +25,12 @@ current_function = None
 declare_at_top_of_func = []
 
 
-class After:
-    def __init__(self, box):
-        self.box = box
-
 
 def _check_if_ref_is_global_state(inst, info):
     sym, scope = info.sym_tbl.lookup2(inst.name)
     is_shared = scope == info.sym_tbl.shared_scope
     if is_shared:
         sym = info.sym_tbl.lookup('shared')
-        # debug(MODULE_TAG, 'shared symbol is defined:', sym is not None)
         if sym is None:
             # Perform a lookup on the map for globally shared values
             ret_inst = get_ret_inst(current_function, info)
@@ -49,6 +45,9 @@ def _check_if_ref_is_global_state(inst, info):
                     None, None)
             entry.set_mem_region(MemoryRegion.STACK)
             entry.set_ref_region(MemoryRegion.BPF_MAP)
+        # Mark the instruction as red, because it will become a lookup from a
+        # map
+        inst.set_red()
     return inst
 
 
@@ -97,56 +96,24 @@ def _process_annotation(inst, info):
 def _process_read_call(inst, info):
     blk = cb_ref.get(BODY)
 
-    # NOTE: I can assign the pointer but then the buffer size won't be right? <-- should be looked at as an optimization?
+    # NOTE: I can assign the pointer but then the buffer size won't be right?
+    #           <-- should it be considered as an optimization and applied only
+    #           if there is no issues?
+
     # report('Assigning packet buffer to var:', inst.rd_buf.name)
     # Assign packet pointer on a previouse line
     lhs = inst.rd_buf.ref
     rhs = info.prog.get_pkt_buf()
+    rhs.set_red()
     assign_inst = BinOp.build(lhs, '=', rhs)
     blk.append(assign_inst)
-    # TODO: what if `skb` is not defined in this scope?
+    # Removing read_system call
+    assign_inst.set_red(Instruction.REMOVE_READ)
+    assign_inst.removed(inst)
     # Set the return value
-    inst = info.prog.get_pkt_size()
-
-    # sz_decl = VarDecl.build(get_tmp_var_name(), BASE_TYPES[clang.TypeKind.USHORT])
-    # declare_at_top_of_func.append(sz_decl)
-    # sz_ref  = sz_decl.get_ref()
-    # sz_assign  = BinOp.build(sz_ref, '=', info.prog.get_pkt_size())
-    # blk.append(sz_assign)
-    # sz_mask = BinOp.build(sz_ref, '&', Literal('PKT_OFFSET_MASK', clang.CursorKind.MACRO_INSTANTIATION))
-    # sz_assign_mask = BinOp.build(sz_ref, '=', sz_mask)
-    # blk.append(sz_assign_mask)
-
-    # # check size is less than map buffer size
-    # size_check_cond = BinOp.build(sz_ref, '>', Literal('1000', clang.CursorKind.INTEGER_LITERAL))
-    # size_check = ControlFlowInst.build_if_inst(size_check_cond)
-    # size_check.body.add_inst(_get_ret_inst())
-    # blk.append(size_check)
-
-
-    # # Copy data from XDP to Buffer
-    # lhs = Literal(inst.rd_buf.name, CODE_LITERAL)
-    # rhs = info.prog.get_pkt_buf()
-    # # TODO: check if context is used
-    # # dst_end = Literal('<not set>', CODE_LITERAL)
-    # # TODO: cast lhs to void *
-    # dst_end = BinOp.build(lhs, '+', Literal(inst.rd_buf.size_cursor, CODE_LITERAL))
-    # src_end = info.prog.get_pkt_end()
-    # cpy = Call(None)
-    # cpy.name = 'bpf_memcpy'
-    # cpy.args = [lhs, rhs, sz_ref, dst_end, src_end]
-    # blk.append(cpy)
-
-    # # Mark memcpy as used
-    # func = cpy.get_function_def()
-    # assert func is not None
-    # if not func.is_used_in_bpf_code:
-    #     func.is_used_in_bpf_code = True
-    #     info.prog.declarations.insert(0, func)
-    #     # debug(MODULE_TAG, 'Add func', func.name)
-
-    # inst = sz_ref
-    return inst
+    new_inst = info.prog.get_pkt_size()
+    new_inst.set_red()
+    return new_inst
 
 
 def _process_call_needing_send_flag(inst, blk, current_function, info):
@@ -157,37 +124,40 @@ def _process_call_needing_send_flag(inst, blk, current_function, info):
     @parm info
     @return Instruction
     """
-    inst.change_applied |= Function.SEND_FLAG
+    inst.set_flag(Function.SEND_FLAG)
     sym = info.sym_tbl.lookup(SEND_FLAG_NAME)
     if current_function is None:
         if sym is None:
             # Allocate the flag on the stack and pass a poitner
-            decl = VarDecl(None)
-            decl.name = SEND_FLAG_NAME
-            decl.type = BASE_TYPES[clang.TypeKind.SCHAR]
-            decl.init.add_inst(Literal('0', clang.CursorKind.INTEGER_LITERAL))
+            CHAR = BASE_TYPES[clang.TypeKind.SCHAR]
+            decl = VarDecl.build(SEND_FLAG_NAME, CHAR)
+            decl.init.add_inst(ZERO)
+            decl.set_red(Instruction.EXTRA_STACK_ALOC)
             declare_at_top_of_func.append(decl)
             sym = decl.update_symbol_table(info.sym_tbl)
-
             flag_ref = decl.get_ref()
         else:
             flag_ref = Ref.from_sym(sym)
             assert not flag_ref.type.is_pointer()
         ref = UnaryOp.build('&', flag_ref)
         inst.args.append(ref)
+        inst.set_red(Instruction.ADD_ARGUMENT)
     else:
         # Just pass the reference, the function must have received a flag from
         # the entry scope
         assert sym is not None and sym.type.is_pointer()
         flag_ref = Ref.from_sym(sym)
         inst.args.append(flag_ref)
+        inst.set_red(Function.ADD_ARGUMENT)
     # Check the flag after the function
     if flag_ref.type.is_pointer():
         flag_val = UnaryOp.build('*', flag_ref)
     else:
         flag_val = flag_ref
     cond  = BinOp.build(flag_val, '!=', ZERO)
+    cond.set_red()
     check = ControlFlowInst.build_if_inst(cond)
+    check.set_red(Instruction.CHECK)
     if current_function is None:
         # Do we need modify the packet before sending? (e.g., swap IP address)
         before_send_insts = info.prog.before_send()
@@ -224,6 +194,9 @@ def _process_current_inst(inst, info, more):
             # Change the declaration
             T = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
             new_inst = VarDecl.build(inst.name, T)
+            new_inst.set_red()
+            # removing allocation of arrays, malloc, ...
+            new_inst.removed.append(inst)
             return new_inst
         else:
             # We do not care about this variable
@@ -233,30 +206,31 @@ def _process_current_inst(inst, info, more):
             # TODO: if the return value of the function call is ignored, we
             # should remove this instruction.
             return _process_read_call(inst, info)
-        elif inst.name in WRITE_PACKET:
-            # NOTE: the write calls are transformed after verifer pass
-            return inst
-        elif inst.name in KNOWN_FUNCS:
-            # NOTE: the known function calls are transformed after verifer pass
+        elif inst.name in (WRITE_PACKET + KNOWN_FUNCS):
+            # NOTE: the writel or libc calls are transformed after verifer pass
             return inst
         else:
-            # Check if the function being invoked needs to receive any flag and pass.
+            # Check if the function being invoked needs to receive any flag and
+            # pass.
             func = inst.get_function_def()
             if not func:
                 return inst
-            # Add context
-            if (func.calls_recv  or func.calls_send) and (inst.change_applied & Function.CTX_FLAG == 0):
-                assert func.change_applied & Function.CTX_FLAG != 0
+            tmp = func.calls_recv or func.calls_send
+            req_ctx = tmp and not inst.has_flag(Function.CTX_FLAG)
+            if req_ctx:
+                # Add context
+                assert func.change_applied & Function.CTX_FLAG != 0, 'The function call is determined to requier context pointer but the function signiture is not updated'
                 inst.change_applied |= Function.CTX_FLAG
                 inst.args.append(info.prog.get_ctx_ref())
-                debug('add ctx ref to call:', inst.name)
+                inst.set_red(Instruction.ADD_ARGUMENT)
+                # debug('add ctx ref to call:', inst.name)
 
             # Add send flag
-            if func.calls_send and (inst.change_applied & Function.SEND_FLAG == 0):
+            if func.calls_send and not inst.has_flag(Function.SEND_FLAG):
                 blk = cb_ref.get(BODY)
                 inst = _process_call_needing_send_flag(inst, blk, current_function, info)
 
-            # NOTE: fail flag is added in userspace_fallback
+            # NOTE: fail flag is added in userspace_fallback (future pass)
     elif inst.kind == ANNOTATION_INST:
         return _process_annotation(inst, info)
     return inst
@@ -365,13 +339,14 @@ def transform_vars_pass(inst, info, more):
 
     # Process other functions
     for func in Function.directory.values():
-        if func.is_used_in_bpf_code:
-            current_function = func
-            with info.sym_tbl.with_func_scope(current_function.name):
-                func.body = _do_pass(func.body, info, PassObject())
-                if declare_at_top_of_func:
-                    for inst in declare_at_top_of_func:
-                        func.body.children.insert(0, inst)
-                declare_at_top_of_func.clear()
-            current_function = None
+        if not func.is_used_in_bpf_code:
+            continue
+        current_function = func
+        with info.sym_tbl.with_func_scope(current_function.name):
+            func.body = _do_pass(func.body, info, PassObject())
+            if declare_at_top_of_func:
+                for inst in declare_at_top_of_func:
+                    func.body.children.insert(0, inst)
+            declare_at_top_of_func.clear()
+        current_function = None
     return res

@@ -11,6 +11,7 @@ CHAR_PTR = MyType.make_pointer(BASE_TYPES[clang.TypeKind.UCHAR])
 INT = BASE_TYPES[clang.TypeKind.INT]
 U64 = BASE_TYPES[clang.TypeKind.ULONGLONG]
 VOID_PTR = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+CHAR     = BASE_TYPES[clang.TypeKind.SCHAR]
 
 
 def show_insts(lst, depth=0):
@@ -177,17 +178,21 @@ def add_flag_to_func(flag, func, info):
         raise Exception('Not implemented yet!')
 
 
-def decl_new_var(T: MyType, info: Info, decl_list: list[Instruction]) -> Ref:
+def decl_new_var(T: MyType, info: Info, decl_list: list[Instruction], name:str=None) -> Ref:
     """
     Declare a new variable. The variable declaration will be added to the
     `decl_list` param.
     @returns a Ref object of the new variable
     """
-    tmp_name = get_tmp_var_name()
+    if name is None:
+        tmp_name = get_tmp_var_name()
+    else:
+        tmp_name = name
     tmp_decl = VarDecl.build(tmp_name, T)
     decl_list.append(tmp_decl)
     tmp_decl.update_symbol_table(info.sym_tbl)
     tmp_ref = tmp_decl.get_ref()
+    tmp_decl.set_red(Instruction.EXTRA_STACK_ALOC)
     return tmp_ref
 
 

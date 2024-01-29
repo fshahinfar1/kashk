@@ -119,7 +119,7 @@ def _do_add_bound_check(blk, R, current_function, info, bytes_mode):
     else:
         check_inst = bpf_ctx_bound_check(ref, index, data_end, _ret_inst)
     blk.append(check_inst)
-    ref.change_applied |= Instruction.BOUND_CHECK_FLAG
+    ref.set_flag(Instruction.BOUND_CHECK_FLAG)
 
 
 def _add_bound_check(blk, R, current_function, info, bytes_mode, more):
@@ -179,7 +179,7 @@ def _handle_binop(inst, info, more):
         if is_value_from_bpf_ctx(x, info, R):
             r = R.pop()
             ref, index, T = r
-            if ref.change_applied & Instruction.BOUND_CHECK_FLAG != 0:
+            if ref.has_flag(Instruction.BOUND_CHECK_FLAG):
                 continue
 
             assert isinstance(ref, Instruction)
@@ -396,16 +396,13 @@ def _pass_ctx_to_func_if_needed(inst, func, info):
 
 
 def _step_into_func_and_track_context(inst, func, info):
-    # caller_scope = info.sym_tbl.current_scope
-    # callee_scope = info.sym_tbl.scope_mapping[func.name]
-
     receives_bpf_ctx = _check_passing_bpf_context(inst, func, info)
     if receives_bpf_ctx:
         _pass_ctx_to_func_if_needed(inst, func, info)
-
     # Check to not repeat analyzing same function multiple times.
+    # TODO: buf what if the inputs are different in (terms of being bpf context)?
     # if inst.name not in _has_processed_func:
-    # _has_processed_func.add(inst.name)
+    #     _has_processed_func.add(inst.name)
     with new_backward_jump_context(off=True):
         with info.sym_tbl.with_func_scope(inst.name):
             with set_current_func(func):
@@ -434,10 +431,8 @@ def _handle_call(inst, info, more):
             # TODO: this is handing memcpy, handle other known fucntions
             ref = inst.args[0]
             size = inst.args[2]
-
-            if ref.change_applied & Instruction.BOUND_CHECK_FLAG != 0:
+            if ref.has_flag(Instruction.BOUND_CHECK_FLAG):
                 return inst
-
             blk = cb_ref.get(BODY)
             # text, _ = gen_code(blk, info)
             # debug(text, tag=MODULE_TAG)
@@ -468,15 +463,12 @@ def _process_current_inst(inst, info, more):
 def _do_pass(inst, info, more):
     lvl, ctx, parent_list = more.unpack()
     new_children = []
-
     with cb_ref.new_ref(ctx, parent_list):
         # Process current instruction
         inst = _process_current_inst(inst, info, more)
-
         if inst is None:
             # This instruction should be removed
             return None
-
         # ------------------------------------------------------------------
         # TODO: this backward jump implementation has a huge bug to be fixed.
         # In the first pass, I might add bound checks and these checks are lost

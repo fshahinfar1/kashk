@@ -1,6 +1,5 @@
 import clang.cindex as clang
 from utility import report_on_cursor
-from helpers.instruction_helper import show_insts
 from log import debug, error, report
 from instruction import UnaryOp
 
@@ -8,24 +7,23 @@ from instruction import UnaryOp
 # TODO: How to make sure that `read` is the read system-call and not a simple
 # function?
 READ_PACKET = ('async_read_some', 'recv', 'read', 'recvfrom', 'recvmsg')
-WRITE_PACKET = ('async_write', 'async_write_some', 'write', 'send', 'sendto', 'sendmsg')
-COROUTINE_FUNC_NAME = ('await_resume', 'await_transform', 'await_ready', 'await_suspend')
-
-# TODO: is it formally correct to ignore a function? We should ignore a
-# function based on the effects that it makes. If the effects are not of
-# interest only then we can ignore a funciton.
+WRITE_PACKET = ('async_write', 'async_write_some', 'write', 'send', 'sendto',
+        'sendmsg')
+COROUTINE_FUNC_NAME = ('await_resume', 'await_transform', 'await_ready',
+        'await_suspend')
 IGNORE_FUNC = ('printf', 'fprintf')
-
 MEMORY_ACCESS_FUNC = ('memchr', 'memrchr', 'memcpy', 'memmove', 'memset',
     'strcpy', 'strncpy', 'strlen', 'strnlen', 'strcmp', 'strncmp')
 KNOWN_FUNCS = (*READ_PACKET, *WRITE_PACKET, *COROUTINE_FUNC_NAME, *IGNORE_FUNC,
         *MEMORY_ACCESS_FUNC, 'malloc', 'ntohs', 'ntohl', 'ntohll', 'htons',
         'htonl', 'htonll')
-
-
+# Names of functions that we implement
 OUR_IMPLEMENTED_FUNC = ('bpf_memcpy', 'bpf_strncpy', 'bpf_ntohs', 'bpf_ntohl',
                         'bpf_htons', 'bpf_htonl', 'bpf_cpu_to_be64',
-                        'bpf_be64_to_cpu', 'bpf_xdp_adjust_tail',)
+                        'bpf_be64_to_cpu', 'bpf_xdp_adjust_tail',
+                        'bpf_map_lookup_elem',
+                        '__prepare_headers_before_send',
+                        '__prepare_headers_before_pass')
 
 
 def __is_ignored_function(cursor):
@@ -102,7 +100,8 @@ def should_ignore_cursor(cursor):
                     break
             else:
                 return True
-    elif cursor.kind in (clang.CursorKind.BINARY_OPERATOR, clang.CursorKind.COMPOUND_ASSIGNMENT_OPERATOR):
+    elif cursor.kind in (clang.CursorKind.BINARY_OPERATOR,
+            clang.CursorKind.COMPOUND_ASSIGNMENT_OPERATOR):
         children = list(cursor.get_children())
         tokens = list(cursor.get_tokens())
         count_token = len(tokens)
@@ -117,5 +116,4 @@ def should_ignore_cursor(cursor):
         if lhs_tokens >= tokens:
             # error('Binary operator which we can not find the operator for')
             return True
-
     return False

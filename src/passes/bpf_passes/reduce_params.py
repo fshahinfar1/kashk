@@ -119,11 +119,13 @@ def _handle_call(inst, info, more):
         # debug(MODULE_TAG, inst.name, 'was not changed!')
         return inst
 
+    # TODO: maybe it is better to copy the instruction and then modify it
     # Create an instance of struct which should be passed to the function
     extra_args = [inst.args.pop() for i in range(count_extra)]
     decl = VarDecl(None)
     decl.type = MyType.make_simple(change.struct_name, clang.TypeKind.RECORD)
     decl.name = get_tmp_var_name()
+    decl.set_red(Instruction.EXTRA_STACK_ALOC)
     # TODO: How to implement a struct initialization?
     tmp = []
     for field, var in zip(change.list_of_params, extra_args):
@@ -131,26 +133,26 @@ def _handle_call(inst, info, more):
         var_name, _ = gen_code([var], info)
         tmp.append(f'.{field_name} = {var_name}')
     init_text = '{\n' + indent(',\n'.join(tmp)) + '\n}'
-    decl.init.add_inst(Literal(init_text, CODE_LITERAL))
+    tmp_init = Literal(init_text, CODE_LITERAL)
+    tmp_init.set_red(Instruction.MEM_COPY)
+    decl.init.add_inst(tmp_init)
     # Add the struct definition to the line before calling the function
     blk = cb_ref.get(BODY)
     blk.append(decl)
     decl.update_symbol_table(info.sym_tbl)
-
     # Pass a reference of this struct to the function
     ref = decl.get_ref()
     unary = UnaryOp(None)
     unary.op = '&'
     unary.child.add_inst(ref)
     inst.args.append(unary)
-
+    inst.set_red(Instruction.ADD_ARGUMENT)
     return inst
 
 
 def _handle_ref(inst, info, more):
     if current_change_ctx is None:
         # This is the body of BPF program
-        # debug(MODULE_TAG, 'No change context')
         return inst
 
     top_lvl_var_name = inst.name
@@ -164,16 +166,15 @@ def _handle_ref(inst, info, more):
     flag = current_change_ctx.should_update_ref(top_lvl_var_name)
     if flag:
         new_inst = inst.clone([])
-
         struct_name = current_change_ctx.struct_name
         ex_ref = Ref(None)
         ex_ref.name = EXTRA_PARAM_NAME
         ex_ref.kind = clang.CursorKind.DECL_REF_EXPR
         tmp_T = MyType.make_simple('struct {struct_name}', clang.TypeKind.RECORD)
         ex_ref.type = MyType.make_pointer(tmp_T)
-
         new_inst.owner.append(ex_ref)
         new_inst.kind = clang.CursorKind.MEMBER_REF_EXPR
+        new_inst.set_red(Instruction.EXTRA_MEM_ACCESS)
         # debug(MODULE_TAG, 'updated!', new_inst, new_inst.owner)
         return new_inst
     # debug(MODULE_TAG, 'should not update')

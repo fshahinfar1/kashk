@@ -64,6 +64,7 @@ def _rename_func_to_a_known_one(inst, info, target_name):
         func.is_used_in_bpf_code = True
         info.prog.declarations.insert(0, func)
     # debug(MODULE_TAG, 'Add func:', func.name)
+    inst.set_red(Instruction.KNOWN_FUNC_IMPL)
     return inst
 
 
@@ -86,6 +87,7 @@ def _known_function_substitution(inst, info):
         declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
+        tmp_inst[1].removed.append(inst)
         return tmp_res
     elif inst.name == 'strncpy':
         assert len(inst.args) == 3, 'Assumption on the number of arguments'
@@ -159,17 +161,12 @@ def _known_function_substitution(inst, info):
 
 
 def _process_write_call(inst, info):
-    # TODO: maybe it is too soon to convert instructions to the code
     if inst.wr_buf.size_cursor is None:
         write_size = Literal('<UNKNOWN WRITE BUF SIZE>', CODE_LITERAL)
     else:
-        # write_size, _ = gen_code(inst.wr_buf.size_cursor, info, context=ARG)
         write_size = inst.wr_buf.size_cursor
-
-
     ref = inst.wr_buf.ref
     should_copy = not is_bpf_ctx_ptr(ref, info)
-
     blk = cb_ref.get(BODY)
     return_val = get_ret_inst(current_function, info)
     if current_function is None:
@@ -177,7 +174,9 @@ def _process_write_call(inst, info):
         insts = info.prog.send(ref, write_size, info, return_val,
                 do_copy=should_copy)
         blk.extend(insts[:-1])
-        inst = insts[-1]
+        new_inst = insts[-1]
+        new_inst.set_red(Instruction.REMOVE_WRITE)
+        new_inst.removed.append(inst)
     else:
         # On a function which is not the main. Do not return
         copy_inst = info.prog.send(ref, write_size, info, return_val,
@@ -191,13 +190,15 @@ def _process_write_call(inst, info):
         deref.op = '*'
         one = Literal('1', clang.CursorKind.INTEGER_LITERAL)
         set_flag = BinOp.build(deref, '=', one)
-
+        set_flag.set_red(Instruction.EXTRA_MEM_ACCESS)
         # add it to the body
         blk.extend(copy_inst)
         blk.append(set_flag)
         # Return from this point to the BPF main
-        inst = get_ret_inst(current_function, info)
-    return inst
+        new_inst = get_ret_inst(current_function, info)
+        new_inst.set_red(Instruction.REMOVE_WRITE)
+        new_inst.removed.append(inst)
+    return new_inst
 
 
 def _process_call_inst(inst, info):
@@ -231,55 +232,51 @@ def _process_annotation(inst, info):
 
 def _process_var_decl(inst, info):
     # NOTE: these variables are defined on the stack memory
-    # TODO: I need to tack the total memory allocated on the stack and not just
-    # the size of each object. But for now let's just move huge objects to the
-    # map.
-    if inst.type.mem_size > 255:
-        debug(MODULE_TAG, f'moving {inst.name}:{inst.type.spelling} to BPF map')
-        debug(MODULE_TAG, f'{inst.name}:{inst.type.spelling} ({inst.type.mem_size} bytes)')
+    # TODO: I need to track the total memory allocated on the stack and not
+    # just the size of each object. But for now let's just move huge objects to
+    # the map.
+    if inst.type.mem_size <= 255:
+        return inst
+    debug(MODULE_TAG, f'moving {inst.name}:{inst.type.spelling} to BPF map')
+    debug(MODULE_TAG, f'{inst.name}:{inst.type.spelling} ({inst.type.mem_size} bytes)')
 
-        name = _get_stack_obj_name()
-        map_name = name + '_map'
-        data_field = StateObject(None)
-        data_field.name = 'data'
-        data_field.type_ref = inst.type
-        struct_decl = Record(name, [data_field])
-        struct_decl.is_used_in_bpf_code = True
-        info.prog.add_declaration(struct_decl)
+    name = _get_stack_obj_name()
+    map_name = name + '_map'
+    data_field = StateObject(None)
+    data_field.name = 'data'
+    data_field.type_ref = inst.type
+    struct_decl = Record(name, [data_field])
+    struct_decl.is_used_in_bpf_code = True
+    info.prog.add_declaration(struct_decl)
+    # Update symbol table
+    __scope = info.sym_tbl.current_scope
+    info.sym_tbl.current_scope = info.sym_tbl.global_scope
+    struct_decl.update_symbol_table(info.sym_tbl)
+    info.sym_tbl.current_scope = __scope
+    # Define the BPF map
+    m = define_bpf_arr_map(map_name, struct_decl.get_name(), 1)
+    info.prog.add_declaration(m)
+    # Lookup the malloc map
+    return_val = get_ret_value_text(current_function, info)
+    lookup_inst, ref = malloc_lookup(name, info, return_val)
+    blk = cb_ref.get(BODY)
+    blk.extend(lookup_inst)
 
-        # Update symbol table
-        __scope = info.sym_tbl.current_scope
-        info.sym_tbl.current_scope = info.sym_tbl.global_scope
-        struct_decl.update_symbol_table(info.sym_tbl)
-        info.sym_tbl.current_scope = __scope
+    new_type = None
+    if inst.type.is_array():
+        new_type = MyType.make_pointer(inst.type.element_type)
+    elif inst.type.is_record():
+        new_type = MyType.make_pointer(inst.type)
+        error('TODO: Changing type of record to a pointer requires updating the references')
+    else:
+        raise Exception('Not implemented yet?')
 
-        # Define the BPF map
-        m = define_bpf_arr_map(map_name, struct_decl.get_name(), 1)
-        info.prog.add_declaration(m)
-
-        # Look the malloc map
-        return_val = get_ret_value_text(current_function, info)
-        lookup_inst, ref = malloc_lookup(name, info, return_val)
-        blk = cb_ref.get(BODY)
-        for tmp_inst in lookup_inst:
-            blk.append(tmp_inst)
-
-        new_type = None
-        if inst.type.is_array():
-            new_type = MyType.make_pointer(inst.type.element_type)
-        elif inst.type.is_record():
-            new_type = MyType.make_pointer(inst.type)
-            error('TODO: Changing type of record to a pointer requires updating the references')
-        else:
-            raise Exception('Not implemented yet?')
-
-        new_var_decl = VarDecl.build(inst.name, new_type)
-        blk.append(new_var_decl)
-        var_ref = new_var_decl.get_ref()
-        assign = BinOp.build(var_ref, '=', ref)
-        return assign
-
-    return inst
+    new_var_decl = VarDecl.build(inst.name, new_type)
+    blk.append(new_var_decl)
+    var_ref = new_var_decl.get_ref()
+    assign = BinOp.build(var_ref, '=', ref)
+    assign.set_red()
+    return assign
 
 
 def _process_current_inst(inst, info, more):
@@ -329,11 +326,9 @@ def _do_pass(inst, info, more):
 def transform_func_after_verifier(bpf, info, more):
     """
     Some of the transformations like SEND functions are done after the verifier
-    pass. Verifier pass marks which variables are using the BPF context (which
-    are on the packet). This pass uses these information.
-
-    e.g., to check if it is needed to copy data from a buffer to
-    the packet or it is already on the packet.
+    pass. Verifier pass marks which variables are using the BPF context. This
+    pass uses these information e.g., to check if it is needed to copy data
+    from a buffer to the packet or it is already on the packet.
     """
     global declare_at_top_of_func
     declare_at_top_of_func = []
