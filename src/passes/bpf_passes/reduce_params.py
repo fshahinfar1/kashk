@@ -125,7 +125,7 @@ def _handle_call(inst, info, more):
     decl = VarDecl(None)
     decl.type = MyType.make_simple(change.struct_name, clang.TypeKind.RECORD)
     decl.name = get_tmp_var_name()
-    decl.set_red(Instruction.EXTRA_STACK_ALOC)
+    decl.set_red(InstructionColor.EXTRA_STACK_ALOC)
     # TODO: How to implement a struct initialization?
     tmp = []
     for field, var in zip(change.list_of_params, extra_args):
@@ -134,7 +134,7 @@ def _handle_call(inst, info, more):
         tmp.append(f'.{field_name} = {var_name}')
     init_text = '{\n' + indent(',\n'.join(tmp)) + '\n}'
     tmp_init = Literal(init_text, CODE_LITERAL)
-    tmp_init.set_red(Instruction.MEM_COPY)
+    tmp_init.set_red(InstructionColor.MEM_COPY)
     decl.init.add_inst(tmp_init)
     # Add the struct definition to the line before calling the function
     blk = cb_ref.get(BODY)
@@ -146,7 +146,7 @@ def _handle_call(inst, info, more):
     unary.op = '&'
     unary.child.add_inst(ref)
     inst.args.append(unary)
-    inst.set_red(Instruction.ADD_ARGUMENT)
+    inst.set_red(InstructionColor.ADD_ARGUMENT)
     return inst
 
 
@@ -174,7 +174,7 @@ def _handle_ref(inst, info, more):
         ex_ref.type = MyType.make_pointer(tmp_T)
         new_inst.owner.append(ex_ref)
         new_inst.kind = clang.CursorKind.MEMBER_REF_EXPR
-        new_inst.set_red(Instruction.EXTRA_MEM_ACCESS)
+        new_inst.set_red(InstructionColor.EXTRA_MEM_ACCESS)
         # debug(MODULE_TAG, 'updated!', new_inst, new_inst.owner)
         return new_inst
     # debug(MODULE_TAG, 'should not update')

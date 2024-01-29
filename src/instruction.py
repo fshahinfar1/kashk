@@ -71,11 +71,11 @@ INSTRUCTION_COLORS = (InstructionColor.ORIGINAL, InstructionColor.RED,
         InstructionColor.KNOWN_FUNC_IMPL, InstructionColor.EXTRA_STACK_ALOC,
         InstructionColor.EXTRA_MEM_ACCESS, InstructionColor.REMOVE_READ,
         InstructionColor.REMOVE_WRITE, InstructionColor.ADD_ARGUMENT,
-        InstructionColor.EXTRA_ALU_OP, MEM_COPY)
+        InstructionColor.EXTRA_ALU_OP, InstructionColor.MEM_COPY)
 
 
-INSTRUCTION_FLAGS = (Instruction.BOUND_CHECK_FLAG,
-        Instruction.OFFSET_MASK_FLAG)
+# INSTRUCTION_FLAGS = (Instruction.BOUND_CHECK_FLAG,
+#         Instruction.OFFSET_MASK_FLAG)
 
 class Instruction(PassableObject):
     __slots__ = ('kind', 'bpf_ignore', 'change_applied', 'color', 'body',
@@ -145,7 +145,7 @@ class Instruction(PassableObject):
         Mark instruction as modified by the tool
         """
         assert color in INSTRUCTION_COLORS
-        assert self.color == Instruction.ORIGINAL, 'we are overriding another red-color'
+        assert self.color == InstructionColor.ORIGINAL, 'we are overriding another red-color'
         self.color = color
         return self
 
@@ -153,11 +153,11 @@ class Instruction(PassableObject):
         return self.color != InstructionColor.ORIGINAL
 
     def has_flag(self, flag):
-        assert flag in INSTRUCTION_FLAGS
+        # assert flag in INSTRUCTION_FLAGS
         return self.change_applied & flag != 0
 
     def set_flag(self, flag, on=True):
-        assert flag in INSTRUCTION_FLAGS
+        # assert flag in INSTRUCTION_FLAGS
         if on:
             self.change_applied |= flag
         else:
@@ -707,7 +707,7 @@ class Cast(Instruction):
     @classmethod
     def build(cls, inst, T, red=False):
         obj = Cast()
-        obj.objee.add_inst(inst)
+        obj.castee.add_inst(inst)
         obj.type = T
         if red:
             obj.set_red()

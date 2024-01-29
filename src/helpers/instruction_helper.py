@@ -192,7 +192,7 @@ def decl_new_var(T: MyType, info: Info, decl_list: list[Instruction], name:str=N
     decl_list.append(tmp_decl)
     tmp_decl.update_symbol_table(info.sym_tbl)
     tmp_ref = tmp_decl.get_ref()
-    tmp_decl.set_red(Instruction.EXTRA_STACK_ALOC)
+    tmp_decl.set_red(InstructionColor.EXTRA_STACK_ALOC)
     return tmp_ref
 
 

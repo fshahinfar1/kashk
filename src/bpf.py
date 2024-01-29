@@ -162,13 +162,13 @@ class BPF_PROG:
                 check        = ControlFlowInst.build_if_inst(cond)
                 ret_inst     = failure_return
                 check.body.add_inst(ret_inst)
-                check.set_red(Instruction.CHECK)
+                check.set_red(InstructionColor.CHECK)
 
                 copy         = Call(None)
                 copy.name    = memcpy
                 args         = [self.get_pkt_buf(), buf, write_size]
                 copy.args = args
-                copy.set_red(Instruction.MEM_COPY)
+                copy.set_red(InstructionColor.MEM_COPY)
                 inst.extend([check, copy])
             else:
                 # variable copy

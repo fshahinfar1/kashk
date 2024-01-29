@@ -108,8 +108,8 @@ def _process_read_call(inst, info):
     assign_inst = BinOp.build(lhs, '=', rhs)
     blk.append(assign_inst)
     # Removing read_system call
-    assign_inst.set_red(Instruction.REMOVE_READ)
-    assign_inst.removed(inst)
+    assign_inst.set_red(InstructionColor.REMOVE_READ)
+    assign_inst.removed.append(inst)
     # Set the return value
     new_inst = info.prog.get_pkt_size()
     new_inst.set_red()
@@ -132,7 +132,7 @@ def _process_call_needing_send_flag(inst, blk, current_function, info):
             CHAR = BASE_TYPES[clang.TypeKind.SCHAR]
             decl = VarDecl.build(SEND_FLAG_NAME, CHAR)
             decl.init.add_inst(ZERO)
-            decl.set_red(Instruction.EXTRA_STACK_ALOC)
+            decl.set_red(InstructionColor.EXTRA_STACK_ALOC)
             declare_at_top_of_func.append(decl)
             sym = decl.update_symbol_table(info.sym_tbl)
             flag_ref = decl.get_ref()
@@ -141,7 +141,7 @@ def _process_call_needing_send_flag(inst, blk, current_function, info):
             assert not flag_ref.type.is_pointer()
         ref = UnaryOp.build('&', flag_ref)
         inst.args.append(ref)
-        inst.set_red(Instruction.ADD_ARGUMENT)
+        inst.set_red(InstructionColor.ADD_ARGUMENT)
     else:
         # Just pass the reference, the function must have received a flag from
         # the entry scope
@@ -157,7 +157,7 @@ def _process_call_needing_send_flag(inst, blk, current_function, info):
     cond  = BinOp.build(flag_val, '!=', ZERO)
     cond.set_red()
     check = ControlFlowInst.build_if_inst(cond)
-    check.set_red(Instruction.CHECK)
+    check.set_red(InstructionColor.CHECK)
     if current_function is None:
         # Do we need modify the packet before sending? (e.g., swap IP address)
         before_send_insts = info.prog.before_send()
@@ -222,7 +222,7 @@ def _process_current_inst(inst, info, more):
                 assert func.change_applied & Function.CTX_FLAG != 0, 'The function call is determined to requier context pointer but the function signiture is not updated'
                 inst.change_applied |= Function.CTX_FLAG
                 inst.args.append(info.prog.get_ctx_ref())
-                inst.set_red(Instruction.ADD_ARGUMENT)
+                inst.set_red(InstructionColor.ADD_ARGUMENT)
                 # debug('add ctx ref to call:', inst.name)
 
             # Add send flag

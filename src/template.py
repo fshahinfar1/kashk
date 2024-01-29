@@ -10,21 +10,21 @@ VOID_PTR = 'void *'
 def bpf_ctx_bound_check(ref, index, data_end, return_value=None):
     _if = ControlFlowInst()
     _if.kind = clang.CursorKind.IF_STMT
-    _if.set_red(Instruction.CHECK)
+    _if.set_red(InstructionColor.CHECK)
 
     # index + 1
     size_plus_one = BinOp(None)
     size_plus_one.op = '+'
     size_plus_one.lhs.add_inst(index)
     size_plus_one.rhs.add_inst(Literal('1', clang.CursorKind.INTEGER_LITERAL))
-    size_plus_one.set_red(Instruction.EXTRA_ALU_OP)
+    size_plus_one.set_red(InstructionColor.EXTRA_ALU_OP)
 
     # (ref + index + 1)
     pkt_off = BinOp(None)
     pkt_off.op = '+'
     pkt_off.lhs.add_inst(ref)
     pkt_off.rhs.add_inst(size_plus_one)
-    pkt_off.set_red(Instruction.EXTRA_ALU_OP)
+    pkt_off.set_red(InstructionColor.EXTRA_ALU_OP)
 
     # (void *)(ref + size + 1)
     lhs_cast = Cast()
@@ -36,7 +36,7 @@ def bpf_ctx_bound_check(ref, index, data_end, return_value=None):
     cond.op = '>'
     cond.lhs.add_inst(lhs_cast)
     cond.rhs.add_inst(data_end)
-    cond.set_red(Instruction.EXTRA_ALU_OP)
+    cond.set_red(InstructionColor.EXTRA_ALU_OP)
 
     # return 0
     ret = Return()
@@ -54,14 +54,14 @@ def bpf_ctx_bound_check(ref, index, data_end, return_value=None):
 def bpf_ctx_bound_check_bytes(ref, size, data_end, return_value=None):
     _if = ControlFlowInst()
     _if.kind = clang.CursorKind.IF_STMT
-    _if.set_red(Instruction.CHECK)
+    _if.set_red(InstructionColor.CHECK)
 
     # size + 1
     size_plus_one = BinOp(None)
     size_plus_one.op = '+'
     size_plus_one.lhs.add_inst(size)
     size_plus_one.rhs.add_inst(Literal('1', clang.CursorKind.INTEGER_LITERAL))
-    size_plus_one.set_red(Instruction.EXTRA_ALU_OP)
+    size_plus_one.set_red(InstructionColor.EXTRA_ALU_OP)
 
     # (void *)(ref)
     lhs_cast = Cast()
@@ -73,14 +73,14 @@ def bpf_ctx_bound_check_bytes(ref, size, data_end, return_value=None):
     pkt_off.op = '+'
     pkt_off.lhs.add_inst(lhs_cast)
     pkt_off.rhs.add_inst(size_plus_one)
-    pkt_off.set_Red(Instruction.EXTRA_ALU_OP)
+    pkt_off.set_Red(InstructionColor.EXTRA_ALU_OP)
 
     # (void *)(ref + size + 1) > (void *)(data_end)
     cond = BinOp(None)
     cond.op = '>'
     cond.lhs.add_inst(pkt_off)
     cond.rhs.add_inst(data_end)
-    cond.set_red(Instruction.EXTRA_ALU_OP)
+    cond.set_red(InstructionColor.EXTRA_ALU_OP)
 
     # return 0
     ret = Return()
@@ -128,7 +128,7 @@ def prepare_shared_state_var(ret_val=None):
     call_lookup = Call(None)
     call_lookup.name = 'bpf_map_lookup_elem'
     call_lookup.args = [SHARED_MAP_PTR, zero_ptr]
-    call_lookup.set_red(Instruction.KNOWN_FUNC_IMPL)
+    call_lookup.set_red(InstructionColor.KNOWN_FUNC_IMPL)
 
     lookup_assign = BinOp.build(var_ref, '=', call_lookup)
     lookup_assign.set_red()
@@ -164,7 +164,7 @@ def prepare_meta_data(failure_number, meta_declaration, info):
         store.append(f'{ref.name}->{f.name} = {f.name};')
     code = '\n'.join(store) + '\n'
     populate = Literal(code, CODE_LITERAL)
-    populate.set_red(Instruction.MEM_COPY)
+    populate.set_red(InstructionColor.MEM_COPY)
 
     insts = adjust_inst + [assign, bound_check, populate]
     return insts, decl
@@ -214,7 +214,7 @@ def malloc_lookup(name, info, return_val):
 }}
 '''
     lookup_inst = Literal(text, CODE_LITERAL)
-    lookup_inst.set_red(Instruction.MAP_LOOKUP)
+    lookup_inst.set_red(InstructionColor.MAP_LOOKUP)
 
     #Inst: tmp->data
     owner = Ref(None)
