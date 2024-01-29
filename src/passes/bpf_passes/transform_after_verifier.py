@@ -64,7 +64,7 @@ def _rename_func_to_a_known_one(inst, info, target_name):
         func.is_used_in_bpf_code = True
         info.prog.declarations.insert(0, func)
     # debug(MODULE_TAG, 'Add func:', func.name)
-    inst.set_red(InstructionColor.KNOWN_FUNC_IMPL)
+    inst.set_modified(InstructionColor.KNOWN_FUNC_IMPL)
     return inst
 
 
@@ -175,7 +175,7 @@ def _process_write_call(inst, info):
                 do_copy=should_copy)
         blk.extend(insts[:-1])
         new_inst = insts[-1]
-        new_inst.set_red(InstructionColor.REMOVE_WRITE)
+        new_inst.set_modified(InstructionColor.REMOVE_WRITE)
         new_inst.removed.append(inst)
     else:
         # On a function which is not the main. Do not return
@@ -190,13 +190,13 @@ def _process_write_call(inst, info):
         deref.op = '*'
         one = Literal('1', clang.CursorKind.INTEGER_LITERAL)
         set_flag = BinOp.build(deref, '=', one)
-        set_flag.set_red(InstructionColor.EXTRA_MEM_ACCESS)
+        set_flag.set_modified(InstructionColor.EXTRA_MEM_ACCESS)
         # add it to the body
         blk.extend(copy_inst)
         blk.append(set_flag)
         # Return from this point to the BPF main
         new_inst = get_ret_inst(current_function, info)
-        new_inst.set_red(InstructionColor.REMOVE_WRITE)
+        new_inst.set_modified(InstructionColor.REMOVE_WRITE)
         new_inst.removed.append(inst)
     return new_inst
 
@@ -275,7 +275,7 @@ def _process_var_decl(inst, info):
     blk.append(new_var_decl)
     var_ref = new_var_decl.get_ref()
     assign = BinOp.build(var_ref, '=', ref)
-    assign.set_red()
+    assign.set_modified()
     return assign
 
 

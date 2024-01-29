@@ -47,7 +47,7 @@ def _check_if_ref_is_global_state(inst, info):
             entry.set_ref_region(MemoryRegion.BPF_MAP)
         # Mark the instruction as red, because it will become a lookup from a
         # map
-        inst.set_red()
+        inst.set_modified()
     return inst
 
 
@@ -104,15 +104,15 @@ def _process_read_call(inst, info):
     # Assign packet pointer on a previouse line
     lhs = inst.rd_buf.ref
     rhs = info.prog.get_pkt_buf()
-    rhs.set_red()
+    rhs.set_modified()
     assign_inst = BinOp.build(lhs, '=', rhs)
     blk.append(assign_inst)
     # Removing read_system call
-    assign_inst.set_red(InstructionColor.REMOVE_READ)
+    assign_inst.set_modified(InstructionColor.REMOVE_READ)
     assign_inst.removed.append(inst)
     # Set the return value
     new_inst = info.prog.get_pkt_size()
-    new_inst.set_red()
+    new_inst.set_modified()
     return new_inst
 
 
@@ -132,7 +132,7 @@ def _process_call_needing_send_flag(inst, blk, current_function, info):
             CHAR = BASE_TYPES[clang.TypeKind.SCHAR]
             decl = VarDecl.build(SEND_FLAG_NAME, CHAR)
             decl.init.add_inst(ZERO)
-            decl.set_red(InstructionColor.EXTRA_STACK_ALOC)
+            decl.set_modified(InstructionColor.EXTRA_STACK_ALOC)
             declare_at_top_of_func.append(decl)
             sym = decl.update_symbol_table(info.sym_tbl)
             flag_ref = decl.get_ref()
@@ -141,23 +141,23 @@ def _process_call_needing_send_flag(inst, blk, current_function, info):
             assert not flag_ref.type.is_pointer()
         ref = UnaryOp.build('&', flag_ref)
         inst.args.append(ref)
-        inst.set_red(InstructionColor.ADD_ARGUMENT)
+        inst.set_modified(InstructionColor.ADD_ARGUMENT)
     else:
         # Just pass the reference, the function must have received a flag from
         # the entry scope
         assert sym is not None and sym.type.is_pointer()
         flag_ref = Ref.from_sym(sym)
         inst.args.append(flag_ref)
-        inst.set_red(InstructionColor.ADD_ARGUMENT)
+        inst.set_modified(InstructionColor.ADD_ARGUMENT)
     # Check the flag after the function
     if flag_ref.type.is_pointer():
         flag_val = UnaryOp.build('*', flag_ref)
     else:
         flag_val = flag_ref
     cond  = BinOp.build(flag_val, '!=', ZERO)
-    cond.set_red()
+    cond.set_modified()
     check = ControlFlowInst.build_if_inst(cond)
-    check.set_red(InstructionColor.CHECK)
+    check.set_modified(InstructionColor.CHECK)
     if current_function is None:
         # Do we need modify the packet before sending? (e.g., swap IP address)
         before_send_insts = info.prog.before_send()
@@ -194,7 +194,7 @@ def _process_current_inst(inst, info, more):
             # Change the declaration
             T = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
             new_inst = VarDecl.build(inst.name, T)
-            new_inst.set_red()
+            new_inst.set_modified()
             # removing allocation of arrays, malloc, ...
             new_inst.removed.append(inst)
             return new_inst
@@ -222,7 +222,7 @@ def _process_current_inst(inst, info, more):
                 assert func.change_applied & Function.CTX_FLAG != 0, 'The function call is determined to requier context pointer but the function signiture is not updated'
                 inst.change_applied |= Function.CTX_FLAG
                 inst.args.append(info.prog.get_ctx_ref())
-                inst.set_red(InstructionColor.ADD_ARGUMENT)
+                inst.set_modified(InstructionColor.ADD_ARGUMENT)
                 # debug('add ctx ref to call:', inst.name)
 
             # Add send flag

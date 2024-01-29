@@ -10,7 +10,7 @@ FALSE = Literal('False', CODE_LITERAL)
 
 
 class Jump:
-    def __init__(self, cond, target, backward):
+    def __init__(self, cond: Instruction, target: CFGNode, backward: bool):
         self.case_cond = cond
         self.target = target
         self.backward = backward
@@ -141,7 +141,10 @@ class HTMLWriter:
         return '\n'.join(res)
 
 
-def _leafs(node, visited=None):
+def cfg_leafs(node, visited=None):
+    """
+    Find the leaf nodes of a CFG
+    """
     if visited is None:
         visited = set()
     if node is None or node.node_id in visited:
@@ -171,7 +174,7 @@ def _leafs(node, visited=None):
         """
         leaf_nodes = set()
         for _, n in node.jmps:
-            for x in _leafs(n, visited):
+            for x in cfg_leafs(n, visited):
                 leaf_nodes.add(x)
         l = list(leaf_nodes)
         return l
@@ -191,11 +194,11 @@ def make_cfg(inst):
         if_true = make_cfg(inst.body)
         jmp.jmps.append(Jump(TRUE, if_true, False))
         after_node = CFGNode()
-        l = _leafs(if_true)
+        l = cfg_leafs(if_true)
         if inst.other_body.has_children():
             if_false = make_cfg(inst.other_body)
             jmp.jmps.append(Jump(FALSE, if_false, False))
-            l += _leafs(if_false)
+            l += cfg_leafs(if_false)
         else:
             jmp.jmps.append(Jump(FALSE, after_node, False))
         for x in l:
@@ -216,7 +219,7 @@ def make_cfg(inst):
             for i in inst_list:
                 node = make_cfg(i)
                 cur.connect(node, join=True)
-            l = _leafs(begin)
+            l = cfg_leafs(begin)
             for x in l:
                 x.connect(after_node, join=True)
             swt.jmps.append(Jump(case_cond, begin, False))
@@ -231,7 +234,7 @@ def make_cfg(inst):
         after_node = CFGNode()
         jmp.jmps.append(Jump(TRUE, body_node, False))
         jmp.jmps.append(Jump(FALSE, after_node, False))
-        for x in _leafs(body_node):
+        for x in cfg_leafs(body_node):
             x.connect(last_node, join=False)
         backward = CFGJump()
         backward.cond = Literal('backward-jump', CODE_LITERAL)
@@ -242,7 +245,7 @@ def make_cfg(inst):
         for child in inst.get_children():
             node = make_cfg(child)
             cur = cur.connect(node, join=True)
-            l = _leafs(cur)
+            l = cfg_leafs(cur)
             if len(l) == 1:
                 cur = l[0]
             else:

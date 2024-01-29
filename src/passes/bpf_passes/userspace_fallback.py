@@ -78,7 +78,7 @@ def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
     switch      = ControlFlowInst()
     switch.kind = clang.CursorKind.SWITCH_STMT
     switch.cond.add_inst(flag_ref)
-    switch.set_red(InstructionColor.CHECK)
+    switch.set_modified(InstructionColor.CHECK)
 
     break_inst = Instruction()
     break_inst.kind = clang.CursorKind.BREAK_STMT
@@ -132,7 +132,7 @@ def _handle_call_may_fail_or_succeed(inst, func, info, more):
     else:
         addr_op = UnaryOp.build('&', flag_ref)
         inst.args.append(addr_op)
-    inst.set_red(InstructionColor.ADD_ARGUMENT)
+    inst.set_modified(InstructionColor.ADD_ARGUMENT)
     # Check the flag after the function call
     tmp = Literal('/* check if function fail */\n', CODE_LITERAL)
     after_func_call.append(tmp)
@@ -142,7 +142,7 @@ def _handle_call_may_fail_or_succeed(inst, func, info, more):
         declare_at_top_of_func.extend(tmp_decl)
     else:
         tmp_inst = ToUserspace.from_func_obj(current_function)
-        tmp_inst.set_red()
+        tmp_inst.set_modified()
     after_func_call.append(tmp_inst)
 
     # Analyse the called function.
@@ -227,7 +227,7 @@ def _process_current_inst(inst, info, more):
                 sym = info.sym_tbl.lookup(FAIL_FLAG_NAME)
             assert sym is not None, 'We want to set the failure flag, it should be already defined!'
             set_failuer = _set_failure_flag(failure_num, sym.type.is_pointer())
-            set_failuer.set_red(InstructionColor.EXTRA_MEM_ACCESS)
+            set_failuer.set_modified(InstructionColor.EXTRA_MEM_ACCESS)
             blk.append(set_failuer)
     return inst
 

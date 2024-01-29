@@ -10,21 +10,21 @@ VOID_PTR = 'void *'
 def bpf_ctx_bound_check(ref, index, data_end, return_value=None):
     _if = ControlFlowInst()
     _if.kind = clang.CursorKind.IF_STMT
-    _if.set_red(InstructionColor.CHECK)
+    _if.set_modified(InstructionColor.CHECK)
 
     # index + 1
     size_plus_one = BinOp(None)
     size_plus_one.op = '+'
     size_plus_one.lhs.add_inst(index)
     size_plus_one.rhs.add_inst(Literal('1', clang.CursorKind.INTEGER_LITERAL))
-    size_plus_one.set_red(InstructionColor.EXTRA_ALU_OP)
+    size_plus_one.set_modified(InstructionColor.EXTRA_ALU_OP)
 
     # (ref + index + 1)
     pkt_off = BinOp(None)
     pkt_off.op = '+'
     pkt_off.lhs.add_inst(ref)
     pkt_off.rhs.add_inst(size_plus_one)
-    pkt_off.set_red(InstructionColor.EXTRA_ALU_OP)
+    pkt_off.set_modified(InstructionColor.EXTRA_ALU_OP)
 
     # (void *)(ref + size + 1)
     lhs_cast = Cast()
@@ -36,7 +36,7 @@ def bpf_ctx_bound_check(ref, index, data_end, return_value=None):
     cond.op = '>'
     cond.lhs.add_inst(lhs_cast)
     cond.rhs.add_inst(data_end)
-    cond.set_red(InstructionColor.EXTRA_ALU_OP)
+    cond.set_modified(InstructionColor.EXTRA_ALU_OP)
 
     # return 0
     ret = Return()
@@ -54,14 +54,14 @@ def bpf_ctx_bound_check(ref, index, data_end, return_value=None):
 def bpf_ctx_bound_check_bytes(ref, size, data_end, return_value=None):
     _if = ControlFlowInst()
     _if.kind = clang.CursorKind.IF_STMT
-    _if.set_red(InstructionColor.CHECK)
+    _if.set_modified(InstructionColor.CHECK)
 
     # size + 1
     size_plus_one = BinOp(None)
     size_plus_one.op = '+'
     size_plus_one.lhs.add_inst(size)
     size_plus_one.rhs.add_inst(Literal('1', clang.CursorKind.INTEGER_LITERAL))
-    size_plus_one.set_red(InstructionColor.EXTRA_ALU_OP)
+    size_plus_one.set_modified(InstructionColor.EXTRA_ALU_OP)
 
     # (void *)(ref)
     lhs_cast = Cast()
@@ -80,7 +80,7 @@ def bpf_ctx_bound_check_bytes(ref, size, data_end, return_value=None):
     cond.op = '>'
     cond.lhs.add_inst(pkt_off)
     cond.rhs.add_inst(data_end)
-    cond.set_red(InstructionColor.EXTRA_ALU_OP)
+    cond.set_modified(InstructionColor.EXTRA_ALU_OP)
 
     # return 0
     ret = Return()
@@ -116,22 +116,22 @@ def prepare_shared_state_var(ret_val=None):
     var_decl = VarDecl.build('shared', SHARED_OBJ_PTR, red=True)
     var_decl.init.add_inst(NULL)
     var_ref = var_decl.get_ref()
-    var_ref.set_red()
+    var_ref.set_modified()
 
     zero_decl = VarDecl.build(get_tmp_var_name(), INT, red=True)
     zero_decl.init.add_inst(ZERO)
     zero_ref = zero_decl.get_ref()
-    zero_ref.set_red()
+    zero_ref.set_modified()
     zero_ptr = UnaryOp.build('&', zero_ref)
-    zero_ptr.set_red()
+    zero_ptr.set_modified()
 
     call_lookup = Call(None)
     call_lookup.name = 'bpf_map_lookup_elem'
     call_lookup.args = [SHARED_MAP_PTR, zero_ptr]
-    call_lookup.set_red(InstructionColor.KNOWN_FUNC_IMPL)
+    call_lookup.set_modified(InstructionColor.KNOWN_FUNC_IMPL)
 
     lookup_assign = BinOp.build(var_ref, '=', call_lookup)
-    lookup_assign.set_red()
+    lookup_assign.set_modified()
 
     cond  = BinOp.build(var_ref, '==', NULL, red=True)
     check = ControlFlowInst.build_if_inst(cond, red=True)
@@ -154,7 +154,7 @@ def prepare_meta_data(failure_number, meta_declaration, info):
 
     ref = decl_new_var(T, info, decl)
     assign = BinOp.build(ref, '=', info.prog.get_pkt_buf())
-    assign.set_red()
+    assign.set_modified()
 
     DROP = Literal(info.prog.get_drop(), clang.CursorKind.INTEGER_LITERAL)
     bound_check = bpf_ctx_bound_check(ref, ZERO, info.prog.get_pkt_end(), DROP)
@@ -164,7 +164,7 @@ def prepare_meta_data(failure_number, meta_declaration, info):
         store.append(f'{ref.name}->{f.name} = {f.name};')
     code = '\n'.join(store) + '\n'
     populate = Literal(code, CODE_LITERAL)
-    populate.set_red(InstructionColor.MEM_COPY)
+    populate.set_modified(InstructionColor.MEM_COPY)
 
     insts = adjust_inst + [assign, bound_check, populate]
     return insts, decl
@@ -214,7 +214,7 @@ def malloc_lookup(name, info, return_val):
 }}
 '''
     lookup_inst = Literal(text, CODE_LITERAL)
-    lookup_inst.set_red(InstructionColor.MAP_LOOKUP)
+    lookup_inst.set_modified(InstructionColor.MAP_LOOKUP)
 
     #Inst: tmp->data
     owner = Ref(None)
@@ -226,7 +226,7 @@ def malloc_lookup(name, info, return_val):
     ref.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
     ref.kind = clang.CursorKind.MEMBER_REF_EXPR
     ref.owner.append(owner)
-    ref.set_red()
+    ref.set_modified()
 
     return [var_decl, lookup_inst], ref
 
@@ -243,7 +243,7 @@ def new_bounded_loop(var_bound, max_bound, info, loop_var_type=INT):
     post = UnaryOp.build('++', loop_var)
     loop = ForLoop.build(initialize, condition, post)
     loop.repeat = max_bound
-    loop.set_red()
+    loop.set_modified()
     return loop, decl, loop_var
 
 
@@ -287,7 +287,7 @@ def variable_memcpy(dst, src, size, up_bound, info, fail_return_inst=None):
     at_src = ArrayAccess.build(src, loop_var)
     at_dst = ArrayAccess.build(dst, loop_var)
     copy = BinOp.build(at_dst, '=', at_src)
-    copy.set_red()
+    copy.set_modified()
     loop.body.add_inst(copy)
     return loop, declare_at_top_of_func
 

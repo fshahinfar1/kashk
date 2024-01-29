@@ -23,7 +23,7 @@ FUNC = 5
 BRANCHING_INSTRUCTIONS = (clang.CursorKind.IF_STMT, clang.CursorKind.SWITCH_STMT,
         clang.CursorKind.CASE_STMT, clang.CursorKind.FOR_STMT,
         clang.CursorKind.WHILE_STMT, clang.CursorKind.DO_STMT,
-        clang.CursorKind.CONDITIONAL_OPERATOR)
+        clang.CursorKind.CONDITIONAL_OPERATOR, clang.CursorKind.GOTO_STMT)
 
 MAY_HAVE_BACKWARD_JUMP_INSTRUCTIONS = (clang.CursorKind.FOR_STMT,
         clang.CursorKind.WHILE_STMT, clang.CursorKind.DO_STMT,)
@@ -40,7 +40,7 @@ def get_context_name(ctx):
 
 
 
-def _generate_marked_children(groups, context):
+def _generate_marked_children(groups):
     return tuple(map(lambda x: (x, x.tag), groups))
 
 
@@ -140,7 +140,7 @@ class Instruction(PassableObject):
     def __repr__(self):
         return self.__str__()
 
-    def set_red(self, color=InstructionColor.RED):
+    def set_modified(self, color=InstructionColor.RED):
         """
         Mark instruction as modified by the tool
         """
@@ -171,7 +171,7 @@ class Return(Instruction):
         obj = Return()
         obj.body.extend_inst(values)
         if red:
-            obj.set_red()
+            obj.set_modified()
         return obj
 
     def __init__(self):
@@ -297,7 +297,7 @@ class VarDecl(Instruction):
         obj.name = name
         obj.type = T
         if red:
-            obj.set_red()
+            obj.set_modified()
         return obj
 
     def __init__(self, c):
@@ -374,7 +374,7 @@ class ControlFlowInst(Instruction):
         obj.kind = clang.CursorKind.IF_STMT
         obj.cond.add_inst(condition_inst)
         if red:
-            obj.set_red()
+            obj.set_modified()
         return obj
 
     def __init__(self):
@@ -392,12 +392,13 @@ class ControlFlowInst(Instruction):
         return f'<CtrlFlow {self.kind}: {self.cond}>'
 
     def get_children(self):
+        if self.other_body.is_empty():
+            return [self.cond, self.body]
         return [self.cond, self.body, self.other_body]
 
     def get_children_context_marked(self):
-        context = [ARG, BODY, BODY]
-        groups = [self.cond, self.body, self.other_body]
-        return _generate_marked_children(groups, context)
+        groups = self.get_children()
+        return _generate_marked_children(groups)
 
     def clone(self, children):
         new = ControlFlowInst()
@@ -426,7 +427,7 @@ class UnaryOp(Instruction):
         obj.op = op
         obj.child.add_inst(inst)
         if red:
-            obj.set_red()
+            obj.set_modified()
         return obj
 
     def __init__(self, cursor):
@@ -481,9 +482,8 @@ class UnaryOp(Instruction):
         return [self.child,]
 
     def get_children_context_marked(self):
-        context = [ARG]
         groups = [self.child]
-        return _generate_marked_children(groups, context)
+        return _generate_marked_children(groups)
 
     def clone(self, children):
         """
@@ -520,7 +520,7 @@ class BinOp(Instruction):
         obj.op = op
         obj.rhs.add_inst(rhs_inst)
         if red:
-            obj.set_red()
+            obj.set_modified()
         return obj
 
     def __init__(self, cursor):
@@ -572,9 +572,8 @@ class BinOp(Instruction):
         return [self.rhs, self.lhs]
 
     def get_children_context_marked(self):
-        context = (ARG, ARG)
         groups = (self.rhs, self.lhs)
-        return _generate_marked_children(groups, context)
+        return _generate_marked_children(groups)
 
     def clone(self, children):
         new = BinOp(None)
@@ -603,9 +602,8 @@ class CaseSTMT(Instruction):
         return [self.case, self.body]
 
     def get_children_context_marked(self):
-        context = (ARG, BODY)
         groups = (self.case, self.body)
-        return _generate_marked_children(groups, context)
+        return _generate_marked_children(groups)
 
     def clone(self, children):
         new = CaseSTMT(self.cursor, self.kind)
@@ -625,7 +623,7 @@ class ArrayAccess(Instruction):
         assert isinstance(index, Instruction)
         obj.index.add_inst(index)
         if red:
-            obj.set_red()
+            obj.set_modified()
         return obj
 
     def __init__(self, T):
@@ -671,7 +669,7 @@ class Parenthesis(Instruction):
         obj = Parenthesis()
         obj.body.add_inst(inst)
         if red:
-            obj.set_red()
+            obj.set_modified()
         return obj
 
     def __init__(self):
@@ -710,7 +708,7 @@ class Cast(Instruction):
         obj.castee.add_inst(inst)
         obj.type = T
         if red:
-            obj.set_red()
+            obj.set_modified()
         return obj
 
     def __init__(self):
@@ -753,7 +751,7 @@ class Ref(Instruction):
         obj.name = name
         obj.type = T
         if red:
-            obj.set_red()
+            obj.set_modified()
         return obj
 
     def __init__(self, cursor, kind=None):
@@ -867,7 +865,7 @@ class ForLoop(Instruction):
         obj.cond.add_inst(cond)
         obj.post.add_inst(post)
         if red:
-            obj.set_red()
+            obj.set_modified()
         return obj
 
     def __init__(self):
@@ -887,9 +885,8 @@ class ForLoop(Instruction):
         return [self.pre, self.cond, self.post, self.body]
 
     def get_children_context_marked(self):
-        context =  (ARG, ARG, ARG, BODY)
         groups = (self.pre, self.cond, self.post, self.body)
-        return _generate_marked_children(groups, context)
+        return _generate_marked_children(groups)
 
     def clone(self, children):
         new = ForLoop()

@@ -2,8 +2,10 @@
 Decide what part of the user program to offload
 """
 from math import inf
-from cfg import make_cfg, CFGJump, CFGNode
+from cfg import CFGJump, CFGNode
 from code_pass import Pass
+
+from brain.basic_block import create_basic_block_cfg
 
 # NOTE: The evaluation function is path independent, use memoizing, otherwise
 # there will be too many traverses.
@@ -78,24 +80,7 @@ class ExecutionPath:
         self.blocks = []
 
 
-class BasicBlock:
-    counter = 0
-
-    def __init__(self):
-        BasicBlock.counter += 1
-        self.id = BasicBlock.counter
-        self.insts = []
-        # Map a path id to a cost value. Cost of reaching this block when
-        # following the given path
-        self.cost_book = {}
-        self.expected_cost = 0
-
-
 def basic_block_cost_func(block):
-    pass
-
-
-def create_basic_block(prog, info):
     pass
 
 
