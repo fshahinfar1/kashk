@@ -6,6 +6,7 @@ from cfg import CFGJump, CFGNode
 from code_pass import Pass
 
 from brain.basic_block import create_basic_block_cfg
+from helpers.cfg_graphviz import CFGGraphviz
 
 # NOTE: The evaluation function is path independent, use memoizing, otherwise
 # there will be too many traverses.
@@ -96,10 +97,16 @@ def analyse_offload(prog, info):
     # Transform the AST to a new AST which nodes are basic-blocks we want to
     # analyse
     cfg = create_basic_block_cfg(prog, info)
-    # Extract all exection paths from the CFG. An execution path is a linear
-    # sequence of basic blocks
-    paths = extract_paths(prog, info)
-    for path in paths:
-        calculate_cost_along_path(path)
-    CalcExpectedCost.do(cfg, info)
-    SelectBoundaries.do(cfg, info)
+    tmp = CFGGraphviz.do(cfg, info)
+    tmp.dot.save('/tmp/cfg.dot')
+    tmp.dot.render(filename='cfg', directory='/tmp/', format='svg')
+
+    # # Extract all exection paths from the CFG. An execution path is a linear
+    # # sequence of basic blocks
+    # paths = extract_paths(prog, info)
+    # for path in paths:
+    #     calculate_cost_along_path(path)
+
+    # CalcExpectedCost.do(cfg, info)
+
+    # SelectBoundaries.do(cfg, info)

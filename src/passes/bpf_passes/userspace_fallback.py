@@ -57,6 +57,7 @@ def _set_failure_flag(failure_number, is_pointer=False):
 
 def _decl_failure_flag_on_stack(info):
     decl_new_var(CHAR, info, declare_at_top_of_func, name=FAIL_FLAG_NAME)
+    flag_decl = declare_at_top_of_func[-1]
     flag_decl.init.add_inst(ZERO)
 
 

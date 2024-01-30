@@ -45,6 +45,7 @@ from helpers.cfg_graphviz import CFGGraphviz
 
 from perf_model.static_high_level_perf_model import gen_static_high_level_perf_model
 from cfg import make_cfg, HTMLWriter
+from decide import analyse_offload
 
 
 MODULE_TAG = '[Gen Offload]'
@@ -414,6 +415,10 @@ def gen_bpf_code(bpf, info, out_bpf):
     # TODO: split the code between parser and verdict
     debug('[Parser/Verdict Split Code]', tag=MODULE_TAG)
     info.prog.set_code(bpf)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    debug('[Decide What to Offload]', tag=MODULE_TAG)
+    analyse_offload(bpf, info)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Write the code we have generated

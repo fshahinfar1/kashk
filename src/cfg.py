@@ -9,17 +9,6 @@ TRUE = Literal('True', CODE_LITERAL)
 FALSE = Literal('False', CODE_LITERAL)
 
 
-class Jump:
-    def __init__(self, cond: Instruction, target: CFGNode, backward: bool):
-        self.case_cond = cond
-        self.target = target
-        self.backward = backward
-
-    def __iter__(self):
-        yield self.case_cond
-        yield self.target
-
-
 class CFGBaseNode(PassableObject):
     node_id = 0
     def __init__(self):
@@ -81,6 +70,17 @@ class CFGNode(CFGBaseNode):
         if self.next is None:
             return []
         return [(self.next, None), ]
+
+
+class Jump:
+    def __init__(self, cond: Instruction, target: CFGNode, backward: bool):
+        self.case_cond = cond
+        self.target = target
+        self.backward = backward
+
+    def __iter__(self):
+        yield self.case_cond
+        yield self.target
 
 
 class HTMLWriter:

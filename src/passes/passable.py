@@ -1,4 +1,5 @@
 class PassableObject:
+    __slots__ = ('kind', 'node_id')
     def __init__(self):
         self.kind = None
         self.node_id = None

@@ -87,7 +87,7 @@ def _known_function_substitution(inst, info):
         declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
-        tmp_inst[1].removed.append(inst)
+        tmp_insts[1].removed.append(inst)
         return tmp_res
     elif inst.name == 'strncpy':
         assert len(inst.args) == 3, 'Assumption on the number of arguments'

@@ -9,6 +9,7 @@ from log import debug
 from code_pass import Pass
 from code_gen import gen_code
 from cfg import CFGNode, CFGJump
+from brain.basic_block import BasicBlock
 
 
 MODULE_TAG = '[CFG Graphviz]'
@@ -16,6 +17,7 @@ MODULE_TAG = '[CFG Graphviz]'
 
 shape_config = {
         CFGNode: 'square',
+        BasicBlock: 'square',
         CFGJump: 'diamond',
 }
 
@@ -34,7 +36,8 @@ def code_format(s):
 class CFGGraphviz(Pass):
     def __init__(self, info, comment=None):
         super().__init__(info)
-        self.dot = graphviz.Digraph(comment=comment)
+        self.dot = graphviz.Digraph(comment=comment,
+                node_attr={'style':'filled', 'color':'white', 'stroke': 'black'})
         # self.dot.node('__root', label='-')
 
     def get_cfg_node_label(self, node):
@@ -55,15 +58,21 @@ class CFGGraphviz(Pass):
 
         NID = node.node_id
         shape = shape_config[type(node)]
+        color = 'silver'
         if isinstance(node, CFGNode):
+            if len(node.insts) > 0 and isinstance(node, BasicBlock):
+                if node.is_red():
+                    color = 'lightcoral'
+                else:
+                    color = 'lightblue2'
             lbl = self.get_cfg_node_label(node)
-            self.dot.node(NID, label=lbl, shape=shape)
+            self.dot.node(NID, label=lbl, shape=shape, color=color)
             if node.next is not None:
                 T_NID = node.next.node_id
                 self.dot.edge(NID, T_NID)
         elif isinstance(node, CFGJump):
             lbl = self.get_cfg_node_label(node)
-            self.dot.node(NID, label=lbl, shape=shape)
+            self.dot.node(NID, label=lbl, shape=shape, color=color)
             for case_cond, target_node in node.jmps:
                 T_NID = target_node.node_id
                 edge_lbl, _ = gen_code([case_cond,], self.info)

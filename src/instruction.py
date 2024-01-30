@@ -124,14 +124,13 @@ class Instruction(PassableObject):
     def clone(self, children):
         if self.kind not in Instruction.MAY_NOT_OVERLOAD:
             error('Instruction clone method uses parent implementation:', self.kind)
+            debug('--', type(self), self.body)
         new = Instruction()
-        # new.kind = self.kind
-        for name, val in vars(self).items():
-            if isinstance(val, list):
-                val = val[:]
-            setattr(new, name, val)
+        new.kind = self.kind
+        _default_clone_operation(new, self)
         if children:
             new.body = children[0]
+        assert new.kind is not None, vars(self)
         return new
 
     def __str__(self):
@@ -392,7 +391,7 @@ class ControlFlowInst(Instruction):
         return f'<CtrlFlow {self.kind}: {self.cond}>'
 
     def get_children(self):
-        if self.other_body.is_empty():
+        if not self.other_body.has_children():
             return [self.cond, self.body]
         return [self.cond, self.body, self.other_body]
 
@@ -406,7 +405,8 @@ class ControlFlowInst(Instruction):
         new.kind = self.kind
         new.cond = children[0]
         new.body = children[1]
-        new.other_body = children[2]
+        if len(children) > 2:
+            new.other_body = children[2]
         new.repeat = self.repeat
         return new
 
@@ -735,7 +735,7 @@ class Cast(Instruction):
 
 
 class Ref(Instruction):
-    __slots__ = ('name', 'type', 'owner')
+    __slots__ = ('cursor', 'name', 'type', 'owner')
 
     @classmethod
     def from_sym(cls, sym):

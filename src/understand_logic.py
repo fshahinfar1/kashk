@@ -340,12 +340,12 @@ def __convert_cursor_to_inst(c, info, _state):
     elif c.kind == clang.CursorKind.LABEL_STMT:
         inst = Instruction()
         inst.kind = c.kind
-        inst.label = c.spelling
+        inst.body = c.spelling
     elif c.kind == clang.CursorKind.GOTO_STMT:
         label = next(c.get_children())
         inst = Instruction()
         inst.kind = c.kind
-        inst.label = label.spelling
+        inst.body = label.spelling
         return inst
     elif c.kind == clang.CursorKind.IF_STMT:
         children = list(c.get_children())
@@ -469,7 +469,7 @@ def __convert_cursor_to_inst(c, info, _state):
         children = [_get_init_field(child) for child in c.get_children()]
         inst = Instruction()
         inst.kind = c.kind
-        inst.list = children
+        inst.body = children
         # debug(MODULE_TAG, 'INIT_LIST:', inst.list)
         return inst
     elif c.kind == clang.CursorKind.ENUM_DECL:
