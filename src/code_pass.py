@@ -11,6 +11,12 @@ PARENT_INST = 1000
 #                               instruction being investigated)
 
 
+ignore_these_parents = (
+        clang.CursorKind.CSTYLE_CAST_EXPR,
+        clang.CursorKind.PAREN_EXPR,
+        BLOCK_OF_CODE,
+    )
+
 class Pass:
     __slots__ = ('current_function', 'visited_functions', 'cb_ref', 'info',
             'result', '_may_remove', '_skip_children', '_visited_ids')
@@ -48,6 +54,17 @@ class Pass:
         The parent instruction is the one this instruction is its child.
         """
         return self.parent_stack.get(PARENT_INST)
+
+    def get_valid_parent(self):
+        at = 0
+        parent = self.parent_stack.get2(PARENT_INST, at)
+        while parent is not None:
+            if parent.kind not in ignore_these_parents:
+                # found a good parent instruction
+                break
+            at += 1
+            parent = self.parent_stack.get2(PARENT_INST, at)
+        return parent
 
     @contextmanager
     def set_current_func(self, func, change_scope=True):

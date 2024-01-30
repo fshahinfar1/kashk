@@ -7,12 +7,6 @@ from code_gen import gen_code
 
 MODULE_TAG = '[Static Perf Model]'
 
-ignore_these_parents = (
-        clang.CursorKind.CSTYLE_CAST_EXPR,
-        clang.CursorKind.PAREN_EXPR,
-        BLOCK_OF_CODE,
-    )
-
 
 _model_param_counter = 0
 def _get_new_param():
@@ -116,19 +110,8 @@ class GenStaticHighLevelPerfModelPass(Pass):
     def _increment(self, stat, value=1):
         self.model._increment(stat, value)
 
-    def _get_valid_parent(self):
-        at = 0
-        parent = self.parent_stack.get2(PARENT_INST, at)
-        while parent is not None:
-            if parent.kind not in ignore_these_parents:
-                # found a good parent instruction
-                break
-            at += 1
-            parent = self.parent_stack.get2(PARENT_INST, at)
-        return parent
-
     def _deref_memory(self, inst):
-        parent = self._get_valid_parent()
+        parent = self.get_valid_parent()
         tmp, _ = gen_code([inst,], self.info)
         pre = (parent is not None and
                 parent.kind == clang.CursorKind.BINARY_OPERATOR and

@@ -124,6 +124,7 @@ def _process_call_needing_send_flag(inst, blk, current_function, info):
     @parm info
     @return Instruction
     """
+    assert not inst.has_flag(Function.SEND_FLAG)
     inst.set_flag(Function.SEND_FLAG)
     sym = info.sym_tbl.lookup(SEND_FLAG_NAME)
     if current_function is None:
@@ -228,7 +229,8 @@ def _process_current_inst(inst, info, more):
             # Add send flag
             if func.calls_send and not inst.has_flag(Function.SEND_FLAG):
                 blk = cb_ref.get(BODY)
-                inst = _process_call_needing_send_flag(inst, blk, current_function, info)
+                new_inst = _process_call_needing_send_flag(inst, blk, current_function, info)
+                return new_inst
 
             # NOTE: fail flag is added in userspace_fallback (future pass)
     elif inst.kind == ANNOTATION_INST:

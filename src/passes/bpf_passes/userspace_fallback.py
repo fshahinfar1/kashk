@@ -155,6 +155,7 @@ def _handle_call_may_fail_or_succeed(inst, func, info, more):
                     body = _do_pass(func.body, info, PassObject())
                     body.children = declare_at_top_of_func + body.children
                     func.body = body
+    return inst
 
 
 def _handle_call_may_fail(inst, func, info, more):

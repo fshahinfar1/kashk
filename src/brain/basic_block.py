@@ -3,6 +3,23 @@ from code_pass import Pass
 from cfg import CFGJump, CFGNode, Jump, TRUE, FALSE, cfg_leafs
 
 
+def _deep(inst):
+    if inst.kind == clang.CursorKind.PAREN_EXPR:
+        return _deep(inst.body.children[0])
+    elif inst.kind == clang.CursorKind.CSTYLE_CAST_EXPR:
+        return _deep(inst.castee.children[0])
+    elif inst.kind == clang.CursorKind.BINARY_OPERATOR and inst.op == '=':
+        return _deep(inst.rhs.children[0])
+    return inst
+
+
+def _inst_is_func_call(inst):
+    tmp = _deep(inst)
+    if tmp.kind == clang.CursorKind.CALL_EXPR:
+        return inst
+    return None
+
+
 class BasicBlock(CFGNode):
     """
     It is a kind of CFG node, which has some attributes :)
@@ -20,13 +37,18 @@ class BasicBlock(CFGNode):
     
     def is_red(self):
         assert len(self.insts) > 0
+        # TODO: I might to fix this in the Instruction class. Maybe an
+        # instruction that has a red child, should be red.
         first_inst = self.insts[0]
+        if first_inst.is_modified():
+            return True
+        tmp = _deep(first_inst)
         return first_inst.is_modified()
 
     def is_func_call(self):
         assert len(self.insts) > 0
         first_inst = self.insts[0]
-        tmp = first_inst.kind == clang.CursorKind.CALL_EXPR
+        tmp = _inst_is_func_call(first_inst) is not None
         if tmp:
             assert len(self.insts) == 1, 'Each basic block mut have at most one function call'
         return tmp
@@ -57,7 +79,9 @@ class CreateBasicBlockCFG(Pass):
         """
         assert not self.cur_block.is_empty()
         is_red = self.cur_block.is_red()
-        if inst.is_modified():
+        tmp = _deep(inst)
+        inst_is_red = inst.is_modified() or tmp.is_modified()
+        if inst_is_red:
             return is_red
         else:
             return not is_red
@@ -89,8 +113,12 @@ class CreateBasicBlockCFG(Pass):
             br1 = CreateBasicBlockCFG.do(inst.body, self.info).cfg_root
             br2 = CreateBasicBlockCFG.do(inst.other_body, self.info).cfg_root
             jmp.jmps.append(Jump(TRUE, br1, False))
-            jmp.jmps.append(Jump(FALSE, br2, False))
-            _connect_leafs_to(B, br1, br2)
+            _connect_leafs_to(B, br1)
+            if not br2.is_empty():
+                jmp.jmps.append(Jump(FALSE, br2, False))
+                _connect_leafs_to(B, br2)
+            else:
+                jmp.jmps.append(Jump(FALSE, B, False))
         elif inst.kind == clang.CursorKind.FOR_STMT:
             pre = CreateBasicBlockCFG.do(inst.pre, self.info).cfg_root
             A.connect(pre, join=False)
@@ -134,7 +162,7 @@ class CreateBasicBlockCFG(Pass):
     def _do_process_inst(self, inst, more):
         if inst.kind in BRANCHING_INSTRUCTIONS: 
             self._handle_a_branching_inst(inst, more)
-        elif inst.kind == clang.CursorKind.CALL_EXPR:
+        elif _inst_is_func_call(inst):
             """
             Transform the CFG as follows.
                 [A]--> null
@@ -144,9 +172,13 @@ class CreateBasicBlockCFG(Pass):
                                     ===
             """
             A = self.cur_block
-            func_call = BasicBlock()
+            if A.is_empty():
+                # Do not create extra empty block
+                func_call = A
+            else:
+                func_call = BasicBlock()
+                A.connect(func_call, join=False)
             func_call.add(inst)
-            A.connect(func_call, join=False)
             B = BasicBlock()
             func_call.connect(B, join=False)
             self.cur_block = B

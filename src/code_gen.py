@@ -367,8 +367,9 @@ def gen_code(list_instructions, info, context=BODY):
                 modified = CHANGE_BUFFER_DEF
             elif inst.kind == ANNOTATION_INST:
                 if not inst.is_block_annotation() or not inst.has_children():
-                    continue
-                text, _ = gen_code(inst.block, info, BODY)
+                    text = f'/* Annotation: {inst.msg}*/\n'
+                else:
+                    text, _ = gen_code(inst.block, info, BODY)
             else:
                 handler = jump_table.get(inst.kind, lambda x,y,z: '')
                 text = handler(inst, info, [lvl])

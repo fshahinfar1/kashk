@@ -61,7 +61,9 @@ class CFGGraphviz(Pass):
         color = 'silver'
         if isinstance(node, CFGNode):
             if len(node.insts) > 0 and isinstance(node, BasicBlock):
-                if node.is_red():
+                if node.is_func_call():
+                    color = 'lightgreen'
+                elif node.is_red():
                     color = 'lightcoral'
                 else:
                     color = 'lightblue2'

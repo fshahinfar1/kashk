@@ -76,27 +76,33 @@ int xdp_prog(struct xdp_md *xdp)
         xdp = Ref(None, clang.CursorKind.DECL_REF_EXPR)
         xdp.name = self.ctx
         xdp.type = self.ctx_type
+        xdp.set_modified()
 
         ref = Ref(None, clang.CursorKind.MEMBER_REF_EXPR)
         ref.name = 'data'
         ref.type = BASE_TYPES[clang.TypeKind.UINT]
         ref.owner.append(xdp)
+        ref.set_modified()
 
         cast1 = Cast.build(ref, U64)
         data_off = Literal('DATA_OFFSET', clang.CursorKind.INTEGER_LITERAL)
         add_off = BinOp.build(cast1, '+', data_off)
         cast2 = Cast.build(add_off,  VOID_PTR)
+        cast1.set_modified()
+        cast2.set_modified()
         return cast2
 
     def get_pkt_end(self):
         xdp = Ref(None, clang.CursorKind.DECL_REF_EXPR)
         xdp.name = 'xdp'
         xdp.type = self.ctx_type
+        xdp.set_modified()
 
         ref = Ref(None, clang.CursorKind.MEMBER_REF_EXPR)
         ref.name = 'data_end'
         ref.type = BASE_TYPES[clang.TypeKind.UINT]
         ref.owner.append(xdp)
+        ref.set_modified()
         return cast_data(ref)
 
     def get_pkt_size(self):
@@ -104,7 +110,9 @@ int xdp_prog(struct xdp_md *xdp)
         beg = self.get_pkt_buf()
 
         delta = BinOp.build(end, '-', beg)
+        delta.set_modified()
         size  = Cast.build(delta,  BASE_TYPES[clang.TypeKind.USHORT])
+        size.set_modified()
         return size
 
     def adjust_pkt(self, req_size, info):
