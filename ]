@@ -5,8 +5,7 @@ from math import inf
 from cfg import CFGJump, CFGNode
 from code_pass import Pass
 
-from log import debug
-from brain.basic_block import create_basic_block_cfg, _inst_is_func_call
+from brain.basic_block import create_basic_block_cfg
 from brain.exec_path import extract_exec_paths
 from helpers.cfg_graphviz import CFGGraphviz
 
@@ -78,25 +77,8 @@ class CalcExpectedCost(Pass):
         return node
 
 
-def basic_block_cost_func(block, cfg_table):
-    if len(block.insts) == 0:
-        # Special case in which the block is empty
-        return 0
-    elif block.is_func_call():
-        first_inst = block.insts[0]
-        call_inst = _inst_is_func_call(first_inst)
-        func_cfg = cfg_table.get(call_inst.name)
-        assert func_cfg is not None
-        return  basic_block_cost_func(func_cfg)
-    elif block.is_red():
-        cost = 0
-        for inst in block.insts:
-            tmp = consult_inst_cost_table(inst)
-            cost += tmp
-        return cost
-    else:
-        # Just original instructions
-        return 0
+def basic_block_cost_func(block):
+    pass
 
 
 def calculate_cost_along_path(path):
@@ -110,9 +92,7 @@ def calculate_cost_along_path(path):
 def analyse_offload(prog, info):
     # Transform the AST to a new AST which nodes are basic-blocks we want to
     # analyse
-    cfg_table = {}
     cfg = create_basic_block_cfg(prog, info)
-    cfg_table[...]
 
     # Extract all exection paths from the CFG. An execution path is a linear
     # sequence of basic blocks

@@ -152,7 +152,6 @@ class CreateBasicBlockCFG(Pass):
             A.connect(jmp, False)
             jmp.cond = inst.cond.children[0]
             for sw_case in inst.body.children:
-                print(sw_case)
                 c = sw_case.case.children[0]
                 body = CreateBasicBlockCFG.do(sw_case.body, self.info).cfg_root
                 jmp.jmps.append(Jump(c, body, False))

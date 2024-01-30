@@ -16,14 +16,14 @@ MODULE_TAG = '[CFG Graphviz]'
 
 
 shape_config = {
-        CFGNode: 'square',
-        BasicBlock: 'square',
+        CFGNode: 'rect',
+        BasicBlock: 'rect',
         CFGJump: 'diamond',
 }
 
 
 def code_format(s):
-    chunk_size = 20
+    chunk_size = 25
     tmp = s.strip()
     length = len(tmp)
     remainder = 0 if length % chunk_size == 0 else 1
@@ -37,14 +37,21 @@ class CFGGraphviz(Pass):
     def __init__(self, info, comment=None):
         super().__init__(info)
         self.dot = graphviz.Digraph(comment=comment,
-                node_attr={'style':'filled', 'color':'white', 'stroke': 'black'})
-        # self.dot.node('__root', label='-')
+                node_attr={
+                    'style':'filled',
+                    'color':'white',
+                    'stroke': 'black',
+                    'fontname': 'monospace',
+                    },
+                )
 
     def get_cfg_node_label(self, node):
         if isinstance(node, CFGNode):
             insts = [gen_code([i], self.info)[0] for i in node.insts]
             insts = map(code_format, insts)
             lbl = '\n'.join(insts)
+            if isinstance(node, BasicBlock):
+                lbl += f'\nexp_cost: {node.expected_cost}'
             return lbl
         elif isinstance(node, CFGJump):
             cond_text, _ = gen_code([node.cond,], self.info)
@@ -55,7 +62,6 @@ class CFGGraphviz(Pass):
         if node.node_id in self._visited_ids:
             self.skip_children()
             return node
-
         NID = node.node_id
         shape = shape_config[type(node)]
         color = 'silver'
