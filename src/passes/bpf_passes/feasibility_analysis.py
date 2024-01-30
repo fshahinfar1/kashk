@@ -33,7 +33,7 @@ def set_skip(val):
     else:
         # restore the failed value before going out of the block
         fail_ref.set(FAILED, _failed_val)
-        debug('Restore to', _failed_val)
+        # debug('Restore to', _failed_val)
         _failed_val = None
     _skip_inst = val
 

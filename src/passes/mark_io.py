@@ -124,7 +124,6 @@ def _do_pass(bpf, info):
         func = call.get_function_def()
         if func is None:
             continue
-        debug('~~~~~', func.name, tag=MODULE_TAG)
         if not func.is_empty() and func.name not in has_processed:
             with _set_current_func(func):
                 _do_pass(func.body, info)

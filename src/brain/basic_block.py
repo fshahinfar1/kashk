@@ -121,8 +121,10 @@ class CreateBasicBlockCFG(Pass):
             jmp.jmps.append(Jump(TRUE, body, True))
             jmp.jmps.append(Jump(FALSE, B, False))
         elif inst.kind == clang.CursorKind.SWITCH_STMT:
+            A.connect(jmp, False)
             jmp.cond = inst.cond.children[0]
             for sw_case in inst.body.children:
+                print(sw_case)
                 c = sw_case.case.children[0]
                 body = CreateBasicBlockCFG.do(sw_case.body, self.info).cfg_root
                 jmp.jmps.append(Jump(c, body, False))
@@ -171,6 +173,7 @@ class CreateBasicBlockCFG(Pass):
                 self._do_process_inst(child_inst, more)
         else:
             self._do_process_inst(inst, more)
+        self.skip_children()
         return inst
 
 
