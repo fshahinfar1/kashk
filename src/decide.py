@@ -90,16 +90,21 @@ def analyse_offload(prog, info):
         cost_table[name] = exp_cost_func
         debug('Add', name, 'with cost:', exp_cost_func, 'to the table',
                 tag=MODULE_TAG)
+        CalcExpectedCost.do(cfg, info)
 
     cfg = create_basic_block_cfg(prog, info)
     cfg_table[MAIN] = cfg
     paths = extract_exec_paths(cfg, info)
     for path in paths:
         calculate_cost_along_path(path, cost_table)
-    # CalcExpectedCost.do(cfg, info)
-
+    CalcExpectedCost.do(cfg, info)
     # SelectBoundaries.do(cfg, info)
 
     tmp = CFGGraphviz.do(cfg, info)
     tmp.dot.save('/tmp/cfg.dot')
     tmp.dot.render(filename='cfg', directory='/tmp/', format='svg')
+    for name, tmp_cfg in cfg_table.items():
+        tmp = CFGGraphviz.do(tmp_cfg, info)
+        tmp.dot.save(f'/tmp/cfg_{name}.dot')
+        tmp.dot.render(filename=f'cfg_{name}', directory='/tmp/', format='svg')
+

@@ -2,6 +2,7 @@
 Calculate the cost of basic-blocks. It is used in determining the
 """
 from log import debug
+from instruction import InstructionColor
 from code_pass import Pass
 from data_structure import Function
 from cfg import CFGJump, CFGNode
@@ -12,7 +13,22 @@ MODULE_TAG = '[Cost Func]'
 
 
 def consult_inst_cost_table(inst):
-    return 0
+    # debug(inst.color, tag=MODULE_TAG)
+    table = {
+            InstructionColor.ORIGINAL: 0,
+            InstructionColor.RED: 0,
+            InstructionColor.CHECK: 5,
+            InstructionColor.MAP_LOOKUP: 20,
+            InstructionColor.KNOWN_FUNC_IMPL: 0,
+            InstructionColor.EXTRA_STACK_ALOC: 1,
+            InstructionColor.EXTRA_MEM_ACCESS: 5,
+            InstructionColor.REMOVE_READ: -100,
+            InstructionColor.REMOVE_WRITE: -100,
+            InstructionColor.ADD_ARGUMENT: 0,
+            InstructionColor.EXTRA_ALU_OP: 0,
+            InstructionColor.MEM_COPY: 10,
+        }
+    return table[inst.color]
 
 
 def basic_block_cost_func(block, cost_table):
@@ -71,7 +87,10 @@ class CalcExpectedCost(Pass):
             return node
         if not isinstance(node, BasicBlock):
             raise Exception('Unexpected')
-        count_paths = len(block.cost_book.keys())
-        exp = round(sum(block.cost_book.values()) / count_paths, 3)
-        block.expected_cost = exp
+        count_paths = len(node.cost_book.keys())
+        if count_paths == 0:
+            exp = 0
+        else:
+            exp = round(sum(node.cost_book.values()) / count_paths, 3)
+        node.expected_cost = exp
         return node
