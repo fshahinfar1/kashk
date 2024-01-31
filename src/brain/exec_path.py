@@ -39,10 +39,12 @@ class ExtractExecPath(Pass):
         if isinstance(node, BasicBlock):
             self.cur_path.add(node)
         elif isinstance(node, CFGJump):
+            did_something = False
             for j in node.jmps:
                 if j.backward:
                     # Let's not follow the backward links
                     continue
+                did_something = True
                 # NOTE: I could track the condition for each branch if needed
                 tmp = ExtractExecPath.do(j.target, self.info)
                 for branch in tmp.paths:
@@ -50,7 +52,8 @@ class ExtractExecPath(Pass):
                     self.paths.append(path)
             # End of a straight track. Do not continue. We are done.
             self.skip_children()
-            self.cur_path = None
+            if did_something:
+                self.cur_path = None
         else:
             raise Exception('Encountered unexpected CFG node')
         return node

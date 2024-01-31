@@ -64,6 +64,7 @@ class InstructionColor:
     ADD_ARGUMENT      = 309
     EXTRA_ALU_OP      = 310
     MEM_COPY          = 311
+    TO_USER           = 312
 
 
 INSTRUCTION_COLORS = (InstructionColor.ORIGINAL, InstructionColor.RED,
@@ -71,7 +72,8 @@ INSTRUCTION_COLORS = (InstructionColor.ORIGINAL, InstructionColor.RED,
         InstructionColor.KNOWN_FUNC_IMPL, InstructionColor.EXTRA_STACK_ALOC,
         InstructionColor.EXTRA_MEM_ACCESS, InstructionColor.REMOVE_READ,
         InstructionColor.REMOVE_WRITE, InstructionColor.ADD_ARGUMENT,
-        InstructionColor.EXTRA_ALU_OP, InstructionColor.MEM_COPY)
+        InstructionColor.EXTRA_ALU_OP, InstructionColor.MEM_COPY,
+        InstructionColor.TO_USER)
 
 
 # INSTRUCTION_FLAGS = (Instruction.BOUND_CHECK_FLAG,

@@ -55,6 +55,7 @@ class CFGGraphviz(Pass):
             return lbl
         elif isinstance(node, CFGJump):
             cond_text, _ = gen_code([node.cond,], self.info)
+            cond_text = code_format(cond_text)
             return cond_text
         raise Exception('Unexpected')
 
@@ -81,10 +82,14 @@ class CFGGraphviz(Pass):
         elif isinstance(node, CFGJump):
             lbl = self.get_cfg_node_label(node)
             self.dot.node(NID, label=lbl, shape=shape, color=color)
-            for case_cond, target_node in node.jmps:
+            for j in node.jmps:
+                case_cond, target_node = j
                 T_NID = target_node.node_id
                 edge_lbl, _ = gen_code([case_cond,], self.info)
-                self.dot.edge(NID, T_NID, label=edge_lbl)
+                edge_color = 'black'
+                if j.backward:
+                    edge_color = 'purple'
+                self.dot.edge(NID, T_NID, label=edge_lbl, color=edge_color)
         else:
             raise Exception('Unexpected')
         return node

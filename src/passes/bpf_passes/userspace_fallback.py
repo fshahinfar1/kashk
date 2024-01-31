@@ -100,7 +100,9 @@ def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
         case        = CaseSTMT(None)
         case.case.add_inst(int_literal)
         case.body.extend_inst(prepare_meta_code)
-        case.body.add_inst(ToUserspace.from_func_obj(current_function))
+        to_user = ToUserspace.from_func_obj(current_function)
+        to_user.set_modified(InstructionColor.TO_USER)
+        case.body.add_inst(to_user)
         switch.body.add_inst(case)
     return switch, decl
 
@@ -108,7 +110,6 @@ def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
 def _handle_call_may_fail_or_succeed(inst, func, info, more):
     ctx = more.ctx
     blk = cb_ref.get(BODY)
-    before_func_call = []
     after_func_call = []
     ## we need to pass a flag
     if inst.has_flag(Function.FAIL_FLAG):
@@ -155,6 +156,7 @@ def _handle_call_may_fail_or_succeed(inst, func, info, more):
                     body = _do_pass(func.body, info, PassObject())
                     body.children = declare_at_top_of_func + body.children
                     func.body = body
+    blk.append(After(after_func_call))
     return inst
 
 

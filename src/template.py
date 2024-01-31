@@ -134,10 +134,11 @@ def prepare_shared_state_var(ret_val=None):
     lookup_assign.set_modified()
 
     cond  = BinOp.build(var_ref, '==', NULL, red=True)
-    check = ControlFlowInst.build_if_inst(cond, red=True)
+    check = ControlFlowInst.build_if_inst(cond)
     if ret_val is None:
         ret_val = Return.build([], red=True)
     check.body.add_inst(ret_val)
+    check.set_modified(InstructionColor.CHECK)
     insts = [var_decl, zero_decl, lookup_assign,  check]
     return insts
 

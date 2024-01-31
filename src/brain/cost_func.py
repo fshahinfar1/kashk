@@ -14,6 +14,15 @@ MODULE_TAG = '[Cost Func]'
 
 def consult_inst_cost_table(inst):
     # debug(inst.color, tag=MODULE_TAG)
+    if inst.color == InstructionColor.KNOWN_FUNC_IMPL:
+        know_func_table = {
+                'bpf_map_lookup_elem': 10,
+                'bpf_xdp_adjust_tail': 5,
+                '__prepare_headers_before_send': 20,
+                '__prepare_headers_before_pass': 20,
+                }
+        return know_func_table[inst.name]
+
     table = {
             InstructionColor.ORIGINAL: 0,
             InstructionColor.RED: 0,
@@ -25,8 +34,9 @@ def consult_inst_cost_table(inst):
             InstructionColor.REMOVE_READ: -100,
             InstructionColor.REMOVE_WRITE: -100,
             InstructionColor.ADD_ARGUMENT: 0,
-            InstructionColor.EXTRA_ALU_OP: 0,
+            InstructionColor.EXTRA_ALU_OP: 2,
             InstructionColor.MEM_COPY: 10,
+            InstructionColor.TO_USER: 100,
         }
     return table[inst.color]
 

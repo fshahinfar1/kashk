@@ -2,6 +2,7 @@ from instruction import *
 from code_pass import Pass
 from cfg import CFGJump, CFGNode, Jump, TRUE, FALSE, cfg_leafs
 
+DASH = Literal('-', CODE_LITERAL)
 
 def _deep(inst):
     if inst.kind == clang.CursorKind.PAREN_EXPR:
@@ -107,6 +108,15 @@ class CreateBasicBlockCFG(Pass):
         A = self.cur_block
         B = BasicBlock()
         jmp = CFGJump()
+
+        if inst.is_modified():
+            tmp = BasicBlock()
+            tmp_inst = Literal('modified code', CODE_LITERAL)
+            # print(inst.color, inst.removed)
+            tmp_inst.color = inst.color
+            tmp.insts.append(tmp_inst)
+            A.connect(tmp, join=False)
+            A = tmp
         if inst.kind == clang.CursorKind.IF_STMT:
             A.connect(jmp, join=False)
             jmp.cond = inst.cond.children[0]
@@ -127,6 +137,7 @@ class CreateBasicBlockCFG(Pass):
             body = CreateBasicBlockCFG.do(inst.body, self.info).cfg_root
             _connect_leafs_to(post, body)
             tmp_jmp = CFGJump()
+            tmp_jmp.cond = DASH
             tmp_jmp.jmps.append(Jump(TRUE, jmp, True))
             _connect_leafs_to(tmp_jmp, post)
             jmp.cond = inst.cond.children[0]
@@ -139,6 +150,7 @@ class CreateBasicBlockCFG(Pass):
             jmp.jmps.append(Jump(TRUE, body, False))
             jmp.jmps.append(Jump(FALSE, B, False))
             tmp_jmp = CFGJump()
+            tmp_jmp.cond = DASH
             tmp_jmp.jmps.append(Jump(TRUE, jmp, True))
             body.connect(tmp_jmp, join=False)
         elif inst.kind == clang.CursorKind.DO_STMT:
@@ -156,6 +168,8 @@ class CreateBasicBlockCFG(Pass):
                 body = CreateBasicBlockCFG.do(sw_case.body, self.info).cfg_root
                 jmp.jmps.append(Jump(c, body, False))
                 _connect_leafs_to(B, body)
+        else:
+            raise Exception('Unexpected type of branching instruction')
         self.cur_block = B
 
     def _do_process_inst(self, inst, more):
@@ -194,7 +208,7 @@ class CreateBasicBlockCFG(Pass):
                 A.connect(B, join=False)
                 self.cur_block = B
 
-            if inst.kind == clang.CursorKind.RETURN_STMT:
+            if inst.kind in (clang.CursorKind.RETURN_STMT, TO_USERSPACE_INST):
                 self.cur_block.terminal = True
 
     def process_current_inst(self, inst, more):
