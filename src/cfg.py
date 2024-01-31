@@ -157,10 +157,11 @@ def cfg_leafs(node, visited=None):
         while isinstance(ptr, CFGNode):
             if ptr.next is not None:
                 if ptr.next.node_id in visited:
-                    if isinstance(ptr.next, CFGJump):
-                        return []
-                    else:
-                        raise Exception('Looping back to a normal node?!')
+                    return []
+                    # if isinstance(ptr.next, CFGJump):
+                    #     return []
+                    # else:
+                    #     raise Exception('Looping back to a normal node?!')
                 ptr = ptr.next
                 visited.add(ptr.node_id)
             else:

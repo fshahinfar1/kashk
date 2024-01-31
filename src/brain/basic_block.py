@@ -13,10 +13,10 @@ def _deep(inst):
     return inst
 
 
-def _inst_is_func_call(inst):
+def inst_is_func_call(inst):
     tmp = _deep(inst)
     if tmp.kind == clang.CursorKind.CALL_EXPR:
-        return inst
+        return tmp
     return None
 
 
@@ -48,7 +48,7 @@ class BasicBlock(CFGNode):
     def is_func_call(self):
         assert len(self.insts) > 0
         first_inst = self.insts[0]
-        tmp = _inst_is_func_call(first_inst) is not None
+        tmp = inst_is_func_call(first_inst) is not None
         if tmp:
             assert len(self.insts) == 1, 'Each basic block mut have at most one function call'
         return tmp
@@ -140,7 +140,7 @@ class CreateBasicBlockCFG(Pass):
             jmp.jmps.append(Jump(FALSE, B, False))
             tmp_jmp = CFGJump()
             tmp_jmp.jmps.append(Jump(TRUE, jmp, True))
-            body.connect(tmp_jmp)
+            body.connect(tmp_jmp, join=False)
         elif inst.kind == clang.CursorKind.DO_STMT:
             body = CreateBasicBlockCFG.do(inst.body, self.info).cfg_root
             A.connect(body, join=False)
@@ -161,7 +161,7 @@ class CreateBasicBlockCFG(Pass):
     def _do_process_inst(self, inst, more):
         if inst.kind in BRANCHING_INSTRUCTIONS: 
             self._handle_a_branching_inst(inst, more)
-        elif _inst_is_func_call(inst):
+        elif inst_is_func_call(inst):
             """
             Transform the CFG as follows.
                 [A]--> null

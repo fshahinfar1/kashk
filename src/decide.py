@@ -2,15 +2,19 @@
 Decide what part of the user program to offload
 """
 from math import inf
-from cfg import CFGJump, CFGNode
+
+from cfg import CFGJump, CFGNode, cfg_leafs
 from code_pass import Pass
-
+from data_structure import Function
 from log import debug
-from brain.basic_block import create_basic_block_cfg, _inst_is_func_call
+from brain.basic_block import create_basic_block_cfg
 from brain.exec_path import extract_exec_paths
+from brain.cost_func import calculate_cost_along_path, CalcExpectedCost
 from helpers.cfg_graphviz import CFGGraphviz
+from helpers.function_call_dependency import find_function_call_dependencies
 
 
+MAIN = '__main__'
 MODULE_TAG = '[Analyze Program]'
 
 
@@ -59,68 +63,39 @@ class SelectBoundaries(Pass):
             # END
 
 
-class CalcExpectedCost(Pass):
-    def process_current_inst(self, node, more):
-        if node.node_id in self._visited_ids:
-            # We have processed this node. We have either processed its
-            # children or we are in middle of processing them.
-            self.skip_children()
-            return node
-
-        if isinstance(node, CFGJump):
-            return node
-        if not isinstance(node, CFGNode):
-            raise Exception('Unexpected')
-        for block in node.insts:
-            count_paths = len(block.cost_book.keys())
-            exp = round(sum(block.cost_book.values()) / count_paths, 3)
-            block.expected_cost = exp
-        return node
-
-
-def basic_block_cost_func(block, cfg_table):
-    if len(block.insts) == 0:
-        # Special case in which the block is empty
-        return 0
-    elif block.is_func_call():
-        first_inst = block.insts[0]
-        call_inst = _inst_is_func_call(first_inst)
-        func_cfg = cfg_table.get(call_inst.name)
-        assert func_cfg is not None
-        return  basic_block_cost_func(func_cfg)
-    elif block.is_red():
-        cost = 0
-        for inst in block.insts:
-            tmp = consult_inst_cost_table(inst)
-            cost += tmp
-        return cost
-    else:
-        # Just original instructions
-        return 0
-
-
-def calculate_cost_along_path(path):
-    acc = 0
-    for block in path.blocks:
-        cost = basic_block_cost_func(block)
-        acc += cost
-        block.cost_book[path.id] = acc
-
-
 def analyse_offload(prog, info):
-    # Transform the AST to a new AST which nodes are basic-blocks we want to
-    # analyse
     cfg_table = {}
+    relevant_func_names = set(func.name
+            for func in Function.directory.values()
+                if func.is_used_in_bpf_code)
+    # Find function call dependencies
+    ordered_list_of_funcs = find_function_call_dependencies(relevant_func_names)
+    debug('order of evaluating cost of functions:', ordered_list_of_funcs, tag=MODULE_TAG)
+    cost_table = {}
+    for name in ordered_list_of_funcs:
+        debug('For func', name, tag=MODULE_TAG)
+        func = Function.directory[name]
+        cfg = create_basic_block_cfg(func.body, info)
+        cfg_table[name] = cfg
+        paths = extract_exec_paths(cfg, info)
+        for path in paths:
+            calculate_cost_along_path(path, cost_table)
+        leafs = cfg_leafs(cfg)
+        exp_cost_func = 0
+        count_path = 0
+        for l in leafs:
+            count_path += len(l.cost_book.keys())
+            exp_cost_func += sum(l.cost_book.values())
+        exp_cost_func = round(exp_cost_func / count_path, 3)
+        cost_table[name] = exp_cost_func
+        debug('Add', name, 'with cost:', exp_cost_func, 'to the table',
+                tag=MODULE_TAG)
+
     cfg = create_basic_block_cfg(prog, info)
-    cfg_table[...]
-
-    # Extract all exection paths from the CFG. An execution path is a linear
-    # sequence of basic blocks
+    cfg_table[MAIN] = cfg
     paths = extract_exec_paths(cfg, info)
-    debug('Number of execution paths are:', len(paths), tag=MODULE_TAG)
     for path in paths:
-        calculate_cost_along_path(path)
-
+        calculate_cost_along_path(path, cost_table)
     # CalcExpectedCost.do(cfg, info)
 
     # SelectBoundaries.do(cfg, info)
