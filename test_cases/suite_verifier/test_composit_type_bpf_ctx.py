@@ -29,7 +29,7 @@ from passes.bpf_passes.verifier import verifier_pass
 from passes.bpf_passes.transform_after_verifier import transform_func_after_verifier
 from passes.bpf_passes.reduce_params import reduce_params_pass
 
-from passes.user_passes.select_user import select_user_pass
+from passes.user_passes.create_user_graph import create_user_graph
 
 
 class TestCase(BasicTest):
@@ -46,7 +46,7 @@ class TestCase(BasicTest):
         mark_io(bpf, info)
         bpf = simplify_code_structure(bpf, info, PassObject())
         bpf = feasibilty_analysis_pass(bpf, info, PassObject())
-        select_user_pass(bpf, info, PassObject())
+        create_user_graph(bpf, info, PassObject())
         bpf = loop_end_pass(bpf, info, PassObject())
         bpf = transform_vars_pass(bpf, info, PassObject())
         bpf = userspace_fallback_pass(bpf, info, PassObject())

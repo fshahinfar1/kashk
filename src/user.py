@@ -98,12 +98,13 @@ class UserProg:
     Hold the information needed for generating the userspace program
     """
     def __init__(self):
-        # TODO: the graph could be a forest! I probably should use a list
+        # TODO: the graph could be a forest! I probably should use a list (I do
+        # not remember what did this comment mean?)
         self.graph = FallbackRegionGraph()
         self.sym_tbl = None
         self.func_dir = None
         self.fallback_funcs_def = []
-        self.declarations = []
+        self.declarations = {}
 
     @contextmanager
     def select_context(self, info):
@@ -196,7 +197,8 @@ __m = (struct {meta.name} *)__b;
 
 def _load_meta(info):
     # TODO: load the correct data structure based on the failure number
-    meta = info.user_prog.declarations[0]
+    debug('--', info.user_prog.declarations, tag=MODULE_TAG)
+    meta = list(info.user_prog.declarations.values())[0]
     declare = []
     load = []
     for f in meta.fields:
@@ -214,7 +216,7 @@ def generate_user_prog(info):
     """
     code = []
 
-    declarations, _ = gen_code(info.user_prog.declarations, info)
+    declarations, _ = gen_code(list(info.user_prog.declarations.values()), info)
     code.append(declarations)
     code.append('\n')
 

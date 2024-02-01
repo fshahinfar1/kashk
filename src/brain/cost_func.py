@@ -20,6 +20,7 @@ def consult_inst_cost_table(inst):
                 'bpf_xdp_adjust_tail': 5,
                 '__prepare_headers_before_send': 20,
                 '__prepare_headers_before_pass': 20,
+                '__adjust_skb_size': 10,
                 }
         return know_func_table[inst.name]
 

@@ -152,7 +152,7 @@ class CreateBasicBlockCFG(Pass):
             tmp_jmp = CFGJump()
             tmp_jmp.cond = DASH
             tmp_jmp.jmps.append(Jump(TRUE, jmp, True))
-            body.connect(tmp_jmp, join=False)
+            _connect_leafs_to(tmp_jmp, body)
         elif inst.kind == clang.CursorKind.DO_STMT:
             body = CreateBasicBlockCFG.do(inst.body, self.info).cfg_root
             A.connect(body, join=False)

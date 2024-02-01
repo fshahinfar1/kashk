@@ -19,7 +19,7 @@ from passes.simplify_code import simplify_code_structure
 from passes.mark_annotation_pass import mark_annotation_pass
 from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
 from passes.bpf_passes.mark_user_boundary import get_number_of_failure_paths
-from passes.user_passes.select_user import select_user_pass
+from passes.user_passes.create_user_graph import create_user_graph
 from passes.user_passes.create_fallback import create_fallback_pass
 
 from passes.mark_relevant_code import mark_relevant_code
@@ -47,7 +47,7 @@ class TestCase(BasicTest):
         mark_io(bpf, info)
         bpf = simplify_code_structure(bpf, info, PassObject())
         bpf = feasibilty_analysis_pass(bpf, info, PassObject())
-        select_user_pass(bpf, info, PassObject())
+        create_user_graph(bpf, info, PassObject())
 
         # Clone for User processing
         # user = clone_pass(bpf, info, PassObject())

@@ -98,7 +98,8 @@ def _starts_with_func_call(node, info):
     new_func = func.clone2(call_inst.name, Function.directory)
     new_func.body = Block(BODY)
     new_functions.append(new_func)
-    func.update_symbol_table(info.sym_tbl.global_scope)
+    with info.sym_tbl.with_scope(info.sym_tbl.global_scope):
+        new_func.update_symbol_table(info.sym_tbl)
     return call_inst, new_func, clone_first_inst
 
 

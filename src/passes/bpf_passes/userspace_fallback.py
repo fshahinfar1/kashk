@@ -88,10 +88,15 @@ def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
     case.body.add_inst(break_inst)
     switch.body.add_inst(case)
 
-    for failure_number in set(func.path_ids):
-        assert failure_number != 0, 'The zero can not be a failure id'
+    failure_ids = set(func.path_ids)
+    debug(f'failure numbers for func {func.name}:', failure_ids, tag=MODULE_TAG)
+    for failure_number in failure_ids:
+        assert failure_number > 0, 'The zero can not be a failure id'
         # TODO: change declaration to a dictionary instead of array
-        meta = info.user_prog.declarations[failure_number-1]
+        debug(info.user_prog.declarations, tag=MODULE_TAG)
+        if failure_number not in info.user_prog.declarations:
+            continue
+        meta = info.user_prog.declarations[failure_number]
         prepare_meta_code, tmp_decl = prepare_meta_data(failure_number, meta, info)
         decl.extend(tmp_decl)
 
@@ -217,7 +222,7 @@ def _process_current_inst(inst, info, more):
         failure_num = inst.path_id
         if current_function is None:
             # Found a split point on the BPF entry function
-            meta = info.user_prog.declarations[failure_num - 1]
+            meta = info.user_prog.declarations[failure_num]
             prepare_pkt, tmp_decl = prepare_meta_data(failure_num, meta, info)
             declare_at_top_of_func.extend(tmp_decl)
             blk.extend(prepare_pkt)

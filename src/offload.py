@@ -35,7 +35,7 @@ from passes.bpf_passes.remove_everything_not_used import remove_everything_not_u
 from passes.bpf_passes.prog_complexity import mitiage_program_comlexity
 from passes.bpf_passes.change_bpf_loop import change_to_bpf_loop
 
-from passes.user_passes.select_user import select_user_pass
+from passes.user_passes.create_user_graph import create_user_graph
 from passes.user_passes.var_dependency import var_dependency_pass
 from passes.user_passes.create_fallback import create_fallback_pass
 
@@ -186,7 +186,7 @@ def generate_offload(io_ctx):
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('Create User Code Graph', tag=MODULE_TAG)
-    select_user_pass(prog, info, PassObject())
+    create_user_graph(prog, info, PassObject())
     tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
     debug('\n', tree, tag=MODULE_TAG)
     tree = draw_tree(info.user_prog.graph, fn=lambda x: str(x.path_ids))
@@ -353,7 +353,7 @@ def gen_user_code(user, info, out_user):
             meta = Record(f'meta_{path_id}', fields)
             meta.is_used_in_bpf_code = True
             info.prog.add_declaration(meta)
-            info.user_prog.declarations.append(meta)
+            info.user_prog.declarations[path_id] = meta
 
             __scope = info.sym_tbl.current_scope
             info.sym_tbl.current_scope = info.sym_tbl.global_scope

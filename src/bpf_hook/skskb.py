@@ -136,7 +136,7 @@ if (!sock_ctx) {
         adjust_pkt   = Call(None)
         adjust_pkt.name = '__adjust_skb_size'
         adjust_pkt.args = [self.get_ctx_ref(), final_size]
-        adjust_pkt.set_Red(Instruction.KNOWN_FUNCS)
+        adjust_pkt.set_modified(InstructionColor.KNOWN_FUNC_IMPL)
         insts = [adjust_pkt]
         return insts, []
 

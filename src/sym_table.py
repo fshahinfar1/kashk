@@ -174,6 +174,16 @@ class SymbolTable:
         finally:
             self.current_scope = cur
 
+    @contextmanager
+    def with_scope(self, scope):
+        assert isinstance(scope, Scope)
+        cur = self.current_scope
+        self.current_scope = scope
+        try:
+            yield scope
+        finally:
+            self.current_scope = cur
+
     def clone(self):
         # Creat a new object
         new_tbl = SymbolTable()
