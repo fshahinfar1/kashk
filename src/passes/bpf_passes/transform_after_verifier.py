@@ -268,16 +268,20 @@ def _process_var_decl(inst, info):
     blk.extend(lookup_inst)
 
     new_type = None
-    if inst.type.is_array():
-        new_type = MyType.make_pointer(inst.type.element_type)
-    elif inst.type.is_record():
-        new_type = MyType.make_pointer(inst.type)
-        error('TODO: Changing type of record to a pointer requires updating the references')
-    else:
-        raise Exception('Not implemented yet?')
-
+    def _convert_type(t):
+        if t.is_array():
+            tmp = _convert_type(t.element_type)
+            return MyType.make_pointer(tmp)
+        elif t.is_record():
+            return MyType.make_pointer(t)
+        else:
+            return t
+            # raise Exception('Not implemented yet?', str(t))
+    new_type = _convert_type(inst.type)
     new_var_decl = VarDecl.build(inst.name, new_type)
-    blk.append(new_var_decl)
+    new_var_decl.update_symbol_table(info.sym_tbl)
+    declare_at_top_of_func.append(new_var_decl)
+    # blk.append(new_var_decl)
     var_ref = new_var_decl.get_ref()
     assign = BinOp.build(var_ref, '=', ref)
     assign.set_modified()
