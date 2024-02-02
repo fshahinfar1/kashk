@@ -57,7 +57,7 @@ class SK_SKB_PROG(BPF_PROG):
                 '/* Put state of each socket in this struct (This will be used in sockops.h as',
                 ' * part of per socket metadata) */',
                 generate_struct_with_fields('connection_state', self.connection_state)+';',
-                '#include "my_bpf/sockops.h"',
+                '#include "sockops.h"',
                 ])
 
 
