@@ -174,7 +174,7 @@ def _do_pass(inst, info, more):
         current_function.may_succeed = True
 
     _check_annotation(inst, info, more)
-    if failed or inst.bpf_ignore is True:
+    if failed or inst.ignore is True:
         return clone_pass(inst, info, PassObject())
 
     with cb_ref.new_ref(ctx, parent_list):

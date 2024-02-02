@@ -18,7 +18,7 @@ def _should_not_share_variable(inst, sym, info):
     if inst.name == 'conn':
         # TODO: figure out what I need to do in this case
         return True
-    if inst.bpf_ignore:
+    if inst.ignore:
         return True
     if 'asio::' in sym.type.spelling:
         return True

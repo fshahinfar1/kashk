@@ -83,7 +83,7 @@ class SimplifyCode(Pass):
         ref = inst.get_ref()
         bin_op = BinOp.build(ref, '=', rhs)
         # If the declartion was ignored, also ignore the initialization
-        bin_op.bpf_ignore = clone.bpf_ignore
+        bin_op.ignore = clone.ignore
         blk.append(clone)
         return bin_op
 
@@ -126,8 +126,8 @@ class SimplifyCode(Pass):
             bin_op = BinOp.build(tmp_ref, '=', cloned_inst)
             blk.append(bin_op)
 
-            tmp_decl.bpf_ignore = cloned_inst.bpf_ignore
-            bin_op.bpf_ignore = cloned_inst.bpf_ignore
+            tmp_decl.ignore = cloned_inst.ignore
+            bin_op.ignore = cloned_inst.ignore
 
             # Use a variable instead of function call
             return tmp_ref.clone([])

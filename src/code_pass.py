@@ -3,13 +3,11 @@ from data_structure import *
 from instruction import *
 from passes.pass_obj import PassObject
 from passes.clone import clone_pass
+from after import After
 
 PARENT_INST = 1000
 
 # TODO: support declare_at_top_of_func
-# TODO: support After objects (adding some instructions after the current
-#                               instruction being investigated)
-
 
 ignore_these_parents = (
         clang.CursorKind.CSTYLE_CAST_EXPR,
@@ -31,6 +29,8 @@ class Pass:
             if more is None:
                 more = PassObject()
             res = obj.do_pass(inst, more)
+            for inst in obj.declare_at_top_of_func:
+                res.children.insert(0, inst)
         obj.result = res
         return obj
 
@@ -44,6 +44,7 @@ class Pass:
         self._skip_children = False
         self.parent_stack = CodeBlockRef()
         self._visited_ids = set()
+        self.declare_at_top_of_func = []
 
     @property
     def parent_inst(self):
@@ -114,7 +115,7 @@ class Pass:
             if inst is None:
                 assert self._may_remove, 'This pass is not allowed to remove instructions'
                 return None
-            if self._skip_children:
+            if self._skip_children: #  or inst.ignore
                 self._skip_children = False
                 new_inst = clone_pass(inst)
                 return new_inst
@@ -127,11 +128,21 @@ class Pass:
                         for i in child:
                             obj = PassObject.pack(lvl+1, tag, new_child)
                             new_inst = self.do_pass(i, obj)
-                            if new_inst is not None:
-                                new_child.append(new_inst)
-                            elif tag != BODY:
+                            if new_inst is None:
                                 assert self._may_remove, 'This pass is not allowed to remove instructions'
-                                return None
+                                if tag != BODY:
+                                    # Remove the whole block
+                                    return None
+                                # Omit this child from the block
+                                continue
+                            # Look for "After" box
+                            after = []
+                            while (new_child and
+                                    isinstance(new_child[-1], After)):
+                                after.append(new_child.pop())
+                            new_child.append(new_inst)
+                            for a in reversed(after):
+                                new_child.extend(a.box)
                     else:
                         obj = PassObject.pack(lvl+1, tag, parent_list)
                         new_child = self.do_pass(child, obj)

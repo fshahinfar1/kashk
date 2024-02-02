@@ -139,7 +139,7 @@ def _do_pass(inst, info, more):
     new_children = []
     failed = fail_ref.get(FAILED)
 
-    if failed or inst.bpf_ignore:
+    if failed or inst.ignore:
         return clone_pass(inst, info, PassObject())
 
     with cb_ref.new_ref(ctx, parent_list):

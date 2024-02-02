@@ -216,7 +216,7 @@ def __convert_cursor_to_inst(c, info, _state):
         rhs_inst = gather_instructions_from(rhs_child, info, context=RHS)[0]
         inst.rhs.add_inst(rhs_inst)
 
-        inst.bpf_ignore = lhs_inst.bpf_ignore or rhs_inst.bpf_ignore
+        inst.ignore = lhs_inst.ignore or rhs_inst.ignore
         return inst
     elif (c.kind == clang.CursorKind.UNARY_OPERATOR
             or c.kind == clang.CursorKind.CXX_UNARY_EXPR):
@@ -504,7 +504,7 @@ def gather_instructions_from(cursor, info, context=BODY, _state=None):
             with _state.set_global_for_bpf(False):
                 inst = __convert_cursor_to_inst(c, info, _state)
                 if inst:
-                    inst.bpf_ignore = True
+                    inst.ignore = True
                     ops.append(inst)
             continue
 
@@ -528,7 +528,7 @@ def gather_instructions_from(cursor, info, context=BODY, _state=None):
 
         # TODO: handling the IO frameworks needs a bit of thought
         if inst and inst.kind == clang.CursorKind.CALL_EXPR and inst.name in (READ_PACKET + WRITE_PACKET):
-            inst.bpf_ignore = True
+            inst.ignore = True
 
         if inst:
             ops.append(inst)
