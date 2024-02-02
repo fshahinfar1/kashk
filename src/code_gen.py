@@ -6,6 +6,7 @@ from utility import (indent, INDENT, report_on_cursor)
 from prune import READ_PACKET, WRITE_PACKET
 
 from template import (license_text, shared_map_decl)
+from helpers.function_call_dependency import find_function_call_dependencies2
 
 MODULE_TAG = '[BPF Code Gen]'
 
@@ -494,7 +495,7 @@ def generate_bpf_prog(info):
     non_func_declarations, _ = gen_code(non_func_decs, info, context=DEF)
     non_func_declarations += shared_state_struct_decl
 
-    func_decs = __sort_by_function_depandancy(func_decs)
+    func_decs = find_function_call_dependencies2(func_decs)
     func_declarations, _ = gen_code(func_decs, info, context=ARG)
     declarations = (non_func_declarations + func_declarations)
 

@@ -111,8 +111,11 @@ if (!sock_ctx) {
                 self._load_connection_state() + verdict_code)
         verdict_code = indent(verdict_code, 1)
 
-        tmp = (info.prog._parser_prog(per_conn + [''] + [parser_code]) + ['']
-                + info.prog._verdict_prog([verdict_code]))
+        tmp = (per_conn +
+                [''] +
+                info.prog._parser_prog([parser_code]) +
+                [''] +
+                info.prog._verdict_prog([verdict_code]))
         return '\n'.join(tmp)
 
     def send(self, buf, write_size, info, failure_return, ret=True, do_copy=True):

@@ -11,23 +11,21 @@ class Node:
         self.edge = set()
 
 
-def find_function_call_dependencies(func_names):
-    """
-    @param func_name A set of function names of interest
-    @returns a list of function names
-    """
+def find_function_call_dependencies2(funcs):
+    func_map = {f.name: f for f in funcs}
     table = {}
     set_of_all_nodes_with_out_any_dep = set()
-    for name in func_names:
+    for func in funcs:
+        name = func.name
         node = Node(name)
         table[name] = node
         set_of_all_nodes_with_out_any_dep.add(node)
-    for name in func_names:
+    for func in funcs:
+        name = func.name
         node = table[name]
-        func = Function.directory[name]
         list_calls = find_elems_of_kind(func.body, clang.CursorKind.CALL_EXPR)
         has_dep = False
-        relevant_calls = [x.name for x in list_calls if x.name in func_names]
+        relevant_calls = [x.name for x in list_calls if x.name in func_map]
         for dep_name in relevant_calls:
             has_dep = True
             other = table[dep_name]
@@ -58,5 +56,19 @@ def find_function_call_dependencies(func_names):
     for tmp_node in table.values():
         if len(tmp_node.edge) > 0:
             raise Exception('Graph has cycles')
-    result = [node.name for node in order]
+    result = [func_map[node.name] for node in order]
     return result
+
+
+def find_function_call_dependencies(func_names):
+    """
+    @param func_name A set of function names of interest
+    @returns a list of function names
+    """
+    funcs = []
+    for name in func_names:
+        f = Function.directory[name]
+        funcs.append(f)
+    tmp = find_function_call_dependencies2(funcs)
+    res = [f.name for f in tmp]
+    return res
