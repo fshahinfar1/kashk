@@ -164,8 +164,12 @@ def _process_call_needing_send_flag(inst, blk, current_function, info):
         before_send_insts = info.prog.before_send()
         check.body.extend_inst(before_send_insts)
         # Return the verdict
-        ret_val  = Literal(info.prog.get_send(), clang.CursorKind.INTEGER_LITERAL)
+        ret_val  = info.prog.get_send()
         ret_inst = Return.build([ret_val,])
+        # It is not marked as 'InstructionColor.REMOVE_WRITE'
+        # because the instruction was removed inside the
+        # called funcation and we count it there.
+        ret_inst.set_modified()
         check.body.add_inst(ret_inst)
     else:
         # Return to the caller func

@@ -151,4 +151,16 @@ if (!sock_ctx) {
 
     def get_send(self):
         # raise Exception('not implemented')
-        return f'return bpf_sk_redirect_map(skb, &sock_map, sock_ctx->sock_map_index, 0);'
+        map_ref_addr = UnaryOp.build('&', Literal('sock_map', CODE_LITERAL))
+        map_ref_addr.set_modified()
+        index_ref = Literal('sock_ctx->sock_map_index', CODE_LITERAL)
+        index_ref.set_modified()
+        name = 'bpf_sk_redirect_map'
+        args= [self.get_ctx_ref(), map_ref_addr, index_ref, ZERO]
+        call_redir = Call(None)
+        call_redir.name = name
+        call_redir.args.extend(args)
+        call_redir.set_modified(InstructionColor.KNOWN_FUNC_IMPL)
+        # ret_inst = Return.build([call_redir,])
+        # ret_inst.set_modified(InstructionColor.REMOVE_WRITE)
+        return call_redir

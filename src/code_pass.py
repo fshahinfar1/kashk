@@ -129,6 +129,9 @@ class Pass:
                             new_inst = self.do_pass(i, obj)
                             if new_inst is not None:
                                 new_child.append(new_inst)
+                            elif tag != BODY:
+                                assert self._may_remove, 'This pass is not allowed to remove instructions'
+                                return None
                     else:
                         obj = PassObject.pack(lvl+1, tag, parent_list)
                         new_child = self.do_pass(child, obj)

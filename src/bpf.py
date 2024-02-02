@@ -187,7 +187,7 @@ class BPF_PROG:
         inst.extend(before_send_insts)
 
         if ret is True:
-            ret_val  = Literal(self.get_send(), clang.CursorKind.INTEGER_LITERAL)
+            ret_val  = self.get_send()
             ret_inst = Return.build([ret_val,])
             inst.append(ret_inst)
         return inst

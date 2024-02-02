@@ -173,10 +173,15 @@ def _process_write_call(inst, info):
         # On the main BPF program. feel free to return the verdict value
         insts = info.prog.send(ref, write_size, info, return_val,
                 do_copy=should_copy)
-        blk.extend(insts[:-1])
+        blk.extend(insts)
         new_inst = insts[-1]
         new_inst.set_modified(InstructionColor.REMOVE_WRITE)
         new_inst.removed.append(inst)
+
+        parent = parent_block.get(BODY)
+        last_inst_block = parent.children[-1]
+        _set_skip(last_inst_block)
+        return None # remove the write call
     else:
         # On a function which is not the main. Do not return
         copy_inst = info.prog.send(ref, write_size, info, return_val,
@@ -313,6 +318,8 @@ def _do_pass(inst, info, more):
                             continue
                         if new_inst is not None:
                             new_child.append(new_inst)
+                        elif tag != BODY:
+                            return None
                 else:
                     obj = PassObject.pack(lvl+1, tag, parent_list)
                     new_child = _do_pass(child, info, obj)
