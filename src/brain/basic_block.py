@@ -3,6 +3,8 @@ from code_pass import Pass
 from cfg import CFGJump, CFGNode, Jump, TRUE, FALSE, cfg_leafs
 
 DASH = Literal('-', CODE_LITERAL)
+ONE = Literal('1', clang.CursorKind.INTEGER_LITERAL)
+TWO = Literal('2', clang.CursorKind.INTEGER_LITERAL)
 
 def _deep(inst):
     if inst.kind == clang.CursorKind.PAREN_EXPR:
@@ -194,6 +196,19 @@ class CreateBasicBlockCFG(Pass):
             func_call.add(inst)
             B = BasicBlock()
             func_call.connect(B, join=False)
+            self.cur_block = B
+        elif inst.kind == ANNOTATION_INST:
+            if not inst.is_block_annotation() or not inst.has_children():
+                return
+            A = self.cur_block
+            B = BasicBlock()
+            jmp = CFGJump()
+            jmp.cond = inst
+            body = CreateBasicBlockCFG.do(inst.block, self.info).cfg_root
+            jmp.jmps.append(Jump(ONE, body, False))
+            jmp.jmps.append(Jump(TWO, B, False))
+            A.connect(jmp, False)
+            _connect_leafs_to(B, body)
             self.cur_block = B
         else:
             if self.cur_block.is_empty() or self._check_same_color(inst):
