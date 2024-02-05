@@ -205,9 +205,9 @@ class TransformVars(Pass):
                 # We do not care about this variable
                 return inst
         elif inst.kind == clang.CursorKind.CALL_EXPR:
-            debug('func call', inst)
+            # debug('func call', inst)
             if inst.name in READ_PACKET:
-                debug('read call:', inst, tag=MODULE_TAG)
+                # debug('read call:', inst, tag=MODULE_TAG)
                 # TODO: if the return value of the function call is ignored, we
                 # should remove this instruction.
                 return self._process_read_call(inst)

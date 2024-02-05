@@ -72,7 +72,9 @@ def _known_function_substitution(inst, info):
     """
     Replace some famous functions with implementations that work in BPF
     """
-    if inst.name in ('strlen',):
+    if inst.name == 'free':
+        return None
+    elif inst.name in ('strlen',):
         new_name = 'bpf_' + inst.name
         return _rename_func_to_a_known_one(inst, info, new_name)
     elif inst.name == 'strncmp':

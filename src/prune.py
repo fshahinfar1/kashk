@@ -15,7 +15,7 @@ IGNORE_FUNC = ('printf', 'fprintf')
 MEMORY_ACCESS_FUNC = ('memchr', 'memrchr', 'memcpy', 'memmove', 'memset',
     'strcpy', 'strncpy', 'strlen', 'strnlen', 'strcmp', 'strncmp')
 KNOWN_FUNCS = (*READ_PACKET, *WRITE_PACKET, *COROUTINE_FUNC_NAME, *IGNORE_FUNC,
-        *MEMORY_ACCESS_FUNC, 'malloc', 'ntohs', 'ntohl', 'ntohll', 'htons',
+        *MEMORY_ACCESS_FUNC, 'malloc', 'free', 'ntohs', 'ntohl', 'ntohll', 'htons',
         'htonl', 'htonll')
 # Names of functions that we implement
 OUR_IMPLEMENTED_FUNC = ('bpf_memcpy', 'bpf_strncpy', 'bpf_ntohs', 'bpf_ntohl',

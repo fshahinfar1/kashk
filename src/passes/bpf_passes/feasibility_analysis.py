@@ -184,7 +184,7 @@ def _do_pass(inst, info, more):
             if current_function:
                 current_function.may_fail = True
                 text, _ = gen_code([inst,], info)
-                debug(f'Failed @{current_function.name} on:', text, inst)
+                debug(f'Failed @{current_function.name} on:', text, inst, tag=MODULE_TAG)
             # Not a stack
             fail_ref.set(FAILED, True)
         # Continue deeper
