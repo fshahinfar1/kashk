@@ -80,10 +80,9 @@ def _do_pass(inst, info, more):
                     info.prog.declarations.insert(0, func)
                     # report(MODULE_TAG, 'Function:', func.name)
 
-                if not flag:
-                    # Check param types and mark their definition useful
-                    for arg in func.get_arguments():
-                        _add_type_to_declarations(arg.type_ref, info)
+                # Check param types and mark their definition useful
+                for arg in func.get_arguments():
+                    _add_type_to_declarations(arg.type_ref, info)
                 # Continue processing the code reachable inside the function
                 with set_current_func(func):
                     _do_pass(func.body, info, None)
@@ -91,22 +90,19 @@ def _do_pass(inst, info, more):
                 debug('did not found function struct for', inst.name)
             # continue
         elif inst.kind == clang.CursorKind.VAR_DECL:
-            if not flag:
-                _add_type_to_declarations(inst.type, info)
+            _add_type_to_declarations(inst.type, info)
+        elif inst.kind == clang.CursorKind.DECL_REF_EXPR:
+            # Global variables do not have declerations on function scope. If
+            # we do not have this we may miss them.
+            _add_type_to_declarations(inst.type, info)
         d.go_deep()
 
-flag = None
 def mark_relevant_code(bpf, info, more):
     """
     Mark used functions and types. This helps to only consider the relevant
     codes and data-types when processing.
     """
-    global flag
     # global _has_processed
     # _has_processed = set()
-    if more and more.get('func_only'):
-        flag = True
-    else:
-        flag = False
     with set_current_func(None):
         _do_pass(bpf, info, None)

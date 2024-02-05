@@ -39,6 +39,8 @@ def _do_pass(bpf, all_declarations, shared_vars, info):
             var_name = inst.name
             if var_name in shared_vars:
                 shared_vars.remove(var_name)
+                type_name = get_actual_type(inst.type).spelling
+                keys = [type_name,]
 
         # Remove the types that was found useful
         if keys is not None:
