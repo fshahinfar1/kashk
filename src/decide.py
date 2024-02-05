@@ -7,7 +7,7 @@ from cfg import CFGJump, CFGNode, cfg_leafs
 from code_pass import Pass
 from data_structure import Function
 from log import debug
-from brain.basic_block import create_basic_block_cfg
+from brain.basic_block import BasicBlock, create_basic_block_cfg
 from brain.exec_path import extract_exec_paths
 from brain.cost_func import calculate_cost_along_path, CalcExpectedCost
 from helpers.cfg_graphviz import CFGGraphviz
@@ -47,11 +47,10 @@ class SelectBoundaries(Pass):
             self.skip_children()
             return node
             # END
-        elif isinstance(node, CFGNode):
-            for block in node.insts:
-                if block.expected_cost < self.cur_min:
-                    self.cur_sel = block
-                    self.cur_min = block.expected_cost
+        elif isinstance(node, BasicBlock):
+            if node.expected_cost < self.cur_min:
+                self.cur_sel = node
+                self.cur_min = node.expected_cost
         return node
 
     def end_current_inst(self, node, more):

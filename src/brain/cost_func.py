@@ -12,6 +12,12 @@ from brain.basic_block import inst_is_func_call
 MODULE_TAG = '[Cost Func]'
 
 
+context_switch = 100
+def set_context_switch_cost(val):
+    global context_switch
+    context_switch = val
+
+
 def consult_inst_cost_table(inst):
     # debug(inst.color, tag=MODULE_TAG)
     if inst.color == InstructionColor.KNOWN_FUNC_IMPL:
@@ -32,12 +38,12 @@ def consult_inst_cost_table(inst):
             InstructionColor.KNOWN_FUNC_IMPL: 0,
             InstructionColor.EXTRA_STACK_ALOC: 1,
             InstructionColor.EXTRA_MEM_ACCESS: 5,
-            InstructionColor.REMOVE_READ: -100,
-            InstructionColor.REMOVE_WRITE: -100,
+            InstructionColor.REMOVE_READ: -context_switch,
+            InstructionColor.REMOVE_WRITE: -context_switch,
             InstructionColor.ADD_ARGUMENT: 0,
             InstructionColor.EXTRA_ALU_OP: 2,
             InstructionColor.MEM_COPY: 10,
-            InstructionColor.TO_USER: 100,
+            InstructionColor.TO_USER: context_switch,
         }
     return table[inst.color]
 

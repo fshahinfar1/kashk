@@ -43,6 +43,8 @@ from helpers.instruction_helper import show_insts
 from helpers.ast_graphviz import ASTGraphviz
 from helpers.cfg_graphviz import CFGGraphviz
 
+from brain.cost_func import set_context_switch_cost
+
 from perf_model.static_high_level_perf_model import gen_static_high_level_perf_model
 from cfg import make_cfg, HTMLWriter
 from decide import analyse_offload
@@ -112,6 +114,11 @@ def generate_offload(io_ctx):
     # filter_log(MODULE_TAG, '[Select Userspace Pass]', '[Var Dependency]')
     # filter_log(MODULE_TAG, '[Var Dependency]', '[Create Fallback]',
     #         '[User Code]', '[Select Userspace]')
+
+    if io_ctx.bpf_hook == InputOutputContext.HOOK_XDP:
+        set_context_switch_cost(1000)
+    else:
+        set_context_switch_cost(100)
 
     info = Info.from_io_ctx(io_ctx)
     build_sym_table(info)
