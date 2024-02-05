@@ -26,6 +26,7 @@ class BasicTest:
         io_ctx.set_entry_func(entry_func_name)
         io_ctx.set_cflags(compiler_args)
         io_ctx.bpf_hook = hook
+        io_ctx.set_framework('poll')
         self.info = Info.from_io_ctx(io_ctx)
 
     def run_test(self):
