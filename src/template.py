@@ -45,6 +45,7 @@ def bpf_ctx_bound_check(ref, index, data_end, return_value=None):
         pass
     else:
         ret.body.add_inst(return_value)
+    ret.set_modified()
 
     _if.cond.add_inst(cond)
     _if.body.add_inst(ret)
@@ -88,6 +89,7 @@ def bpf_ctx_bound_check_bytes(ref, size, data_end, return_value=None):
         ret.body.add_inst(Literal('0', kind=clang.CursorKind.INTEGER_LITERAL))
     else:
         ret.body.add_inst(return_value)
+    ret.set_modified()
 
     _if.cond.add_inst(cond)
     _if.body.add_inst(ret)
@@ -158,6 +160,7 @@ def prepare_meta_data(failure_number, meta_declaration, info):
     assign.set_modified()
 
     DROP = Literal(info.prog.get_drop(), clang.CursorKind.INTEGER_LITERAL)
+    DROP.set_modified()
     bound_check = bpf_ctx_bound_check(ref, ZERO, info.prog.get_pkt_end(), DROP)
 
     store = [f'{ref.name}->failure_number = {failure_number};', ]

@@ -129,7 +129,7 @@ class TransformVars(Pass):
         # Remove annotation
         return None
 
-    def _process_read_call(self, inst):
+    def _process_read_call(self, inst, more):
         blk = self.cb_ref.get(BODY)
         # NOTE: I can assign the pointer but then the buffer size won't be right?
         #           <-- should it be considered as an optimization and applied only
@@ -145,6 +145,10 @@ class TransformVars(Pass):
         assign_inst.set_modified(InstructionColor.REMOVE_READ)
         assign_inst.removed.append(inst)
         # Set the return value
+        if more.ctx == BODY:
+            # Discard the function return value
+            return None
+        # Use size of the packet as the return value
         new_inst = self.info.prog.get_pkt_size()
         new_inst.set_modified()
         return new_inst
@@ -190,10 +194,6 @@ class TransformVars(Pass):
                 # This will become a packet pointer, change the type if needed!
                 # TODO: this code does not consider shadowing variables and scopes
                 # other than those given to each function.
-                if (inst.type.is_pointer() and
-                        inst.type.get_pointee().kind == clang.TypeKind.SCHAR):
-                    # The type is okay
-                    return inst
                 # Change the declaration
                 T = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
                 new_inst = VarDecl.build(inst.name, T)
@@ -210,7 +210,7 @@ class TransformVars(Pass):
                 # debug('read call:', inst, tag=MODULE_TAG)
                 # TODO: if the return value of the function call is ignored, we
                 # should remove this instruction.
-                return self._process_read_call(inst)
+                return self._process_read_call(inst, more)
             elif inst.name in WRITE_PACKET:
                 # NOTE: the writel or libc calls are transformed after verifer pass
                 self.skip_children()

@@ -90,7 +90,7 @@ def _prepare_event_handler_args(cursor, info):
     return []
 
 
-def _move_vars_before_event_loop_to_shared_scope(entry_func, main, info):
+def move_vars_before_event_loop_to_shared_scope(entry_func, main, info):
     list_vars = get_variable_declaration_before_elem(entry_func, main)
     # if list_vars:
     #     debug('This is the list of variables before event loop:', tag=MODULE_TAG)
@@ -116,7 +116,7 @@ def generate_offload(io_ctx):
     #         '[User Code]', '[Select Userspace]')
 
     if io_ctx.bpf_hook == InputOutputContext.HOOK_XDP:
-        set_context_switch_cost(1000)
+        set_context_switch_cost(100)
     else:
         set_context_switch_cost(100)
 
@@ -134,7 +134,7 @@ def generate_offload(io_ctx):
     # Find the entry function
     main, entry_func = get_entry_code(cursor, info)
     #
-    _move_vars_before_event_loop_to_shared_scope(entry_func, main, info)
+    move_vars_before_event_loop_to_shared_scope(entry_func, main, info)
 
     # Start the passes
     debug('First pass on the AST (initializing...)', tag=MODULE_TAG)

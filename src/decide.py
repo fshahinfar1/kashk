@@ -99,11 +99,12 @@ def analyse_offload(prog, info):
     CalcExpectedCost.do(cfg, info)
     # SelectBoundaries.do(cfg, info)
 
-    tmp = CFGGraphviz.do(cfg, info)
-    tmp.dot.save('/tmp/cfg.dot')
-    tmp.dot.render(filename='cfg', directory='/tmp/', format='svg')
-    for name, tmp_cfg in cfg_table.items():
-        tmp = CFGGraphviz.do(tmp_cfg, info)
-        tmp.dot.save(f'/tmp/cfg_{name}.dot')
-        tmp.dot.render(filename=f'cfg_{name}', directory='/tmp/', format='svg')
+    # tmp = CFGGraphviz.do(cfg, info)
+    # tmp.dot.save('/tmp/cfg.dot')
+    # tmp.dot.render(filename='cfg', directory='/tmp/', format='svg')
+    # for name, tmp_cfg in cfg_table.items():
+    #     tmp = CFGGraphviz.do(tmp_cfg, info)
+    #     tmp.dot.save(f'/tmp/cfg_{name}.dot')
+    #     tmp.dot.render(filename=f'cfg_{name}', directory='/tmp/', format='svg')
+    return cfg_table
 
