@@ -9,9 +9,10 @@ from data_structure import Function
 from log import debug
 from brain.basic_block import BasicBlock, create_basic_block_cfg
 from brain.exec_path import extract_exec_paths
-from brain.cost_func import calculate_cost_along_path, CalcExpectedCost
+from brain.cost_func import calculate_cost_along_path, CalcExpectedCost, context_switch
 from helpers.cfg_graphviz import CFGGraphviz
 from helpers.function_call_dependency import find_function_call_dependencies
+from elements.likelihood import Likelihood
 
 
 MAIN = '__main__'
@@ -39,14 +40,17 @@ class SelectBoundaries(Pass):
             for branch in node.jmps:
                 tmp_obj = SelectBoundaries.do(branch.target, self.info)
                 branch_blocks = tmp_obj.selected_blocks
-                tmp_list.append(branch_blocks)
+                tmp = (branch, branch_blocks)
+                tmp_list.append(tmp)
                 # TODO: there may be conflicts along the paths. I think not
                 # handling conflicts would be fine for now.
                 # self.selected_blocks.extend(blocks_for_this_branch)
             # Evaluate if we should  offload the branch or not
             wins = 0
             our_champion = self.cur_min
-            for branch_blocks in tmp_list:
+            for branch, branch_blocks in tmp_list:
+                if branch.likelihood == Likelihood.Unlikely:
+                    continue
                 # how many boundaries does this branch have
                 boundaries = len(branch_blocks)
                 expected_br_cost = sum([t[1]
@@ -57,7 +61,7 @@ class SelectBoundaries(Pass):
             if wins >= len(node.jmps) // 2:
                 # At least half of the paths would benefit from offloading. We
                 # are offloading this branch.
-                for branch_blocks in tmp_list:
+                for _, branch_blocks in tmp_list:
                     self.selected_blocks.extend(branch_blocks)
                 # Deselect the boundary of before this branch
                 self.cur_min = inf
@@ -70,9 +74,16 @@ class SelectBoundaries(Pass):
             return node
             # END
         elif isinstance(node, BasicBlock):
-            if node.expected_cost <= self.cur_min:
+            expected_cost = node.expected_cost
+            if not node.terminal:
+                # If we set the boundary here we need to fallback. Adjust the
+                # cost for fallback operations.
+                expected_cost += context_switch
+                # TODO: I also need to adjust for packet manipulations that
+                # will happen (data summarization e.g.,)
+            if expected_cost <= self.cur_min:
                 self.cur_sel = node
-                self.cur_min = node.expected_cost
+                self.cur_min = expected_cost
         return node
 
     def end_current_inst(self, node, more):
