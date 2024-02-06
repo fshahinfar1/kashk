@@ -27,7 +27,9 @@ def _assign_block_to(blk, ref):
 
 
 def inst_type(inst):
-    if inst.kind in (clang.CursorKind.DECL_REF_EXPR, clang.CursorKind.MEMBER_REF_EXPR, clang.CursorKind.VAR_DECL, clang.CursorKind.CSTYLE_CAST_EXPR):
+    if inst.kind in (clang.CursorKind.DECL_REF_EXPR,
+            clang.CursorKind.MEMBER_REF_EXPR, clang.CursorKind.VAR_DECL,
+            clang.CursorKind.CSTYLE_CAST_EXPR):
         return inst.type
     elif inst.kind in (clang.CursorKind.PAREN_EXPR,):
         return inst_type(inst.body.children[0])
@@ -73,7 +75,7 @@ class SimplifyCode(Pass):
 
         return tmp_ref
 
-    def _separate_var_decl_and_init(self, inst):
+    def _separate_var_decl_and_init(self, inst, more):
         blk = self.cb_ref.get(BODY)
         assert blk is not None
         clone = clone_pass(inst)
@@ -85,6 +87,8 @@ class SimplifyCode(Pass):
         # If the declartion was ignored, also ignore the initialization
         bin_op.ignore = clone.ignore
         blk.append(clone)
+        if more.ctx != BODY:
+            blk.append(bin_op)
         return bin_op
 
     def _move_function_out(self, inst):
@@ -150,7 +154,7 @@ class SimplifyCode(Pass):
                 return self._move_function_out(inst)
         elif inst.kind == clang.CursorKind.VAR_DECL:
             if inst.has_children():
-                return self._separate_var_decl_and_init(inst)
+                return self._separate_var_decl_and_init(inst, more)
         elif inst.kind == clang.CursorKind.CONDITIONAL_OPERATOR:
             return self._handle_conditional_operator(inst)
 
