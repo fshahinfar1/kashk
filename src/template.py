@@ -3,6 +3,7 @@ from data_structure import *
 from utility import get_tmp_var_name
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
 from helpers.instruction_helper import decl_new_var, ZERO, NULL, CHAR_PTR, INT
+from elements.likelihood import Likelihood
 
 VOID_PTR = 'void *'
 
@@ -49,6 +50,7 @@ def bpf_ctx_bound_check(ref, index, data_end, return_value=None):
 
     _if.cond.add_inst(cond)
     _if.body.add_inst(ret)
+    _if.likelihood = Likelihood.Unlikely
     return _if
 
 
@@ -74,7 +76,7 @@ def bpf_ctx_bound_check_bytes(ref, size, data_end, return_value=None):
     pkt_off.op = '+'
     pkt_off.lhs.add_inst(lhs_cast)
     pkt_off.rhs.add_inst(size_plus_one)
-    pkt_off.set_Red(InstructionColor.EXTRA_ALU_OP)
+    pkt_off.set_modified(InstructionColor.EXTRA_ALU_OP)
 
     # (void *)(ref + size + 1) > (void *)(data_end)
     cond = BinOp(None)
@@ -93,6 +95,7 @@ def bpf_ctx_bound_check_bytes(ref, size, data_end, return_value=None):
 
     _if.cond.add_inst(cond)
     _if.body.add_inst(ret)
+    _if.likelihood = Likelihood.Unlikely
     return _if
 
 
@@ -140,6 +143,7 @@ def prepare_shared_state_var(ret_val=None):
     if ret_val is None:
         ret_val = Return.build([], red=True)
     check.body.add_inst(ret_val)
+    check.likelihood = Likelihood.Unlikely
     check.set_modified(InstructionColor.CHECK)
     insts = [var_decl, zero_decl, lookup_assign,  check]
     return insts

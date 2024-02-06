@@ -4,6 +4,7 @@ from instruction import *
 from data_structure import *
 from code_gen import gen_code
 from passes.passable import PassableObject
+from elements.likelihood import Likelihood
 
 TRUE = Literal('True', CODE_LITERAL)
 FALSE = Literal('False', CODE_LITERAL)
@@ -73,10 +74,12 @@ class CFGNode(CFGBaseNode):
 
 
 class Jump:
-    def __init__(self, cond: Instruction, target: CFGNode, backward: bool):
+    def __init__(self, cond: Instruction, target: CFGNode, backward: bool,
+            likely=Likelihood.Neutral):
         self.case_cond = cond
         self.target = target
         self.backward = backward
+        self.likelihood = likely
 
     def __iter__(self):
         yield self.case_cond

@@ -43,6 +43,9 @@ class Info:
     Represents the general understanding of the program
     """
 
+    __slots__ = ('prog', 'sym_tbl', 'user_prog', 'io_ctx', 'map_definitions',
+            'read_decl', 'func_cost_table')
+
     @classmethod
     def from_io_ctx(cls, io_ctx):
         info = Info()
@@ -68,6 +71,7 @@ class Info:
         self.map_definitions = {}
         # For tracking name of read buffers in a scope (scope name --> set of var names)
         self.read_decl = {}
+        self.func_cost_table = None
 
 
 class PacketBuffer:

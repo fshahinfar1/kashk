@@ -18,9 +18,6 @@ MAIN = '__main__'
 MODULE_TAG = '[Analyze Program]'
 
 
-# NOTE: The evaluation function is path independent, use memoizing, otherwise
-# there will be too many traverses.
-
 class SelectBoundaries(Pass):
     def __init__(self, info):
         super().__init__(info)
@@ -38,23 +35,51 @@ class SelectBoundaries(Pass):
         if self.entry_node is None:
             self.entry_node = node
         if isinstance(node, CFGJump):
+            tmp_list = []
             for branch in node.jmps:
-                tmp = SelectBoundaries.do(branch.target, self.info)
-                blocks_for_this_branch = tmp.selected_blocks
+                tmp_obj = SelectBoundaries.do(branch.target, self.info)
+                branch_blocks = tmp_obj.selected_blocks
+                tmp_list.append(branch_blocks)
                 # TODO: there may be conflicts along the paths. I think not
                 # handling conflicts would be fine for now.
-                self.selected_blocks.extend(blocks_for_this_branch)
+                # self.selected_blocks.extend(blocks_for_this_branch)
+            # Evaluate if we should  offload the branch or not
+            wins = 0
+            our_champion = self.cur_min
+            for branch_blocks in tmp_list:
+                # how many boundaries does this branch have
+                boundaries = len(branch_blocks)
+                expected_br_cost = sum([t[1]
+                    for t in branch_blocks]) / boundaries
+                if expected_br_cost < our_champion:
+                    # This branch is expected to benefit from offloading
+                    wins += 1
+            if wins >= len(node.jmps) // 2:
+                # At least half of the paths would benefit from offloading. We
+                # are offloading this branch.
+                for branch_blocks in tmp_list:
+                    self.selected_blocks.extend(branch_blocks)
+                # Deselect the boundary of before this branch
+                self.cur_min = inf
+                self.cur_sel = None
+            else:
+                # Taking the branch is not promising. We are falling back
+                # before the branch.
+                pass
             self.skip_children()
             return node
             # END
         elif isinstance(node, BasicBlock):
-            if node.expected_cost < self.cur_min:
+            if node.expected_cost <= self.cur_min:
                 self.cur_sel = node
                 self.cur_min = node.expected_cost
         return node
 
     def end_current_inst(self, node, more):
         if node == self.entry_node:
+            if self.cur_sel is None:
+                # We have not selected anything
+                return
             # we are exiting the evaluation of the root
             # What was the choice?
             tmp = (self.cur_sel, self.cur_min)
@@ -97,7 +122,14 @@ def analyse_offload(prog, info):
     for path in paths:
         calculate_cost_along_path(path, cost_table)
     CalcExpectedCost.do(cfg, info)
-    # SelectBoundaries.do(cfg, info)
+    obj = SelectBoundaries.do(cfg, info)
+    debug('Selected Boundaries', tag=MODULE_TAG)
+    for b in obj.selected_blocks:
+        debug(b, tag=MODULE_TAG)
+        b[0].boundary = True
+    debug('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+
+    info.func_cost_table = cost_table
 
     # tmp = CFGGraphviz.do(cfg, info)
     # tmp.dot.save('/tmp/cfg.dot')

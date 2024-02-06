@@ -6,6 +6,7 @@ from helpers.instruction_helper import *
 import template
 
 from bpf_hook import cast_data
+from elements.likelihood import Likelihood
 
 
 MODULE_TAG = '[BPF Prog]'
@@ -163,6 +164,7 @@ class BPF_PROG:
                 ret_inst     = failure_return
                 check.body.add_inst(ret_inst)
                 check.set_modified(InstructionColor.CHECK)
+                check.likelihood = Likelihood.Unlikely
 
                 copy         = Call(None)
                 copy.name    = memcpy

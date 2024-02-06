@@ -104,6 +104,7 @@ class Pass:
         return inst
 
     def do_pass(self, inst, more):
+        _old_inst = inst
         info = self.info
         lvl, ctx, parent_list = more.unpack()
         new_children = []
@@ -114,10 +115,12 @@ class Pass:
             inst = tmp
             if inst is None:
                 assert self._may_remove, 'This pass is not allowed to remove instructions'
+                self.end_current_inst(_old_inst, more)
                 return None
             if self._skip_children: #  or inst.ignore
                 self._skip_children = False
                 new_inst = clone_pass(inst)
+                self.end_current_inst(_old_inst, more)
                 return new_inst
             # Continue deeper
             parent = inst if inst.kind != BLOCK_OF_CODE else self.parent_inst
@@ -132,6 +135,7 @@ class Pass:
                                 assert self._may_remove, 'This pass is not allowed to remove instructions'
                                 if tag != BODY:
                                     # Remove the whole block
+                                    self.end_current_inst(_old_inst, more)
                                     return None
                                 # Omit this child from the block
                                 continue
@@ -148,9 +152,10 @@ class Pass:
                         new_child = self.do_pass(child, obj)
                         if new_child is None:
                             assert self._may_remove, 'This pass is not allowed to remove instructions'
+                            self.end_current_inst(_old_inst, more)
                             return None
                     new_children.append(new_child)
-        new_inst = self.end_current_inst(inst, more)
+        new_inst = self.end_current_inst(_old_inst, more)
         if inst is None:
             assert self._may_remove, 'This pass is not allowed to remove instructions'
             return None

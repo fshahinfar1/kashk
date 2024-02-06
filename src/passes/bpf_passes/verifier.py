@@ -103,6 +103,7 @@ def _check_if_variable_index_should_be_masked(ref, index, blk, info):
             continue
         mask_op     = BinOp.build(var, '&', info.prog.index_mask)
         mask_assign = BinOp.build(var, '=', mask_op)
+        mask_assign.set_modified(InstructionColor.EXTRA_ALU_OP)
         blk.append(mask_assign)
 
 

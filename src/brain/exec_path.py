@@ -9,6 +9,8 @@ class ExecutionPath:
     def __init__(self):
         ExecutionPath.counter += 1
         self.id = ExecutionPath.counter
+        # this list will contain basic blocks comprising a path. It may also
+        # contain some Jump object in case there is a backward jump.
         self.blocks = []
 
     def add(self, block):
@@ -26,6 +28,9 @@ class ExecutionPath:
 
 
 class ExtractExecPath(Pass):
+    """
+    Walks a CFG and prepares a list of different execution paths.
+    """
     def __init__(self, info):
         super().__init__(info)
 
@@ -43,6 +48,7 @@ class ExtractExecPath(Pass):
             for j in node.jmps:
                 if j.backward:
                     # Let's not follow the backward links
+                    self.cur_path.add(j)
                     continue
                 did_something = True
                 # NOTE: I could track the condition for each branch if needed

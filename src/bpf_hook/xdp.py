@@ -163,7 +163,7 @@ int xdp_prog(struct xdp_md *xdp)
             self.headers.append(XDP_HELPER_HEADER)
         xdp = Ref.build(self.ctx, self.ctx_type)
         call = Call(None)
-        call.name = '__prepare_headers_before_send'
+        call.name = '__prepare_headers_before_pass'
         call.args.append(xdp)
         call.set_modified(InstructionColor.KNOWN_FUNC_IMPL)
         return [call,]

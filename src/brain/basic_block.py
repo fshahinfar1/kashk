@@ -5,6 +5,7 @@ from cfg import CFGJump, CFGNode, Jump, TRUE, FALSE, cfg_leafs
 DASH = Literal('-', CODE_LITERAL)
 ONE = Literal('1', clang.CursorKind.INTEGER_LITERAL)
 TWO = Literal('2', clang.CursorKind.INTEGER_LITERAL)
+OTHERWISE = Literal('otherwise', CODE_LITERAL)
 
 def _deep(inst):
     if inst.kind == clang.CursorKind.PAREN_EXPR:
@@ -37,7 +38,14 @@ class BasicBlock(CFGNode):
         self.cost_book = {}
         self.expected_cost = 0
         self.terminal = False
-    
+        self.boundary = False
+
+    def __str__(self):
+        return f'[{self.insts}]'
+
+    def __repr__(self):
+        return str(self)
+
     def is_red(self):
         assert len(self.insts) > 0
         # TODO: I might to fix this in the Instruction class. Maybe an
@@ -95,13 +103,13 @@ class CreateBasicBlockCFG(Pass):
             [A]--> null
             ===
         to
-            [A] 
+            [A]
              |
              v
             <Branch> +-> (Recursivly Generate CFG for branch 1) --
                      |                                            \
                      +-> (Recursivly Generate CFG for branch 2) ----> [B] --> (Rest of the CFG)
-                     |                                            
+                     |
                      +-> ... --> [TERMINAL]
 
         NOTE: the CFG may terminate in a branch. That means some branches will
@@ -124,10 +132,11 @@ class CreateBasicBlockCFG(Pass):
             jmp.cond = inst.cond.children[0]
             br1 = CreateBasicBlockCFG.do(inst.body, self.info).cfg_root
             br2 = CreateBasicBlockCFG.do(inst.other_body, self.info).cfg_root
-            jmp.jmps.append(Jump(TRUE, br1, False))
+            jmp.jmps.append(Jump(TRUE, br1, False, likely=inst.likelihood))
             _connect_leafs_to(B, br1)
             if not br2.is_empty():
-                jmp.jmps.append(Jump(FALSE, br2, False))
+                tmp = Likelihood.flip(inst.likelihood)
+                jmp.jmps.append(Jump(FALSE, br2, False, likely=tmp))
                 _connect_leafs_to(B, br2)
             else:
                 jmp.jmps.append(Jump(FALSE, B, False))
@@ -166,7 +175,10 @@ class CreateBasicBlockCFG(Pass):
             A.connect(jmp, False)
             jmp.cond = inst.cond.children[0]
             for sw_case in inst.body.children:
-                c = sw_case.case.children[0]
+                if sw_case.kind == clang.CursorKind.DEFAULT_STMT:
+                    c = OTHERWISE
+                else:
+                    c = sw_case.case.children[0]
                 body = CreateBasicBlockCFG.do(sw_case.body, self.info).cfg_root
                 jmp.jmps.append(Jump(c, body, False))
                 _connect_leafs_to(B, body)
@@ -175,7 +187,7 @@ class CreateBasicBlockCFG(Pass):
         self.cur_block = B
 
     def _do_process_inst(self, inst, more):
-        if inst.kind in BRANCHING_INSTRUCTIONS: 
+        if inst.kind in BRANCHING_INSTRUCTIONS:
             self._handle_a_branching_inst(inst, more)
         elif inst_is_func_call(inst):
             """
@@ -187,12 +199,10 @@ class CreateBasicBlockCFG(Pass):
                                     ===
             """
             A = self.cur_block
-            if A.is_empty():
-                # Do not create extra empty block
-                func_call = A
-            else:
-                func_call = BasicBlock()
-                A.connect(func_call, join=False)
+            # NOTE: Always create an empty block before functions so we could
+            # decide if we want set boundary before or after the function call
+            func_call = BasicBlock()
+            A.connect(func_call, join=False)
             func_call.add(inst)
             B = BasicBlock()
             func_call.connect(B, join=False)

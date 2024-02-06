@@ -10,6 +10,7 @@ from code_pass import Pass
 from code_gen import gen_code
 from cfg import CFGNode, CFGJump
 from brain.basic_block import BasicBlock
+from elements.likelihood import Likelihood
 
 
 MODULE_TAG = '[CFG Graphviz]'
@@ -39,8 +40,8 @@ class CFGGraphviz(Pass):
         self.dot = graphviz.Digraph(comment=comment,
                 node_attr={
                     'style':'filled',
-                    'color':'white',
-                    'stroke': 'black',
+                    'color':'black',
+                    'fillcolor': 'white',
                     'fontname': 'monospace',
                     },
                 )
@@ -65,23 +66,30 @@ class CFGGraphviz(Pass):
             return node
         NID = node.node_id
         shape = shape_config[type(node)]
-        color = 'silver'
+        color = 'ivory2'
+        stroke = 'black'
+        penwidth = '1.0'
         if isinstance(node, CFGNode):
             if len(node.insts) > 0 and isinstance(node, BasicBlock):
                 if node.is_func_call():
                     color = 'lightgreen'
                 elif node.is_red():
-                    color = 'lightcoral'
+                    color = 'lightpink'
                 else:
-                    color = 'lightblue2'
+                    color = 'lightcyan'
+            if isinstance(node, BasicBlock) and node.boundary:
+                stroke = 'magenta3'
+                penwidth = '5.0'
             lbl = self.get_cfg_node_label(node)
-            self.dot.node(NID, label=lbl, shape=shape, color=color)
+            self.dot.node(NID, label=lbl, shape=shape,
+                    fillcolor=color, penwidth=penwidth, color=stroke)
             if node.next is not None:
                 T_NID = node.next.node_id
                 self.dot.edge(NID, T_NID)
         elif isinstance(node, CFGJump):
             lbl = self.get_cfg_node_label(node)
-            self.dot.node(NID, label=lbl, shape=shape, color=color)
+            self.dot.node(NID, label=lbl, shape=shape,
+                    fillcolor=color, penwidth=penwidth, color=stroke)
             for j in node.jmps:
                 case_cond, target_node = j
                 T_NID = target_node.node_id
@@ -89,6 +97,8 @@ class CFGGraphviz(Pass):
                 edge_color = 'black'
                 if j.backward:
                     edge_color = 'purple'
+                elif j.likelihood == Likelihood.Unlikely:
+                    edge_color = 'pink'
                 self.dot.edge(NID, T_NID, label=edge_lbl, color=edge_color)
         else:
             raise Exception('Unexpected')

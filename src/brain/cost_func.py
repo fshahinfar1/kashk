@@ -5,7 +5,7 @@ from log import debug
 from instruction import InstructionColor
 from code_pass import Pass
 from data_structure import Function
-from cfg import CFGJump, CFGNode
+from cfg import CFGJump, CFGNode, Jump
 from brain.basic_block import BasicBlock
 from brain.basic_block import inst_is_func_call
 
@@ -55,6 +55,7 @@ def basic_block_cost_func(block, cost_table):
     @param cost_table, a table which holds the cost calculated for the
     functions
     """
+    assert isinstance(block, BasicBlock)
     if len(block.insts) == 0:
         # Special case in which the block is empty
         return 0
@@ -85,6 +86,10 @@ def calculate_cost_along_path(path, cost_table):
     """
     acc = 0
     for block in path.blocks:
+        if isinstance(block, Jump):
+            # jump.target...
+            # print('here')
+            continue
         cost = basic_block_cost_func(block, cost_table)
         acc += cost
         block.cost_book[path.id] = acc

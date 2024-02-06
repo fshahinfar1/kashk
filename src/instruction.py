@@ -5,6 +5,7 @@ from utility import get_owner, report_on_cursor, get_actual_type
 from data_structure import Function, MyType, BASE_TYPES
 from log import error, debug, report
 from passes.passable import PassableObject
+from elements.likelihood import Likelihood
 
 
 CODE_LITERAL = 8081
@@ -366,7 +367,7 @@ class VarDecl(Instruction):
 
 
 class ControlFlowInst(Instruction):
-    __slots__ = ('cond', 'other_body', 'repeat')
+    __slots__ = ('cond', 'other_body', 'repeat', 'likelihood')
 
     @classmethod
     def build_if_inst(cls, condition_inst, red=False):
@@ -384,6 +385,7 @@ class ControlFlowInst(Instruction):
         self.body = Block(BODY)
         self.other_body = Block(BODY)
         self.repeat = None
+        self.likelihood = Likelihood.Neutral
 
     def has_children(self):
         return True
@@ -409,6 +411,7 @@ class ControlFlowInst(Instruction):
         if len(children) > 2:
             new.other_body = children[2]
         new.repeat = self.repeat
+        new.likelihood = self.likelihood
         return new
 
 
