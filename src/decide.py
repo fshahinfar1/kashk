@@ -38,6 +38,8 @@ class SelectBoundaries(Pass):
         if isinstance(node, CFGJump):
             tmp_list = []
             for branch in node.jmps:
+                if branch.backward:
+                    continue
                 tmp_obj = SelectBoundaries.do(branch.target, self.info)
                 branch_blocks = tmp_obj.selected_blocks
                 tmp = (branch, branch_blocks)
@@ -58,7 +60,7 @@ class SelectBoundaries(Pass):
                 if expected_br_cost < our_champion:
                     # This branch is expected to benefit from offloading
                     wins += 1
-            if wins >= len(node.jmps) // 2:
+            if wins > 0 and wins >= len(tmp_list) // 2:
                 # At least half of the paths would benefit from offloading. We
                 # are offloading this branch.
                 for _, branch_blocks in tmp_list:
@@ -142,9 +144,9 @@ def analyse_offload(prog, info):
 
     info.func_cost_table = cost_table
 
-    # tmp = CFGGraphviz.do(cfg, info)
+    tmp = CFGGraphviz.do(cfg, info)
     # tmp.dot.save('/tmp/cfg.dot')
-    # tmp.dot.render(filename='cfg', directory='/tmp/', format='svg')
+    tmp.dot.render(filename='cfg', directory='/tmp/', format='svg')
     # for name, tmp_cfg in cfg_table.items():
     #     tmp = CFGGraphviz.do(tmp_cfg, info)
     #     tmp.dot.save(f'/tmp/cfg_{name}.dot')

@@ -306,9 +306,9 @@ def strncmp(s1, s2, size, upper_bound, info, fail_return_inst=None):
 
 
     assert s1.type.is_pointer() or s1.type.is_array()
-    assert s1.type.under_type.spelling == 'char'
+    assert s1.type.under_type.spelling in ('char', 'unsigned char')
     assert s2.type.is_pointer() or s2.type.is_array()
-    assert s2.type.under_type.spelling == 'char'
+    assert s2.type.under_type.spelling in ('char', 'unsigned char'), f'{s2.type.under_type.spelling} is not char!'
 
     s1 = _add_paranthesis_if_needed(s1)
     s2 = _add_paranthesis_if_needed(s2)
@@ -319,11 +319,11 @@ def strncmp(s1, s2, size, upper_bound, info, fail_return_inst=None):
     bound_check_s2 = is_bpf_ctx_ptr(s2, info)
 
 
-    debug('strncmp, inputs:')
-    debug('s1:', s1, s1.owner)
-    debug('s2:', s2, s2.owner)
-    debug('bound check needed:', bound_check_s1, bound_check_s2)
-    debug('++++++++++++++++++++++++++++')
+    # debug('strncmp, inputs:')
+    # debug('s1:', s1, s1.owner)
+    # debug('s2:', s2, s2.owner)
+    # debug('bound check needed:', bound_check_s1, bound_check_s2)
+    # debug('++++++++++++++++++++++++++++')
 
     res_var = decl_new_var(INT, info, decl)
     init_res = BinOp.build(res_var, '=', ZERO)

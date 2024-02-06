@@ -24,6 +24,11 @@ declare_at_top_of_func = None
 # Skip until the cache END
 skip_to_end = None
 
+def _is_known_integer(inst):
+    return (isinstance(inst, Literal) or
+            (inst.kind == clang.CursorKind.UNARY_OPERATOR
+                and inst.op == 'sizeof'))
+
 
 def _set_skip(val):
     global skip_to_end
@@ -80,7 +85,9 @@ def _known_function_substitution(inst, info):
     elif inst.name == 'strncmp':
         assert len(inst.args) == 3
         max_bound = inst.repeat
-        # TODO: check if the size is integer literal, then the annotation is not needed
+        if max_bound is None and _is_known_integer(inst.args[2]):
+            # Try to guess the max bound from the size parameter
+            max_bound = gen_code([inst.args[2],], None)[0]
         assert max_bound is not None, 'The strncmp should have annotation declaring max number of iterations'
         s1 = inst.args[0]
         s2 = inst.args[1]
@@ -135,9 +142,7 @@ def _known_function_substitution(inst, info):
     elif inst.name == 'memcpy':
         assert len(inst.args) == 3
         size = inst.args[2]
-        is_constant = (isinstance(size, Literal)
-                or (size.kind == clang.CursorKind.UNARY_OPERATOR
-                    and size.op == 'sizeof'))
+        is_constant = _is_known_integer(size)
         if is_constant:
             # No change is needed the builtin memcpy would work
             return inst

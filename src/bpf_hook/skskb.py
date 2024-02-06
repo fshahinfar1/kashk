@@ -20,7 +20,7 @@ class SK_SKB_PROG(BPF_PROG):
         bpf_parser.add_inst(Literal('return skb->len;', CODE_LITERAL))
         self.parser_code = bpf_parser
         self.ctx = 'skb'
-        self.ctx_type = MyType.make_pointer(MyType.make_simple('struct __sk_skb', clang.TypeKind.RECORD))
+        self.ctx_type = MyType.make_pointer(MyType.make_simple('struct __sk_buff', clang.TypeKind.RECORD))
 
     def set_bpf_context_struct_sym_tbl(self, sym_tbl):
         T = self.ctx_type.under_type
@@ -44,7 +44,7 @@ class SK_SKB_PROG(BPF_PROG):
             fields = [StateObject.build('data', U32),
                     StateObject.build('data_end', U32),
                     StateObject.build('len', U32)]
-            rec = Record('__sk_skb', fields)
+            rec = Record('__sk_buff', fields)
 
     def set_code(self, code):
         self.verdict_code = code
