@@ -1,6 +1,7 @@
 from cfg import CFGJump
 from brain.basic_block import BasicBlock
 from code_pass import Pass
+from elements.likelihood import Likelihood
 
 
 class ExecutionBlock:
@@ -18,6 +19,7 @@ class ExecutionPath:
         # this list will contain basic blocks comprising a path. It may also
         # contain some Jump object in case there is a backward jump.
         self.blocks = []
+        self.unlikely = False
 
     def add(self, block):
         self.blocks.append(block)
@@ -79,6 +81,8 @@ class ExtractExecPath(Pass):
                 tmp = ExtractExecPath.do(j.target, self.info)
                 for branch in tmp.paths:
                     path = cur + branch
+                    if j.likelihood == Likelihood.Unlikely:
+                        path.unlikely = True
                     self.paths.append(path)
             # End of a straight track. Do not continue. We are done.
             self.skip_children()

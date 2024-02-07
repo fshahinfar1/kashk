@@ -40,22 +40,10 @@ int main(int argc, char *argv[])
 		int ret = recvfrom(fd, buf, BUFSIZE, 0,
 				(struct sockaddr *)&addr, &addr_len);
 		char *tmp = malloc(1024);
-		__ANNOTATE_LOOP(128)
-		memcpy(&tmp[0 * BUFSIZE], buf, ret);
-		__ANNOTATE_LOOP(128)
-		memcpy(&tmp[1 * BUFSIZE], buf, ret);
-		__ANNOTATE_LOOP(128)
-		memcpy(&tmp[2 * BUFSIZE], buf, ret);
-		/* __ANNOTATE_LOOP(128) */
-		/* memcpy(&tmp[3 * BUFSIZE], buf, ret); */
-		/* __ANNOTATE_LOOP(128) */
-		/* memcpy(&tmp[4 * BUFSIZE], buf, ret); */
-		/* __ANNOTATE_LOOP(128) */
-		/* memcpy(&tmp[5 * BUFSIZE], buf, ret); */
-		/* __ANNOTATE_LOOP(128) */
-		/* memcpy(&tmp[6 * BUFSIZE], buf, ret); */
-		/* __ANNOTATE_LOOP(128) */
-		/* memcpy(&tmp[7 * BUFSIZE], buf, ret); */
+		for (int i = 0; i < 8; i++) {
+			__ANNOTATE_LOOP(128)
+			memcpy(&tmp[i * BUFSIZE], buf, ret);
+		}
 		sendto(fd, tmp, ret, 0, (struct sockaddr *)&addr, addr_len);
 	}
 	return 0;

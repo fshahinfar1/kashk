@@ -40,6 +40,8 @@ class SelectBoundaries(Pass):
             for branch in node.jmps:
                 if branch.backward:
                     continue
+                if branch.forward_loop_branch:
+                    continue
                 tmp_obj = SelectBoundaries.do(branch.target, self.info)
                 branch_blocks = tmp_obj.selected_blocks
                 tmp = (branch, branch_blocks)

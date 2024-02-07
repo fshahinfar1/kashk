@@ -82,10 +82,14 @@ def basic_block_cost_func(block, cost_table):
 
 def _execution_block_exp_cost(exec_block, cost_table):
     exp_cost = 0
+    count = 0
     for path in exec_block.paths:
         tmp = calculate_cost_along_path(path, cost_table)
+        if path.unlikely:
+            continue
         exp_cost += tmp
-    exp_cost = round(exp_cost / len(exec_block.paths), 3)
+        count += 1
+    exp_cost = round(exp_cost / count, 3)
     return exp_cost
 
 
