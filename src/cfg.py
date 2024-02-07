@@ -75,11 +75,12 @@ class CFGNode(CFGBaseNode):
 
 class Jump:
     def __init__(self, cond: Instruction, target: CFGNode, backward: bool,
-            likely=Likelihood.Neutral):
+            likely=Likelihood.Neutral, loop=False):
         self.case_cond = cond
         self.target = target
         self.backward = backward
         self.likelihood = likely
+        self.forward_loop_branch = loop
 
     def __iter__(self):
         yield self.case_cond

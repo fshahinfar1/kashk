@@ -99,6 +99,8 @@ class CFGGraphviz(Pass):
                     edge_color = 'purple'
                 elif j.likelihood == Likelihood.Unlikely:
                     edge_color = 'pink'
+                elif j.forward_loop_branch:
+                    edge_color = 'red'
                 self.dot.edge(NID, T_NID, label=edge_lbl, color=edge_color)
         else:
             raise Exception('Unexpected')

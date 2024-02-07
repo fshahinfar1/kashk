@@ -3,6 +3,12 @@ from brain.basic_block import BasicBlock
 from code_pass import Pass
 
 
+class ExecutionBlock:
+    def __init__(self):
+        self.paths = []
+        self.exp_cost = None
+
+
 class ExecutionPath:
     counter = 0
 
@@ -26,6 +32,11 @@ class ExecutionPath:
         new.blocks = self.blocks + other.blocks
         return new
 
+    def clone(self):
+        new = ExecutionPath()
+        new.blocks = self.blocks[:]
+        return new
+
 
 class ExtractExecPath(Pass):
     """
@@ -45,16 +56,29 @@ class ExtractExecPath(Pass):
             self.cur_path.add(node)
         elif isinstance(node, CFGJump):
             did_something = False
+            cur = self.cur_path
+            # Check if this node is a kind of loop ...
+            loop_jumps = [j for j in node.jmps if j.forward_loop_branch]
+            loop = ExecutionBlock()
+            for j in loop_jumps:
+                tmp = ExtractExecPath.do(j.target, self.info)
+                for branch in tmp.paths:
+                    loop.paths.append(branch)
+            if len(loop.paths) > 0:
+                cur = cur.clone()
+                cur.add(loop)
             for j in node.jmps:
+                if j.forward_loop_branch:
+                    continue
                 if j.backward:
                     # Let's not follow the backward links
-                    self.cur_path.add(j)
+                    # self.cur_path.add(j)
                     continue
                 did_something = True
                 # NOTE: I could track the condition for each branch if needed
                 tmp = ExtractExecPath.do(j.target, self.info)
                 for branch in tmp.paths:
-                    path = self.cur_path + branch
+                    path = cur + branch
                     self.paths.append(path)
             # End of a straight track. Do not continue. We are done.
             self.skip_children()
@@ -63,7 +87,7 @@ class ExtractExecPath(Pass):
         else:
             raise Exception('Encountered unexpected CFG node')
         return node
-    
+
     def end_current_inst(self, node, more):
         if node == self._first_node:
             # End of processing this CFG

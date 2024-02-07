@@ -6,8 +6,8 @@ from instruction import InstructionColor
 from code_pass import Pass
 from data_structure import Function
 from cfg import CFGJump, CFGNode, Jump
-from brain.basic_block import BasicBlock
-from brain.basic_block import inst_is_func_call
+from brain.basic_block import BasicBlock, inst_is_func_call
+from brain.exec_path import ExecutionBlock
 
 MODULE_TAG = '[Cost Func]'
 
@@ -80,19 +80,35 @@ def basic_block_cost_func(block, cost_table):
         return 0
 
 
+def _execution_block_exp_cost(exec_block, cost_table):
+    exp_cost = 0
+    for path in exec_block.paths:
+        tmp = calculate_cost_along_path(path, cost_table)
+        exp_cost += tmp
+    exp_cost = round(exp_cost / len(exec_block.paths), 3)
+    return exp_cost
+
+
 def calculate_cost_along_path(path, cost_table):
     """
     @param cost_table: a table defining the cost of calling a function
     """
     acc = 0
     for block in path.blocks:
-        if isinstance(block, Jump):
-            # jump.target...
-            # print('here')
+        if isinstance(block, ExecutionBlock):
+            debug('an execution block: How many times does it repeat?', tag=MODULE_TAG)
+            N = 1
+            if block.exp_cost is None:
+                cost = _execution_block_exp_cost(block, cost_table)
+                block.exp_cost = cost
+            else:
+                cost = block.exp_cost
+            acc += N * cost
             continue
         cost = basic_block_cost_func(block, cost_table)
         acc += cost
         block.cost_book[path.id] = acc
+    return acc
 
 
 class CalcExpectedCost(Pass):
