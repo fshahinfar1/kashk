@@ -26,6 +26,7 @@
 
 #include "runner_args.h"
 #include "rdtsc.h"
+#include "bpf_stats.h"
 struct parameters args = {};
 struct program_context {
 	struct bpf_object *bpfobj;
@@ -151,15 +152,18 @@ int load_bpf_binary_and_get_program(void)
 
 int run_test(void)
 {
+	double tmp_ns;
 	int ret;
+	struct fd_info info = {};
 	char *payload = "this is a test\n";
 	char *output = calloc(1, MAX_BUF);
-	printf("DOING A TEST\n");
-	printf("--------------------------------------------------------\n");
 	ret = send_payload(context.prog_fd, payload, output, MAX_BUF);
-	printf("benchmark res: %f\n", context.last_test_duration);
+	bpf_read_fdinfo(context.prog_fd, &info);
+	/* printf("benchmark res: %f\n", context.last_test_duration); */
+	tmp_ns = (double)info.run_time_ns / (double)info.run_cnt;
+	printf("benchmark res: %f\n", tmp_ns);
 	printf("return value: %d\n", ret);
-	if (ret ==  XDP_DROP) {
+	if (ret == XDP_DROP) {
 		printf("XDP_DROP\n");
 	} else if (ret == XDP_PASS) {
 		printf("XDP_PASS\n");
@@ -185,8 +189,8 @@ int main(int argc, char *argv[])
 	printf("BPF binary: %s\n", args.binary_path);
 	load_bpf_binary_and_get_program();
 	printf("Program fd: %d\n", context.prog_fd);
+	printf("The benchmark expects kernel.bpf_stats_enabled to be enabled\n");
 	run_test();
-	sleep(5);
 	bpf_object__close(context.bpfobj);
 	return 0;
 }
