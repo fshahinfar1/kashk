@@ -25,12 +25,17 @@
 #include "runner_args.h"
 #include "rdtsc.h"
 #include "bpf_stats.h"
+#include "user_server.h"
+#include "csum.h"
+
 struct parameters args = {};
 struct program_context {
 	struct bpf_object *bpfobj;
 	struct bpf_program *prog;
 	int prog_fd;
 	double last_test_duration;
+	int live;
+	int server_pid;
 };
 static struct program_context context;
 
@@ -46,6 +51,7 @@ int send_packet(int prog_fd, const char *input, size_t in_size,
 		char *output, size_t out_size)
 {
 	/* time_t before, after; */
+	int ret;
 	struct bpf_test_run_opts test_opts;
 	struct xdp_md ctx_in;
 	/* struct xdp_md ctx_out; */
@@ -56,31 +62,40 @@ int send_packet(int prog_fd, const char *input, size_t in_size,
 	test_opts.sz = sizeof(struct bpf_test_run_opts);
 	test_opts.data_in = input;
 	test_opts.data_size_in = in_size;
-	test_opts.data_out = output;
-	test_opts.data_size_out = out_size;
 	test_opts.ctx_in = &ctx_in;
 	test_opts.ctx_size_in = sizeof(ctx_in);
-	/* test_opts.ctx_out = &ctx_out; */
-	/* test_opts.ctx_size_out = sizeof(ctx_out); */
 	test_opts.repeat = args.repeat;
-	test_opts.flags = 0;
+	if (context.live == 1) {
+		printf("trying live flag...\n");
+		test_opts.flags = BPF_F_TEST_XDP_LIVE_FRAMES;
+		test_opts.batch_size = 8;
+		ctx_in.ingress_ifindex = args.ifindex;
+		assert(args.ifindex > 0);
+	} else {
+		test_opts.flags = 0;
+		test_opts.batch_size = 0;
+		test_opts.data_out = output;
+		test_opts.data_size_out = out_size;
+		/* test_opts.ctx_out = &ctx_out; */
+		/* test_opts.ctx_size_out = sizeof(ctx_out); */
+	}
 	test_opts.cpu = 0;
-	test_opts.batch_size = 0;
 	/* before = read_tsc(); */
-	int ret = bpf_prog_test_run_opts(prog_fd, &test_opts);
+	ret = bpf_prog_test_run_opts(prog_fd, &test_opts);
 	/* after = read_tsc(); */
-	/* context.last_test_duration = (after - before) / (double)args.repeat; */
-	context.last_test_duration = test_opts.duration;
 	if (ret < 0) {
 		perror("something went wrong\n");
 		return -1;
 	}
+	/* context.last_test_duration = (after - before) / (double)args.repeat; */
+	context.last_test_duration = test_opts.duration;
 	return test_opts.retval;
 }
 
 int send_payload(int prog_fd, const char *input, char *output, size_t out_size)
 {
 	int ret;
+	uint64_t csum;
 	/* Prepare the packet */
 	const size_t payload_size = strlen(input);
 	char *pkt = calloc(1, MAX_BUF);
@@ -90,8 +105,11 @@ int send_payload(int prog_fd, const char *input, char *output, size_t out_size)
 	struct iphdr *ip   = (struct iphdr *)(eth + 1);
 	struct udphdr *udp = (struct udphdr *)(ip + 1);
 	char *payload = (char *)(udp + 1);
-	memset(eth->h_source, 0xff, ETH_ALEN);
-	memset(eth->h_dest, 0xff, ETH_ALEN);
+	char my_mac_addr[6] = {0x4c,0xcc,0x6a,0xdb,0xbd,0xf8};
+	/* memset(eth->h_source, 0xff, ETH_ALEN); */
+	/* memset(eth->h_dest, 0xff, ETH_ALEN); */
+	memcpy(eth->h_source, my_mac_addr, 6);
+	memcpy(eth->h_dest, my_mac_addr, 6);
 	eth->h_proto = htons(ETH_P_IP);
 	ip->ihl = 5;
 	ip->version = 4;
@@ -103,9 +121,14 @@ int send_payload(int prog_fd, const char *input, char *output, size_t out_size)
 	ip->check = 0;
 	ip->saddr = htonl(0x7F000001);
 	ip->daddr = htonl(0x7F000001);
+	csum = 0;
+	ipv4_csum_inline(ip, &csum);
+	ip->check = htons(csum);
+
 	udp->source = htons(1234);
 	udp->dest = htons(8080);
 	udp->len = htons(sizeof(struct udphdr) + payload_size);
+	/* it is fine to not have udp checksum */
 	udp->check = 0;
 	memcpy(payload, input, payload_size);
 	ret = send_packet(prog_fd, pkt, pkt_size, output, out_size);
@@ -149,11 +172,30 @@ int load_bpf_binary_and_get_program(void)
 	return prog_fd;
 }
 
+static int xdp_flags = (XDP_FLAGS_UPDATE_IF_NOEXIST );
+// | XDP_FLAGS_DRV_MODE
+
+void detach_xdp_program(void)
+{
+	bpf_xdp_detach(args.ifindex, xdp_flags, NULL);
+}
+
+void attach_xdp_program(void)
+{
+	int ret;
+	ret = bpf_xdp_attach(args.ifindex, context.prog_fd, xdp_flags, NULL);
+	if (ret) {
+		perror("failed to attach xdp program\n");
+		detach_xdp_program();
+		exit(EXIT_FAILURE);
+	}
+}
+
 int run_test(void)
 {
-	double tmp_ns;
+	/* double tmp_ns; */
 	int ret;
-	struct fd_info info = {};
+	/* struct fd_info info = {}; */
 	char *payload = "this is a test\n";
 	char *output = calloc(1, MAX_BUF);
 	ret = send_payload(context.prog_fd, payload, output, MAX_BUF);
@@ -178,6 +220,30 @@ int run_test(void)
 	return ret;
 }
 
+int run_cross_test()
+{
+	int ret;
+	char *payload = "this is a test\n";
+	char *output = calloc(1, MAX_BUF);
+	attach_xdp_program();
+	ret = launch_server();
+	context.server_pid = ret;
+	ret = send_payload(context.prog_fd, payload, output, MAX_BUF);
+	kill(context.server_pid, SIGINT);
+	detach_xdp_program();
+	/* TODO: get the output of the server program */
+	return 0;
+}
+
+void interrupt_handler(int sig)
+{
+	if (context.server_pid != 0)
+		kill(context.server_pid, SIGINT);
+	if (args.ifindex != 0)
+		detach_xdp_program();
+	exit(EXIT_FAILURE);
+}
+
 int main(int argc, char *argv[])
 {
 	cpu_set_t cpu_cores;
@@ -185,10 +251,18 @@ int main(int argc, char *argv[])
 	CPU_SET(2, &cpu_cores);
 	pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpu_cores);
 	parse_args(argc, argv);
+	if (args.cross_test == 1) {
+		context.live = 1;
+	}
 	printf("BPF binary: %s\n", args.binary_path);
 	load_bpf_binary_and_get_program();
 	printf("Program fd: %d\n", context.prog_fd);
-	run_test();
+	signal(SIGINT, interrupt_handler);
+	if (args.cross_test == 1) {
+		run_cross_test();
+	} else {
+		run_test();
+	}
 	bpf_object__close(context.bpfobj);
 	return 0;
 }

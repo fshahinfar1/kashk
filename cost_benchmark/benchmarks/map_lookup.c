@@ -18,7 +18,7 @@ int prog_1(struct xdp_md *xdp)
 {
 	void *data = (void *)(__u64)xdp->data;
 	void *data_end = (void *)(__u64)xdp->data_end;
-	char obj[256];
+	char obj[256] = {};
 	for (int i = 0; i < 256; i++) {
 		obj[i] = (i * i) % 256;
 	}
@@ -41,6 +41,12 @@ int prog_2(struct xdp_md *xdp)
 		return XDP_DROP;
 	}
 	obj = it->data;
+	/*  Moving large objects to BPF map seems to be good :) ?!
+	 *  Probably because the same memory region is reused multiple times.
+	 *  But if we want to reinitialize the whole memory everytime (set to
+	 *  zero), it would be bad be cause we would be doing more work.
+	 * */
+	 /* memset(obj, 0, 256); */
 	for (int i = 0; i < 256; i++) {
 		obj[i] = (i * i) % 256;
 	}

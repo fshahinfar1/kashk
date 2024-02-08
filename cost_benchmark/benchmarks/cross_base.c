@@ -1,0 +1,59 @@
+#include "./commons.h"
+
+SEC("xdp")
+int prog(struct xdp_md *xdp)
+{
+	void *data = (void *)(__u64)xdp->data;
+	void *data_end = (void *)(__u64)xdp->data_end;
+	__u64 *payload = data + DATA_OFFSET;
+	__u64 ts = bpf_ktime_get_ns();
+	if ((void *)(payload + 1) > data_end) {
+		bpf_printk("drop it");
+		return XDP_DROP;
+	}
+	*payload = ts;
+
+	/* struct ethhdr *eth = data; */
+	/* if ((void *)(eth + 1) > data_end) { */
+	/* 	return XDP_DROP; */
+	/* } */
+	/* bpf_printk("Packet size: %ld\n", (__u64)(xdp->data_end - xdp->data)); */
+	/* bpf_printk("Src MAC: %x:%x:%x:", eth->h_source[0], eth->h_source[1], */
+	/* 		eth->h_source[2]); */
+	/* bpf_printk("%x:%x:%x\n", eth->h_source[3], eth->h_source[4], */
+	/* 		eth->h_source[5]); */
+	/* bpf_printk("Dest MAC: %x:%x:%x:", eth->h_dest[0], eth->h_dest[1], */
+	/* 		eth->h_dest[2]); */
+	/* bpf_printk("%x:%x:%x\n", eth->h_dest[3], eth->h_dest[4], */
+	/* 		eth->h_dest[5]); */
+	/* bpf_printk("Ether Type: %x\n", bpf_ntohs(eth->h_proto)); */
+	/* if (eth->h_proto == bpf_htons(ETH_P_IP)) { */
+	/* 	struct iphdr *ip = (struct iphdr *)(eth + 1); */
+	/* 	if ((void *)(ip + 1) > data_end) { */
+	/* 		return XDP_DROP; */
+	/* 	} */
+	/* 	// Swap IP */
+	/* 	bpf_printk("Src IP: %x\n", bpf_ntohl(ip->saddr)); */
+	/* 	bpf_printk("Dst IP: %x\n", bpf_ntohl(ip->daddr)); */
+	/* 	bpf_printk("ip checksum: %d\n", ip->check); */
+	/* 	bpf_printk("ip len: %d\n", bpf_ntohs(ip->tot_len)); */
+	/* 	if (ip->protocol == IPPROTO_UDP) { */
+	/* 		struct udphdr *udp = (void *)((__u64)xdp->data + */
+	/* 				(sizeof(*eth) + (ip->ihl * 4))); */
+	/* 		if ((void *)(udp + 1) > data_end) { */
+	/* 			return XDP_DROP; */
+	/* 		} */
+	/* 		// struct udphdr *udp = (struct udphdr *)(ip + 1); */
+	/* 		bpf_printk("Transport: UDP\n"); */
+	/* 		bpf_printk("Src PORT: %d\n", bpf_ntohs(udp->source)); */
+	/* 		bpf_printk("Dst PORT: %d\n", bpf_ntohs(udp->dest)); */
+	/* 		bpf_printk("checksum: %d\n", udp->check); */
+	/* 		bpf_printk("udp len: %d\n", bpf_ntohs(udp->len)); */
+	/* 		payload = udp + 1; */
+	/* 		bpf_printk("payload: %s\n", payload); */
+	/* 	} */
+	/* } */
+	/* __prepare_headers_before_pass(xdp); */
+	return XDP_PASS;
+}
+

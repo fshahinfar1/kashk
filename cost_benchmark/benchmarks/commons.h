@@ -26,4 +26,7 @@ typedef char bool;
 #define PKT_OFFSET_MASK 0xfff
 #define MAX_PACKET_SIZE 1472
 #define DATA_OFFSET (sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr))
+char _license[] SEC("license") = "GPL";
 #endif
+
+
