@@ -1,5 +1,16 @@
 #include "./commons.h"
 
+struct xdp_config {
+  int ifindex;
+};
+
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__type(key,  __u32);
+	__type(value, struct xdp_config);
+	__uint(max_entries, 1);
+} a_map SEC(".maps");
+
 SEC("xdp")
 int prog(struct xdp_md *xdp)
 {
@@ -11,7 +22,13 @@ int prog(struct xdp_md *xdp)
 		bpf_printk("drop it");
 		return XDP_DROP;
 	}
-	*payload = ts;
+	/* *payload = ts; */
+
+	/* const int zero = 0; */
+	/* struct xdp_config *config = bpf_map_lookup_elem(&a_map, &zero); */
+	/* if (config == NULL) { */
+	/* 	return XDP_DROP; */
+	/* } */
 
 	/* struct ethhdr *eth = data; */
 	/* if ((void *)(eth + 1) > data_end) { */
@@ -54,6 +71,8 @@ int prog(struct xdp_md *xdp)
 	/* 	} */
 	/* } */
 	/* __prepare_headers_before_pass(xdp); */
-	return XDP_PASS;
+	/* return XDP_PASS; */
+	return XDP_TX;
+	/* return bpf_redirect(config->ifindex, BPF_F_INGRESS); */
 }
 

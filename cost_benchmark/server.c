@@ -37,13 +37,13 @@ int main(int argc, char *argv[])
 	double avg_cross_time = 0;
 	size_t count = 0;
 	uint64_t acc = 0;
-	struct sockaddr_in sk_addr, addr;
+	struct sockaddr_in6 sk_addr, addr;
 	socklen_t addr_len;
-	inet_pton(AF_INET, "127.0.0.1", &(sk_addr.sin_addr));
-	/* sk_addr.sin_addr.s_addr = htonl(INADDR_ANY); */
-	sk_addr.sin_port = htons(8080);
-	sk_addr.sin_family = AF_INET;
-	sock = socket(AF_INET, SOCK_DGRAM, 0);
+	/* inet_pton(AF_INET6, "::::", &(sk_addr.sin_addr)); */
+	memset(sk_addr.sin6_addr.s6_addr, 0, 16);
+	sk_addr.sin6_port = htons(8080);
+	sk_addr.sin6_family = AF_INET6;
+	sock = socket(AF_INET6, SOCK_DGRAM, 0);
 	bind(sock, (struct sockaddr *)&sk_addr, sizeof(sk_addr));
 	running = 1;
 	signal(SIGINT, interrupt_handler);
@@ -57,7 +57,8 @@ int main(int argc, char *argv[])
 		if (ret < 1) {
 			continue;
 		}
-		/* printf("recv something: %s\n", buf); */
+		buf[ret] = '\0';
+		printf("recv something: %s\n", buf);
 		user_ts = get_ns();
 		bpf_ts = ((uint64_t *)buf)[0];
 		travel_time = user_ts - bpf_ts;

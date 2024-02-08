@@ -19,17 +19,6 @@ def set_context_switch_cost(val):
 
 
 def consult_inst_cost_table(inst):
-    # debug(inst.color, tag=MODULE_TAG)
-    if inst.color == InstructionColor.KNOWN_FUNC_IMPL:
-        know_func_table = {
-                'bpf_map_lookup_elem': 10,
-                'bpf_xdp_adjust_tail': 5,
-                '__prepare_headers_before_send': 20,
-                '__prepare_headers_before_pass': 20,
-                '__adjust_skb_size': 10,
-                }
-        return know_func_table[inst.name]
-
     table = {
             InstructionColor.ORIGINAL: 0,
             InstructionColor.RED: 0,
@@ -45,6 +34,16 @@ def consult_inst_cost_table(inst):
             InstructionColor.MEM_COPY: 10,
             InstructionColor.TO_USER: context_switch,
         }
+    # debug(inst.color, tag=MODULE_TAG)
+    if inst.color == InstructionColor.KNOWN_FUNC_IMPL:
+        know_func_table = {
+                'bpf_map_lookup_elem': table[InstructionColor.MAP_LOOKUP],
+                'bpf_xdp_adjust_tail': 5,
+                '__prepare_headers_before_send': 20,
+                '__prepare_headers_before_pass': 20,
+                '__adjust_skb_size': 10,
+                }
+        return know_func_table[inst.name]
     return table[inst.color]
 
 

@@ -47,7 +47,7 @@ void parse_args(int argc, char *argv[]) {
 	};
 
 	/* Default values */
-	args.repeat = 10000000;
+	args.repeat = 1000000000;
 	args.progname = "prog";
 
 	while (1) {
