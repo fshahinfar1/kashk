@@ -17,8 +17,8 @@ void usage(void) {
 	printf("loader:\n"
 		"  --binary    -b   path to binary file\n"
 		"  --input     -i   path to the benchmark input file\n"
-		"  --repeat    -r   [default 10^8]\n"
-		"  --prog-name -p   [default xdp_prog]\n"
+		"  --repeat    -r   [default 10^7]\n"
+		"  --prog-name -p   [default prog]\n"
 		"  --help      -h\n"
 	);
 }
@@ -37,8 +37,8 @@ void parse_args(int argc, char *argv[]) {
 	};
 
 	/* Default values */
-	args.repeat = 100000000;
-	args.progname = "xdp_prog";
+	args.repeat = 10000000;
+	args.progname = "prog";
 
 	while (1) {
 		ret = getopt_long(argc, argv, "hb:i:r:p:", long_opts, NULL);

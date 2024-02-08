@@ -1,7 +1,5 @@
 /*
  * This program relies on the BPF_PROG_TEST_RUN.
- * NOTE: I think using sysctl -w kernel.bpf_stats_enabled=1 I can gather some
- * information about the performance
  * */
 #define _GNU_SOURCE
 #include <arpa/inet.h>
@@ -47,7 +45,7 @@ static struct program_context context;
 int send_packet(int prog_fd, const char *input, size_t in_size,
 		char *output, size_t out_size)
 {
-	time_t before, after;
+	/* time_t before, after; */
 	struct bpf_test_run_opts test_opts;
 	struct xdp_md ctx_in;
 	/* struct xdp_md ctx_out; */
@@ -68,10 +66,11 @@ int send_packet(int prog_fd, const char *input, size_t in_size,
 	test_opts.flags = 0;
 	test_opts.cpu = 0;
 	test_opts.batch_size = 0;
-	before = read_tsc();
+	/* before = read_tsc(); */
 	int ret = bpf_prog_test_run_opts(prog_fd, &test_opts);
-	after = read_tsc();
-	context.last_test_duration = (after - before) / (double)args.repeat;
+	/* after = read_tsc(); */
+	/* context.last_test_duration = (after - before) / (double)args.repeat; */
+	context.last_test_duration = test_opts.duration;
 	if (ret < 0) {
 		perror("something went wrong\n");
 		return -1;
@@ -158,10 +157,10 @@ int run_test(void)
 	char *payload = "this is a test\n";
 	char *output = calloc(1, MAX_BUF);
 	ret = send_payload(context.prog_fd, payload, output, MAX_BUF);
-	bpf_read_fdinfo(context.prog_fd, &info);
-	/* printf("benchmark res: %f\n", context.last_test_duration); */
-	tmp_ns = (double)info.run_time_ns / (double)info.run_cnt;
-	printf("benchmark res: %f\n", tmp_ns);
+	/* bpf_read_fdinfo(context.prog_fd, &info); */
+	printf("benchmark res: %f\n", context.last_test_duration);
+	/* tmp_ns = (double)info.run_time_ns / (double)info.run_cnt; */
+	/* printf("benchmark res: %f\n", tmp_ns); */
 	printf("return value: %d\n", ret);
 	if (ret == XDP_DROP) {
 		printf("XDP_DROP\n");
@@ -189,7 +188,6 @@ int main(int argc, char *argv[])
 	printf("BPF binary: %s\n", args.binary_path);
 	load_bpf_binary_and_get_program();
 	printf("Program fd: %d\n", context.prog_fd);
-	printf("The benchmark expects kernel.bpf_stats_enabled to be enabled\n");
 	run_test();
 	bpf_object__close(context.bpfobj);
 	return 0;

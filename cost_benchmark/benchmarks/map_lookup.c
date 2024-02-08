@@ -1,5 +1,7 @@
 #include "./commons.h"
 
+/* Moving a large object from stack to the BPF map */
+
 struct item {
 	char data[256];
 };
@@ -8,11 +10,11 @@ struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);
 	__type(key,  __u32);
 	__type(value, struct item);
-	__uint(max_entries, 1024);
+	__uint(max_entries, 1);
 } a_map SEC(".maps");
 
 SEC("xdp")
-int xdp_prog_1(struct xdp_md *xdp)
+int prog_1(struct xdp_md *xdp)
 {
 	void *data = (void *)(__u64)xdp->data;
 	void *data_end = (void *)(__u64)xdp->data_end;
@@ -27,7 +29,7 @@ int xdp_prog_1(struct xdp_md *xdp)
 }
 
 SEC("xdp")
-int xdp_prog_2(struct xdp_md *xdp)
+int prog_2(struct xdp_md *xdp)
 {
 	void *data = (void *)(__u64)xdp->data;
 	void *data_end = (void *)(__u64)xdp->data_end;
