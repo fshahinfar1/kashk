@@ -128,7 +128,6 @@ int main(int argc, char *argv[])
 	load_bpf_binary_and_get_program();
 	printf("Program fd: %d\n", context.prog_fd);
 	signal(SIGINT, interrupt_handler);
-	context.live = 1;
 	if (args.cross_test == 1) {
 		/* run_cross_test(); */
 		run_xdp();
