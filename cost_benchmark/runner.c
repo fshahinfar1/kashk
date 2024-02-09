@@ -82,13 +82,25 @@ int run_cross_test()
 	bpf_map__update_elem(m, &key, sizeof(key), &cfg, sizeof(cfg), BPF_ANY);
 
 	ret = 0;
-	attach_xdp_program();
+	/* attach_xdp_program(); */
 	ret = launch_server();
 	context.server_pid = ret;
 	ret = send_payload(context.prog_fd, payload, output, MAX_BUF);
 	kill(context.server_pid, SIGINT);
-	detach_xdp_program();
+	/* detach_xdp_program(); */
 	/* TODO: get the output of the server program */
+	return 0;
+}
+
+static volatile int running = 1;
+int run_xdp()
+{
+	attach_xdp_program();
+	running = 1;
+	while (running) {
+		sleep(3);
+	}
+	detach_xdp_program();
 	return 0;
 }
 
@@ -98,6 +110,7 @@ void interrupt_handler(int sig)
 		kill(context.server_pid, SIGINT);
 	if (args.ifindex != 0)
 		detach_xdp_program();
+	running = 0;
 	exit(EXIT_FAILURE);
 }
 
@@ -117,7 +130,8 @@ int main(int argc, char *argv[])
 	signal(SIGINT, interrupt_handler);
 	context.live = 1;
 	if (args.cross_test == 1) {
-		run_cross_test();
+		/* run_cross_test(); */
+		run_xdp();
 	} else {
 		run_test();
 	}
