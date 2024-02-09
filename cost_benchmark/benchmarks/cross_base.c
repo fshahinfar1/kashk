@@ -1,28 +1,36 @@
 #include "./commons.h"
 
-struct xdp_config {
-  int ifindex;
-};
+/* struct xdp_config { */
+/*   int ifindex; */
+/* }; */
 
-struct {
-	__uint(type, BPF_MAP_TYPE_ARRAY);
-	__type(key,  __u32);
-	__type(value, struct xdp_config);
-	__uint(max_entries, 1);
-} a_map SEC(".maps");
+/* struct { */
+/* 	__uint(type, BPF_MAP_TYPE_ARRAY); */
+/* 	__type(key,  __u32); */
+/* 	__type(value, struct xdp_config); */
+/* 	__uint(max_entries, 1); */
+/* } a_map SEC(".maps"); */
 
 SEC("xdp")
 int prog(struct xdp_md *xdp)
 {
-	void *data = (void *)(__u64)xdp->data;
-	void *data_end = (void *)(__u64)xdp->data_end;
-	__u64 *payload = data + DATA_OFFSET;
-	__u64 ts = bpf_ktime_get_ns();
-	if ((void *)(payload + 1) > data_end) {
+	void *data = (void *)(unsigned long long)xdp->data;
+	void *data_end = (void *)(unsigned long long)xdp->data_end;
+	struct ethhdr *eth = data;
+	struct iphdr  *ip  = (void *)(eth + 1);
+	struct udphdr *udp = (void *)(ip  + 1);
+	if ((void *)(udp + 1) > data_end) return XDP_PASS;
+	if (udp->dest != bpf_htons(8080)) return XDP_PASS;
+
+	__u64 *payload = (void *)(udp + 1);
+	if ((void *)(payload + 2) > data_end) {
 		bpf_printk("drop it");
 		return XDP_DROP;
 	}
-	/* *payload = ts; */
+	__u64 ts = bpf_ktime_get_ns();
+	payload[1] = ts;
+	udp->check = 0; /* The UDP checksum is wrong now, disable it */
+	return XDP_PASS;
 
 	/* const int zero = 0; */
 	/* struct xdp_config *config = bpf_map_lookup_elem(&a_map, &zero); */
@@ -70,9 +78,6 @@ int prog(struct xdp_md *xdp)
 	/* 		bpf_printk("payload: %s\n", payload); */
 	/* 	} */
 	/* } */
-	/* __prepare_headers_before_pass(xdp); */
-	/* return XDP_PASS; */
-	return XDP_TX;
 	/* return bpf_redirect(config->ifindex, BPF_F_INGRESS); */
 }
 

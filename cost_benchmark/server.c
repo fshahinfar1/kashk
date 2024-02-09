@@ -11,6 +11,8 @@
 
 #define BUFSIZE 128
 
+#define ECHO_MODE 1
+
 static uint64_t get_ns(void)
 {
 	int ret;
@@ -45,6 +47,11 @@ int main(int argc, char *argv[])
 	bind(sock, (struct sockaddr *)&sk_addr, sizeof(sk_addr));
 	running = 1;
 	signal(SIGINT, interrupt_handler);
+#ifdef ECHO_MODE
+	printf("The server is running in echo mode\n");
+#else
+	printf("The server will drop requests\n");
+#endif
 	printf("Hit Ctrl+C to terminate ...\n");
 	while (running) {
 		struct sockaddr_in addr;
@@ -60,21 +67,33 @@ int main(int argc, char *argv[])
 		}
 		buf[size] = '\0';
 		/* printf("recv something: %s\n", buf); */
-		user_ts = get_ns();
-		bpf_ts = ((uint64_t *)buf)[0];
-		travel_time = user_ts - bpf_ts;
-		count++;
-		acc += travel_time;
-		/* Echo */
 		/* char *ip = strdup(inet_ntoa(addr.sin_addr)); */
 		/* char *tm = strdup(inet_ntoa(sk_addr.sin_addr)); */
 		/* printf("%s --> %s\n", tm, ip); */
+#ifdef ECHO_MODE
+		user_ts = get_ns();
+		bpf_ts = ((uint64_t *)buf)[1];
+		/* printf("bpf: %ld   user: %ld\n", bpf_ts, user_ts); */
+		travel_time = user_ts - bpf_ts;
+		count++;
+		acc += travel_time;
+
 		ret = sendto(sock, buf, size, 0,
 				(struct sockaddr *)&addr, addr_len);
 		if (ret <= 0) {
 			perror("Failed to echo the message\n");
 			continue;
 		}
+		continue;
+#else
+		user_ts = get_ns();
+		bpf_ts = *(uint64_t *)buf;
+		/* printf("bpf: %ld   user: %ld\n", bpf_ts, user_ts); */
+		travel_time = user_ts - bpf_ts;
+		count++;
+		acc += travel_time;
+		continue;
+#endif
 	}
 	if (count == 0) {
 		avg_cross_time = 0;
