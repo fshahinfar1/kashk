@@ -117,7 +117,7 @@ int monitor_connections(struct bpf_sock_ops *skops)
 			bpf_spin_unlock(&count->lock);
 			ctx->sock_map_index = sk_index;
 			/* Add the socket to the map */
-			/* bpf_printk("regiseter connection at index %d", sk_index); */
+			bpf_printk("regiseter connection at index %d", sk_index);
 			ret = bpf_sock_map_update(skops, &sock_map, &sk_index, BPF_ANY);
 			if (ret != 0) {
 				bpf_printk("failed to insert into map");
