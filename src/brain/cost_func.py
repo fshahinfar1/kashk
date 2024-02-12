@@ -12,7 +12,7 @@ from brain.exec_path import ExecutionBlock
 MODULE_TAG = '[Cost Func]'
 
 
-context_switch = 100
+context_switch = 10750
 def set_context_switch_cost(val):
     global context_switch
     context_switch = val
@@ -22,16 +22,16 @@ def consult_inst_cost_table(inst):
     table = {
             InstructionColor.ORIGINAL: 0,
             InstructionColor.RED: 0,
-            InstructionColor.CHECK: 5,
-            InstructionColor.MAP_LOOKUP: 20,
+            InstructionColor.CHECK: 0.5,
+            InstructionColor.MAP_LOOKUP: 2,
             InstructionColor.KNOWN_FUNC_IMPL: 0,
-            InstructionColor.EXTRA_STACK_ALOC: 1,
-            InstructionColor.EXTRA_MEM_ACCESS: 5,
+            InstructionColor.EXTRA_STACK_ALOC: 0,
+            InstructionColor.EXTRA_MEM_ACCESS: 1,
             InstructionColor.REMOVE_READ: -context_switch,
             InstructionColor.REMOVE_WRITE: -context_switch,
             InstructionColor.ADD_ARGUMENT: 0,
-            InstructionColor.EXTRA_ALU_OP: 2,
-            InstructionColor.MEM_COPY: 10,
+            InstructionColor.EXTRA_ALU_OP: 0,
+            InstructionColor.MEM_COPY: 0,
             InstructionColor.TO_USER: context_switch,
         }
     # debug(inst.color, tag=MODULE_TAG)
