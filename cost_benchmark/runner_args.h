@@ -22,7 +22,7 @@ void usage(void) {
 	printf("loader:\n"
 		"  --binary     -b   path to binary file\n"
 		"  --input           path to the benchmark input file\n"
-		"  --repeat     -r   [default 10^7]\n"
+		"  --repeat     -r   [default 10^4]\n"
 		"  --prog-name  -p   [default prog]\n"
 		"  --cross-test -x   run a userspace server for \n"
 		"                    testing the kernel/user crossing.\n"
@@ -47,7 +47,7 @@ void parse_args(int argc, char *argv[]) {
 	};
 
 	/* Default values */
-	args.repeat = 10000000;
+	args.repeat = 10000;
 	args.progname = "prog";
 
 	while (1) {

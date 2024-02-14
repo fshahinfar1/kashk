@@ -127,6 +127,7 @@ int do_tcp()
 	signal(SIGINT, interrupt_handler);
 
 	listen(sock, 1);
+	printf("Waiting for the client to connect (only one connection)...\n");
 	client = accept(sock, (struct sockaddr *)&addr, &addr_len);
 
 #ifdef ECHO_MODE
@@ -186,8 +187,25 @@ int do_tcp()
 	return 0;
 }
 
+void usage(void)
+{
+	printf("server MODE\n"
+		"  MODE: udp | tcp \n"
+	);
+}
+
 int main(int argc, char *argv[])
 {
-	/* return do_udp(); */
-	return do_tcp();
+	if (argc < 2) {
+		usage();
+		exit(1);
+	}
+	if (strcmp(argv[1], "tcp") == 0) {
+		return do_tcp();
+	} else if (strcmp(argv[1], "udp") == 0) {
+		return do_udp();
+	} else {
+		usage();
+		exit(1);
+	}
 }

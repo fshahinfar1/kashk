@@ -17,7 +17,7 @@ $(SERVER): server.c
 
 $(RUNNER): runner.c $(RUNNER_HEADERS)
 	if [ ! -d $(OUTDIR) ]; then mkdir -p $(OUTDIR) ; fi
-	$(CC) $(CFLAGS) -o $(RUNNER) runner.c -lbpf
+	$(CC) $(CFLAGS) -o $(RUNNER) runner.c -lbpf -lrt
 
 bpf:
 	for file in $(BPF_FILES); do \
