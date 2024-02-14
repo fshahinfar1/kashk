@@ -13,8 +13,11 @@ struct parameters {
 	size_t repeat;
 	char *progname;
 	int cross_test;
+	int xdp;
 	char *ifname;
 	int ifindex;
+	char *sender_ip;
+	char *receiver_ip;
 };
 extern struct parameters args;
 
@@ -26,7 +29,10 @@ void usage(void) {
 		"  --prog-name  -p   [default prog]\n"
 		"  --cross-test -x   run a userspace server for \n"
 		"                    testing the kernel/user crossing.\n"
+		"  --xdp             run xdp program\n"
 		"  --iface     -i    interface to use in cross test\n"
+		"  --sender          ip of the sender (when running cross-test)\n"
+		"  --receiver        ip of receiver (when running cross-test)\n"
 		"  --help      -h\n"
 	);
 }
@@ -42,6 +48,9 @@ void parse_args(int argc, char *argv[]) {
 		{"prog-name",  required_argument, NULL, 'p'},
 		{"cross-test", no_argument,       NULL, 'x'},
 		{"iface",      required_argument, NULL, 'i'},
+		{"xdp",        no_argument,       NULL, 129},
+		{"sender",     required_argument, NULL, 130},
+		{"receiver",   required_argument, NULL, 131},
 		/* End of option list ------------------- */
 		{NULL, 0, NULL, 0},
 	};
@@ -49,6 +58,10 @@ void parse_args(int argc, char *argv[]) {
 	/* Default values */
 	args.repeat = 10000;
 	args.progname = "prog";
+	args.cross_test = 0;
+	args.xdp = 0;
+	args.sender_ip = "192.168.1.2";
+	args.receiver_ip = "192.168.1.1";
 
 	while (1) {
 		ret = getopt_long(argc, argv, "xhb:i:r:p:", long_opts, NULL);
@@ -75,15 +88,34 @@ void parse_args(int argc, char *argv[]) {
 				args.ifindex = if_nametoindex(optarg);
 				assert(args.ifindex > 0);
 				break;
+			case 129:
+				args.xdp = 1;
+			case 130:
+				args.sender_ip = strdup(optarg);
+				break;
+			case 131:
+				args.receiver_ip = strdup(optarg);
+				break;
 			case 'h':
 				usage();
 				exit(0);
 				break;
 			default:
 				usage();
-				exit(1);
+				exit(EXIT_FAILURE);
 				break;
 		}
+	}
+
+	if (args.xdp && args.cross_test) {
+		fprintf(stderr, "Cannot configure both cross-test and xdp together.\n");
+		exit(EXIT_FAILURE);
+	}
+
+
+	if ((args.xdp || args.cross_test) && args.ifindex < 1) {
+		fprintf(stderr, "You should specifiy an interface.\n");
+		exit(EXIT_FAILURE);
 	}
 }
 #endif

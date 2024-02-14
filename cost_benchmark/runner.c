@@ -72,22 +72,23 @@ struct xdp_config {
 int run_cross_test()
 {
 	int ret;
-	char *payload = "this is a test\n";
+	char *payload = "this is a test message\n";
 	char *output = calloc(1, MAX_BUF);
 
-	const int key = 0;
-	struct bpf_map *m;
-	struct xdp_config cfg = { .ifindex = args.ifindex, };
-	m = bpf_object__find_map_by_name(context.bpfobj, "a_map");
-	bpf_map__update_elem(m, &key, sizeof(key), &cfg, sizeof(cfg), BPF_ANY);
+	/* const int key = 0; */
+	/* struct bpf_map *m; */
+	/* struct xdp_config cfg = { .ifindex = args.ifindex, }; */
+	/* m = bpf_object__find_map_by_name(context.bpfobj, "a_map"); */
+	/* bpf_map__update_elem(m, &key, sizeof(key), &cfg, sizeof(cfg), BPF_ANY); */
 
 	ret = 0;
-	/* attach_xdp_program(); */
+	attach_xdp_program();
 	ret = launch_server();
 	context.server_pid = ret;
-	ret = send_payload(context.prog_fd, payload, output, MAX_BUF);
+	const size_t repeat = 100000;
+	ret = _send_payload(context.prog_fd, payload, output, MAX_BUF, repeat);
 	kill(context.server_pid, SIGINT);
-	/* detach_xdp_program(); */
+	detach_xdp_program();
 	/* TODO: get the output of the server program */
 	return 0;
 }
@@ -129,9 +130,10 @@ int main(int argc, char *argv[])
 	printf("Program fd: %d\n", context.prog_fd);
 	signal(SIGINT, interrupt_handler);
 	if (args.cross_test == 1) {
-		/* run_cross_test(); */
+		run_cross_test();
+	} else if (args.xdp == 1) {
 		run_xdp();
-	} else {
+	}else {
 		run_test();
 	}
 	bpf_object__close(context.bpfobj);

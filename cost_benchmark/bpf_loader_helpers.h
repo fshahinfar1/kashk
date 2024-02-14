@@ -13,14 +13,14 @@
 #include "runner_args.h"
 #include "runner_global_context.h"
 #include "csum.h"
+#include "mac_addr.h"
 #define MAX_BUF 4096
 
 #ifndef BPF_F_TEST_XDP_LIVE_FRAMES
 #define BPF_F_TEST_XDP_LIVE_FRAMES	(1U << 1)
 #endif
 
-static int xdp_flags = (XDP_FLAGS_UPDATE_IF_NOEXIST );
-// | XDP_FLAGS_DRV_MODE
+static int xdp_flags = (XDP_FLAGS_UPDATE_IF_NOEXIST | XDP_FLAGS_DRV_MODE);
 
 void detach_xdp_program(void)
 {
@@ -97,11 +97,12 @@ int send_packet(int prog_fd, const char *input, size_t in_size,
 	test_opts.ctx_size_in = sizeof(ctx_in);
 	test_opts.repeat = args.repeat;
 	if (context.live == 1) {
-		printf("trying live flag...\n");
+		/* printf("trying live flag...\n"); */
 		test_opts.flags = BPF_F_TEST_XDP_LIVE_FRAMES;
-		test_opts.batch_size = 0;
-		/* ctx_in.ingress_ifindex = args.ifindex; */
-		printf("ifindex is %d\n", args.ifindex);
+		/* test_opts.batch_size = 0; */
+		test_opts.batch_size = 1;
+		ctx_in.ingress_ifindex = args.ifindex;
+		/* printf("ifindex is %d\n", args.ifindex); */
 		assert(args.ifindex > 0);
 	} else {
 		test_opts.flags = 0;
@@ -124,7 +125,7 @@ int send_packet(int prog_fd, const char *input, size_t in_size,
 	return test_opts.retval;
 }
 
-int send_payload(int prog_fd, const char *input, char *output, size_t out_size)
+int _send_payload(int prog_fd, const char *input, char *output, size_t out_size, size_t N)
 {
 	int ret;
 	uint64_t csum;
@@ -138,7 +139,8 @@ int send_payload(int prog_fd, const char *input, char *output, size_t out_size)
 	struct udphdr *udp = (struct udphdr *)(ip + 1);
 	char *payload = (char *)(udp + 1);
 	memset(eth->h_source, 0x00, ETH_ALEN);
-	memset(eth->h_dest, 0x00, ETH_ALEN);
+	get_mac_addr(args.ifindex, eth->h_dest);
+	/* memset(eth->h_dest, 0x00, ETH_ALEN); */
 	/* char my_mac_addr[6] = {0x4c,0xcc,0x6a,0xdb,0xbd,0xf8}; */
 	/* memcpy(eth->h_source, my_mac_addr, 6); */
 	/* memcpy(eth->h_dest, my_mac_addr, 6); */
@@ -149,11 +151,13 @@ int send_payload(int prog_fd, const char *input, char *output, size_t out_size)
 	ip->tot_len = htons(sizeof(struct iphdr) + sizeof(struct udphdr)
 			+ payload_size);
 	ip->id = 0;
-	ip->frag_off = 0x4 << 8;
+	ip->frag_off = 0;
 	ip->ttl = 64;
 	ip->protocol = IPPROTO_UDP;
-	ip->saddr = htonl(0x7F000001);
-	ip->daddr = htonl(0x7F000001);
+	inet_pton(AF_INET, args.sender_ip, &ip->saddr);
+	inet_pton(AF_INET, args.receiver_ip, &ip->daddr);
+	/* ip->saddr = htonl(0x7F000001); */
+	/* ip->daddr = htonl(0x7F000001); */
 	ip->check = 0;
 	csum = 0;
 	ipv4_csum_inline(ip, &csum);
@@ -164,13 +168,19 @@ int send_payload(int prog_fd, const char *input, char *output, size_t out_size)
 	udp->len = htons(sizeof(struct udphdr) + payload_size);
 	/* it is fine to not have udp checksum */
 	udp->check = 0;
-	/* csum = 0; */
-	/* void *data_end = payload + payload_size; */
-	/* ipv4_l4_csum_inline(data_end, udp, ip, &csum); */
-	/* udp->check = ntohs(csum); */
 	memcpy(payload, input, payload_size);
-	ret = send_packet(prog_fd, pkt, pkt_size, output, out_size);
+	csum = 0;
+	void *data_end = payload + payload_size;
+	ipv4_l4_csum_inline(data_end, udp, ip, &csum);
+	udp->check = ntohs(csum);
+	for (size_t i = 0; i < N; i++)
+		ret = send_packet(prog_fd, pkt, pkt_size, output, out_size);
 	free(pkt);
 	return ret;
+}
+
+int send_payload(int prog_fd, const char *input, char *output, size_t out_size)
+{
+	return _send_payload(prog_fd, input, output, out_size, 1);
 }
 #endif

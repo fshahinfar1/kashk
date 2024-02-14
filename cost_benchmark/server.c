@@ -11,7 +11,7 @@
 
 #define BUFSIZE 128
 
-#define ECHO_MODE 1
+/* #define ECHO_MODE 1 */
 
 static uint64_t get_ns(void)
 {
@@ -91,7 +91,7 @@ int do_udp()
 		continue;
 #else
 		user_ts = get_ns();
-		bpf_ts = *(uint64_t *)buf;
+		bpf_ts = ((uint64_t *)buf)[1];
 		/* printf("bpf: %ld   user: %ld\n", bpf_ts, user_ts); */
 		travel_time = user_ts - bpf_ts;
 		count++;

@@ -47,7 +47,7 @@ ipv4_l4_csum_inline(void *data_end, void *l4_hdr, struct iphdr *iph, unsigned lo
 		*csum += ntohs(*next_iph_u16);
 		next_iph_u16++;
 	}
-	printf("len: %d, %d\n", length, nr);
+	/* printf("len: %d, %d\n", length, nr); */
 	if ((void *)next_iph_u16 < data_end) {
 		last_byte = (unsigned char *)next_iph_u16;
 		if ((void *)(last_byte + 1) <= data_end) {
