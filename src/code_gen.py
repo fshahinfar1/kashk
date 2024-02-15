@@ -28,6 +28,14 @@ def handle_var(inst, info, more):
             text = f'{tmp[:first_brack]}[{el_count}]{tmp[first_brack:]}'
         else:
             text = f'{tmp}[{el_count}]'
+    elif inst.type.is_pointer() and inst.type.get_pointee().is_array():
+        dimensions = []
+        t = inst.type.get_pointee()
+        while t.is_array():
+            dimensions.append(t.element_count)
+            t = t.element_type
+        d = ''.join([f'[{str(x)}]' for x in dimensions])
+        text = f'{t.spelling} (* {inst.name}){d}'
     else:
         text = f'{inst.type.spelling} {inst.name}'
     if inst.init.has_children():

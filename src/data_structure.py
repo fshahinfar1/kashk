@@ -298,8 +298,9 @@ class MyType:
         self.func_proto_obj = None
 
     def __str__(self):
-        if self.is_pointer():
-            return self.spelling
+        if self.is_pointer() and self.under_type.is_array():
+            tmp = '(*) {str(self.under_type)}'
+            return tmp
         return self.spelling
 
     def get_pointee(self):

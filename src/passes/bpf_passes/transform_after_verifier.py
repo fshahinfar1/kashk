@@ -302,7 +302,8 @@ def _process_var_decl(inst, info):
     new_type = None
     def _convert_type(t):
         if t.is_array():
-            tmp = _convert_type(t.element_type)
+            # tmp = _convert_type(t.element_type)
+            tmp = t.element_type
             return MyType.make_pointer(tmp)
         elif t.is_record():
             return MyType.make_pointer(t)
