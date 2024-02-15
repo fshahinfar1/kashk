@@ -79,9 +79,19 @@ def _known_function_substitution(inst, info):
     """
     if inst.name == 'free':
         return None
-    elif inst.name in ('strlen',):
-        new_name = 'bpf_' + inst.name
-        return _rename_func_to_a_known_one(inst, info, new_name)
+    elif inst.name == 'strlen':
+        # new_name = 'bpf_' + inst.name
+        # return _rename_func_to_a_known_one(inst, info, new_name)
+        max_bound = inst.repeat
+        if max_bound is None:
+            raise Exception('the strlen should have annotation declaring max number of iterations')
+        s1 = inst.args[0]
+        tmp_insts, tmp_decl, tmp_res = template.strlen(s1, max_bound, info)
+        declare_at_top_of_func.extend(tmp_decl)
+        blk = cb_ref.get(BODY)
+        blk.extend(tmp_insts)
+        tmp_insts[1].removed.append(inst)
+        return tmp_res
     elif inst.name == 'strncmp':
         assert len(inst.args) == 3
         max_bound = inst.repeat

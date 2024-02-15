@@ -109,10 +109,10 @@ def analyse_offload(prog, info):
                 if func.is_used_in_bpf_code)
     # Find function call dependencies
     ordered_list_of_funcs = find_function_call_dependencies(relevant_func_names)
-    debug('order of evaluating cost of functions:', ordered_list_of_funcs, tag=MODULE_TAG)
+    # debug('order of evaluating cost of functions:', ordered_list_of_funcs, tag=MODULE_TAG)
     cost_table = {}
     for name in ordered_list_of_funcs:
-        debug('For func', name, tag=MODULE_TAG)
+        # debug('For func', name, tag=MODULE_TAG)
         func = Function.directory[name]
         cfg = create_basic_block_cfg(func.body, info)
         cfg_table[name] = cfg
@@ -127,8 +127,8 @@ def analyse_offload(prog, info):
             exp_cost_func += sum(l.cost_book.values())
         exp_cost_func = round(exp_cost_func / count_path, 3)
         cost_table[name] = exp_cost_func
-        debug('Add', name, 'with cost:', exp_cost_func, 'to the table',
-                tag=MODULE_TAG)
+        # debug('Add', name, 'with cost:', exp_cost_func, 'to the table',
+        #         tag=MODULE_TAG)
         CalcExpectedCost.do(cfg, info)
 
     cfg = create_basic_block_cfg(prog, info)
@@ -146,9 +146,9 @@ def analyse_offload(prog, info):
 
     info.func_cost_table = cost_table
 
-    tmp = CFGGraphviz.do(cfg, info)
+    # tmp = CFGGraphviz.do(cfg, info)
     # tmp.dot.save('/tmp/cfg.dot')
-    tmp.dot.render(filename='cfg', directory='/tmp/', format='svg')
+    # tmp.dot.render(filename='cfg', directory='/tmp/', format='svg')
     # for name, tmp_cfg in cfg_table.items():
     #     tmp = CFGGraphviz.do(tmp_cfg, info)
     #     tmp.dot.save(f'/tmp/cfg_{name}.dot')

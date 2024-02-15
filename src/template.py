@@ -2,7 +2,7 @@ from instruction import *
 from data_structure import *
 from utility import get_tmp_var_name
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
-from helpers.instruction_helper import decl_new_var, ZERO, NULL, CHAR_PTR, INT
+from helpers.instruction_helper import decl_new_var, ZERO, NULL, CHAR_PTR, INT, NULL_CHAR
 from elements.likelihood import Likelihood
 
 VOID_PTR = 'void *'
@@ -354,6 +354,34 @@ def strncmp(s1, s2, size, upper_bound, info, fail_return_inst=None):
     tmp_brk.kind = clang.CursorKind.BREAK_STMT
     check.body.add_inst(tmp_brk)
     loop.body.extend_inst([assign, check])
+
+    insts = [init_res, loop]
+    return insts, decl, res_var
+
+
+def strlen(s, max_bound, info):
+    assert hasattr(s, 'type')
+    assert s.type.is_pointer() or s.type.is_array()
+    assert s.type.under_type.spelling in ('char', 'unsigned char'), f'unexpected type {s.type.under_type.spelling}'
+    s = _add_paranthesis_if_needed(s)
+    decl = []
+    max_bound = Literal(str(max_bound), clang.CursorKind.INTEGER_LITERAL)
+    bound_check_s = is_bpf_ctx_ptr(s, info)
+    res_var = decl_new_var(INT, info, decl)
+    init_res = BinOp.build(res_var, '=', ZERO)
+
+    loop, tmp_decl, loop_var = new_bounded_loop(max_bound, max_bound, info, INT)
+    decl.extend(tmp_decl)
+
+    at_s = ArrayAccess.build(s, loop_var)
+    tmp_cond = BinOp.build(at_s, '==', NULL_CHAR)
+    check = ControlFlowInst.build_if_inst(tmp_cond)
+    update_res = BinOp.build(res_var, '=', loop_var)
+    tmp_brk = Instruction()
+    tmp_brk.kind = clang.CursorKind.BREAK_STMT
+    check.body.add_inst(update_res)
+    check.body.add_inst(tmp_brk)
+    loop.body.add_inst(check)
 
     insts = [init_res, loop]
     return insts, decl, res_var

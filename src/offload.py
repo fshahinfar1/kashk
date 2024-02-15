@@ -159,7 +159,6 @@ def generate_offload(io_ctx):
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('[1st] Annotation', tag=MODULE_TAG)
-    show_insts(Function.directory['process_request'].body)
     prog = primary_annotation_pass(prog, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 

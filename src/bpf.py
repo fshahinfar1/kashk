@@ -69,6 +69,7 @@ class BPF_PROG:
 ##endif''', CODE_LITERAL),
                 ]
         self.headers = [
+                '/* vim: set et ts=2 sw=2: */',
                 '#include <linux/bpf.h>',
                 '#include <bpf/bpf_helpers.h>',
                 '#include <bpf/bpf_endian.h>',

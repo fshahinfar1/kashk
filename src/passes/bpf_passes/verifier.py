@@ -316,7 +316,7 @@ def _check_passing_bpf_context(inst, func, info):
 
 
 def _check_setting_bpf_context_in_callee(inst, func, info):
-    debug('checking func:', inst.name, tag=MODULE_TAG)
+    # debug('checking func:', inst.name, tag=MODULE_TAG)
     callee_scope = info.sym_tbl.scope_mapping[func.name]
 
     # Check if value of pointers passed to this function was changed to point
@@ -338,7 +338,7 @@ def _check_setting_bpf_context_in_callee(inst, func, info):
                 continue
             ref = tmp
 
-        debug(f'Parameter {param.name} ({param.type_ref.kind}) is given argument {ref.owner} {ref.name} ({ref.type})', tag=MODULE_TAG)
+        # debug(f'Parameter {param.name} ({param.type_ref.kind}) is given argument {ref.owner} {ref.name} ({ref.type})', tag=MODULE_TAG)
 
         # If the pointer it self is set to be BPF context, then the pointer
         # will be BPF context in this scope too.

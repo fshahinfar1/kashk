@@ -6,6 +6,7 @@ from utility import get_tmp_var_name
 ZERO = Literal('0', clang.CursorKind.INTEGER_LITERAL)
 ONE  = Literal('1', clang.CursorKind.INTEGER_LITERAL)
 NULL = Literal('NULL', clang.CursorKind.MACRO_INSTANTIATION)
+NULL_CHAR = Literal("'\\0'", clang.CursorKind.INTEGER_LITERAL);
 
 CHAR_PTR = MyType.make_pointer(BASE_TYPES[clang.TypeKind.UCHAR])
 INT = BASE_TYPES[clang.TypeKind.INT]

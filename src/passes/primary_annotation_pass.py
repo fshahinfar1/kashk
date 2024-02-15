@@ -113,14 +113,16 @@ def _process_current_inst(inst, info):
         # Apply the loop annotation
         if inst.kind in MAY_HAVE_BACKWARD_JUMP_INSTRUCTIONS:
             inst.repeat = loop_ann
+            _set_loop_ann(None)
         elif (inst.kind == clang.CursorKind.CALL_EXPR and
                 inst.name in MEMORY_ACCESS_FUNC):
             inst.repeat = loop_ann
+            _set_loop_ann(None)
         else:
-            debug('Instruction:', inst, tag=MODULE_TAG)
-            raise Exception('The Loop annotation is not set to a correct instruction')
-        _set_loop_ann(None)
-        return inst
+            pass
+            # debug('Instruction:', inst, tag=MODULE_TAG)
+            # raise Exception('The Loop annotation is not set to a correct instruction')
+        # return inst
 
     if inst.kind == ANNOTATION_INST:
         return _process_annotation(inst, info)
