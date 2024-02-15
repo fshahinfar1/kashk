@@ -9,8 +9,9 @@ NULL = Literal('NULL', clang.CursorKind.MACRO_INSTANTIATION)
 NULL_CHAR = Literal("'\\0'", clang.CursorKind.INTEGER_LITERAL);
 
 CHAR_PTR = MyType.make_pointer(BASE_TYPES[clang.TypeKind.UCHAR])
-INT = BASE_TYPES[clang.TypeKind.INT]
-U64 = BASE_TYPES[clang.TypeKind.ULONGLONG]
+UINT = BASE_TYPES[clang.TypeKind.UINT]
+INT  = BASE_TYPES[clang.TypeKind.INT]
+U64  = BASE_TYPES[clang.TypeKind.ULONGLONG]
 VOID_PTR = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
 CHAR     = BASE_TYPES[clang.TypeKind.SCHAR]
 

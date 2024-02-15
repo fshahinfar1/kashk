@@ -153,7 +153,7 @@ class SimplifyCode(Pass):
                     return inst
                 return self._move_function_out(inst)
         elif inst.kind == clang.CursorKind.VAR_DECL:
-            if inst.has_children():
+            if inst.has_children() and not inst.type.is_array():
                 return self._separate_var_decl_and_init(inst, more)
         elif inst.kind == clang.CursorKind.CONDITIONAL_OPERATOR:
             return self._handle_conditional_operator(inst)

@@ -73,7 +73,7 @@ def _rename_func_to_a_known_one(inst, info, target_name):
     return inst
 
 
-def _known_function_substitution(inst, info):
+def _known_function_substitution(inst, info, more):
     """
     Replace some famous functions with implementations that work in BPF
     """
@@ -110,14 +110,20 @@ def _known_function_substitution(inst, info):
         return tmp_res
     elif inst.name == 'strncpy':
         assert len(inst.args) == 3, 'Assumption on the number of arguments'
-        buf = inst.args[0]
-        if is_bpf_ctx_ptr(buf, info):
-            end_dest = info.prog.get_pkt_end()
-        else:
-            end_dest = BinOp.build(buf, '+', inst.args[2])
-        # end_src = BinOp.build(inst.args[1], '+', inst.args[2])
-        inst.args.extend([end_dest,])
-        return _rename_func_to_a_known_one(inst, info, 'bpf_strncpy')
+        max_bound = inst.repeat
+        if max_bound is None and _is_known_integer(inst.args[2]):
+            # Try to guess the max bound from the size parameter
+            max_bound = gen_code([inst.args[2],], None)[0]
+        assert max_bound is not None, 'The strncpy should have annotation declaring max number of iterations'
+        s1 = inst.args[0]
+        s2 = inst.args[1]
+        size = inst.args[2]
+        tmp_insts, tmp_decl, tmp_res = template.strncpy(s1, s2, size, max_bound, info)
+        declare_at_top_of_func.extend(tmp_decl)
+        blk = cb_ref.get(BODY)
+        blk.extend(tmp_insts)
+        tmp_insts[0].removed.append(inst)
+        return tmp_res
     elif inst.name == 'malloc':
         map_value_size,_ = gen_code([inst.args[0]], info)
         name = _get_malloc_name()
@@ -223,11 +229,15 @@ def _process_write_call(inst, info):
     return new_inst
 
 
-def _process_call_inst(inst, info):
+def _process_call_inst(inst, info, more):
     if inst.name in WRITE_PACKET:
         return _process_write_call(inst, info)
     elif inst.name in KNOWN_FUNCS:
-        return _known_function_substitution(inst, info)
+        tmp = _known_function_substitution(inst, info, more)
+        if more.ctx == BODY:
+            # Discard the return value of the function
+            return None
+        return tmp
     return inst
 
 
@@ -307,7 +317,7 @@ def _process_var_decl(inst, info):
 
 def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.CALL_EXPR:
-        return _process_call_inst(inst,info)
+        return _process_call_inst(inst, info, more)
     elif inst.kind == ANNOTATION_INST:
         return _process_annotation(inst, info)
     elif inst.kind == clang.CursorKind.VAR_DECL:

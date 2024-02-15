@@ -2,7 +2,7 @@ from instruction import *
 from data_structure import *
 from utility import get_tmp_var_name
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
-from helpers.instruction_helper import decl_new_var, ZERO, NULL, CHAR_PTR, INT, NULL_CHAR
+from helpers.instruction_helper import decl_new_var, ZERO, NULL, CHAR_PTR, INT, NULL_CHAR, UINT, ONE
 from elements.likelihood import Likelihood
 
 VOID_PTR = 'void *'
@@ -303,8 +303,6 @@ def variable_memcpy(dst, src, size, up_bound, info, fail_return_inst=None):
 def strncmp(s1, s2, size, upper_bound, info, fail_return_inst=None):
     assert hasattr(s1, 'type')
     assert hasattr(s2, 'type')
-
-
     assert s1.type.is_pointer() or s1.type.is_array()
     assert s1.type.under_type.spelling in ('char', 'unsigned char')
     assert s2.type.is_pointer() or s2.type.is_array()
@@ -384,4 +382,52 @@ def strlen(s, max_bound, info):
     loop.body.add_inst(check)
 
     insts = [init_res, loop]
+    return insts, decl, res_var
+
+def strncpy(s1, s2, size, max_bound, info):
+    assert hasattr(s1, 'type')
+    assert hasattr(s2, 'type')
+    assert s1.type.is_pointer() or s1.type.is_array()
+    assert s1.type.under_type.spelling in ('char', 'unsigned char'), f'{s2.type.under_type.spelling} is not char!'
+    assert s2.type.is_pointer() or s2.type.is_array()
+    assert s2.type.under_type.spelling in ('char', 'unsigned char'), f'{s2.type.under_type.spelling} is not char!'
+    s1 = _add_paranthesis_if_needed(s1)
+    s2 = _add_paranthesis_if_needed(s2)
+    decl = []
+    max_bound = Literal(str(max_bound), clang.CursorKind.INTEGER_LITERAL)
+    bound_check_s1 = is_bpf_ctx_ptr(s1, info)
+    bound_check_s2 = is_bpf_ctx_ptr(s2, info)
+
+    # strncpy returns a pointer to the destination string
+    res_var = s1
+    # Creat the loop
+    loop, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info, UINT)
+    decl.extend(tmp_decl)
+    # Performe bound check on the src/dest if needed
+    if bound_check_s1:
+        data_end = info.prog.get_pkt_end()
+        ret = fail_return_inst
+        tmp_check = bpf_ctx_bound_check(s1, loop_var, data_end, ret)
+        loop.body.add_inst(tmp_check)
+    if bound_check_s2:
+        data_end = info.prog.get_pkt_end()
+        ret = fail_return_inst
+        tmp_check = bpf_ctx_bound_check(s2, loop_var, data_end, ret)
+        loop.body.add_inst(tmp_check)
+    #
+    at_s1 = ArrayAccess.build(s1, loop_var)
+    at_s2 = ArrayAccess.build(s2, loop_var)
+    assign = BinOp.build(at_s1, '=', at_s2)
+
+    null_term_cond = BinOp.build(at_s2, '==', NULL_CHAR)
+    size_minus_one = BinOp.build(size, '-', ONE)
+    len_cond = BinOp.build(loop_var, '>=', size_minus_one)
+    tmp_cond = BinOp.build(null_term_cond, '||', len_cond)
+    check = ControlFlowInst.build_if_inst(tmp_cond)
+    tmp_brk = Instruction()
+    tmp_brk.kind = clang.CursorKind.BREAK_STMT
+    check.body.add_inst(tmp_brk)
+    loop.body.extend_inst([assign, check])
+
+    insts = [loop]
     return insts, decl, res_var
