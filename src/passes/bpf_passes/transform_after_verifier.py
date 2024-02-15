@@ -76,9 +76,12 @@ def _rename_func_to_a_known_one(inst, info, target_name):
 def _known_function_substitution(inst, info, more):
     """
     Replace some famous functions with implementations that work in BPF
+    @returns a tuple. First element is a instruction. Second element is a
+        boolean. The boolean determines if the instruciton is the return value
+        of the function or not.
     """
     if inst.name == 'free':
-        return None
+        return None, False
     elif inst.name == 'strlen':
         # new_name = 'bpf_' + inst.name
         # return _rename_func_to_a_known_one(inst, info, new_name)
@@ -91,7 +94,7 @@ def _known_function_substitution(inst, info, more):
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
         tmp_insts[1].removed.append(inst)
-        return tmp_res
+        return tmp_res, True
     elif inst.name == 'strncmp':
         assert len(inst.args) == 3
         max_bound = inst.repeat
@@ -107,7 +110,7 @@ def _known_function_substitution(inst, info, more):
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
         tmp_insts[1].removed.append(inst)
-        return tmp_res
+        return tmp_res, True
     elif inst.name == 'strncpy':
         assert len(inst.args) == 3, 'Assumption on the number of arguments'
         max_bound = inst.repeat
@@ -123,12 +126,11 @@ def _known_function_substitution(inst, info, more):
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
         tmp_insts[0].removed.append(inst)
-        return tmp_res
+        return tmp_res, True
     elif inst.name == 'malloc':
         map_value_size,_ = gen_code([inst.args[0]], info)
         name = _get_malloc_name()
         map_name = name + '_map'
-
         # Define structure which will be the value of the malloc map
         field = StateObject(None)
         field.name = 'data'
@@ -154,33 +156,36 @@ def _known_function_substitution(inst, info, more):
         blk = cb_ref.get(BODY)
         for tmp_inst in lookup_inst:
             blk.append(tmp_inst)
-        return ref
+        return ref, True
     elif inst.name == 'memcpy':
         assert len(inst.args) == 3
         size = inst.args[2]
         is_constant = _is_known_integer(size)
         if is_constant:
             # No change is needed the builtin memcpy would work
-            return inst
+            return inst, False
         assert isinstance(inst.repeat, int), 'The max bound is not set for variable-sized memcpy'
         max_bound = inst.repeat
         assert max_bound is not None, 'The variable memcpy should have annotation declaring max number of iterations'
         dst = inst.args[0]
         src = inst.args[1]
-        loop, decl = template.variable_memcpy(dst, src, size, max_bound, info)
+        loop, decl, tmp_res = template.variable_memcpy(dst, src, size, max_bound, info)
         declare_at_top_of_func.extend(decl)
-        return loop
+        blk = cb_ref.get(BODY)
+        blk.append(loop)
+        loop.removed.append(inst)
+        return tmp_res, True
     elif inst.name in ('ntohs', 'ntohl', 'htons', 'htonl'):
         inst.name = 'bpf_'+inst.name
-        return inst
+        return inst, False
     elif inst.name == 'htonll':
         inst.name = 'bpf_cpu_to_be64'
-        return inst
+        return inst, False
     elif inst.name == 'ntohll':
         inst.name = 'bpf_be64_to_cpu'
-        return inst
+        return inst, False
     error(f'Known function {inst.name} is not implemented yet')
-    return inst
+    return inst, False
 
 
 def _process_write_call(inst, info):
@@ -233,8 +238,8 @@ def _process_call_inst(inst, info, more):
     if inst.name in WRITE_PACKET:
         return _process_write_call(inst, info)
     elif inst.name in KNOWN_FUNCS:
-        tmp = _known_function_substitution(inst, info, more)
-        if more.ctx == BODY:
+        tmp, is_ret_val = _known_function_substitution(inst, info, more)
+        if is_ret_val and more.ctx == BODY:
             # Discard the return value of the function
             return None
         return tmp

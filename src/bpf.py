@@ -180,8 +180,8 @@ class BPF_PROG:
                 ret_value = None
                 if failure_return.body.has_children():
                     ret_value = failure_return.body.children[0]
-                loop, decl = template.variable_memcpy(dst, buf, write_size,
-                        1470, info, ret_value)
+                loop, decl, tmp_ret = template.variable_memcpy(dst, buf,
+                        write_size, 1470, info, ret_value)
                 inst.extend(decl)
                 inst.append(loop)
 

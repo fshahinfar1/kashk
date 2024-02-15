@@ -297,7 +297,7 @@ def variable_memcpy(dst, src, size, up_bound, info, fail_return_inst=None):
     copy = BinOp.build(at_dst, '=', at_src)
     copy.set_modified()
     loop.body.add_inst(copy)
-    return loop, declare_at_top_of_func
+    return loop, declare_at_top_of_func, dst
 
 
 def strncmp(s1, s2, size, upper_bound, info, fail_return_inst=None):
