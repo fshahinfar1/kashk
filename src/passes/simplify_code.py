@@ -6,6 +6,7 @@ from instruction import *
 from utility import get_tmp_var_name
 from passes.clone import clone_pass
 from code_pass import Pass
+from helpers.instruction_helper import decl_new_var
 
 
 MODULE_TAG = '[Linear Code Pass]'
@@ -137,6 +138,22 @@ class SimplifyCode(Pass):
             return tmp_ref.clone([])
         raise Exception('Not implemented yet!')
 
+    def _move_index_out(self, inst):
+        assert isinstance(inst, ArrayAccess)
+        # TODO: can we decide type for all the cases?
+        index = inst.index.children[0]
+        T = index.type
+        ref = decl_new_var(T, self.info, self.declare_at_top_of_func)
+        assign = BinOp.build(ref, '=', index)
+
+        blk = self.cb_ref.get(BODY)
+        blk.append(assign)
+
+        new_inst = clone_pass(inst)
+        new_inst.index.children.clear()
+        new_inst.index.children.append(ref)
+        return new_inst
+
     def process_current_inst(self, inst, more):
         ctx = more.ctx
         if inst.kind == clang.CursorKind.CALL_EXPR:
@@ -157,7 +174,22 @@ class SimplifyCode(Pass):
                 return self._separate_var_decl_and_init(inst, more)
         elif inst.kind == clang.CursorKind.CONDITIONAL_OPERATOR:
             return self._handle_conditional_operator(inst)
-
+        elif inst.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
+            # TODO: we should also move on the owner of the references
+            index = inst.index.children[0]
+            if isinstance(index, Ref):
+                # if the reference is on a map we should move it out
+                sym, scope = self.info.sym_tbl.lookup2(index.name)
+                if sym is None:
+                    debug('Did not found the symbol for', sym, tag=MODULE_TAG)
+                    return inst
+                is_global = scope == self.info.sym_tbl.global_scope
+                is_shared = scope == self.info.sym_tbl.shared_scope
+                if not is_shared and not is_global:
+                    # It is fine
+                    return inst
+            # Move the indexing calculation out
+            return self._move_index_out(inst)
         return inst
 
 

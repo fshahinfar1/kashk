@@ -7,13 +7,13 @@ from after import After
 
 PARENT_INST = 1000
 
-# TODO: support declare_at_top_of_func
 
 ignore_these_parents = (
         clang.CursorKind.CSTYLE_CAST_EXPR,
         clang.CursorKind.PAREN_EXPR,
         BLOCK_OF_CODE,
     )
+
 
 class Pass:
     __slots__ = ('current_function', 'visited_functions', 'cb_ref', 'info',

@@ -17,6 +17,7 @@ from helpers.bpf_ctx_helper import (is_bpf_ctx_ptr, is_value_from_bpf_ctx,
 from helpers.instruction_helper import (get_ret_inst, get_scalar_variables,
         get_ret_value_text, get_ref_symbol, add_flag_to_func,
         simplify_inst_to_ref, ZERO)
+from sym_table import MemoryRegion
 
 
 MODULE_TAG = '[Verfier Pass]'
@@ -171,7 +172,6 @@ def _handle_binop(inst, info, more):
                         'Failed to set the BPF context flag on reference', lhs)
             if backward_jmp_ctx is not None and rhs_is_ptr:
                 backward_jmp_ctx.append(lhs)
-
     # Check if the BPF context is accessed and add bound checking
     blk = cb_ref.get(BODY)
     for x in [lhs, rhs]:
@@ -253,7 +253,7 @@ def _check_passing_bpf_context(inst, func, info):
             receives_bpf_ctx = True
         else:
             # Otherwise, check if the argument has a field, which is a pointer
-            # to BPF context 
+            # to BPF context
             if not hasattr(a, 'type'):
                 error('do not know the type for', a)
                 continue
@@ -265,7 +265,7 @@ def _check_passing_bpf_context(inst, func, info):
             # check if the argument is a record or not
             # (Not record --> Not composit type --> no BPF_CTX field)
             # [ignore pointers, get the underlying type]
-            T = get_actual_type(a.type) 
+            T = get_actual_type(a.type)
             if not T.is_record():
                 continue
 
@@ -452,11 +452,41 @@ def _handle_call(inst, info, more):
     return inst
 
 
+def _handle_array_access(inst, info, more):
+    assert isinstance(inst, ArrayAccess)
+    sym = info.sym_tbl.lookup(inst.name)
+    if sym is None:
+        debug('Did not found symbol table for', inst, tag=MODULE_TAG)
+        return inst
+    # debug(inst, sym.memory_region, '--->', sym.referencing_memory_region, tag=MODULE_TAG)
+    debug('---', inst, inst.array_ref, inst.array_ref.type)
+    array_ref = inst.array_ref
+    if array_ref.type.is_pointer():
+        debug('Accessing pointer', array_ref, 'does it need bound checking?', tag=MODULE_TAG)
+        return inst
+    element_count = inst.array_ref.type.element_count
+    debug('doing bound check for array access:', inst, element_count)
+    el_count = Literal(str(element_count), clang.CursorKind.INTEGER_LITERAL)
+
+    index = inst.index.children[0]
+    cond1 = BinOp.build(index, '>=', el_count)
+    cond2 = BinOp.build(index, '<', ZERO)
+    cond = BinOp.build(cond1, '||', cond2)
+    check = ControlFlowInst.build_if_inst(cond)
+    tmp = get_ret_inst(current_function, info)
+    check.body.add_inst(tmp)
+    blk = cb_ref.get(BODY)
+    blk.append(check)
+    return inst
+
+
 def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.BINARY_OPERATOR:
         return _handle_binop(inst, info, more)
     elif inst.kind == clang.CursorKind.CALL_EXPR:
         return _handle_call(inst, info, more)
+    elif inst.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
+        return _handle_array_access(inst, info, more)
     # Ignore other instructions
     return inst
 
