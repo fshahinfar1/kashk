@@ -6,6 +6,11 @@ from sym_table import Scope
 
 from framework_support import InputOutputContext
 
+from utility import parse_file
+from find_ev_loop import get_entry_code, find_event_loop
+from understand_logic_handler import __add_func_definition2
+from instruction import * 
+
 USER_EVENT_LOOP_ENTRY = '__user_event_loop_entry__'
 
 MODULE_TAG = '[User Code]'
@@ -210,23 +215,37 @@ def _load_meta(info):
     return declare + '\n' + recv_pkt + '\n' + load
 
 
-def generate_user_prog(user, info):
+def generate_user_prog(main, info):
     """
     Generate the final userspace program
     """
+    assert isinstance(main, Block)
     code = []
 
+    # New type declarations
     declarations, _ = gen_code(list(info.user_prog.declarations.values()), info)
     code.append(declarations)
     code.append('\n')
 
+    # New function definitions
     funcs = list(reversed(info.user_prog.fallback_funcs_def))
     func_text, _ = gen_code(funcs, info)
     code.append(func_text)
 
-    meta_load = _load_meta(info)
-    entry_body, _ = gen_code(user, info)
-    entry_body = meta_load + '\n' + entry_body
-    code.append(entry_body)
+    # Load the meta-data from the packet first thing in the event loop
+    tmp = _load_meta(info)
+    meta_load_inst = Literal(tmp, CODE_LITERAL)
+    main.children.insert(0, meta_load_inst)
 
+    # Find the entry function again and replace the event loop
+    index, tu, cursor = parse_file(info.io_ctx.input_file, info.io_ctx.cflags)
+    _, entry_func = get_entry_code(cursor, info)
+    f = __add_func_definition2(USER_EVENT_LOOP_ENTRY, entry_func, info)
+    ev_loop = find_event_loop(f.body)
+    if ev_loop is None:
+        ev_loop = f
+    ev_loop.body = main
+    # Generate the textual code
+    text, _ = gen_code([f,], info)
+    code.append(text)
     return '\n'.join(code)

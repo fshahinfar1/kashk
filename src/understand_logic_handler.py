@@ -172,6 +172,7 @@ def __add_func_definition2(name, cursor, info):
         # This function has body but let's not evaluate it. (Lazy evaluation)
         ev = FunctionBodyEvaluator(body, info, f)
         f.body = ev
+    return f
 
 
 def create_func_objs(info):

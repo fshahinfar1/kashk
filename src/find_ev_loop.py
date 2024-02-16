@@ -36,7 +36,7 @@ def find_event_loop(cursor):
     return None
 
 
-def find_request_processing_logic(cursor, info):
+def find_request_processing_logic(cursor):
     body_of_loop = None
     # Find the event-loop
     ev_loop = find_event_loop(cursor)
@@ -64,5 +64,5 @@ def get_entry_code(cursor, info):
     children = list(entry_func.get_children())
     last_child = children[-1]
     assert last_child.kind == clang.CursorKind.COMPOUND_STMT, 'The entry function does not have an implementation body!'
-    body_of_loop = find_request_processing_logic(entry_func, info)
+    body_of_loop = find_request_processing_logic(entry_func)
     return body_of_loop, entry_func
