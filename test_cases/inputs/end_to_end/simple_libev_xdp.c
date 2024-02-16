@@ -5,6 +5,10 @@
 #include <linux/in.h>
 #include <string.h>
 
+#ifndef __ANNOTATE_LOOP
+#define __ANNOTATE_LOOP(x)
+#endif
+
 struct resp {
 	char *ptr;
 	int size;
@@ -30,6 +34,7 @@ void event_handler(int fd, short which, void *arg)
 
 
 	c->resp.ptr = "Hello world!END\r\n";
+	__ANNOTATE_LOOP(32)
 	c->resp.size = strlen(c->resp.ptr);
 
 	send(fd, c->resp.ptr, c->resp.size, 0);

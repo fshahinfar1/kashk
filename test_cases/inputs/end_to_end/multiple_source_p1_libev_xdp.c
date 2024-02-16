@@ -5,6 +5,10 @@
 #include <linux/in.h>
 #include <string.h>
 
+#ifndef __ANNOTATE_LOOP
+#define __ANNOTATE_LOOP(x)
+#endif
+
 
 /* This function is implemented in another file */
 int func1(int a, int b);
@@ -34,6 +38,7 @@ void event_handler(int fd, short which, void *arg)
 
 	int x = func1(3, 81);
 	c->resp.ptr = "Hello world!END\r\n";
+	__ANNOTATE_LOOP(32)
 	c->resp.size = strlen(c->resp.ptr);
 
 	send(fd, c->resp.ptr, c->resp.size, 0);
