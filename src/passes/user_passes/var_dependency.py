@@ -158,11 +158,11 @@ def _process_node(node, info):
     if node.has_code():
         path = node.paths
         tmp = VarAnalysis.do(path.code, info, path=path)
-        # debug('Just processed node with id:', id(node), tag=MODULE_TAG)
+        debug('Just processed node with id:', id(node), tag=MODULE_TAG)
         new_block = tmp.result 
         path.code = new_block
-        # text, _ = gen_code(path.code, info)
-        # debug(text, tag=MODULE_TAG)
+        text, _ = gen_code(path.code, info)
+        debug(text, tag=MODULE_TAG)
 
 
 def var_dependency_pass(info):

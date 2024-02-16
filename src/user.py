@@ -187,7 +187,7 @@ if (__len <= 0) {{
   close(sockfd);
   return;
 }}
-__b[__size] = '\\0';
+__b[__len] = '\\0';
 __m = (struct {meta.name} *)__b;
 """
     else:
@@ -210,7 +210,7 @@ def _load_meta(info):
     return declare + '\n' + recv_pkt + '\n' + load
 
 
-def generate_user_prog(info):
+def generate_user_prog(user, info):
     """
     Generate the final userspace program
     """
@@ -225,7 +225,7 @@ def generate_user_prog(info):
     code.append(func_text)
 
     meta_load = _load_meta(info)
-    entry_body, _ = gen_code(info.user_prog.graph.paths.code, info)
+    entry_body, _ = gen_code(user, info)
     entry_body = meta_load + '\n' + entry_body
     code.append(entry_body)
 

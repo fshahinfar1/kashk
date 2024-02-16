@@ -6,6 +6,7 @@ from data_structure import *
 from instruction import *
 from code_pass import Pass
 from user import FallbackRegionGraph
+from helpers.instruction_helper import show_insts
 
 
 MODULE_TAG = '[Create User Graph]'
@@ -33,7 +34,8 @@ class CreateUserGraph(Pass):
         return self.cur_node_stack[-1][0]
 
     def _end_of_failure_path(self):
-        debug('end of failure path', tag=MODULE_TAG)
+        fname = self.current_function.name if self.current_function else '[[main]]'
+        # debug('end of failure path', fname, tag=MODULE_TAG)
         node, to_user_inst_ref = self.cur_node_stack[-1]
         assert to_user_inst_ref is not None, 'End of userland region without a reference to the ToUserspace instruction.'
         user_inst = Block(BODY)
@@ -46,6 +48,7 @@ class CreateUserGraph(Pass):
 
     def process_current_inst(self, inst, more):
         if inst.kind == TO_USERSPACE_INST:
+            # debug('Encounter a to user instruction')
             # Entering the userland
             assert self.failed is False, 'Overlapping TO_USERSPACE_INST was not expected'
             self.failed = True
@@ -53,6 +56,7 @@ class CreateUserGraph(Pass):
             new_node = self.cur_node.new_child()
             tmp = (new_node, inst)
             self.cur_node_stack.append(tmp)
+            self.skip_children()
             return inst
 
         if self.failed:
@@ -62,19 +66,23 @@ class CreateUserGraph(Pass):
 
         # If we have not failed, and we are calling a function which might fail
         if inst.kind == clang.CursorKind.CALL_EXPR:
+            fname = self.current_function.name if self.current_function else '[[main]]'
             func = inst.get_function_def()
             if not func.may_fail:
                 return inst
             with self.set_current_func(func):
+                # debug(fname, 'investigating func call:', func.name)
                 tmp_res = CreateUserGraph.do(func.body, self.info)
                 func_root = tmp_res.root
                 # debug('@', inst.name, tag=MODULE_TAG)
                 # debug(func.may_fail, func.may_succeed, tag=MODULE_TAG)
                 # debug(func_root, func_root.children, tag=MODULE_TAG)
+                # debug('state of gather:', self.gathered_insts)
                 assert not func_root.is_empty(), 'The function may fail, there should be a failure path!'
                 assert not func_root.paths.code.has_children(), 'The root of the failure graph should not have any code associated with it'
-                for child in func_root.children:
+                for i, child in enumerate(func_root.children):
                     self.cur_node.add_child(child)
+                    # debug(i, 'adding node to the root', 'from:', func.name, tag=MODULE_TAG)
 
         return inst
 
@@ -82,4 +90,5 @@ class CreateUserGraph(Pass):
 def create_user_graph(inst, info, more):
     obj = CreateUserGraph.do(inst, info, more)
     root = obj.root
+    assert not root.has_code()
     info.user_prog.graph = root

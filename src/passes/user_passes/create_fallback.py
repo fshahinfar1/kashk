@@ -172,7 +172,7 @@ def _process_node(node, info):
         blk.extend_inst(insts)
 
     assert blk.has_children()
-    node.paths.code = blk
+    # node.paths.code = blk
     node.paths.scope = info.sym_tbl.current_scope
     return blk
 
@@ -190,5 +190,6 @@ def create_fallback_pass(inst, info, more):
     new_scope = Scope(info.sym_tbl.global_scope)
     info.sym_tbl.scope_mapping[USER_EVENT_LOOP_ENTRY] = new_scope
     with info.sym_tbl.with_func_scope(USER_EVENT_LOOP_ENTRY):
-        _process_node(root, info)
+        tmp = _process_node(root, info)
     info.user_prog.fallback_funcs_def = new_functions
+    return tmp

@@ -320,7 +320,7 @@ def gen_user_code(user, info, out_user):
     # userspace analysis
     with info.user_prog.select_context(info):
         debug('User Prog: Handle Fallback', tag=MODULE_TAG)
-        create_fallback_pass(user, info, PassObject())
+        main = create_fallback_pass(user, info, PassObject())
         debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
         debug('User Prog: Calculate Variable Deps', tag=MODULE_TAG)
         var_dependency_pass(info)
@@ -368,7 +368,7 @@ def gen_user_code(user, info, out_user):
             info.sym_tbl.current_scope = __scope
             # debug('Meta', path_id, 'at index:', len(info.user_prog.declarations), tag=MODULE_TAG)
 
-        text = generate_user_prog(info)
+        text = generate_user_prog(main, info)
         debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     with open(out_user, 'w') as f:
