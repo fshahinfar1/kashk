@@ -8,14 +8,14 @@ from code_pass import Pass
 from user import FallbackRegionGraph
 
 
-MODULE_TAG = '[Select Userspace]'
+MODULE_TAG = '[Create User Graph]'
 
 
-class SelectUserPass(Pass):
+class CreateUserGraph(Pass):
     @classmethod
     def do(cls, inst, info, *args, **kwargs):
         obj = super().do(inst, info, *args, **kwargs)
-        if obj.gathered_insts:
+        if obj.gathered_insts is not None:
             obj._end_of_failure_path()
         return obj
 
@@ -66,7 +66,7 @@ class SelectUserPass(Pass):
             if not func.may_fail:
                 return inst
             with self.set_current_func(func):
-                tmp_res = SelectUserPass.do(func.body, self.info)
+                tmp_res = CreateUserGraph.do(func.body, self.info)
                 func_root = tmp_res.root
                 # debug('@', inst.name, tag=MODULE_TAG)
                 # debug(func.may_fail, func.may_succeed, tag=MODULE_TAG)
@@ -80,6 +80,6 @@ class SelectUserPass(Pass):
 
 
 def create_user_graph(inst, info, more):
-    obj = SelectUserPass.do(inst, info, more)
+    obj = CreateUserGraph.do(inst, info, more)
     root = obj.root
     info.user_prog.graph = root

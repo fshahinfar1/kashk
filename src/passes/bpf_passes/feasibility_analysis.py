@@ -170,7 +170,8 @@ def _do_pass(inst, info, more):
     lvl, ctx, parent_list = more.unpack()
     new_children = []
     failed = fail_ref.get(FAILED)
-    if current_function and not failed and inst.kind == clang.CursorKind.RETURN_STMT:
+    if (current_function and not failed and
+            inst.kind == clang.CursorKind.RETURN_STMT):
         current_function.may_succeed = True
 
     _check_annotation(inst, info, more)
@@ -184,7 +185,8 @@ def _do_pass(inst, info, more):
             if current_function:
                 current_function.may_fail = True
                 text, _ = gen_code([inst,], info)
-                debug(f'Failed @{current_function.name} on:', text, inst, tag=MODULE_TAG)
+                debug(f'Failed @{current_function.name} on:', text, inst,
+                        tag=MODULE_TAG)
             # Not a stack
             fail_ref.set(FAILED, True)
         # Continue deeper

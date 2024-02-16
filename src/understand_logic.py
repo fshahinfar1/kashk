@@ -268,14 +268,13 @@ def __convert_cursor_to_inst(c, info, _state):
         # Find the variable initialization, if there is any.
         init = []
         if inst.type.is_array():
-            debug('declaring an array and initializing:', tag=MODULE_TAG)
-            debug(inst, tag=MODULE_TAG)
-            report_on_cursor(c)
+            # debug('declaring an array and initializing:', tag=MODULE_TAG)
+            # debug(inst, tag=MODULE_TAG)
+            # report_on_cursor(c)
             children = list(c.get_children())
-            debug('array declaration children:', children, tag=MODULE_TAG)
+            # debug('array declaration children:', children, tag=MODULE_TAG)
             # assert len(children) == 1
             for child in children:
-                debug(child)
                 if child.kind == clang.CursorKind.INTEGER_LITERAL:
                     continue
                 init = gather_instructions_from(child, info, context=ARG)

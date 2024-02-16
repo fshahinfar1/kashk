@@ -459,13 +459,13 @@ def _handle_array_access(inst, info, more):
         debug('Did not found symbol table for', inst, tag=MODULE_TAG)
         return inst
     # debug(inst, sym.memory_region, '--->', sym.referencing_memory_region, tag=MODULE_TAG)
-    debug('---', inst, inst.array_ref, inst.array_ref.type)
+    # debug('---', inst, inst.array_ref, inst.array_ref.type)
     array_ref = inst.array_ref
     if array_ref.type.is_pointer():
-        debug('Accessing pointer', array_ref, 'does it need bound checking?', tag=MODULE_TAG)
+        # debug('Accessing pointer', array_ref, 'does it need bound checking?', tag=MODULE_TAG)
         return inst
     element_count = inst.array_ref.type.element_count
-    debug('doing bound check for array access:', inst, element_count)
+    # debug('doing bound check for array access:', inst, element_count)
     el_count = Literal(str(element_count), clang.CursorKind.INTEGER_LITERAL)
 
     index = inst.index.children[0]
