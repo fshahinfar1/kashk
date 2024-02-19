@@ -475,6 +475,7 @@ def _handle_array_access(inst, info, more):
     check = ControlFlowInst.build_if_inst(cond)
     tmp = get_ret_inst(current_function, info)
     check.body.add_inst(tmp)
+    check.likelihood = Likelihood.Unlikely
     blk = cb_ref.get(BODY)
     blk.append(check)
     return inst
