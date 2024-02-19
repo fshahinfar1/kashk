@@ -384,7 +384,7 @@ def strlen(s, max_bound, info):
     insts = [init_res, loop]
     return insts, decl, res_var
 
-def strncpy(s1, s2, size, max_bound, info):
+def strncpy(s1, s2, size, max_bound, info, fail_return_inst=None):
     assert hasattr(s1, 'type')
     assert hasattr(s2, 'type')
     assert s1.type.is_pointer() or s1.type.is_array()

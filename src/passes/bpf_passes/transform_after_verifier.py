@@ -105,7 +105,8 @@ def _known_function_substitution(inst, info, more):
         s1 = inst.args[0]
         s2 = inst.args[1]
         size = inst.args[2]
-        tmp_insts, tmp_decl, tmp_res = template.strncmp(s1, s2, size, max_bound, info)
+        return_val = get_ret_inst(current_function, info)
+        tmp_insts, tmp_decl, tmp_res = template.strncmp(s1, s2, size, max_bound, info, return_val)
         declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
@@ -121,7 +122,8 @@ def _known_function_substitution(inst, info, more):
         s1 = inst.args[0]
         s2 = inst.args[1]
         size = inst.args[2]
-        tmp_insts, tmp_decl, tmp_res = template.strncpy(s1, s2, size, max_bound, info)
+        return_val = get_ret_inst(current_function, info)
+        tmp_insts, tmp_decl, tmp_res = template.strncpy(s1, s2, size, max_bound, info, return_val)
         declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
@@ -169,7 +171,8 @@ def _known_function_substitution(inst, info, more):
         assert max_bound is not None, 'The variable memcpy should have annotation declaring max number of iterations'
         dst = inst.args[0]
         src = inst.args[1]
-        loop, decl, tmp_res = template.variable_memcpy(dst, src, size, max_bound, info)
+        return_val = get_ret_inst(current_function, info)
+        loop, decl, tmp_res = template.variable_memcpy(dst, src, size, max_bound, info, return_val)
         declare_at_top_of_func.extend(decl)
         blk = cb_ref.get(BODY)
         blk.append(loop)
