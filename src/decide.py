@@ -62,7 +62,7 @@ class SelectBoundaries(Pass):
                 if expected_br_cost < our_champion:
                     # This branch is expected to benefit from offloading
                     wins += 1
-            if wins > 0 and wins >= len(tmp_list) // 2:
+            if wins > 0 and wins >= len(tmp_list) / 2:
                 # At least half of the paths would benefit from offloading. We
                 # are offloading this branch.
                 for _, branch_blocks in tmp_list:
