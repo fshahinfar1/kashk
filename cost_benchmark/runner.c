@@ -120,10 +120,11 @@ int run_cross_test()
 	attach_xdp_program();
 	ret = launch_server();
 	context.server_pid = ret;
-	const size_t repeat = 100000;
+	const size_t repeat = 10000;
 	ret = _send_payload(context.prog_fd, payload, output, MAX_BUF, repeat);
 	kill(context.server_pid, SIGINT);
 	detach_xdp_program();
+	sleep(3);
 	/* TODO: get the output of the server program */
 	return 0;
 }
@@ -142,8 +143,10 @@ int run_xdp()
 
 void interrupt_handler(int sig)
 {
-	if (context.server_pid != 0)
+	if (context.server_pid != 0) {
 		kill(context.server_pid, SIGINT);
+		sleep(3);
+	}
 	if (args.ifindex != 0)
 		detach_xdp_program();
 	running = 0;

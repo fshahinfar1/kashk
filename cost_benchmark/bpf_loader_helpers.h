@@ -99,8 +99,8 @@ int send_packet(int prog_fd, const char *input, size_t in_size,
 	if (context.live == 1) {
 		/* printf("trying live flag...\n"); */
 		test_opts.flags = BPF_F_TEST_XDP_LIVE_FRAMES;
-		/* test_opts.batch_size = 0; */
-		test_opts.batch_size = 1;
+		test_opts.batch_size = 0;
+		/* test_opts.batch_size = 1; */
 		ctx_in.ingress_ifindex = args.ifindex;
 		/* printf("ifindex is %d\n", args.ifindex); */
 		assert(args.ifindex > 0);

@@ -9,7 +9,7 @@
 #include <sys/socket.h>
 #include <signal.h>
 
-#define BUFSIZE 128
+#define BUFSIZE 4096
 
 /* #define ECHO_MODE 1 */
 
@@ -57,10 +57,13 @@ int do_udp()
 	printf("The server will drop requests\n");
 #endif
 	printf("Hit Ctrl+C to terminate ...\n");
+	size_t tp = 0 ;
+	uint64_t last_ts = 0;
+	size_t tp_index = 0;
+	size_t *tp_measure = calloc(1000, sizeof(size_t));
 	while (running) {
 		struct sockaddr_in addr;
 		socklen_t addr_len = sizeof(addr);
-		int ret;
 		int size;
 		uint64_t user_ts, bpf_ts, travel_time;
 		char buf[BUFSIZE];
@@ -74,14 +77,23 @@ int do_udp()
 		/* char *ip = strdup(inet_ntoa(addr.sin_addr)); */
 		/* char *tm = strdup(inet_ntoa(sk_addr.sin_addr)); */
 		/* printf("%s --> %s\n", tm, ip); */
-#ifdef ECHO_MODE
+
+		tp++;
 		user_ts = get_ns();
 		bpf_ts = ((uint64_t *)buf)[1];
-		/* printf("bpf: %ld   user: %ld\n", bpf_ts, user_ts); */
 		travel_time = user_ts - bpf_ts;
 		count++;
 		acc += travel_time;
 
+		if (user_ts - last_ts > 1000000000) {
+			tp_measure[tp_index++] = tp;
+			last_ts = user_ts;
+			tp = 0;
+		}
+
+#ifdef ECHO_MODE
+		/* printf("bpf: %ld   user: %ld\n", bpf_ts, user_ts); */
+		int ret;
 		ret = sendto(sock, buf, size, 0,
 				(struct sockaddr *)&addr, addr_len);
 		if (ret <= 0) {
@@ -90,12 +102,6 @@ int do_udp()
 		}
 		continue;
 #else
-		user_ts = get_ns();
-		bpf_ts = ((uint64_t *)buf)[1];
-		/* printf("bpf: %ld   user: %ld\n", bpf_ts, user_ts); */
-		travel_time = user_ts - bpf_ts;
-		count++;
-		acc += travel_time;
 		continue;
 #endif
 	}
@@ -103,6 +109,10 @@ int do_udp()
 		avg_cross_time = 0;
 	} else {
 		avg_cross_time = (double)acc / (double)count;
+	}
+	printf("TP measurements: %ld\n", tp_index);
+	for (size_t i = 1; i < tp_index; i++) {
+		printf("tp @%ld: %ld\n", i, tp_measure[i]);
 	}
 	printf("End of experiment\n");
 	printf("Received: %ld\n", count);
@@ -136,8 +146,11 @@ int do_tcp()
 	printf("The server will drop requests\n");
 #endif
 	printf("Hit Ctrl+C to terminate ...\n");
+	size_t tp = 0 ;
+	uint64_t last_ts = 0;
+	size_t tp_index = 0;
+	size_t *tp_measure = calloc(1000, sizeof(size_t));
 	while (running) {
-		int ret;
 		int size;
 		uint64_t user_ts, bpf_ts, travel_time;
 		char buf[BUFSIZE];
@@ -152,14 +165,22 @@ int do_tcp()
 		/* char *ip = strdup(inet_ntoa(addr.sin_addr)); */
 		/* char *tm = strdup(inet_ntoa(sk_addr.sin_addr)); */
 		/* printf("%s --> %s\n", tm, ip); */
-#ifdef ECHO_MODE
+
+		tp++;
 		user_ts = get_ns();
 		bpf_ts = ((uint64_t *)buf)[1];
-		/* printf("bpf: %ld   user: %ld\n", bpf_ts, user_ts); */
 		travel_time = user_ts - bpf_ts;
 		count++;
 		acc += travel_time;
 
+		if (user_ts - last_ts > 1000000000) {
+			tp_measure[tp_index++] = tp;
+			last_ts = user_ts;
+			tp = 0;
+		}
+#ifdef ECHO_MODE
+		int ret;
+		/* printf("bpf: %ld   user: %ld\n", bpf_ts, user_ts); */
 		ret = send(client, buf, size, 0);
 		if (ret <= 0) {
 			perror("Failed to echo the message\n");
@@ -167,12 +188,7 @@ int do_tcp()
 		}
 		continue;
 #else
-		user_ts = get_ns();
-		bpf_ts = *(uint64_t *)buf;
 		/* printf("bpf: %ld   user: %ld\n", bpf_ts, user_ts); */
-		travel_time = user_ts - bpf_ts;
-		count++;
-		acc += travel_time;
 		continue;
 #endif
 	}
@@ -180,6 +196,10 @@ int do_tcp()
 		avg_cross_time = 0;
 	} else {
 		avg_cross_time = (double)acc / (double)count;
+	}
+	printf("TP measurements: %ld\n", tp_index);
+	for (size_t i = 1; i < tp_index; i++) {
+		printf("tp @%ld: %ld\n", i, tp_measure[i]);
 	}
 	printf("End of experiment\n");
 	printf("Received: %ld\n", count);
