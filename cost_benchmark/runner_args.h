@@ -18,13 +18,13 @@ struct parameters {
 	int ifindex;
 	char *sender_ip;
 	char *receiver_ip;
+	size_t payload_size;
 };
 extern struct parameters args;
 
 void usage(void) {
 	printf("loader:\n"
 		"  --binary     -b   path to binary file\n"
-		"  --input           path to the benchmark input file\n"
 		"  --repeat     -r   [default 10^4]\n"
 		"  --prog-name  -p   [default prog]\n"
 		"  --cross-test -x   run a userspace server for \n"
@@ -33,6 +33,9 @@ void usage(void) {
 		"  --iface     -i    interface to use in cross test\n"
 		"  --sender          ip of the sender (when running cross-test)\n"
 		"  --receiver        ip of receiver (when running cross-test)\n"
+		"  --input           path to the benchmark input file. it is\n"
+		"                    used to fill the payload of the packet\n"
+		"  --size            The size of the payload in bytes [default 16]\n"
 		"  --help      -h\n"
 	);
 }
@@ -51,17 +54,20 @@ void parse_args(int argc, char *argv[]) {
 		{"xdp",        no_argument,       NULL, 129},
 		{"sender",     required_argument, NULL, 130},
 		{"receiver",   required_argument, NULL, 131},
+		{"size",       required_argument, NULL, 132},
 		/* End of option list ------------------- */
 		{NULL, 0, NULL, 0},
 	};
 
 	/* Default values */
+	args.input_path = "./inputs/payload.txt";
 	args.repeat = 10000;
 	args.progname = "prog";
 	args.cross_test = 0;
 	args.xdp = 0;
 	args.sender_ip = "192.168.1.2";
 	args.receiver_ip = "192.168.1.1";
+	args.payload_size = 16;
 
 	while (1) {
 		ret = getopt_long(argc, argv, "xhb:i:r:p:", long_opts, NULL);
@@ -95,6 +101,9 @@ void parse_args(int argc, char *argv[]) {
 				break;
 			case 131:
 				args.receiver_ip = strdup(optarg);
+				break;
+			case 132:
+				args.payload_size = atoi(optarg);
 				break;
 			case 'h':
 				usage();

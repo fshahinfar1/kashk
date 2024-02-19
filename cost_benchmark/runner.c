@@ -32,16 +32,50 @@
 struct parameters args = {};
 struct program_context context = {};
 
+#define PAYLOAD_SIZE_MIN 16
+#define PAYLOAD_SIZE_LIMIT 4000
 #define MAX_BUF 4096
 #define DATA_OFFSET (sizeof(struct ethhdr) + sizeof(struct iphdr) + \
 		sizeof(struct udphdr))
+
+char *read_payload(void)
+{
+	if (args.payload_size < PAYLOAD_SIZE_MIN) {
+		fprintf(stderr, "Requested payload size is too small (min: %d)\n", PAYLOAD_SIZE_MIN);
+		exit(EXIT_FAILURE);
+	}
+	if (args.payload_size > PAYLOAD_SIZE_LIMIT) {
+		fprintf(stderr, "Requested payload size is too large (limit: %d)\n", PAYLOAD_SIZE_LIMIT);
+		exit(EXIT_FAILURE);
+	}
+	char *buf = calloc(1, MAX_BUF);
+	int fd = open(args.input_path, O_RDONLY);
+	if (fd < 1) {
+		perror("Failed to open input file");
+		exit(EXIT_FAILURE);
+	}
+	int size = read(fd, buf, MAX_BUF);
+	if (size >= MAX_BUF) {
+		fprintf(stderr, "Input file is larger than buffer!\n");
+		size = 4095;
+	}
+	buf[size] = '\0';
+	close(fd);
+	if (size < args.payload_size) {
+		fprintf(stderr, "Requested payload size is larger than input file content\n");
+		exit(EXIT_FAILURE);
+	}
+	/* Truncate the payload string to the size specified by user */
+	buf[args.payload_size] = '\0';
+	return buf;
+}
 
 int run_test(void)
 {
 	/* double tmp_ns; */
 	int ret;
 	/* struct fd_info info = {}; */
-	char *payload = "this is a test\n";
+	char *payload = read_payload();
 	char *output = calloc(1, MAX_BUF);
 	ret = send_payload(context.prog_fd, payload, output, MAX_BUF);
 	/* bpf_read_fdinfo(context.prog_fd, &info); */
@@ -69,10 +103,11 @@ struct xdp_config {
 	int ifindex;
 };
 
+
 int run_cross_test()
 {
 	int ret;
-	char *payload = "this is a test message\n";
+	char *payload = read_payload();
 	char *output = calloc(1, MAX_BUF);
 
 	/* const int key = 0; */
