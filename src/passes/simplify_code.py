@@ -177,6 +177,8 @@ class SimplifyCode(Pass):
         elif inst.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
             # TODO: we should also move on the owner of the references
             index = inst.index.children[0]
+            if isinstance(index, Literal):
+                return inst
             if isinstance(index, Ref):
                 # if the reference is on a map we should move it out
                 sym, scope = self.info.sym_tbl.lookup2(index.name)
