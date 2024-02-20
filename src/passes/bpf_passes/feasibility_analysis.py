@@ -182,11 +182,12 @@ def _do_pass(inst, info, more):
         inst, failed = _process_current_inst(inst, info, more)
         assert inst is not None
         if failed:
+            fname = current_function.name if current_function is not None else '[[main]]'
+            text, _ = gen_code([inst,], info)
+            debug(f'Failed @{fname} on:', text, inst,
+                    tag=MODULE_TAG)
             if current_function:
                 current_function.may_fail = True
-                text, _ = gen_code([inst,], info)
-                debug(f'Failed @{current_function.name} on:', text, inst,
-                        tag=MODULE_TAG)
             # Not a stack
             fail_ref.set(FAILED, True)
         # Continue deeper

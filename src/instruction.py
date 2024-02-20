@@ -846,8 +846,10 @@ class Literal(Instruction):
             return BASE_TYPES[clang.TypeKind.INT]
         elif self.kind == clang.CursorKind.STRING_LITERAL:
             return MyType.make_pointer(BASE_TYPES[clang.TypeKind.UCHAR])
+        elif self.kind == clang.CursorKind.CHARACTER_LITERAL:
+            return BASE_TYPES[clang.TypeKind.CHAR]
         else:
-            debug('Trying to guess the type for', self)
+            debug('Trying to guess the type for', self, self.kind)
             raise Exception('I do not know the type')
 
     def __str__(self):

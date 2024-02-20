@@ -114,7 +114,11 @@ def analyse_offload(prog, info):
     for name in ordered_list_of_funcs:
         # debug('For func', name, tag=MODULE_TAG)
         func = Function.directory[name]
-        cfg = create_basic_block_cfg(func.body, info)
+        try:
+            cfg = create_basic_block_cfg(func.body, info)
+        except:
+            # Grace fully fail this step for now :)
+            return
         cfg_table[name] = cfg
         paths = extract_exec_paths(cfg, info)
         for path in paths:

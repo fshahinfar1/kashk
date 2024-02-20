@@ -277,7 +277,7 @@ def _check_passing_bpf_context(inst, func, info):
             # receiving the pointer (we are checking the compound data
             # structure here).
             if param.type_ref.spelling != a.type.spelling:
-                warn('There is a type cast when passing the argument. I lose track of BPF context when there is a type cast! [1]')
+                error('There is a type cast when passing the argument. I lose track of BPF context when there is a type cast! [1]')
                 debug(f'param: {param.type_ref.spelling}    argument: {a.type.spelling}', tag=MODULE_TAG)
                 continue
 

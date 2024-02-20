@@ -349,7 +349,7 @@ def __convert_cursor_to_inst(c, info, _state):
         label = next(c.get_children())
         inst = Instruction()
         inst.kind = c.kind
-        inst.body = label.spelling
+        inst.body = Literal(label.spelling, clang.CursorKind.STRING_LITERAL)
         return inst
     elif c.kind == clang.CursorKind.IF_STMT:
         children = list(c.get_children())
