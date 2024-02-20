@@ -250,6 +250,15 @@ class Call(Instruction):
         self.wr_buf = None
         self.repeat = None
 
+    @property
+    def spelling(self):
+        """
+        This is for backward compatibility with the clang Cursor object (Some
+        old utility code which operate on cursors would also work on this
+        object too)
+        """
+        return self.name
+
     def __str__(self):
         return f'<Call {self.name} ({self.args})>'
 

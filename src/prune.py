@@ -11,7 +11,7 @@ WRITE_PACKET = ('async_write', 'async_write_some', 'write', 'send', 'sendto',
         'sendmsg')
 COROUTINE_FUNC_NAME = ('await_resume', 'await_transform', 'await_ready',
         'await_suspend')
-IGNORE_FUNC = ('printf', 'fprintf')
+IGNORE_FUNC = ('printf', 'fprintf', 'perror')
 MEMORY_ACCESS_FUNC = ('memchr', 'memrchr', 'memcpy', 'memmove', 'memset',
     'strcpy', 'strncpy', 'strlen', 'strnlen', 'strcmp', 'strncmp')
 KNOWN_FUNCS = (*READ_PACKET, *WRITE_PACKET, *COROUTINE_FUNC_NAME, *IGNORE_FUNC,

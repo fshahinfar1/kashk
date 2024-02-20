@@ -274,11 +274,14 @@ def __convert_cursor_to_inst(c, info, _state):
             children = list(c.get_children())
             # debug('array declaration children:', children, tag=MODULE_TAG)
             # assert len(children) == 1
-            for child in children:
-                if child.kind == clang.CursorKind.INTEGER_LITERAL:
-                    continue
+            # for child in children:
+            #     if child.kind == clang.CursorKind.INTEGER_LITERAL:
+            #         continue
+            #     init = gather_instructions_from(child, info, context=ARG)
+            #     break
+            if len(children) > 1:
+                child = children[1]
                 init = gather_instructions_from(child, info, context=ARG)
-                break
         elif inst.type.is_func_ptr():
             # TODO: what to do whit available information about function pointer decleration?
             # debug('Function pointer?')
