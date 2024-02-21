@@ -34,7 +34,28 @@ class RewriteWhileLoop(Pass):
         return loop
 
     def _handle_do_while(self, inst, more):
-        return inst
+        upper_bound_int = inst.repeat
+        if upper_bound_int is None:
+            raise Exception('Missing the upper bound for a while loop')
+        upper_bound = Literal(str(upper_bound_int),
+                clang.CursorKind.INTEGER_LITERAL)
+        loop, tmp_decl, loop_var = template.new_bounded_loop(upper_bound,
+                upper_bound, self.info, loop_var_type=UINT)
+        self.declare_at_top_of_func.extend(tmp_decl)
+
+        while_cond = inst.cond.children[0]
+        _tmp = Parenthesis.build(while_cond)
+        break_cond = UnaryOp.build('!', _tmp)
+        check_break = ControlFlowInst.build_if_inst(break_cond)
+        break_inst = Instruction()
+        break_inst.kind = clang.CursorKind.BREAK_STMT
+        check_break.body.add_inst(break_inst)
+
+        while_body = inst.body
+        loop.body.extend_inst(while_body.children)
+        # Add the break condition check to the end of the body of the loop
+        loop.body.add_inst(check_break)
+        return loop
 
     def process_current_inst(self, inst, more):
         if inst.kind == clang.CursorKind.WHILE_STMT:
