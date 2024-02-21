@@ -221,7 +221,7 @@ def generate_cache_update(inst, blk, current_function, info):
     # Update cache
     ## rewrite key
     dest_ref = item_ref.get_ref_field('key', info)
-    cpy, decl = gen_memcpy(info, current_function,
+    cpy, decl, ret = gen_memcpy(info, current_function,
             dest_ref, key, key_size, upper_bound='255')
     declare_at_top_of_func.extend(decl)
     null_check.body.add_inst(cpy)
@@ -230,7 +230,7 @@ def generate_cache_update(inst, blk, current_function, info):
     null_check.body.add_inst(size_assign)
     ## rewrite value
     dest_ref = item_ref.get_ref_field('value', info)
-    cpy, decl = gen_memcpy(info, current_function,
+    cpy, decl, ret = gen_memcpy(info, current_function,
             dest_ref, value, value_size, upper_bound='255')
     declare_at_top_of_func.extend(decl)
     null_check.body.add_inst(cpy)

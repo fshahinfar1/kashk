@@ -45,11 +45,11 @@ def __collect_information_about_func(cursor, info):
     e.name = cursor.spelling
 
     # Add function parameters to the scope
-    for pos, arg in enumerate(cursor.get_arguments()):
-        if arg.type.kind == clang.TypeKind.TYPEDEF:
-            decl = arg.type.get_declaration()
-        T = MyType.from_cursor_type(arg.type)
-        e = info.sym_tbl.insert_entry(arg.spelling, T, arg.kind, arg)
+    # for pos, arg in enumerate(cursor.get_arguments()):
+    #     if arg.type.kind == clang.TypeKind.TYPEDEF:
+    #         decl = arg.type.get_declaration()
+    #     T = MyType.from_cursor_type(arg.type)
+    #     e = info.sym_tbl.insert_entry(arg.spelling, T, arg.kind, arg)
 
 
 def __pass_over_global_variables(cursor, info):

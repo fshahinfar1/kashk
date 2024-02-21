@@ -300,7 +300,11 @@ def __convert_cursor_to_inst(c, info, _state):
 
         # Add variable to the scope
         if info.sym_tbl.lookup(c.spelling) is not None:
-            error(f'{MODULE_TAG} Shadowing variables are not supported and can cause issues! ({c.spelling})')
+            sym_f = info.sym_tbl.lookup('__func__')
+            # debug('@scope:', sym_f.name, tag=MODULE_TAG)
+            # debug(info.sym_tbl.current_scope.symbols)
+            # report_on_cursor(c)
+            error(f'Shadowing variables are not supported and can cause issues! ({c.spelling})', tag=MODULE_TAG)
         entry = inst.update_symbol_table(info.sym_tbl)
         entry.memory_region = MemoryRegion.STACK
         entry.referencing_memory_region = MemoryRegion.STACK
