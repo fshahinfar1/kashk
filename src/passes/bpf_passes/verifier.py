@@ -279,7 +279,7 @@ def _check_passing_bpf_context(inst, func, info):
             _tmp = get_actual_type(param.type_ref)
             if _tmp.spelling != T.spelling:
                 error('There is a type cast when passing the argument. I lose track of BPF context when there is a type cast! [1]')
-                debug(f'param: {param.type_ref.spelling}    argument: {a.type.spelling}', tag=MODULE_TAG)
+                debug(f'param: {_tmp.spelling}    argument: {T.spelling}', tag=MODULE_TAG)
                 continue
 
             # if not isinstance(a, Ref):
@@ -361,11 +361,12 @@ def _check_setting_bpf_context_in_callee(inst, func, info):
 
         one_type_is_record = (param.type_ref.under_type.is_record() or
                 argum.type.under_type.is_record())
-        if (one_type_is_record and
-                param.type_ref.spelling != argum.type.spelling):
+        _tmp1 = get_actual_type(param.type)
+        _tmp2 = get_actual_type(argum.type)
+        if (one_type_is_record and _tmp1.spelling != _tmp2.spelling):
             error('There is a type cast when passing the argument. I lose track of BPF context when there is a type cast!')
-            debug('argument type:', argum.type.spelling, 'parameter type:',
-                    param.type_ref.spelling)
+            debug('argument type:', _tmp1.spelling, 'parameter type:',
+                    _tmp2.spelling)
             continue
 
         if param.type_ref.is_pointer():
