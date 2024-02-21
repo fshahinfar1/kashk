@@ -34,6 +34,7 @@ from passes.bpf_passes.reduce_params import reduce_params_pass
 from passes.bpf_passes.remove_everything_not_used import remove_everything_not_used
 from passes.bpf_passes.prog_complexity import mitiage_program_comlexity
 from passes.bpf_passes.change_bpf_loop import change_to_bpf_loop
+from passes.bpf_passes.rewrite_while_loop import rewrite_while_loop
 
 from passes.user_passes.create_user_graph import create_user_graph
 from passes.user_passes.var_dependency import var_dependency_pass
@@ -409,6 +410,10 @@ def gen_bpf_code(bpf, info, out_bpf):
 
     debug('[2nd] remove everything that is not used in BPF', tag=MODULE_TAG)
     remove_everything_not_used(bpf, info, None)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    debug('Rewrite While/Do-While', tag=MODULE_TAG)
+    bpf = rewrite_while_loop(bpf, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # debug('Change loop to bpf_loop', tag=MODULE_TAG)

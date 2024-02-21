@@ -130,7 +130,7 @@ def _handle_call(inst, info, more):
     tmp = []
     for field, var in zip(change.list_of_params, extra_args):
         field_name = field.name
-        var_name, _ = gen_code([var], info)
+        var_name, _ = gen_code([var], info, RHS)
         tmp.append(f'.{field_name} = {var_name}')
     init_text = '{\n' + indent(',\n'.join(tmp)) + '\n}'
     tmp_init = Literal(init_text, CODE_LITERAL)

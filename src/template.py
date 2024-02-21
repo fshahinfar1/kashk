@@ -239,18 +239,30 @@ def malloc_lookup(name, info, return_val):
     return [var_decl, lookup_inst], ref
 
 
+_loop_var_name_counter = 0
+def _get_temp_loop_var_name():
+    global _loop_var_name_counter
+    _loop_var_name_counter += 1
+    name = f'_i{_loop_var_name_counter}'
+    return name
+
+
 def new_bounded_loop(var_bound, max_bound, info, loop_var_type=INT):
     decl = []
-    loop_var = decl_new_var(loop_var_type, info, decl)
+    _tmp_name = _get_temp_loop_var_name()
+    loop_var = decl_new_var(loop_var_type, info, decl, name=_tmp_name)
     initialize = BinOp.build(loop_var, '=', ZERO)
 
-    max_bound_check = BinOp.build(loop_var, '<', max_bound)
-    var_bound_check = BinOp.build(loop_var, '<', var_bound)
-    condition = BinOp.build(max_bound_check, '&&', var_bound_check)
+    if var_bound == max_bound:
+        condition = BinOp.build(loop_var, '<', max_bound)
+    else:
+        max_bound_check = BinOp.build(loop_var, '<', max_bound)
+        var_bound_check = BinOp.build(loop_var, '<', var_bound)
+        condition = BinOp.build(max_bound_check, '&&', var_bound_check)
 
     post = UnaryOp.build('++', loop_var)
     loop = ForLoop.build(initialize, condition, post)
-    loop.repeat = max_bound
+    # loop.repeat = max_bound.text # does this work?
     loop.set_modified()
     return loop, decl, loop_var
 
