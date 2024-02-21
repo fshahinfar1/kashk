@@ -2,7 +2,7 @@ import clang.cindex as clang
 
 from data_structure import *
 from instruction import *
-from utility import (indent, INDENT, report_on_cursor)
+from utility import (indent, INDENT, report_on_cursor, get_actual_type)
 from prune import READ_PACKET, WRITE_PACKET
 
 from template import (license_text, shared_map_decl)
@@ -460,38 +460,43 @@ def __generate_global_shared_state(info):
     return shared_state_struct_decl
 
 
-def __sort_by_function_depandancy(funcs):
-    def _calc_rank(func, visited, table):
-        if func.name in visited:
-            return
-        visited.add(func.name)
-        assert func.__rank == -1
-        func.__rank = 1
-        if len(func.function_dependancy) == 0:
-            # Base case
-            return
-        for dep_name in func.function_dependancy:
-            if dep_name not in table:
-                continue
-            dep_func = table[dep_name]
-            if dep_func.__rank == -1:
-                _calc_rank(dep_func, visited, table)
-            func.__rank += dep_func.__rank
+def __sort_declarations(decls):
+    orig_len = len(decls)
+    res = [d for d in decls if not isinstance(d, Record)]
+    record = tuple(filter(lambda d: isinstance(d, Record), decls))
+    relevant_record_names = set(r.name for r in record)
+    # debug('Relevant records:', relevant_record_names, tag=MODULE_TAG)
+    R = {}
+    deps = {}
+    for r in record:
+        name = r.name
+        assert name not in R
+        assert name not in deps
+        R[name] = r
+        dep_list = set()
+        for f in r.fields:
+            T = get_actual_type(f.type)
+            if T.is_record():
+                type_name = T.spelling[len('struct '):]
+                if type_name in relevant_record_names:
+                    dep_list.add(type_name)
+        # debug(name, ':', dep_list, tag=MODULE_TAG)
+        deps[name] = dep_list
 
-
-
-    # TODO: the sorting should consider the graph of dependancy not the number
-    # of functions.
-    new = sorted(funcs, key=lambda x: len(x.function_dependancy))
-    table = {}
-    for f in new:
-        f.__rank = -1
-        table[f.name] = f
-    visited = set()
-    for f in new:
-        _calc_rank(f, visited, table)
-    new.sort(key=lambda f: f.__rank)
-    return new
+    while len(deps.keys()) > 0:
+        # Get records with out any dependency
+        no_dep = tuple(name for name, v in deps.items() if len(v) == 0)
+        if len(no_dep) == 0:
+            raise Exception('Circular dependancy between records')
+        for record_name in no_dep:
+            r = R[record_name]
+            res.append(r)
+            del deps[record_name]
+            for k, v in deps.items():
+                if record_name in v:
+                    v.remove(record_name)
+    assert len(res) == orig_len
+    return res
 
 
 def generate_bpf_prog(info):
@@ -500,6 +505,7 @@ def generate_bpf_prog(info):
     decs = list(info.prog.declarations)
     non_func_decs = list(filter(lambda d: not isinstance(d, Function), decs))
     func_decs = list(filter(lambda d: isinstance(d, Function), decs))
+    non_func_decs = __sort_declarations(non_func_decs)
     non_func_declarations, _ = gen_code(non_func_decs, info, context=DEF)
     non_func_declarations += shared_state_struct_decl
 

@@ -4,6 +4,7 @@ from data_structure import *
 from instruction import *
 import template
 from helpers.instruction_helper import UINT
+from utility import find_elems_of_kind
 
 
 class RewriteWhileLoop(Pass):
@@ -52,6 +53,8 @@ class RewriteWhileLoop(Pass):
         check_break.body.add_inst(break_inst)
 
         while_body = inst.body
+        _tmp = find_elems_of_kind(while_body, clang.CursorKind.CONTINUE_STMT)
+        assert len(_tmp) == 0, 'I do not expect continue statement in this loop! there will be a bug otherwise'
         loop.body.extend_inst(while_body.children)
         # Add the break condition check to the end of the body of the loop
         # TODO: what happens if the loop has a continue statements?
