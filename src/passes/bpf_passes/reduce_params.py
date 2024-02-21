@@ -123,7 +123,7 @@ def _handle_call(inst, info, more):
     # Create an instance of struct which should be passed to the function
     extra_args = [inst.args.pop() for i in range(count_extra)]
     decl = VarDecl(None)
-    decl.type = MyType.make_simple(change.struct_name, clang.TypeKind.RECORD)
+    decl.type = MyType.make_simple(f'struct {change.struct_name}', clang.TypeKind.RECORD)
     decl.name = get_tmp_var_name()
     decl.set_modified(InstructionColor.EXTRA_STACK_ALOC)
     # TODO: How to implement a struct initialization?

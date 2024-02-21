@@ -54,6 +54,7 @@ class RewriteWhileLoop(Pass):
         while_body = inst.body
         loop.body.extend_inst(while_body.children)
         # Add the break condition check to the end of the body of the loop
+        # TODO: what happens if the loop has a continue statements?
         loop.body.add_inst(check_break)
         return loop
 

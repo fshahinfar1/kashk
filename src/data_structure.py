@@ -162,9 +162,9 @@ class StateObject:
             self.kind = None
             self.type_ref = None
 
-    # @property
-    # def type(self):
-    #     return self.type_ref.spelling
+    @property
+    def type(self):
+        return self.type_ref
 
     @property
     def is_pointer(self):

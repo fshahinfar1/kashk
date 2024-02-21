@@ -323,8 +323,8 @@ jump_table = {
         clang.CursorKind.MACRO_INSTANTIATION: handle_literal,
         CODE_LITERAL: handle_literal,
         # Control FLow
-        clang.CursorKind.LABEL_STMT: lambda x,y,z: indent('{x.body}:', z[0]),
-        clang.CursorKind.GOTO_STMT: lambda x,y,z: indent('goto {x.body}', z[0]),
+        clang.CursorKind.LABEL_STMT: lambda x,y,z: indent(f'{x.body.text}:', z[0]),
+        clang.CursorKind.GOTO_STMT: lambda x,y,z: indent(f'goto {x.body.text}', z[0]),
         clang.CursorKind.IF_STMT: handle_if_stmt,
         clang.CursorKind.DO_STMT: handle_do_stmt,
         clang.CursorKind.WHILE_STMT: handle_while_stmt,

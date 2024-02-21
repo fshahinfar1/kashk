@@ -19,6 +19,10 @@ def _do_pass(bpf, all_declarations, shared_vars, info):
             if func and not func.is_empty():
                 _do_pass(func.body, all_declarations, shared_vars, info)
             keys = [inst.name,] # Keep this function
+            if func is not None:
+                for arg in func.args:
+                    type_name = get_actual_type(arg.type).spelling
+                    keys.append(type_name) # Keep this type
         elif inst.kind == clang.CursorKind.VAR_DECL:
             type_name = get_actual_type(inst.type).spelling
             keys = [type_name,] # Keep this type
