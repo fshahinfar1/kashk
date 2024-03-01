@@ -6,6 +6,7 @@ from sym_table import SymbolTableEntry
 from utility import indent, get_tmp_var_name
 from code_gen import gen_code
 from passes.pass_obj import PassObject
+from helpers.instruction_helper import decl_new_var
 
 
 PARAMETER_LIMIT = 5
@@ -47,7 +48,7 @@ class _Change:
         return name in self.__param_has_changed
 
 
-def _function_check_param_reduc(inst, func, info, more):
+def _function_check_param_reduce(inst, func, info, more):
     """
     Check if number of parameters of function exceed.
     1. Define a struct and put some of the parameters in that
@@ -108,7 +109,7 @@ def _handle_call(inst, info, more):
 
     # Check if the function was analysed before
     if inst.name not in _Change.updated_functions:
-        _function_check_param_reduc(inst, func, info, more)
+        _function_check_param_reduce(inst, func, info, more)
 
     # Check how this function was changed then, if needed, change how it is
     # invoked
@@ -122,26 +123,33 @@ def _handle_call(inst, info, more):
     # TODO: maybe it is better to copy the instruction and then modify it
     # Create an instance of struct which should be passed to the function
     extra_args = [inst.args.pop() for i in range(count_extra)]
-    decl = VarDecl(None)
-    decl.type = MyType.make_simple(f'struct {change.struct_name}', clang.TypeKind.RECORD)
-    decl.name = get_tmp_var_name()
-    decl.set_modified(InstructionColor.EXTRA_STACK_ALOC)
-    # TODO: How to implement a struct initialization?
+    T = MyType.make_simple(f'struct {change.struct_name}',
+            clang.TypeKind.RECORD)
+    tmp_decl = []
+    ref = decl_new_var(T, info, tmp_decl)
     tmp = []
+
+    # TODO: How to implement a struct initialization?
+    # for field, var in zip(change.list_of_params, extra_args):
+    #     field_name = field.name
+    #     var_name, _ = gen_code([var], info, RHS)
+    #     tmp.append(f'.{field_name} = {var_name}')
+    # init_text = '{\n' + indent(',\n'.join(tmp)) + '\n}'
+    # tmp_init = Literal(init_text, CODE_LITERAL)
+    # tmp_init.set_modified(InstructionColor.MEM_COPY)
+    # decl.init.add_inst(tmp_init)
+
+    # Use multiple assignments
     for field, var in zip(change.list_of_params, extra_args):
-        field_name = field.name
-        var_name, _ = gen_code([var], info, RHS)
-        tmp.append(f'.{field_name} = {var_name}')
-    init_text = '{\n' + indent(',\n'.join(tmp)) + '\n}'
-    tmp_init = Literal(init_text, CODE_LITERAL)
-    tmp_init.set_modified(InstructionColor.MEM_COPY)
-    decl.init.add_inst(tmp_init)
+        tmp_ref = Ref.build(field.name, field.type, True, True)
+        tmp_ref.owner.append(ref)
+        assign = BinOp.build(tmp_ref, '=', var)
+        tmp.append(assign)
     # Add the struct definition to the line before calling the function
     blk = cb_ref.get(BODY)
-    blk.append(decl)
-    decl.update_symbol_table(info.sym_tbl)
+    blk.extend(tmp_decl)
+    blk.extend(tmp)
     # Pass a reference of this struct to the function
-    ref = decl.get_ref()
     unary = UnaryOp(None)
     unary.op = '&'
     unary.child.add_inst(ref)
@@ -167,11 +175,8 @@ def _handle_ref(inst, info, more):
     if flag:
         new_inst = inst.clone([])
         struct_name = current_change_ctx.struct_name
-        ex_ref = Ref(None)
-        ex_ref.name = EXTRA_PARAM_NAME
-        ex_ref.kind = clang.CursorKind.DECL_REF_EXPR
         tmp_T = MyType.make_simple('struct {struct_name}', clang.TypeKind.RECORD)
-        ex_ref.type = MyType.make_pointer(tmp_T)
+        ex_ref = Ref.build(EXTRA_PARAM_NAME, tmp_T, False, red=True)
         new_inst.owner.append(ex_ref)
         new_inst.kind = clang.CursorKind.MEMBER_REF_EXPR
         new_inst.set_modified(InstructionColor.EXTRA_MEM_ACCESS)

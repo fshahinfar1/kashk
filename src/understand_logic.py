@@ -300,7 +300,7 @@ def __convert_cursor_to_inst(c, info, _state):
 
         # Add variable to the scope
         if info.sym_tbl.lookup(c.spelling) is not None:
-            sym_f = info.sym_tbl.lookup('__func__')
+            # sym_f = info.sym_tbl.lookup('__func__')
             # debug('@scope:', sym_f.name, tag=MODULE_TAG)
             # debug(info.sym_tbl.current_scope.symbols)
             # report_on_cursor(c)
@@ -474,12 +474,11 @@ def __convert_cursor_to_inst(c, info, _state):
     elif c.kind == clang.CursorKind.INIT_LIST_EXPR:
         # It will be a list of tuples. The first t.0 is field name t.1 is its value.
         # The t.0 may be None.
-        # report_on_cursor(c)
         children = [_get_init_field(child) for child in c.get_children()]
         inst = Instruction()
         inst.kind = c.kind
         inst.body = children
-        # debug(MODULE_TAG, 'INIT_LIST:', inst.list)
+        debug(MODULE_TAG, 'INIT_LIST:', inst.body)
         return inst
     elif c.kind == clang.CursorKind.ENUM_DECL:
         enum = Enum.from_cursor(c)

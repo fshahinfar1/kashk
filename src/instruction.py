@@ -1076,3 +1076,31 @@ class Annotation(Instruction):
 
     def get_children_context_marked(self):
         return [(self.block, self.block.tag), ]
+
+# TODO: The implementation of this class is not complete yet.
+# Idea: also add a class to represent field assignments. Then the body of
+# Initialization class would be a list of field assignments. A field assignment
+# is basically a name of a field and the value for the assignment.
+class Initialization(Instruction):
+    __slots__ = tuple()
+
+    def __init__(self):
+        super().__init__()
+        self.body = []
+        self.kind = clang.CursorKind.INIT_LIST_EXPR
+
+    def has_children(self):
+        return len(self.body) > 0
+
+    def get_children(self):
+        return self.body[:]
+
+    def get_children_context_marked(self):
+        tmp = [(c, RHS) for c in self.body]
+        return tmp
+
+    def clone(self, children):
+        new = Initialization()
+        _default_clone_operation(new, self)
+        new.body = children
+        return new
