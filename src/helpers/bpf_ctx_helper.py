@@ -160,6 +160,7 @@ def set_ref_bpf_ctx_state(ref, state, info):
     # debug('set', ref, 'as context:', state)
     sym = symbol_for_inst(ref, info)
     if sym is None:
-        error('Setting BPF Context Flag for the given Instruction is not implemented!')
+        error('Setting BPF Context Flag for the given Instruction is not implemented!', tag=MODULE_TAG)
+        debug('debug info', ref, tag=MODULE_TAG)
         return
     sym.set_is_bpf_ctx(state)

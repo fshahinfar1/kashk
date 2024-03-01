@@ -164,7 +164,7 @@ def _handle_binop(inst, info, more):
         # Check if we are assigning a reference
         if T.is_pointer() or T.is_array():
             rhs_is_ptr = is_bpf_ctx_ptr(rhs, info)
-            # debug("***", gen_code([inst,], info), '|| LHS kind:', lhs.kind, '|| RHS kind:', rhs.kind, '|| is rhs ctx:', rhs_is_ptr, tag=MODULE_TAG)
+            debug("***", gen_code([inst,], info)[0], '|| LHS kind:', lhs.kind, '|| RHS kind:', rhs.kind, '|| is rhs ctx:', rhs_is_ptr, tag=MODULE_TAG)
             set_ref_bpf_ctx_state(lhs, rhs_is_ptr, info)
             # assert is_bpf_ctx_ptr(lhs, info) == rhs_is_ptr, 'Check if set_ref_bpf_ctx_state and is_bpf_ctx_ptr work correctly'
             if is_bpf_ctx_ptr(lhs, info) != rhs_is_ptr:
@@ -190,8 +190,8 @@ def _handle_binop(inst, info, more):
             _add_bound_check(blk, r, current_function, info, bytes_mode=False, more=more)
 
             # Report for debuging
-            # tmp,_ = gen_code([inst], info)
-            # debug(f'Add a bound check before:\n    {tmp}', tag=MODULE_TAG)
+            tmp,_ = gen_code([inst], info)
+            debug(f'Add a bound check before:\n    {tmp}', tag=MODULE_TAG)
     # Keep the instruction unchanged
     return inst
 
@@ -225,9 +225,10 @@ def _has_bpf_ctx_in_field(ref, info, field_name=None):
                     field_name.fields.append([ref_field,])
                     found = True
                     field_name.count_bpf_fields += 1
-                    debug(MODULE_TAG, ref, field.name, 'is BPF CTX', tag=MODULE_TAG)
+                    debug(ref, field.name, 'is BPF CTX', tag=MODULE_TAG)
             else:
-                debug('The field is not BPF', ref_field, tag=MODULE_TAG)
+                # debug('The field is not BPF', ref_field, tag=MODULE_TAG)
+                pass
 
         # Check if any of the field has an object which is BPF context
         # for field in decl.fields:
@@ -247,15 +248,15 @@ def _check_passing_bpf_context(inst, func, info):
         param = func.args[pos]
         if is_bpf_ctx_ptr(a, info):
             # First check if the argument it self is a pointer to BPF ctx
-            # debug(f'Passing BPF_CTX as argument {param.name} <-- {a.name}', tag=MODULE_TAG)
+            # debug(f'func: {func.name} | Passing BPF_CTX as argument {param.name} <-- {a.name}', tag=MODULE_TAG)
             sym = callee_scope.lookup(param.name)
             sym.set_is_bpf_ctx(True)
             receives_bpf_ctx = True
         else:
             # Otherwise, check if the argument has a field, which is a pointer
             # to BPF context
-            if not hasattr(a, 'type'):
-                error('do not know the type for', a)
+            if not hasattr(a, 'type') and not isinstance(a, Literal):
+                error('do not know the type for', a, a.kind)
                 continue
             if not (a.type.is_pointer() or a.type.is_array()):
                 # We are not passing a reference. Passing a value copies data.
@@ -310,8 +311,8 @@ def _check_passing_bpf_context(inst, func, info):
                     receives_bpf_ctx = True
                     # debug(f'Set the {param.name} .. {sym.name} to BPF_CTX', tag=MODULE_TAG)
             else:
-                text, _ = gen_code([a, ], info)
-                debug(f'Does not have BPF CTX in its field', a, '|', text, tag=MODULE_TAG)
+                # text, _ = gen_code([a, ], info)
+                # debug(f'Does not have BPF CTX in its field', a, '|', text, tag=MODULE_TAG)
                 pass
     return receives_bpf_ctx
 
@@ -483,14 +484,44 @@ def _handle_array_access(inst, info, more):
     return inst
 
 
+def _handle_unary_op(inst, info, more):
+    assert isinstance(inst, UnaryOp)
+    if inst.op != '*':
+        return inst
+    x = inst.operand
+    R = []
+    is_ctx = is_value_from_bpf_ctx(x, info, R)
+    if not is_ctx:
+        return inst
+    r = R.pop()
+    ref, index, size = r
+    if ref.has_flag(Instruction.BOUND_CHECK_FLAG):
+        return inst
+    assert isinstance(ref, Instruction)
+    assert isinstance(index, Instruction)
+    _check_if_variable_index_should_be_masked(ref, index, blk, info)
+    _add_bound_check(blk, r, current_function, info, bytes_mode=False,
+            more=more)
+    # Report for debuging
+    tmp,_ = gen_code([inst], info)
+    debug(f'Add a bound check before:\n    {tmp}', tag=MODULE_TAG)
+    return inst
+
+
 def _process_current_inst(inst, info, more):
-    if inst.kind == clang.CursorKind.BINARY_OPERATOR:
-        return _handle_binop(inst, info, more)
-    elif inst.kind == clang.CursorKind.CALL_EXPR:
+    if inst.kind == clang.CursorKind.CALL_EXPR:
         return _handle_call(inst, info, more)
+    elif inst.kind == clang.CursorKind.UNARY_OPERATOR:
+        return _handle_unary_op(inst, info, more)
     elif inst.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
         return _handle_array_access(inst, info, more)
     # Ignore other instructions
+    return inst
+
+
+def _end_current_inst(inst, info, more):
+    if inst.kind == clang.CursorKind.BINARY_OPERATOR:
+        return _handle_binop(inst, info, more)
     return inst
 
 
@@ -547,6 +578,7 @@ def _do_pass(inst, info, more):
             new_children.append(new_child)
 
     new_inst = inst.clone(new_children)
+    new_inst = _end_current_inst(new_inst, info, more)
     return new_inst
 
 

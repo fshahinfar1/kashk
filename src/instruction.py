@@ -458,6 +458,10 @@ class UnaryOp(Instruction):
             self.comes_after = False
 
     @property
+    def operand(self):
+        return self.child.children[0]
+
+    @property
     def type(self):
         T = self.child.children[0].type
         if self.op == '&':
@@ -847,7 +851,7 @@ class Literal(Instruction):
         elif self.kind == clang.CursorKind.STRING_LITERAL:
             return MyType.make_pointer(BASE_TYPES[clang.TypeKind.UCHAR])
         elif self.kind == clang.CursorKind.CHARACTER_LITERAL:
-            return BASE_TYPES[clang.TypeKind.CHAR]
+            return BASE_TYPES[clang.TypeKind.SCHAR]
         else:
             debug('Trying to guess the type for', self, self.kind)
             raise Exception('I do not know the type')

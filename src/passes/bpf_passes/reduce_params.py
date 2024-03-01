@@ -157,7 +157,7 @@ def _handle_ref(inst, info, more):
     top_lvl_var_name = inst.name
     if inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
         if inst.owner:
-            top_lvl_var_name = inst.owner[-1]
+            top_lvl_var_name = inst.owner[-1].name
         else:
             # using c++ implicit `this'
             top_lvl_var_name = 'self'
@@ -166,11 +166,18 @@ def _handle_ref(inst, info, more):
     if flag:
         new_inst = inst.clone([])
         struct_name = current_change_ctx.struct_name
-        tmp_T = MyType.make_simple('struct {struct_name}', clang.TypeKind.RECORD)
+        tmp = f'struct {struct_name}'
+        tmp_T = MyType.make_simple(tmp, clang.TypeKind.RECORD)
         tmp_T = MyType.make_pointer(tmp_T)
         ex_ref = Ref.build(EXTRA_PARAM_NAME, tmp_T, False, red=True)
+        last_owner = new_inst
+        if new_inst.owner:
+            last_owner = new_inst.owner[-1]
+        last_owner.kind = clang.CursorKind.MEMBER_REF_EXPR
+        last_owner.owner.append(ex_ref)
         new_inst.owner.append(ex_ref)
         new_inst.kind = clang.CursorKind.MEMBER_REF_EXPR
+        new_inst.color = InstructionColor.ORIGINAL
         new_inst.set_modified(InstructionColor.EXTRA_MEM_ACCESS)
         # debug(MODULE_TAG, 'updated!', new_inst, new_inst.owner)
         return new_inst
