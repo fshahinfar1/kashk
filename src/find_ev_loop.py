@@ -57,6 +57,8 @@ def find_request_processing_logic(cursor):
 
 def get_entry_code(cursor, info):
     tmp_list = find_elem(cursor, info.io_ctx.entry_func)
+    if not tmp_list:
+        raise Exception('Entry function not found')
     list_entry_functions = list(filter(lambda e: e.kind == clang.CursorKind.FUNCTION_DECL and e.is_definition(), tmp_list))
     assert len(list_entry_functions)  > 0, 'Did not found the entry function'
     assert len(list_entry_functions) == 1, 'Found multiple definition of entry functions'

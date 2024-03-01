@@ -92,8 +92,8 @@ def find_elem(cursor, func_name):
     for name in h:
         new_candid = []
         for cursor in candid:
-            match = list(filter(lambda c: c.spelling == name, cursor.get_children()))
-            new_candid.extend(match)
+            m = list(filter(lambda c: c.spelling == name, cursor.get_children()))
+            new_candid.extend(m)
         candid = new_candid
     if not candid:
         return None

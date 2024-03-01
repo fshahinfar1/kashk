@@ -273,6 +273,8 @@ def __convert_cursor_to_inst(c, info, _state):
             # report_on_cursor(c)
             children = list(c.get_children())
             # debug('array declaration children:', children, tag=MODULE_TAG)
+            # for c in children:
+            #     report_on_cursor(c)
             # assert len(children) == 1
             # for child in children:
             #     if child.kind == clang.CursorKind.INTEGER_LITERAL:

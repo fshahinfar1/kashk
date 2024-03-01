@@ -39,7 +39,7 @@ def _do_mark_read(r, info):
         buf_arg = skip_unexposed_stmt(args[0])
         # TODO: assume a size for the buffer
         buf_sz = Literal('1024', clang.CursorKind.INTEGER_LITERAL)
-    elif func_name == 'read':
+    elif func_name == 'read' or func_name == 'recv':
         buf_arg = skip_unexposed_stmt(args[1])
         buf_sz = skip_unexposed_stmt(args[2])
     elif func_name == 'recvfrom':
@@ -47,6 +47,8 @@ def _do_mark_read(r, info):
         buf_arg = skip_unexposed_stmt(args[1])
         buf_sz = skip_unexposed_stmt(args[2])
     elif func_name == 'recvmsg':
+        raise Exception('it is not implemented yet')
+    else:
         raise Exception('it is not implemented yet')
 
     pkt_buf = PacketBuffer(None)
