@@ -251,6 +251,10 @@ class MyType:
         assert isinstance(T, clang.Type)
         obj = MyType()
         obj.spelling = T.spelling
+        if obj.spelling.startswith('const'):
+            # Remove the const keyword
+            tmp = ' '.join(obj.spelling.split()[1:])
+            obj.spelling = tmp
         obj.kind = T.kind
         if obj.is_pointer():
             obj.under_type = MyType.from_cursor_type(T.get_pointee())

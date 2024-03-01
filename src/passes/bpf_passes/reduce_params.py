@@ -107,7 +107,7 @@ def _handle_call(inst, info, more):
         # Ignore this instruction. There is no change
         return inst
 
-    # Check if the function was analysed before
+    # Check if the function was analysed before, otherwise process the function
     if inst.name not in _Change.updated_functions:
         _function_check_param_reduce(inst, func, info, more)
 
@@ -129,18 +129,9 @@ def _handle_call(inst, info, more):
     ref = decl_new_var(T, info, tmp_decl)
     tmp = []
 
-    # TODO: How to implement a struct initialization?
-    # for field, var in zip(change.list_of_params, extra_args):
-    #     field_name = field.name
-    #     var_name, _ = gen_code([var], info, RHS)
-    #     tmp.append(f'.{field_name} = {var_name}')
-    # init_text = '{\n' + indent(',\n'.join(tmp)) + '\n}'
-    # tmp_init = Literal(init_text, CODE_LITERAL)
-    # tmp_init.set_modified(InstructionColor.MEM_COPY)
-    # decl.init.add_inst(tmp_init)
-
-    # Use multiple assignments
+    # Use multiple assignments to initialize the extra data-struct
     for field, var in zip(change.list_of_params, extra_args):
+        # Check if the parameters passed to this function should be changed
         tmp_ref = Ref.build(field.name, field.type, True, True)
         tmp_ref.owner.append(ref)
         assign = BinOp.build(tmp_ref, '=', var)
@@ -176,6 +167,7 @@ def _handle_ref(inst, info, more):
         new_inst = inst.clone([])
         struct_name = current_change_ctx.struct_name
         tmp_T = MyType.make_simple('struct {struct_name}', clang.TypeKind.RECORD)
+        tmp_T = MyType.make_pointer(tmp_T)
         ex_ref = Ref.build(EXTRA_PARAM_NAME, tmp_T, False, red=True)
         new_inst.owner.append(ex_ref)
         new_inst.kind = clang.CursorKind.MEMBER_REF_EXPR
@@ -187,12 +179,16 @@ def _handle_ref(inst, info, more):
 
 
 def _process_current_inst(inst, info, more):
-    if inst.kind == clang.CursorKind.CALL_EXPR:
-        return _handle_call(inst, info, more)
-    elif inst.kind in (clang.CursorKind.DECL_REF_EXPR,
+    if inst.kind in (clang.CursorKind.DECL_REF_EXPR,
                 clang.CursorKind.MEMBER_REF_EXPR):
         # debug(MODULE_TAG, 'handle ref:', inst)
         return _handle_ref(inst, info, more)
+    return inst
+
+
+def _end_current_inst(inst, info, more):
+    if inst.kind == clang.CursorKind.CALL_EXPR:
+        return _handle_call(inst, info, more)
     return inst
 
 
@@ -223,6 +219,7 @@ def _do_pass(inst, info, more):
             new_children.append(new_child)
 
     new_inst = inst.clone(new_children)
+    new_inst = _end_current_inst(new_inst, info, more)
     return new_inst
 
 

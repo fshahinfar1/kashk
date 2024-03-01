@@ -155,6 +155,7 @@ class Pass:
                             self.end_current_inst(_old_inst, more)
                             return None
                     new_children.append(new_child)
+        # TODO: The returned value is ignored
         new_inst = self.end_current_inst(_old_inst, more)
         if inst is None:
             assert self._may_remove, 'This pass is not allowed to remove instructions'
