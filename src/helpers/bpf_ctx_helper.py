@@ -2,6 +2,8 @@ from instruction import *
 from data_structure import *
 from helpers.instruction_helper import symbol_for_inst, simplify_inst_to_ref, ZERO
 
+MODULE_TAG = "[BPF CTX Helper]"
+
 
 def is_value_from_bpf_ctx(inst, info, R=None):
     """
