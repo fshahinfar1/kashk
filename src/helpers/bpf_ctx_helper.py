@@ -151,6 +151,9 @@ def is_bpf_ctx_ptr(inst, info):
         # debug(owner.name, '..', sym.name, '--bpf ctx-->', sym.is_bpf_ctx)
         # debug('owner symb ref:', id(owner_symbol), 'field ref:', id(sym))
         return sym.is_bpf_ctx
+    elif inst.kind == clang.CursorKind.CALL_EXPR:
+        func = inst.get_function_def()
+        return func.may_return_bpf_ctx_ptr
     return False
 
 

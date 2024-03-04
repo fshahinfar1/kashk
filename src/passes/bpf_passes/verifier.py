@@ -155,23 +155,32 @@ def _add_bound_check(blk, R, current_function, info, bytes_mode, more):
     #     more.last_bound_check = check
 
 
+def _track_bpf_ctx_pointer_propagation(inst, info, more):
+    assert isinstance(inst, BinOp)
+    # Track which variables are pointer to the BPF context
+    if inst.op != '=':
+        return
+    lhs = inst.lhs.children[0]
+    rhs = inst.rhs.children[0]
+    T = lhs.type
+    # Check if we are assigning a reference
+    if not T.is_pointer() and not T.is_array():
+        return
+    rhs_is_ptr = is_bpf_ctx_ptr(rhs, info)
+    debug("***", gen_code([inst,], info)[0], '|| LHS kind:', lhs.kind, '|| RHS kind:', rhs.kind, '|| is rhs ctx:', rhs_is_ptr, tag=MODULE_TAG)
+    set_ref_bpf_ctx_state(lhs, rhs_is_ptr, info)
+    # assert is_bpf_ctx_ptr(lhs, info) == rhs_is_ptr, 'Check if set_ref_bpf_ctx_state and is_bpf_ctx_ptr work correctly'
+    if is_bpf_ctx_ptr(lhs, info) != rhs_is_ptr:
+        error(MODULE_TAG,
+                'Failed to set the BPF context flag on reference', lhs)
+    if backward_jmp_ctx is not None and rhs_is_ptr:
+        backward_jmp_ctx.append(lhs)
+
+
 def _handle_binop(inst, info, more):
     lhs = inst.lhs.children[0]
     rhs = inst.rhs.children[0]
-    # Track which variables are pointer to the BPF context
-    if inst.op == '=':
-        T = lhs.type
-        # Check if we are assigning a reference
-        if T.is_pointer() or T.is_array():
-            rhs_is_ptr = is_bpf_ctx_ptr(rhs, info)
-            debug("***", gen_code([inst,], info)[0], '|| LHS kind:', lhs.kind, '|| RHS kind:', rhs.kind, '|| is rhs ctx:', rhs_is_ptr, tag=MODULE_TAG)
-            set_ref_bpf_ctx_state(lhs, rhs_is_ptr, info)
-            # assert is_bpf_ctx_ptr(lhs, info) == rhs_is_ptr, 'Check if set_ref_bpf_ctx_state and is_bpf_ctx_ptr work correctly'
-            if is_bpf_ctx_ptr(lhs, info) != rhs_is_ptr:
-                error(MODULE_TAG,
-                        'Failed to set the BPF context flag on reference', lhs)
-            if backward_jmp_ctx is not None and rhs_is_ptr:
-                backward_jmp_ctx.append(lhs)
+    _track_bpf_ctx_pointer_propagation(inst, info, more)
     # Check if the BPF context is accessed and add bound checking
     blk = cb_ref.get(BODY)
     for x in [lhs, rhs]:
@@ -512,6 +521,17 @@ def _handle_unary_op(inst, info, more):
     return inst
 
 
+def _handle_return(inst, info, more):
+    if current_function is None:
+        return inst
+    assert len(inst.body.children) == 1
+    obj = inst.body.children[0]
+    is_bpf_ptr = is_bpf_ctx_ptr(obj, info)
+    if is_bpf_ptr:
+        current_function.may_return_bpf_ctx_ptr = True
+    return inst
+
+
 def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.CALL_EXPR:
         return _handle_call(inst, info, more)
@@ -519,6 +539,8 @@ def _process_current_inst(inst, info, more):
         return _handle_unary_op(inst, info, more)
     elif inst.kind == clang.CursorKind.ARRAY_SUBSCRIPT_EXPR:
         return _handle_array_access(inst, info, more)
+    elif inst.kind == clang.CursorKind.RETURN_STMT:
+        return _handle_return(inst, info, more)
     # Ignore other instructions
     return inst
 

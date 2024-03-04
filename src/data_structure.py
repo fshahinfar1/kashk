@@ -572,6 +572,7 @@ class Function(TypeDefinition):
         self.may_have_context_ptr = False
         self.may_fail = False
         self.may_succeed = False
+        self.may_return_bpf_ctx_ptr = False
         self.calls_send = False
         self.calls_recv = False
         self.complexity = 0
