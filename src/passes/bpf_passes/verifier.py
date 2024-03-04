@@ -187,6 +187,7 @@ def _handle_binop(inst, info, more):
             assert isinstance(index, Instruction)
 
             _check_if_variable_index_should_be_masked(ref, index, blk, info)
+            debug('add bound check because binary operator access packet' , tag=MODULE_TAG)
             _add_bound_check(blk, r, current_function, info, bytes_mode=False, more=more)
 
             # Report for debuging
@@ -444,6 +445,7 @@ def _handle_call(inst, info, more):
             # debug(text, tag=MODULE_TAG)
             _check_if_variable_index_should_be_masked(ref, size, blk, info)
             # Add the check a line before this access
+            debug('add bound check because calling known function accessing packet' , tag=MODULE_TAG)
             _add_bound_check(blk, (ref, size, ZERO), current_function, info, bytes_mode=True, more=more)
         elif inst.name not in itertools.chain(OUR_IMPLEMENTED_FUNC, WRITE_PACKET):
             # We can not modify this function
@@ -500,6 +502,8 @@ def _handle_unary_op(inst, info, more):
     assert isinstance(ref, Instruction)
     assert isinstance(index, Instruction)
     _check_if_variable_index_should_be_masked(ref, index, blk, info)
+
+    debug('add bound check because unary operator dereferences packet', tag=MODULE_TAG)
     _add_bound_check(blk, r, current_function, info, bytes_mode=False,
             more=more)
     # Report for debuging
@@ -577,8 +581,10 @@ def _do_pass(inst, info, more):
                 assert new_child is not None, 'It seems this pass does not need to remove any instruction. Just checking.'
             new_children.append(new_child)
 
-    new_inst = inst.clone(new_children)
-    new_inst = _end_current_inst(new_inst, info, more)
+        # These instructions are inside the `with cb.new_ref(...)`
+        # This keeps the track of parent block of code (blk)
+        new_inst = inst.clone(new_children)
+        new_inst = _end_current_inst(new_inst, info, more)
     return new_inst
 
 

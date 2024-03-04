@@ -55,10 +55,18 @@ class TestCase(BasicTest):
         print('----------------------------------------------')
 
         # Generate the code and show it for debuging
+        process_func = Function.directory['process']
+
+        text, _ = gen_code([process_func,], info)
+        print(text)
+
         text, _ = gen_code(prog, info)
         print(text)
 
         # Tests
+        elems = find_elems_of_kind(process_func.body, clang.CursorKind.IF_STMT)
+        assert len(elems) > 0, 'The compiler should add bound check to process function'
+
         elems = find_elems_of_kind(prog, clang.CursorKind.IF_STMT)
         assert len(elems) > 0, 'The compiler should add an if statment'
 
