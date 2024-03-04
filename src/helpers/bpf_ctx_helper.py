@@ -41,11 +41,12 @@ def is_value_from_bpf_ctx(inst, info, R=None):
                 R.append((ref, index, size))
             return True
     elif inst.kind == clang.CursorKind.UNARY_OPERATOR:
-        if inst.op == '*' and is_bpf_ctx_ptr(inst.child.children[0], info):
+        obj = inst.operand
+        if inst.op == '*' and is_bpf_ctx_ptr(obj, info):
             if R is not None:
-                ref = inst.child.children[0]
-                R.append((ref, ZERO, ZERO))
+                R.append((obj, ZERO, ZERO))
             return True
+        return False
     elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
         # TODO: what if there are multiple member access?
         owner = inst.owner[-1]
@@ -108,9 +109,13 @@ def is_bpf_ctx_ptr(inst, info):
             if (is_bpf_ctx_ptr(inst.lhs.children[0], info)
                     or is_bpf_ctx_ptr(inst.rhs.children[0], info)):
                 return True
-    elif inst.kind == clang.CursorKind.UNARY_OPERATOR and inst.op == '&':
-        if is_value_from_bpf_ctx(inst.child.children[0], info):
+    elif inst.kind == clang.CursorKind.UNARY_OPERATOR:
+        obj = inst.operand
+        if inst.op == '&' and is_value_from_bpf_ctx(obj, info):
             return True
+        elif inst.op in ('++', '--') and is_bpf_ctx_ptr(obj, info):
+            return True
+        return False
     elif inst.kind == clang.CursorKind.CSTYLE_CAST_EXPR:
         # debug('check if castee is bpf ctx', inst.castee.children, inst.castee.children[0].kind)
         res = is_bpf_ctx_ptr(inst.castee.children[0], info)
