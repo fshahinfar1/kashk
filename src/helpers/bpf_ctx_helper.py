@@ -153,6 +153,8 @@ def is_bpf_ctx_ptr(inst, info):
         return sym.is_bpf_ctx
     elif inst.kind == clang.CursorKind.CALL_EXPR:
         func = inst.get_function_def()
+        if func is None:
+            return False
         return func.may_return_bpf_ctx_ptr
     return False
 
