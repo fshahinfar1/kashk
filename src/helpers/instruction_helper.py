@@ -1,5 +1,6 @@
 from data_structure import *
 from instruction import *
+from my_type import MyType
 from utility import get_tmp_var_name
 
 
@@ -139,7 +140,10 @@ def symbol_for_inst(inst, info):
         # debug("THERE IS A BUG HERE, WHAT IF THERE ARE MULTIPLE NESTED STRUCTS? I NEED A RECURSION HERE.")
         owner = inst.owner[-1]
         if not isinstance(owner, Ref):
-            error('Owner is not a reference and handling this case is not implemented yet')
+            error('Failed to find symbol: owner is not a reference and handling this case is not implemented yet')
+            debug('more info:')
+            debug('inst:', inst)
+            debug('------------------------')
             return None
         owner_symbol = info.sym_tbl.lookup(owner.name)
         if owner_symbol is None:

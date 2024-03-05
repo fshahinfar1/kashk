@@ -3,6 +3,7 @@ import clang.cindex as clang
 from log import error, debug, report
 from data_structure import *
 from instruction import *
+from my_type import MyType
 from utility import get_tmp_var_name
 from passes.clone import clone_pass
 from code_pass import Pass

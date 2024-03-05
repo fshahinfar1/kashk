@@ -2,7 +2,8 @@ import itertools
 import clang.cindex as clang
 
 from utility import get_owner, report_on_cursor, get_actual_type
-from data_structure import Function, MyType, BASE_TYPES
+from data_structure import Function, BASE_TYPES
+from my_type import MyType
 from log import error, debug, report
 from passes.passable import PassableObject
 from elements.likelihood import Likelihood

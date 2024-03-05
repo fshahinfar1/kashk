@@ -5,6 +5,7 @@ import clang.cindex as clang
 from log import error, debug
 from utility import get_code, report_on_cursor, visualize_ast, skip_unexposed_stmt, get_token_from_source_code, token_to_str
 from data_structure import *
+from my_type import MyType
 from instruction import *
 from sym_table import MemoryRegion
 from prune import (should_process_this_cursor, should_ignore_cursor, READ_PACKET, WRITE_PACKET)

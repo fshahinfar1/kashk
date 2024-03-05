@@ -2,6 +2,7 @@ import clang.cindex as clang
 from log import error, debug
 from data_structure import *
 from instruction import *
+from my_type import MyType
 from sym_table import SymbolTableEntry
 from utility import indent, get_tmp_var_name
 from code_gen import gen_code

@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from log import error, debug, report
 from data_structure import *
 from instruction import *
+from my_type import MyType
 from prune import WRITE_PACKET, KNOWN_FUNCS
 from template import define_bpf_arr_map, malloc_lookup
 from code_gen import gen_code

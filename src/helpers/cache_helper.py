@@ -2,6 +2,7 @@ import json
 from utility import get_tmp_var_name
 from instruction import *
 from data_structure import *
+from my_type import MyType
 from parser.parse_helper import is_identifier
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
 from helpers.instruction_helper import (get_ret_inst, decl_new_var, ZERO, ONE)

@@ -1,7 +1,7 @@
 from bpf import BPF_PROG
-from data_structure import (MyType, BASE_TYPES, XDP_HELPER_HEADER, Record,
-        StateObject)
+from data_structure import (BASE_TYPES, XDP_HELPER_HEADER, Record, StateObject)
 from instruction import *
+from my_type import MyType
 from helpers.instruction_helper import *
 from code_gen import gen_code
 from . import cast_data

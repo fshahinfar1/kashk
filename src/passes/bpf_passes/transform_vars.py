@@ -8,6 +8,7 @@ from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS
 from helpers.instruction_helper import get_ret_inst, add_flag_to_func, ZERO
 
 from data_structure import *
+from my_type import MyType
 from instruction import *
 from sym_table import MemoryRegion
 from after import After

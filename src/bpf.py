@@ -1,7 +1,8 @@
 import clang.cindex as clang
 from utility import generate_struct_with_fields, indent, get_tmp_var_name
-from data_structure import MyType, BASE_TYPES
+from data_structure import BASE_TYPES
 from instruction import *
+from my_type import MyType
 from helpers.instruction_helper import *
 import template
 

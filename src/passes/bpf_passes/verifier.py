@@ -5,6 +5,7 @@ import clang.cindex as clang
 from log import error, debug
 from data_structure import *
 from instruction import *
+from my_type import MyType
 from utility import get_tmp_var_name, skip_typedef
 
 from code_gen import gen_code
@@ -167,7 +168,7 @@ def _track_bpf_ctx_pointer_propagation(inst, info, more):
     if not T.is_pointer() and not T.is_array():
         return
     rhs_is_ptr = is_bpf_ctx_ptr(rhs, info)
-    debug("***", gen_code([inst,], info)[0], '|| LHS kind:', lhs.kind, '|| RHS kind:', rhs.kind, '|| is rhs ctx:', rhs_is_ptr, tag=MODULE_TAG)
+    # debug("***", gen_code([inst,], info)[0], '|| LHS kind:', lhs.kind, '|| RHS kind:', rhs.kind, '|| is rhs ctx:', rhs_is_ptr, tag=MODULE_TAG)
     set_ref_bpf_ctx_state(lhs, rhs_is_ptr, info)
     # assert is_bpf_ctx_ptr(lhs, info) == rhs_is_ptr, 'Check if set_ref_bpf_ctx_state and is_bpf_ctx_ptr work correctly'
     if is_bpf_ctx_ptr(lhs, info) != rhs_is_ptr:
@@ -196,7 +197,7 @@ def _handle_binop(inst, info, more):
             assert isinstance(index, Instruction)
 
             _check_if_variable_index_should_be_masked(ref, index, blk, info)
-            debug('add bound check because binary operator access packet' , tag=MODULE_TAG)
+            # debug('add bound check because binary operator access packet' , tag=MODULE_TAG)
             _add_bound_check(blk, r, current_function, info, bytes_mode=False, more=more)
 
             # Report for debuging
@@ -219,7 +220,7 @@ def _has_bpf_ctx_in_field(ref, info, field_name=None):
     T = get_actual_type(T)
     if T.is_record():
         name = T.spelling[len('struct '):]
-        decl = Record.directory.get(name)
+        decl = MyType.type_table.get(name)
         if not decl:
             error(f'Did not found the definition of the Record {T.spelling}')
             return False
@@ -237,7 +238,7 @@ def _has_bpf_ctx_in_field(ref, info, field_name=None):
                     field_name.count_bpf_fields += 1
                     debug(ref, field.name, 'is BPF CTX', tag=MODULE_TAG)
             else:
-                # debug('The field is not BPF', ref_field, tag=MODULE_TAG)
+                debug('The field is not BPF', ref_field, tag=MODULE_TAG)
                 pass
 
         # Check if any of the field has an object which is BPF context
@@ -258,7 +259,7 @@ def _check_passing_bpf_context(inst, func, info):
         param = func.args[pos]
         if is_bpf_ctx_ptr(a, info):
             # First check if the argument it self is a pointer to BPF ctx
-            # debug(f'func: {func.name} | Passing BPF_CTX as argument {param.name} <-- {a.name}', tag=MODULE_TAG)
+            debug(f'func: {func.name} | Passing BPF_CTX as argument {param.name} <-- {a.name}', tag=MODULE_TAG)
             sym = callee_scope.lookup(param.name)
             sym.set_is_bpf_ctx(True)
             receives_bpf_ctx = True
@@ -321,14 +322,14 @@ def _check_passing_bpf_context(inst, func, info):
                     receives_bpf_ctx = True
                     # debug(f'Set the {param.name} .. {sym.name} to BPF_CTX', tag=MODULE_TAG)
             else:
-                # text, _ = gen_code([a, ], info)
-                # debug(f'Does not have BPF CTX in its field', a, '|', text, tag=MODULE_TAG)
+                text, _ = gen_code([a, ], info)
+                debug(f'Does not have BPF CTX in its field', a, '|', text, tag=MODULE_TAG)
                 pass
     return receives_bpf_ctx
 
 
 def _check_setting_bpf_context_in_callee(inst, func, info):
-    # debug('checking func:', inst.name, tag=MODULE_TAG)
+    debug('checking func:', inst.name, tag=MODULE_TAG)
     callee_scope = info.sym_tbl.scope_mapping[func.name]
 
     # Check if value of pointers passed to this function was changed to point
@@ -350,7 +351,7 @@ def _check_setting_bpf_context_in_callee(inst, func, info):
                 continue
             ref = tmp
 
-        # debug(f'Parameter {param.name} ({param.type_ref.kind}) is given argument {ref.owner} {ref.name} ({ref.type})', tag=MODULE_TAG)
+        debug(f'Parameter {param.name} ({param.type_ref.kind}) is given argument {ref.owner} {ref.name} ({ref.type})', tag=MODULE_TAG)
 
         # If the pointer it self is set to be BPF context, then the pointer
         # will be BPF context in this scope too.
@@ -461,7 +462,7 @@ def _handle_call(inst, info, more):
             error(MODULE_TAG, 'function:', inst.name,
                 'receives BPF context but is not accessible for modification')
         else:
-            # debug('<><><>', inst.name, 'I only considered some functions, also check for other mem access functions', tag=MODULE_TAG)
+            debug('<><><>', inst.name, 'I only considered some functions, also check for other mem access functions', tag=MODULE_TAG)
             pass
     return inst
 

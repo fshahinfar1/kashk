@@ -1,5 +1,6 @@
 from instruction import *
 from data_structure import *
+from my_type import MyType
 from helpers.instruction_helper import symbol_for_inst, simplify_inst_to_ref, ZERO
 
 MODULE_TAG = "[BPF CTX Helper]"

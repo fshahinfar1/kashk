@@ -1,5 +1,6 @@
 from bpf import BPF_PROG
-from data_structure import MyType, BASE_TYPES, Record, StateObject
+from data_structure import BASE_TYPES, Record, StateObject
+from my_type import MyType
 from instruction import *
 from helpers.instruction_helper import *
 from code_gen import gen_code

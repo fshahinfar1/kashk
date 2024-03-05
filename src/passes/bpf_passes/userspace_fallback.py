@@ -5,6 +5,7 @@ from log import error, debug
 from template import prepare_meta_data
 from data_structure import *
 from instruction import *
+from my_type import MyType
 from passes.pass_obj import PassObject
 from passes.bpf_passes.transform_vars import FAIL_FLAG_NAME
 from helpers.instruction_helper import ZERO, CHAR, decl_new_var

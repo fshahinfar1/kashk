@@ -5,7 +5,7 @@ from utility import report_on_cursor, PRIMITIVE_TYPES, try_get_definition
 
 from data_structure import Function, Enum
 
-from data_structure import MyType
+from my_type import MyType
 import clang.cindex as clang
 
 

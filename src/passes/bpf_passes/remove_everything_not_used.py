@@ -2,8 +2,8 @@ import clang.cindex as clang
 from utility import get_actual_type
 from dfs import DFSPass
 from log import debug, error, report
-from data_structure import Record
 from instruction import Ref
+from my_type import MyType
 
 
 MODULE_TAG = '[Remove]'
@@ -29,7 +29,7 @@ def _do_pass(bpf, all_declarations, shared_vars, info):
             if inst.type.is_record():
                 # This type is compound, also keep every type in the fields
                 type_name2 = type_name[len('struct '):]
-                decl = Record.directory.get(type_name2)
+                decl = MyType.type_table.get(type_name2)
                 if decl:
                     for field in decl.fields:
                         if field.type_ref.is_record():

@@ -2,6 +2,7 @@ import clang.cindex as clang
 from contextlib import contextmanager
 import pprint
 from log import error, debug
+from my_type import MyType
 
 
 class SymbolAccessMode:
@@ -24,7 +25,6 @@ class SymbolTableEntry:
         self.type = type_
         self.kind = kind
         self.ref = ref
-        from data_structure import MyType
         assert isinstance(type_, MyType)
 
         # This is added to handle the fields of a struct
