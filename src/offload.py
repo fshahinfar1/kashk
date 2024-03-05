@@ -382,6 +382,14 @@ def gen_bpf_code(bpf, info, out_bpf):
     bpf = loop_end_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
+    debug('Rewrite While/Do-While', tag=MODULE_TAG)
+    bpf = rewrite_while_loop(bpf, info, None)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    # debug('Change loop to bpf_loop', tag=MODULE_TAG)
+    # bpf = change_to_bpf_loop(bpf, info, None)
+    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
     # Transform access to variables and read/write buffers.
     debug('Transform Vars', tag=MODULE_TAG)
     bpf = transform_vars_pass(bpf, info, PassObject())
@@ -411,14 +419,6 @@ def gen_bpf_code(bpf, info, out_bpf):
     debug('[2nd] remove everything that is not used in BPF', tag=MODULE_TAG)
     remove_everything_not_used(bpf, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    debug('Rewrite While/Do-While', tag=MODULE_TAG)
-    bpf = rewrite_while_loop(bpf, info, None)
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    # debug('Change loop to bpf_loop', tag=MODULE_TAG)
-    # bpf = change_to_bpf_loop(bpf, info, None)
-    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # debug('Program Complexity Pass', tag=MODULE_TAG)
     # list_bpf_progs = mitiage_program_comlexity(bpf, info, None)
