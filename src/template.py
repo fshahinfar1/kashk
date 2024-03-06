@@ -196,7 +196,6 @@ def define_bpf_hash_map(map_name, key_type, val_type, entries):
     return define_bpf_map(map_name, 'BPF_MAP_TYPE_HASH', key_type, val_type, entries)
 
 
-
 def malloc_lookup(name, info, return_val):
     """
     """
@@ -278,8 +277,6 @@ def _add_paranthesis_if_needed(inst):
 def variable_memcpy(dst, src, size, up_bound, info, fail_return_inst=None):
     declare_at_top_of_func = []
     max_bound = Literal(str(up_bound), clang.CursorKind.INTEGER_LITERAL)
-    bound_check_src = is_bpf_ctx_ptr(src, info)
-    bound_check_dst = is_bpf_ctx_ptr(dst, info)
 
     src = _add_paranthesis_if_needed(src)
     dst = _add_paranthesis_if_needed(dst)
@@ -289,21 +286,8 @@ def variable_memcpy(dst, src, size, up_bound, info, fail_return_inst=None):
     if not hasattr(dst, 'type'):
         dst = Cast.build(dst, CHAR_PTR)
 
-    T = BASE_TYPES[clang.TypeKind.USHORT]
-    loop, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info, T)
+    loop, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info, UINT)
     declare_at_top_of_func.extend(tmp_decl)
-
-    if bound_check_src:
-        data_end = info.prog.get_pkt_end()
-        ret = fail_return_inst
-        tmp_check = bpf_ctx_bound_check(src, loop_var, data_end, ret)
-        loop.body.add_inst(tmp_check)
-
-    if bound_check_dst:
-        data_end = info.prog.get_pkt_end()
-        ret = fail_return_inst
-        tmp_check = bpf_ctx_bound_check(dst, loop_var, data_end, ret)
-        loop.body.add_inst(tmp_check)
 
     at_src = ArrayAccess.build(src, loop_var)
     at_dst = ArrayAccess.build(dst, loop_var)
@@ -326,33 +310,12 @@ def strncmp(s1, s2, size, upper_bound, info, fail_return_inst=None):
 
     decl = []
     max_bound = Literal(str(upper_bound), clang.CursorKind.INTEGER_LITERAL)
-    bound_check_s1 = is_bpf_ctx_ptr(s1, info)
-    bound_check_s2 = is_bpf_ctx_ptr(s2, info)
-
-
-    # debug('strncmp, inputs:')
-    # debug('s1:', s1, s1.owner)
-    # debug('s2:', s2, s2.owner)
-    # debug('bound check needed:', bound_check_s1, bound_check_s2)
-    # debug('++++++++++++++++++++++++++++')
 
     res_var = decl_new_var(INT, info, decl)
     init_res = BinOp.build(res_var, '=', ZERO)
 
-    loop, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info, INT)
+    loop, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info, UINT)
     decl.extend(tmp_decl)
-
-    if bound_check_s1:
-        data_end = info.prog.get_pkt_end()
-        ret = fail_return_inst
-        tmp_check = bpf_ctx_bound_check(s1, loop_var, data_end, ret)
-        loop.body.add_inst(tmp_check)
-
-    if bound_check_s2:
-        data_end = info.prog.get_pkt_end()
-        ret = fail_return_inst
-        tmp_check = bpf_ctx_bound_check(s2, loop_var, data_end, ret)
-        loop.body.add_inst(tmp_check)
 
     at_s1 = ArrayAccess.build(s1, loop_var)
     at_s2 = ArrayAccess.build(s2, loop_var)
@@ -377,11 +340,10 @@ def strlen(s, max_bound, info):
     s = _add_paranthesis_if_needed(s)
     decl = []
     max_bound = Literal(str(max_bound), clang.CursorKind.INTEGER_LITERAL)
-    bound_check_s = is_bpf_ctx_ptr(s, info)
     res_var = decl_new_var(INT, info, decl)
     init_res = BinOp.build(res_var, '=', ZERO)
 
-    loop, tmp_decl, loop_var = new_bounded_loop(max_bound, max_bound, info, INT)
+    loop, tmp_decl, loop_var = new_bounded_loop(max_bound, max_bound, info, UINT)
     decl.extend(tmp_decl)
 
     at_s = ArrayAccess.build(s, loop_var)
@@ -408,26 +370,12 @@ def strncpy(s1, s2, size, max_bound, info, fail_return_inst=None):
     s2 = _add_paranthesis_if_needed(s2)
     decl = []
     max_bound = Literal(str(max_bound), clang.CursorKind.INTEGER_LITERAL)
-    bound_check_s1 = is_bpf_ctx_ptr(s1, info)
-    bound_check_s2 = is_bpf_ctx_ptr(s2, info)
-
     # strncpy returns a pointer to the destination string
     res_var = s1
     # Creat the loop
     loop, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info, UINT)
     decl.extend(tmp_decl)
-    # Performe bound check on the src/dest if needed
-    if bound_check_s1:
-        data_end = info.prog.get_pkt_end()
-        ret = fail_return_inst
-        tmp_check = bpf_ctx_bound_check(s1, loop_var, data_end, ret)
-        loop.body.add_inst(tmp_check)
-    if bound_check_s2:
-        data_end = info.prog.get_pkt_end()
-        ret = fail_return_inst
-        tmp_check = bpf_ctx_bound_check(s2, loop_var, data_end, ret)
-        loop.body.add_inst(tmp_check)
-    #
+
     at_s1 = ArrayAccess.build(s1, loop_var)
     at_s2 = ArrayAccess.build(s2, loop_var)
     assign = BinOp.build(at_s1, '=', at_s2)

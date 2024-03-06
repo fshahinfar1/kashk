@@ -411,6 +411,11 @@ def gen_bpf_code(bpf, info, out_bpf):
     bpf = transform_func_after_verifier(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
+    # Verifier
+    debug('[2nd] Verifier', tag=MODULE_TAG)
+    bpf = verifier_pass(bpf, info, PassObject())
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
     # Reduce number of parameters
     debug('Reduce Params', tag=MODULE_TAG)
     bpf = reduce_params_pass(bpf, info, PassObject())
