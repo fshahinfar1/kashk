@@ -259,7 +259,8 @@ def _check_passing_bpf_context(inst, func, info):
         param = func.args[pos]
         if is_bpf_ctx_ptr(a, info):
             # First check if the argument it self is a pointer to BPF ctx
-            debug(f'func: {func.name} | Passing BPF_CTX as argument {param.name} <-- {a.name}', tag=MODULE_TAG)
+            text = gen_code(a, info)[0]
+            debug(f'func: {func.name} | Passing BPF_CTX as argument {param.name} <-- {text}', tag=MODULE_TAG)
             sym = callee_scope.lookup(param.name)
             sym.set_is_bpf_ctx(True)
             receives_bpf_ctx = True
@@ -525,7 +526,14 @@ def _handle_unary_op(inst, info, more):
 def _handle_return(inst, info, more):
     if current_function is None:
         return inst
-    assert len(inst.body.children) == 1
+    count_children = len(inst.body.children)
+    if count_children == 0:
+        # void return
+        return
+    if count_children != 1:
+        debug('Unexpected number of children for return instruction', tag=MODULE_TAG)
+        debug('--', inst, inst.body.children, tag=MODULE_TAG)
+        raise Exception('Unexpected number of children for return instruction')
     obj = inst.body.children[0]
     is_bpf_ptr = is_bpf_ctx_ptr(obj, info)
     if is_bpf_ptr:

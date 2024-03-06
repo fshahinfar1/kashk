@@ -10,9 +10,9 @@
  * This is the structure I have defined for doing the caching
  * */
 struct cached_resp {
-	char key[32];
+	char key[255];
 	int key_size;
-	char value[32];
+	char value[255];
 	int value_size;
 };
 
@@ -63,6 +63,7 @@ void event_handler(int fd, short which, void *arg)
 	struct conn *c;
 	struct sockaddr_in addr;
 	socklen_t sock_addr_size;
+	char *_tmp;
 
 	/*                      id,           key_kind,   key_t, key_size, value_kind, value_t,            value_size */
 	__ANNOTATE_DEFINE_CACHE("main_cache", BYTE_ARRAY, "char", "0",       STRUCT,   "struct cached_resp", "1028")
@@ -85,13 +86,15 @@ void event_handler(int fd, short which, void *arg)
 			lookup_hashtable(key, key_len, (void **)&val, &val_len);
 			__ANNOTATE_END_CACHE("main_cache", "val = (char *)%p->value; val_len = %p->value_size;")
 			if (val == NULL) {
-				strncpy(c->rbuf, "Miss END\r\n", 10);
+				_tmp = "Miss END\r\n";
+				strncpy(c->rbuf, _tmp, 10);
 				sendto(fd, c->rbuf, 10, 0, (struct sockaddr *)&addr, sock_addr_size);
 			} else {
 				/* TODO: I need to automatically generate this check in the tool because the rbuf is a map */
 				/* val_len = val_len & 0xfff; */
 				/* if (val_len > 1000) */
 				/* 	return; */
+				__ANNOTATE_LOOP(1028)
 				strncpy(c->rbuf, val, val_len);
 				sendto(fd, c->rbuf, val_len, 0, (struct sockaddr *)&addr, sock_addr_size);
 			}
@@ -113,12 +116,14 @@ void event_handler(int fd, short which, void *arg)
 			__ANNOTATE_BEGIN_UPDATE_CACHE("main_cache", "key", "key_len", "val", "val_len")
 			update_hashtable(key, key_len, val, val_len);
 			__ANNOTATE_END_UPDATE_CACHE("main_cache", ";")
-			strncpy(c->rbuf, "Done END\r\n", 10);
+			_tmp = "Done END\r\n";
+			strncpy(c->rbuf, _tmp, 10);
 			sendto(fd, c->rbuf, 10, 0, (struct sockaddr *)&addr, sock_addr_size);
 			break;
 		default:
 			/* Wrong request */
-			strncpy(c->rbuf, "Wrong END\r\n", 11);
+			_tmp = "Wrong END\r\n";
+			strncpy(c->rbuf, _tmp, 11);
 			sendto(fd, c->rbuf, 11, 0, (struct sockaddr *)&addr, sock_addr_size);
 			break;
 	}

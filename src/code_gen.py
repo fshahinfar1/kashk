@@ -348,6 +348,10 @@ jump_table = {
 def gen_code(list_instructions, info, context=BODY):
     if isinstance(list_instructions, Block):
         list_instructions = list_instructions.get_children()
+    elif isinstance(list_instructions, Instruction):
+        # During debugging, I have many times passed a single instruction
+        # instead of a list to this function. Just saving my self some slack.
+        list_instructions = [list_instructions, ]
     count = len(list_instructions)
     q = reversed(list_instructions)
     q = list(zip(q, [0] * count))

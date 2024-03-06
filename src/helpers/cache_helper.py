@@ -9,6 +9,8 @@ from helpers.instruction_helper import (get_ret_inst, decl_new_var, ZERO, ONE)
 import template
 
 TAG = '[Cache Helper]'
+CACHE_KEY_MAX_SIZE = 255
+CACHE_VALUE_MAX_SIZE = 255
 
 
 def get_ref_from_name(name, info):
@@ -28,11 +30,15 @@ def get_var_end(var, upper_bound_inst, info):
     return end
 
 
-def gen_memcpy(info, current_function, dst, src, size, upper_bound):
+def get_ret_val(current_function, info):
     ret = get_ret_inst(current_function, info)
     ret_val = None
     if len(ret.body.children) > 0:
         ret_val = ret.body.children[0]
+    return ret_val
+
+def gen_memcpy(info, current_function, dst, src, size, upper_bound):
+    ret_val = get_ret_val(current_function, info)
     return template.variable_memcpy(dst, src, size, upper_bound, info, ret_val)
 
 
@@ -40,7 +46,7 @@ def get_map_name(map_id):
     return map_id + '_map'
 
 
-def generate_cache_lookup(inst, blk, parent_children, info):
+def generate_cache_lookup(inst, blk, current_function, parent_children, info):
     """
     Process an annotation of type Cache Begin
 
@@ -119,10 +125,10 @@ def generate_cache_lookup(inst, blk, parent_children, info):
     check_key_len = ControlFlowInst.build_if_inst(check_key_len_cond)
     check.body.add_inst(check_key_len)
     key_field = val_ref.get_ref_field('key', info)
-    # TODO: 16 is the max key size which should be determined based on the
-    # internal cache data strucutre
+    tmp_ret = get_ret_val(current_function, info)
     tmp_insts, tmp_decl, tmp_cmp_res = template.strncmp(key_field, key,
-            key_size, 255, info)
+            key_size, CACHE_KEY_MAX_SIZE, info,
+            fail_return_inst=tmp_ret)
     declare_at_top_of_func.extend(tmp_decl)
     check_key_len.body.extend_inst(tmp_insts)
 
@@ -223,7 +229,7 @@ def generate_cache_update(inst, blk, current_function, info):
     ## rewrite key
     dest_ref = item_ref.get_ref_field('key', info)
     cpy, decl, ret = gen_memcpy(info, current_function,
-            dest_ref, key, key_size, upper_bound='255')
+            dest_ref, key, key_size, upper_bound=CACHE_KEY_MAX_SIZE)
     declare_at_top_of_func.extend(decl)
     null_check.body.add_inst(cpy)
     key_size_field = item_ref.get_ref_field('key_size', info)
@@ -232,7 +238,7 @@ def generate_cache_update(inst, blk, current_function, info):
     ## rewrite value
     dest_ref = item_ref.get_ref_field('value', info)
     cpy, decl, ret = gen_memcpy(info, current_function,
-            dest_ref, value, value_size, upper_bound='255')
+            dest_ref, value, value_size, upper_bound=CACHE_VALUE_MAX_SIZE)
     declare_at_top_of_func.extend(decl)
     null_check.body.add_inst(cpy)
     size_assign = BinOp.build(item_ref.get_ref_field('value_size', info), '=', value_size)

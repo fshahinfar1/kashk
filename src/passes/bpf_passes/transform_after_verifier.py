@@ -106,7 +106,8 @@ def _known_function_substitution(inst, info, more):
         s1 = inst.args[0]
         s2 = inst.args[1]
         size = inst.args[2]
-        return_val = get_ret_inst(current_function, info)
+        tmp = get_ret_inst(current_function, info)
+        return_val = tmp.body.children[0] if len(tmp.body.children) > 0 else None
         tmp_insts, tmp_decl, tmp_res = template.strncmp(s1, s2, size, max_bound, info, return_val)
         declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
@@ -123,8 +124,10 @@ def _known_function_substitution(inst, info, more):
         s1 = inst.args[0]
         s2 = inst.args[1]
         size = inst.args[2]
-        return_val = get_ret_inst(current_function, info)
-        tmp_insts, tmp_decl, tmp_res = template.strncpy(s1, s2, size, max_bound, info, return_val)
+        tmp = get_ret_inst(current_function, info)
+        return_val = tmp.body.children[0] if len(tmp.body.children) > 0 else None
+        tmp_insts, tmp_decl, tmp_res = template.strncpy(s1, s2,
+                size, max_bound, info, return_val)
         declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
@@ -262,7 +265,8 @@ def _process_annotation(inst, info):
         blk = cb_ref.get(BODY)
         parent_node = parent_block.get(BODY)
         parent_children = parent_node.get_children()
-        new_inst, to_be_declared = generate_cache_lookup(inst, blk, parent_children, info)
+        new_inst, to_be_declared = generate_cache_lookup(inst, blk,
+                current_function, parent_children, info)
         declare_at_top_of_func.extend(to_be_declared)
         return new_inst
     elif inst.ann_kind == Annotation.ANN_CACHE_END:
