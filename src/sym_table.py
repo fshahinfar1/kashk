@@ -19,7 +19,8 @@ class MemoryRegion:
 
 class SymbolTableEntry:
     __slots__ = ('name', 'type', 'kind', 'ref', 'fields', 'is_bpf_ctx',
-            'is_accessed', 'memory_region', 'referencing_memory_region')
+            'is_accessed', 'mem_entry_ref',)
+
     def __init__(self, name, type_, kind, ref, scope_holding_the_entry=None):
         self.name = name
         self.type = type_
@@ -31,11 +32,7 @@ class SymbolTableEntry:
         self.fields = Scope(scope_holding_the_entry)
         self.is_bpf_ctx = False
         self.is_accessed = SymbolAccessMode.NOT_ACCESSED
-
-        # On what memory region is allocated
-        self.memory_region = None
-        # If it is pointer/array, to what memory region it is pointing
-        self.referencing_memory_region = None
+        self.mem_entry_ref = None
 
     def clone(self):
         e = SymbolTableEntry(self.name, self.type, self.kind, self.ref)
@@ -49,13 +46,6 @@ class SymbolTableEntry:
 
     def __repr__(self):
         return f'"<{self.kind}  {self.name}: {self.type.spelling}>"'
-
-    def set_mem_region(self, reg):
-        self.memory_region = reg
-
-    def set_ref_region(self, reg):
-        assert self.type.is_pointer() or self.type.is_array()
-        self.referencing_memory_region = reg
 
     def set_is_bpf_ctx(self, state):
         self.is_bpf_ctx = state
@@ -198,7 +188,6 @@ class SymbolTable:
         shared_scp_num = self.shared_scope.number
         glb_scp_num = self.global_scope.number
         cur_scp_num = self.current_scope.number
-
 
         book = {}
         q = [new_tbl.shared_scope]

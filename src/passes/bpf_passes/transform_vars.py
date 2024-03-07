@@ -178,8 +178,6 @@ class TransformVars(Pass):
         # inner scope.
         entry = self.info.sym_tbl.insert_entry('shared', SHARED_OBJ_PTR,
                 None, None)
-        entry.set_mem_region(MemoryRegion.STACK)
-        entry.set_ref_region(MemoryRegion.BPF_MAP)
         return inst
 
     def process_current_inst(self, inst, more):

@@ -309,8 +309,6 @@ def __convert_cursor_to_inst(c, info, _state):
             # report_on_cursor(c)
             error(f'Shadowing variables are not supported and can cause issues! ({c.spelling})', tag=MODULE_TAG)
         entry = inst.update_symbol_table(info.sym_tbl)
-        entry.memory_region = MemoryRegion.STACK
-        entry.referencing_memory_region = MemoryRegion.STACK
         return inst
     elif c.kind == clang.CursorKind.MEMBER_REF_EXPR:
         inst = Ref(c)

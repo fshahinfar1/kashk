@@ -474,7 +474,6 @@ def _handle_array_access(inst, info, more):
     if sym is None:
         debug('Did not found symbol table for', inst, tag=MODULE_TAG)
         return inst
-    # debug(inst, sym.memory_region, '--->', sym.referencing_memory_region, tag=MODULE_TAG)
     # debug('---', inst, inst.array_ref, inst.array_ref.type)
     array_ref = inst.array_ref
     if array_ref.type.is_pointer():

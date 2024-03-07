@@ -460,6 +460,7 @@ class UnaryOp(Instruction):
 
     @property
     def operand(self):
+        assert len(self.child.children) == 1
         return self.child.children[0]
 
     @property
