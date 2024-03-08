@@ -23,6 +23,7 @@ from passes.primary_annotation_pass import primary_annotation_pass
 from passes.mark_io import mark_io
 from passes.clone import clone_pass
 from passes.simplify_code import simplify_code_structure
+from passes.create_failure_path import create_failure_paths
 
 from passes.bpf_passes.loop_end import loop_end_pass
 from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
@@ -116,11 +117,6 @@ def generate_offload(io_ctx):
     # filter_log(MODULE_TAG, '[Var Dependency]', '[Create Fallback]',
     #         '[User Code]', '[Select Userspace]')
 
-    if io_ctx.bpf_hook == InputOutputContext.HOOK_XDP:
-        set_context_switch_cost(100)
-    else:
-        set_context_switch_cost(100)
-
     info = Info.from_io_ctx(io_ctx)
     build_sym_table(info)
     # Parse source files
@@ -173,38 +169,10 @@ def generate_offload(io_ctx):
 
     debug('Feasibility Analysis', tag=MODULE_TAG)
     prog = feasibilty_analysis_pass(prog, info, PassObject())
-    # for func in sorted(Function.directory.values(), key=lambda x: x.name):
-    #     debug(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_fail, func.path_ids, tag=MODULE_TAG)
-    # code, _ = gen_code(prog, info)
-    # print(code)
-    # show_insts([prog])
-
-    # func = Function.directory.get('strlen')
-    # assert func is not None
-    # debug(func.name, func.may_succeed, func.may_fail, tag=MODULE_TAG)
-
-    # func = Function.directory.get('tokenize_command')
-    # assert func is not None
-    # debug(func.name, func.may_succeed, func.may_fail, tag=MODULE_TAG)
-    # assert 0
-
-    # func = Function.directory.get('handle_set')
-    # assert func
-    # show_insts(func.body)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Create User Code Graph', tag=MODULE_TAG)
-    create_user_graph(prog, info, PassObject())
-    tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
-    debug('\n', tree, tag=MODULE_TAG)
-    tree = draw_tree(info.user_prog.graph, fn=lambda x: str(x.path_ids))
-    debug('\n', tree, tag=MODULE_TAG)
-    # root = info.user_prog.graph
-    # code = root.paths.code
-    # debug(id(root), root.children, code, tag=MODULE_TAG)
-    # text, _ =  gen_code(code, info)
-    # debug('code:\n', text, '\n---', sep='', tag=MODULE_TAG)
-    # debug('is user empty:', root.is_empty(), tag=MODULE_TAG)
+    debug('Create Failure Paths', tag=MODULE_TAG)
+    create_failure_paths(prog, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('Clone All State', tag=MODULE_TAG)
@@ -215,47 +183,12 @@ def generate_offload(io_ctx):
         new_f = func.clone(info.user_prog.func_dir)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    # debug('Original: AST')
-    # tmp = ASTGraphviz.do(prog, info)
-    # tmp.save_file('/tmp/ast.dot')
-    # tmp.dot.render(filename='ast', directory='/tmp/', format='svg')
-    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    # debug('Original: Create CFG', tag=MODULE_TAG)
-    # # handle_get = Function.directory.get('strncpy_bpf')
-    # # cfg = make_cfg(handle_get.body)
-    # cfg = make_cfg(prog)
-    # tmp = CFGGraphviz.do(cfg, info)
-    # tmp.dot.save('/tmp/cfg.dot')
-    # tmp.dot.render(filename='cfg', directory='/tmp/', format='svg')
-    # with open('/tmp/index.html', 'w') as f:
-    #     tmp = HTMLWriter().cfg_to_html(cfg, info)
-    #     f.write(tmp)
-    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    # debug('Original: Create Performance Modeling', tag=MODULE_TAG)
-    # tmp_text, _ = gen_code(prog, info)
-    # debug('\n', tmp_text, tag=MODULE_TAG)
-    # model = gen_static_high_level_perf_model(prog, info)
-    # tmp = model.dump()
-    # debug('\n', tmp, tag=MODULE_TAG)
-    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    # NOTE: the order of generating the userspace and then BPF is important
-    if not info.user_prog.graph.is_empty():
-        gen_user_code(user, info, io_ctx.user_out_file)
-    else:
-        report("No user space program was generated. The tool has offloaded everything to BPF.")
     prog = gen_bpf_code(prog, info, io_ctx.bpf_out_file)
+    # if not info.user_prog.graph.is_empty():
+    #     gen_user_code(user, info, io_ctx.user_out_file)
+    # else:
+    #     report("No user space program was generated. The tool has offloaded everything to BPF.")
 
-
-    # debug('BPF Program Performance Modeling', tag=MODULE_TAG)
-    # tmp_text, _ = gen_code(prog, info)
-    # debug('\n', tmp_text, tag=MODULE_TAG)
-    # model2 = gen_static_high_level_perf_model(prog, info)
-    # tmp = model2.dump()
-    # debug('\n', tmp, tag=MODULE_TAG)
-    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
     return info
 
 
@@ -317,15 +250,16 @@ def dfs_over_deps_vars(root, visited=None):
 
 
 def gen_user_code(user, info, out_user):
+    assert 0, 'working on the new implementation'
     # Switch the symbol table and functions to the snapshot suitable for
     # userspace analysis
     with info.user_prog.select_context(info):
-        debug('User Prog: Handle Fallback', tag=MODULE_TAG)
-        main = create_fallback_pass(user, info, PassObject())
-        debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-        debug('User Prog: Calculate Variable Deps', tag=MODULE_TAG)
-        var_dependency_pass(info)
-        debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+        # debug('User Prog: Handle Fallback', tag=MODULE_TAG)
+        # main = create_fallback_pass(user, info, PassObject())
+        # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+        # debug('User Prog: Calculate Variable Deps', tag=MODULE_TAG)
+        # var_dependency_pass(info)
+        # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
         # What graph looks like
         # report_user_program_graph(info)
@@ -395,12 +329,6 @@ def gen_bpf_code(bpf, info, out_bpf):
     bpf = transform_vars_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    # Handle moving to userspace and removing the instruction not possible in
-    # BPF
-    debug('Userspace Fallback', tag=MODULE_TAG)
-    bpf = userspace_fallback_pass(bpf, info, PassObject())
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
     # Verifier
     debug('Verifier', tag=MODULE_TAG)
     bpf = verifier_pass(bpf, info, PassObject())
@@ -421,8 +349,19 @@ def gen_bpf_code(bpf, info, out_bpf):
     bpf = reduce_params_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
+    # Handle moving to userspace and removing the instruction not possible in
+    # BPF
+    debug('Userspace Fallback', tag=MODULE_TAG)
+    bpf = userspace_fallback_pass(bpf, info, PassObject())
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
     debug('[2nd] remove everything that is not used in BPF', tag=MODULE_TAG)
     remove_everything_not_used(bpf, info, None)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    # Verifier
+    debug('[3rd] Verifier', tag=MODULE_TAG)
+    bpf = verifier_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # debug('Program Complexity Pass', tag=MODULE_TAG)

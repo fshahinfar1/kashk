@@ -223,7 +223,8 @@ def _process_current_inst(inst, info, more):
         failure_num = inst.path_id
         if current_function is None:
             # Found a split point on the BPF entry function
-            meta = info.user_prog.declarations.get(failure_num)
+            # meta = info.user_prog.declarations.get(failure_num)
+            meta = None
             if meta is None:
                 error('did not found the metadata structure declaration for failure', failure_num, tag=MODULE_TAG)
                 return inst
@@ -294,6 +295,10 @@ def _do_pass(inst, info, more):
 
 
 def userspace_fallback_pass(inst, info, more):
+    """
+    This pass implements the communication protocol between BPF and user
+    program inside the generated BPF program.
+    """
     with remember_func(None):
         with _new_top_func_declare_context():
             body = _do_pass(inst, info, more)

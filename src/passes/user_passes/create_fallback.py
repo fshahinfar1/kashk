@@ -177,7 +177,7 @@ def _process_node(node, info):
     return blk
 
 
-def create_fallback_pass(inst, info, more):
+def create_fallback_pass_old(inst, info, more):
     """
     Descripton:
     Walk the user program graph and creat functions handling fallback paths.
@@ -193,3 +193,6 @@ def create_fallback_pass(inst, info, more):
         tmp = _process_node(root, info)
     info.user_prog.fallback_funcs_def = new_functions
     return tmp
+
+
+def create_fallback_pass(info):
