@@ -226,8 +226,8 @@ def _do_pass(inst, info, more):
                 assert new_child is not None
             new_children.append(new_child)
 
-    new_inst = inst.clone(new_children)
-    new_inst = _end_current_inst(new_inst, info, more)
+        new_inst = inst.clone(new_children)
+        new_inst = _end_current_inst(new_inst, info, more)
     return new_inst
 
 

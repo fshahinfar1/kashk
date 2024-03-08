@@ -148,19 +148,17 @@ class BPF_PROG:
     def send(self, buf, write_size, info, failure_return, ret=True, do_copy=True):
         #TODO: The arguments of this function are crazy ???
         is_size_integer = write_size.kind == clang.CursorKind.INTEGER_LITERAL
-        if is_size_integer:
-            memcpy = 'memcpy'
-        else:
-            memcpy = 'bpf_memcpy'
-            # The BPF_MEMCPY with bpf_loop does not work very well for now.
-            # I will use a simple for loop with an upper bound.
-            # _use_memcpy(info)
-
         inst, decl = self.adjust_pkt(write_size, info)
         inst = decl + inst
         if do_copy:
-            if memcpy == 'memcpy':
-                off          = BinOp.build(self.get_pkt_buf(), '+', write_size)
+            # Get a reference to the packet payload in a variable
+            pkt = self.get_pkt_buf()
+            dst = decl_new_var(CHAR_PTR, info, inst, name=None)
+            assign = BinOp.build(dst, '=', pkt)
+            inst.append(assign)
+
+            if is_size_integer:
+                off          = BinOp.build(dst, '+', write_size)
                 cond         = BinOp.build(off, '>', self.get_pkt_end())
                 check        = ControlFlowInst.build_if_inst(cond)
                 ret_inst     = failure_return
@@ -169,15 +167,13 @@ class BPF_PROG:
                 check.likelihood = Likelihood.Unlikely
 
                 copy         = Call(None)
-                copy.name    = memcpy
-                args         = [self.get_pkt_buf(), buf, write_size]
+                copy.name    = 'memcpy'
+                args         = [dst, buf, write_size]
                 copy.args = args
                 copy.set_modified(InstructionColor.MEM_COPY)
                 inst.extend([check, copy])
             else:
                 # variable copy
-                dst = self.get_pkt_buf()
-                dst.type = CHAR_PTR
                 ret_value = None
                 if failure_return.body.has_children():
                     ret_value = failure_return.body.children[0]

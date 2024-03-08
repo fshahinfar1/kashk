@@ -2,8 +2,14 @@
 #include <stdio.h>
 #include <pthread.h>
 
+#ifndef __ANNOTATE_LOOP
+#define __ANNOTATE_LOOP(x)
+#endif
+
 pthread_mutex_t m;
 int arr[100];
+
+void *fail(int a, int b);
 
 int f1()
 {
@@ -18,7 +24,7 @@ int f2()
 {
 	char *str;
 	/* should fail here */
-	str = calloc(1, 256);
+	str = fail(1, 256);
 	if (str == NULL) {
 		return -1;
 	}
@@ -76,6 +82,12 @@ int main(int argc, char *argv[])
 		printf("c = %d\n", c);
 	}
 	f3(&d);
+
+	/* Should handle the fail path before the while */
+	__ANNOTATE_LOOP(100)
+	while(fail(1, 2) != NULL) {
+		b = a;
+	}
 
 	return 0;
 }

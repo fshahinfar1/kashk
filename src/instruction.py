@@ -653,7 +653,9 @@ class ArrayAccess(Instruction):
 
     @property
     def name(self):
-        return self.array_ref.name
+        if isinstance(self.array_ref, Ref):
+            return self.array_ref.name
+        return None
 
     @property
     def owner(self):
@@ -678,7 +680,7 @@ class ArrayAccess(Instruction):
         return new
 
     def __str__(self):
-        return f'<ArrayAccess {self.array_ref.name}@{self.index.children}>'
+        return f'<ArrayAccess {self.name}@{self.index.children}>'
 
 
 class Parenthesis(Instruction):

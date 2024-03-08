@@ -470,7 +470,11 @@ def _handle_call(inst, info, more):
 
 def _handle_array_access(inst, info, more):
     assert isinstance(inst, ArrayAccess)
-    sym = info.sym_tbl.lookup(inst.name)
+    tmp_name = inst.name
+    if tmp_name is None:
+        error('Did not found the name for bound checking the array', tag=MODULE_TAG)
+        return inst
+    sym = info.sym_tbl.lookup(tmp_name)
     if sym is None:
         debug('Did not found symbol table for', inst, tag=MODULE_TAG)
         return inst

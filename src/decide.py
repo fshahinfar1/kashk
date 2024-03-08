@@ -6,7 +6,7 @@ from math import inf
 from cfg import CFGJump, CFGNode, cfg_leafs
 from code_pass import Pass
 from data_structure import Function
-from log import debug
+from log import debug, error
 from brain.basic_block import BasicBlock, create_basic_block_cfg
 from brain.exec_path import extract_exec_paths
 from brain.cost_func import calculate_cost_along_path, CalcExpectedCost, context_switch
@@ -118,7 +118,7 @@ def analyse_offload(prog, info):
             cfg = create_basic_block_cfg(func.body, info)
         except Exception as e:
             # Grace fully fail this step for now :)
-            print('--Error', e)
+            error('--Error', e)
             return
         cfg_table[name] = cfg
         paths = extract_exec_paths(cfg, info)

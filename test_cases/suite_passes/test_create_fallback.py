@@ -16,7 +16,7 @@ from sym_table import *
 from passes.pass_obj import PassObject
 from passes.clone import clone_pass
 from passes.simplify_code import simplify_code_structure
-from passes.mark_annotation_pass import mark_annotation_pass
+from passes.primary_annotation_pass import primary_annotation_pass
 from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
 from passes.bpf_passes.mark_user_boundary import get_number_of_failure_paths
 from passes.user_passes.create_user_graph import create_user_graph
@@ -43,11 +43,14 @@ class TestCase(BasicTest):
         bpf.extend_inst(insts)
 
         mark_relevant_code(bpf, info, PassObject())
-        bpf = mark_annotation_pass(bpf, info, None)
+        bpf = primary_annotation_pass(bpf, info, None)
         mark_io(bpf, info)
         bpf = simplify_code_structure(bpf, info, PassObject())
         bpf = feasibilty_analysis_pass(bpf, info, PassObject())
         create_user_graph(bpf, info, PassObject())
+
+        text = gen_code(bpf, info)[0]
+        print(text)
 
         # Clone for User processing
         # user = clone_pass(bpf, info, PassObject())
@@ -72,9 +75,12 @@ class TestCase(BasicTest):
         print('code:\n', text, '\n---', sep='')
         print(generated_funcs)
 
-        left_child_code = root.children[1].children[0].paths.code.children
-        print('lll', left_child_code)
+        # left_child_code = root.children[3].children[0].paths.code.children
+        # print('lll', left_child_code)
 
+
+        tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
+        print(tree)
         # Tests
         assert root.paths.code.has_children()
         assert len(generated_funcs) == 2

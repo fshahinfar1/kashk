@@ -54,6 +54,7 @@ def main():
     proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     ret = proc.returncode
     assert ret == 0, f'The BPF program should pass the verifier'
+    print('Test Smiple libev Program Passed')
 
 
 if __name__ == '__main__':
