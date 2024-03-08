@@ -7,12 +7,12 @@ from data_structure import *
 from instruction import *
 from utility import (parse_file, find_elem, report_user_program_graph,
         draw_tree)
-from find_ev_loop import get_entry_code
+from parser.find_ev_loop import get_entry_code
 from sym_table import Scope
 from sym_table_gen import build_sym_table, process_source_file
-from understand_logic import  (gather_instructions_from,
+from parser.understand_logic import  (gather_instructions_from,
         get_variable_declaration_before_elem)
-from understand_logic_handler import create_func_objs, add_known_func_objs
+from parser.understand_logic_handler import create_func_objs, add_known_func_objs
 
 from code_gen import generate_bpf_prog, gen_code
 from user import generate_user_prog

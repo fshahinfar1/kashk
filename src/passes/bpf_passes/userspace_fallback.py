@@ -9,7 +9,7 @@ from my_type import MyType
 from passes.pass_obj import PassObject
 from passes.bpf_passes.transform_vars import FAIL_FLAG_NAME
 from helpers.instruction_helper import ZERO, CHAR, decl_new_var
-from after import After
+from elements.after import After
 
 
 MODULE_TAG = '[Fallback Pass]'

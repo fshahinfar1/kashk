@@ -11,7 +11,7 @@ from data_structure import *
 from my_type import MyType
 from instruction import *
 from sym_table import MemoryRegion
-from after import After
+from elements.after import After
 from passes.code_pass import Pass
 
 

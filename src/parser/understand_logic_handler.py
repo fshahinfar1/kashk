@@ -5,7 +5,7 @@ from prune import READ_PACKET, WRITE_PACKET, COROUTINE_FUNC_NAME
 from data_structure import *
 from instruction import *
 from my_type import MyType
-from understand_logic import gather_instructions_from, gather_instructions_under, MODULE_TAG
+from parser.understand_logic import gather_instructions_from, gather_instructions_under, MODULE_TAG
 from sym_table import *
 
 from prune import should_process_this_cursor

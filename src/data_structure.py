@@ -324,7 +324,7 @@ class FunctionBodyEvaluator:
 
     def __call__(self):
         from instruction import Block, BODY
-        from understand_logic import gather_instructions_under
+        from parser.understand_logic import gather_instructions_under
         # Switch scope
         with self.info.sym_tbl.with_func_scope(self.f.name):
             # Process function body recursively

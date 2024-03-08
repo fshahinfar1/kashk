@@ -8,15 +8,15 @@ code_under_test_dir = os.path.join(current_file_dir, '../src/')
 sys.path.insert(0, code_under_test_dir)
 from utility import parse_file, find_elem
 from sym_table_gen import build_sym_table, process_source_file
-from understand_logic import gather_instructions_under
-from understand_logic_handler import create_func_objs, add_known_func_objs
+from parser.understand_logic import gather_instructions_under
+from parser.understand_logic_handler import create_func_objs, add_known_func_objs
 
 from data_structure import Info, Function
 from instruction import BODY
 from framework_support import InputOutputContext
 
 from offload import load_other_sources, _prepare_event_handler_args, BPF_MAIN
-from find_ev_loop import get_entry_code
+from parser.find_ev_loop import get_entry_code
 from sym_table import Scope
 
 class BasicTest:

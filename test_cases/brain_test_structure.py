@@ -4,8 +4,8 @@ import clang.cindex as clang
 from basic_test_structure import BasicTest
 from utility import parse_file, find_elem
 from sym_table_gen import build_sym_table, process_source_file
-from understand_logic import gather_instructions_under
-from understand_logic_handler import create_func_objs, add_known_func_objs
+from parser.understand_logic import gather_instructions_under
+from parser.understand_logic_handler import create_func_objs, add_known_func_objs
 
 from data_structure import *
 from instruction import BODY, Block
@@ -14,7 +14,7 @@ from framework_support import InputOutputContext
 from offload import (load_other_sources, _prepare_event_handler_args,
         move_vars_before_event_loop_to_shared_scope, dfs_over_deps_vars,
         BPF_MAIN)
-from find_ev_loop import get_entry_code
+from parser.find_ev_loop import get_entry_code
 from sym_table import Scope
 
 from passes.pass_obj import PassObject

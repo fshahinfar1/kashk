@@ -5,7 +5,7 @@ from log import *
 from utility import PRIMITIVE_TYPES, get_actual_type
 from prune import should_process_this_cursor
 
-from understand_program_state import generate_decleration_for
+from parser.understand_program_state import generate_decleration_for
 
 MODULE_TAG = '[Mark Used Func]'
 _has_processed = set()
