@@ -12,7 +12,7 @@ from my_type import MyType
 from instruction import *
 from sym_table import MemoryRegion
 from after import After
-from code_pass import Pass
+from passes.code_pass import Pass
 
 
 MODULE_TAG = '[Transform Vars Pass]'

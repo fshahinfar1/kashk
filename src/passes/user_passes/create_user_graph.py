@@ -4,7 +4,7 @@ import clang.cindex as clang
 from log import error, debug
 from data_structure import *
 from instruction import *
-from code_pass import Pass
+from passes.code_pass import Pass
 from user import FallbackRegionGraph
 from helpers.instruction_helper import show_insts
 

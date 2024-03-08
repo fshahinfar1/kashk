@@ -4,7 +4,7 @@ from sym_table import SymbolAccessMode
 from data_structure import CodeBlockRef
 from instruction import *
 
-from code_pass import Pass
+from passes.code_pass import Pass
 from passes.pass_obj import PassObject
 
 from code_gen import gen_code

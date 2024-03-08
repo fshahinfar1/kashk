@@ -1,5 +1,5 @@
 import clang.cindex as clang
-from code_pass import Pass
+from passes.code_pass import Pass
 from data_structure import *
 from instruction import *
 import template

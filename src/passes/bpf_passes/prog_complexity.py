@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 import clang.cindex as clang
-from code_pass import Pass
+from passes.code_pass import Pass
 from log import debug, error
 from passes.pass_obj import PassObject
 from code_gen import gen_code

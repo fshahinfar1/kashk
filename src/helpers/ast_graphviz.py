@@ -6,7 +6,7 @@ import re
 import graphviz
 
 from log import debug
-from code_pass import Pass
+from passes.code_pass import Pass
 from code_gen import gen_code
 
 

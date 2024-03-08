@@ -3,7 +3,7 @@ Calculate the cost of basic-blocks. It is used in determining the
 """
 from log import debug
 from instruction import InstructionColor
-from code_pass import Pass
+from passes.code_pass import Pass
 from data_structure import Function
 from cfg import CFGJump, CFGNode, Jump
 from brain.basic_block import BasicBlock, inst_is_func_call
