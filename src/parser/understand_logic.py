@@ -189,6 +189,14 @@ def _make_switch_case(cursor, info):
     return inst
 
 
+def _may_be_array_init(kind):
+    """
+    We kind of instructions may be used for initializing an array
+    """
+    return kind in (clang.CursorKind.STRING_LITERAL,
+            clang.CursorKind.INIT_LIST_EXPR)
+
+
 def __convert_cursor_to_inst(c, info, _state):
     if c.kind == clang.CursorKind.CALL_EXPR:
         return understand_call_expr(c, info)
@@ -286,8 +294,7 @@ def __convert_cursor_to_inst(c, info, _state):
             children = tmp
 
             count_children = len(children)
-            if (count_children == 1 and
-                    children[0].kind != clang.CursorKind.INTEGER_LITERAL):
+            if count_children == 1 and _may_be_array_init(children[0].kind):
                 child = children[0]
             elif count_children > 1:
                 child = children[1]
