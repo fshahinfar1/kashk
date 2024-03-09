@@ -166,6 +166,19 @@ def handle_literal(inst, info, more):
     return indent(inst.text, lvl)
 
 
+def handle_init_list_expr(inst, info, more):
+    tmp = []
+    for field_name, field_val in inst.body:
+        print(field_name, field_val)
+        if field_name:
+            tmp.append(f'.{field_name} = {field_val}')
+        else:
+            tmp.append(str(field_val))
+    tmp = ','.join(tmp)
+    tmp = '{' + tmp + '}' 
+    return tmp
+
+
 def handle_if_stmt(inst, info, more):
     lvl = more[0]
 
@@ -322,6 +335,7 @@ jump_table = {
         clang.CursorKind.CXX_BOOL_LITERAL_EXPR: handle_literal,
         clang.CursorKind.MACRO_INSTANTIATION: handle_literal,
         CODE_LITERAL: handle_literal,
+        clang.CursorKind.INIT_LIST_EXPR: handle_init_list_expr,
         # Control FLow
         clang.CursorKind.LABEL_STMT: lambda x,y,z: indent(f'{x.body.text}:', z[0]),
         clang.CursorKind.GOTO_STMT: lambda x,y,z: indent(f'goto {x.body.text}', z[0]),

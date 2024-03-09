@@ -269,21 +269,32 @@ def __convert_cursor_to_inst(c, info, _state):
         # Find the variable initialization, if there is any.
         init = []
         if inst.type.is_array():
-            # debug('declaring an array and initializing:', tag=MODULE_TAG)
-            # debug(inst, tag=MODULE_TAG)
-            # report_on_cursor(c)
+            debug('declaring an array and initializing:', tag=MODULE_TAG)
+            debug(inst, tag=MODULE_TAG)
+            report_on_cursor(c)
             children = list(c.get_children())
-            # debug('array declaration children:', children, tag=MODULE_TAG)
+            debug('array declaration children:', children, tag=MODULE_TAG)
             # for c in children:
             #     report_on_cursor(c)
-            # assert len(children) == 1
-            # for child in children:
-            #     if child.kind == clang.CursorKind.INTEGER_LITERAL:
-            #         continue
-            #     init = gather_instructions_from(child, info, context=ARG)
-            #     break
-            if len(children) > 1:
+
+            tmp = []
+            for c in children:
+                if c.kind == clang.CursorKind.ALIGNED_ATTR:
+                    error('Ignore alignment attribute for array declaration')
+                    continue
+                tmp.append(c)
+            children = tmp
+
+            count_children = len(children)
+            if (count_children == 1 and
+                    children[0].kind != clang.CursorKind.INTEGER_LITERAL):
+                child = children[0]
+            elif count_children > 1:
                 child = children[1]
+            else:
+                child = None
+
+            if child is not None:
                 init = gather_instructions_from(child, info, context=ARG)
         elif inst.type.is_func_ptr():
             # TODO: what to do whit available information about function pointer decleration?
