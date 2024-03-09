@@ -538,7 +538,7 @@ def _handle_return(inst, info, more):
     count_children = len(inst.body.children)
     if count_children == 0:
         # void return
-        return
+        return inst
     if count_children != 1:
         debug('Unexpected number of children for return instruction', tag=MODULE_TAG)
         debug('--', inst, inst.body.children, tag=MODULE_TAG)

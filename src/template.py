@@ -44,7 +44,7 @@ def bpf_ctx_bound_check(ref, index, data_end, return_value=None):
     ret = Return()
     if return_value is None:
         # ret.body.add_inst(Literal('0', kind=clang.CursorKind.INTEGER_LITERAL))
-        pass
+        ret = ret
     else:
         ret.body.add_inst(return_value)
     ret.set_modified()
@@ -89,7 +89,8 @@ def bpf_ctx_bound_check_bytes(ref, size, data_end, return_value=None):
     # return 0
     ret = Return()
     if return_value is None:
-        ret.body.add_inst(Literal('0', kind=clang.CursorKind.INTEGER_LITERAL))
+        # ret.body.add_inst(Literal('0', kind=clang.CursorKind.INTEGER_LITERAL))
+        ret = ret
     else:
         ret.body.add_inst(return_value)
     ret.set_modified()
