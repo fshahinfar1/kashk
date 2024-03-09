@@ -3,10 +3,9 @@ from data_structure import *
 from my_type import MyType
 from utility import get_tmp_var_name
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
-from helpers.instruction_helper import decl_new_var, ZERO, NULL, CHAR_PTR, INT, NULL_CHAR, UINT, ONE
+from helpers.instruction_helper import (decl_new_var, ZERO, NULL, CHAR_PTR,
+        INT, NULL_CHAR, UINT, ONE, VOID_PTR)
 from elements.likelihood import Likelihood
-
-VOID_PTR = 'void *'
 
 
 def bpf_ctx_bound_check(ref, index, data_end, return_value=None):
@@ -125,7 +124,7 @@ def prepare_shared_state_var(ret_val=None):
     var_ref = var_decl.get_ref()
     var_ref.set_modified()
 
-    zero_decl = VarDecl.build(get_tmp_var_name(), INT, red=True)
+    zero_decl = VarDecl.build(get_tmp_var_name(), UINT, red=True)
     zero_decl.init.add_inst(ZERO)
     zero_ref = zero_decl.get_ref()
     zero_ref.set_modified()
@@ -341,7 +340,7 @@ def strlen(s, max_bound, info):
     s = _add_paranthesis_if_needed(s)
     decl = []
     max_bound = Literal(str(max_bound), clang.CursorKind.INTEGER_LITERAL)
-    res_var = decl_new_var(INT, info, decl)
+    res_var = decl_new_var(UINT, info, decl)
     init_res = BinOp.build(res_var, '=', ZERO)
 
     loop, tmp_decl, loop_var = new_bounded_loop(max_bound, max_bound, info, UINT)
