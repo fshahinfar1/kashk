@@ -470,6 +470,9 @@ def _handle_call(inst, info, more):
 
 def _handle_array_access(inst, info, more):
     assert isinstance(inst, ArrayAccess)
+    if inst.has_flag(Instruction.BOUND_CHECK_FLAG):
+        # Has processed it before
+        return inst
     tmp_name = inst.name
     if tmp_name is None:
         error('Did not found the name for bound checking the array', tag=MODULE_TAG)
@@ -498,6 +501,8 @@ def _handle_array_access(inst, info, more):
     check.likelihood = Likelihood.Unlikely
     blk = cb_ref.get(BODY)
     blk.append(check)
+
+    inst.set_flag(Instruction.BOUND_CHECK_FLAG)
     return inst
 
 
