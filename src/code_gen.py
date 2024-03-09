@@ -169,13 +169,13 @@ def handle_literal(inst, info, more):
 def handle_init_list_expr(inst, info, more):
     tmp = []
     for field_name, field_val in inst.body:
-        print(field_name, field_val)
+        # debug(field_name, field_val, tag=MODULE_TAG)
         if field_name:
             tmp.append(f'.{field_name} = {field_val}')
         else:
             tmp.append(str(field_val))
     tmp = ','.join(tmp)
-    tmp = '{' + tmp + '}' 
+    tmp = '{' + tmp + '}'
     return tmp
 
 
