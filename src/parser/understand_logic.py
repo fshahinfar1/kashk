@@ -269,11 +269,11 @@ def __convert_cursor_to_inst(c, info, _state):
         # Find the variable initialization, if there is any.
         init = []
         if inst.type.is_array():
-            debug('declaring an array and initializing:', tag=MODULE_TAG)
-            debug(inst, tag=MODULE_TAG)
-            report_on_cursor(c)
+            # debug('declaring an array and initializing:', tag=MODULE_TAG)
+            # debug(inst, tag=MODULE_TAG)
+            # report_on_cursor(c)
             children = list(c.get_children())
-            debug('array declaration children:', children, tag=MODULE_TAG)
+            # debug('array declaration children:', children, tag=MODULE_TAG)
             # for c in children:
             #     report_on_cursor(c)
 
@@ -492,7 +492,7 @@ def __convert_cursor_to_inst(c, info, _state):
         inst = Instruction()
         inst.kind = c.kind
         inst.body = children
-        debug(MODULE_TAG, 'INIT_LIST:', inst.body)
+        # debug(MODULE_TAG, 'INIT_LIST:', inst.body)
         return inst
     elif c.kind == clang.CursorKind.ENUM_DECL:
         enum = Enum.from_cursor(c)
