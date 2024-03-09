@@ -133,7 +133,7 @@ class Instruction(PassableObject):
         _default_clone_operation(new, self)
         if children:
             new.body = children[0]
-        assert new.kind is not None, vars(self)
+        assert new.kind is not None
         return new
 
     def __str__(self):

@@ -262,8 +262,8 @@ def handle_paren_expr(inst, info, more):
 
 def handle_return_stmt(inst, info, more):
     lvl = more[0]
-    body, _ = gen_code(inst.body, info, context=ARG)
-    if body:
+    if inst.body.has_children():
+        body, _ = gen_code(inst.body, info, context=ARG)
         text = f'return ({body})'
     else:
         text = f'return'
