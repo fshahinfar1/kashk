@@ -35,12 +35,10 @@ class TestCase(BasicTest):
         # show_insts([bpf])
 
         f4 = Function.directory['f4']
-        # text, _ = gen_code([f4, ], self.info)
-        # print(text)
 
         expected_state = {
                 #      Succeed, Fail
-                'f1': (False, True),
+                'f1': (True, False),
                 'f2': (False, True),
                 'f3': (True, False),
                 'f4': (True, True),
@@ -57,7 +55,8 @@ class TestCase(BasicTest):
             assert (func.may_succeed, func.may_fail) == expected_state[func.name], f'For funct {func.name} the expectation does not match (s:{func.may_succeed}, f:{func.may_fail})'
 
         failure_paths = get_number_of_failure_paths()
-        assert  failure_paths == 4, f'Expect 4 failure paths found {failure_paths}'
+        count_expected_failures = 5
+        assert  failure_paths == count_expected_failures, f'Expect {count_expected_failures} failure paths found {failure_paths}'
         # Find the first failure point
         ifs = find_elems_of_kind(bpf, clang.CursorKind.IF_STMT)
         first_if = ifs[0]

@@ -64,9 +64,9 @@ class FindFailurePaths(Pass):
             instruction as part of the rest of instruction to be evaluated.
         """
         tmp = FindFailurePaths.do(b, self.info, first_inst=b)
-        if not tmp.terminate:
+        if len(tmp.failure_paths) == 0:
             # did not failed
-            return
+            return False
         self.new_declarations.extend(tmp.new_declarations)
         rest = self.get_rest(inst)
         if not include_current_inst:
@@ -75,28 +75,29 @@ class FindFailurePaths(Pass):
         for pid, tmp_path in tmp.failure_paths.items():
             path = tmp_path + rest
             self.failure_paths[pid] = path
+        return True
 
-        self.terminate = True
+        # self.terminate = True
 
     def _handle_call(self, inst, more):
-        debug(f'processing call {inst.name}', tag=MODULE_TAG)
+        # debug(f'processing call {inst.name}', tag=MODULE_TAG)
         ctx = more.ctx
         func = inst.get_function_def()
         if func is None or func.is_empty():
             return
         b = func.body
         tmp = FindFailurePaths.do(b, self.info, func=func, first_inst=b)
-        if not tmp.terminate:
+        if len(tmp.failure_paths) == 0:
             return
         self.new_declarations.extend(tmp.new_declarations)
         for path_id, internal_path in tmp.failure_paths.items():
-            # Define a new function and, 
+            # Define a new function and,
             tmp_name = f'__f{path_id}'
             new_func = Function(tmp_name, None)
             new_func.args = list(func.args)
             new_func.return_type = func.return_type
             new_func.body.extend_inst(internal_path)
-            self.new_declarations.append(new_func)
+            new_func.based_on = func
             sym_tbl = self.info.sym_tbl
             gs = sym_tbl.global_scope
             with sym_tbl.with_scope(gs):
@@ -124,9 +125,9 @@ class FindFailurePaths(Pass):
             rest = self.get_rest(inst)[1:]
             gathered = [first_inst, ] + rest
             self.failure_paths[path_id] = gathered
-            debug('For handling a function call that may fail:', path_id, gathered, tag=MODULE_TAG)
+            # debug('For handling a function call that may fail:', path_id, gathered, tag=MODULE_TAG)
 
-        self.terminate = True
+        # self.terminate = True
 
     def process_current_inst(self, inst, more):
         if self.terminate:
@@ -139,25 +140,29 @@ class FindFailurePaths(Pass):
                 assert isinstance(failure_path_id, int)
                 self.terminate = True
                 rest = self.get_rest(inst)
-                self.failure_paths[failure_path_id] = rest 
-                debug(f'encounter a to-user instruction ({failure_path_id})',
-                        tag=MODULE_TAG)
-                debug('instructions for handling it:\n', rest, tag=MODULE_TAG)
+                self.failure_paths[failure_path_id] = rest
+                # debug(f'encounter a to-user instruction ({failure_path_id})',
+                #         tag=MODULE_TAG)
+                # debug('instructions for handling it:\n', rest, tag=MODULE_TAG)
             case clang.CursorKind.IF_STMT:
-                branches = (b for b in (inst.body, inst.other_body)
+                self.skip_children()
+                branches = tuple(b for b in (inst.body, inst.other_body)
                         if b.has_children())
                 for b in branches:
                     self._handle_branch(inst, b, False)
             case clang.CursorKind.SWITCH_STMT:
+                self.skip_children()
                 branches = (b for b in inst.body if b.has_children())
                 for b in branches:
                     self._handle_branch(inst, b, False)
             case clang.CursorKind.DO_STMT | clang.CursorKind.WHILE_STMT:
+                self.skip_children()
                 branches = (b for b in (inst.body, inst.other_body)
                         if b.has_children())
                 for b in branches:
                     self._handle_branch(inst, b, True)
             case clang.CursorKind.FOR_STMT:
+                self.skip_children()
                 if inst.body.has_children():
                     self._handle_branch(inst, inst.body, True)
             case clang.CursorKind.CALL_EXPR:
@@ -166,6 +171,9 @@ class FindFailurePaths(Pass):
 
 
 def create_failure_paths(inst, info, more):
+    """
+    Find possible failure paths due to unsupported instructions
+    """
     obj = FindFailurePaths.do(inst, info, more, first_inst=inst)
     info.failure_paths = obj.failure_paths
     info.failure_path_new_funcs = obj.new_declarations

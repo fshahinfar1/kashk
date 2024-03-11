@@ -23,6 +23,7 @@ from passes.bpf_passes.mark_user_boundary import get_number_of_failure_paths
 # from passes.user_passes.create_user_graph import create_user_graph
 # from passes.user_passes.create_fallback import create_fallback_pass
 from passes.create_failure_path import create_failure_paths
+from passes.fallback_variables import failure_path_fallback_variables
 
 from passes.mark_relevant_code import mark_relevant_code
 from passes.mark_io import mark_io
@@ -54,6 +55,7 @@ class TestCase(BasicTest):
         # print(text)
 
         create_failure_paths(bpf, info, None)
+        failure_path_fallback_variables(info)
 
         pprint.pprint(info.failure_paths)
         assert len(info.failure_paths) == 4

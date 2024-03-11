@@ -21,7 +21,7 @@ int f2()
 	char *str;
 	str = "1234";
 	if (str == NULL) {
-		return -1;
+		printf("something");
 	}
 	/* should fail here */
 	fail(1, 256);
@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
 
 	/* Should handle the fail path before the while */
 	__ANNOTATE_LOOP(100)
-	while(fail(1, 2) != NULL) {
+	while(fail(5, 6) != NULL) {
 		b = a;
 	}
 
