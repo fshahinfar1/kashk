@@ -24,6 +24,8 @@ from passes.mark_io import mark_io
 from passes.clone import clone_pass
 from passes.simplify_code import simplify_code_structure
 from passes.create_failure_path import create_failure_paths
+from passes.unused_vars import find_unused_vars
+from passes.failure_paths import failure_path_fallback_variables
 
 from passes.bpf_passes.loop_end import loop_end_pass
 from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
@@ -37,9 +39,9 @@ from passes.bpf_passes.prog_complexity import mitiage_program_comlexity
 from passes.bpf_passes.change_bpf_loop import change_to_bpf_loop
 from passes.bpf_passes.rewrite_while_loop import rewrite_while_loop
 
-from passes.user_passes.create_user_graph import create_user_graph
-from passes.user_passes.var_dependency import var_dependency_pass
-from passes.user_passes.create_fallback import create_fallback_pass
+# from passes.user_passes.create_user_graph import create_user_graph
+# from passes.user_passes.var_dependency import var_dependency_pass
+# from passes.user_passes.create_fallback import create_fallback_pass
 
 from helpers.instruction_helper import show_insts
 from helpers.ast_graphviz import ASTGraphviz
@@ -175,6 +177,17 @@ def generate_offload(io_ctx):
     create_failure_paths(prog, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
+    debug('Remove Unused Args From Failure Functions', tag=MODULE_TAG)
+    # TODO: Remove unused args from failure functions
+    for func in info.failure_path_new_funcs:
+        tmp_names = [a.name for a in func.args]
+        unused_vars = find_unused_vars(func.body, info, target=tmp_names)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    debug('Failure Path Variables', tag=MODULE_TAG)
+    failure_path_fallback_variables(prog, info, None)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
     debug('Clone All State', tag=MODULE_TAG)
     user = clone_pass(prog, info, PassObject())
     info.user_prog.sym_tbl = info.sym_tbl.clone()
@@ -266,8 +279,8 @@ def gen_user_code(user, info, out_user):
 
         # Look at var deps
         # debug(MODULE_TAG, 'Tree of variable dependencies', tag=MODULE_TAG)
-        tree = draw_tree(info.user_prog.graph, fn=lambda x: str(x.paths.var_deps))
-        debug('\n', tree, tag=MODULE_TAG)
+        # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(x.paths.var_deps))
+        # debug('\n', tree, tag=MODULE_TAG)
         # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
         # debug(MODULE_TAG, info.user_prog.graph.paths.var_deps, tag=MODULE_TAG)
         # debug(tree, tag=MODULE_TAG)
@@ -275,35 +288,35 @@ def gen_user_code(user, info, out_user):
         # debug(tree, tag=MODULE_TAG)
         # ----
 
-        meta_structs = dfs_over_deps_vars(info.user_prog.graph)
+        # meta_structs = dfs_over_deps_vars(info.user_prog.graph)
         # debug(MODULE_TAG, 'Metadata structures:', pformat(meta_structs), tag=MODULE_TAG)
 
-        for x in meta_structs:
-            state_obj = StateObject(None)
-            state_obj.name = 'failure_number'
-            state_obj.type_ref = BASE_TYPES[clang.TypeKind.INT]
-            fields = [state_obj,]
-            for var in x['vars']:
-                # debug(MODULE_TAG, 'bpf/user-shared:', f'{var.name}:{var.type.spelling}', tag=MODULE_TAG)
-                # TODO: do I need to clone?
-                T = var.type.clone()
-                state_obj = StateObject(None)
-                state_obj.name = var.name
-                state_obj.type_ref = T
-                fields.append(state_obj)
-            path_id = x['path_id']
-            meta = Record(f'meta_{path_id}', fields)
-            meta.is_used_in_bpf_code = True
-            info.prog.add_declaration(meta)
-            info.user_prog.declarations[path_id] = meta
+        # for x in meta_structs:
+        #     state_obj = StateObject(None)
+        #     state_obj.name = 'failure_number'
+        #     state_obj.type_ref = BASE_TYPES[clang.TypeKind.INT]
+        #     fields = [state_obj,]
+        #     for var in x['vars']:
+        #         # debug(MODULE_TAG, 'bpf/user-shared:', f'{var.name}:{var.type.spelling}', tag=MODULE_TAG)
+        #         # TODO: do I need to clone?
+        #         T = var.type.clone()
+        #         state_obj = StateObject(None)
+        #         state_obj.name = var.name
+        #         state_obj.type_ref = T
+        #         fields.append(state_obj)
+        #     path_id = x['path_id']
+        #     meta = Record(f'meta_{path_id}', fields)
+        #     meta.is_used_in_bpf_code = True
+        #     info.prog.add_declaration(meta)
+        #     info.user_prog.declarations[path_id] = meta
 
-            __scope = info.sym_tbl.current_scope
-            info.sym_tbl.current_scope = info.sym_tbl.global_scope
-            meta.update_symbol_table(info.sym_tbl)
-            info.sym_tbl.current_scope = __scope
-            # debug('Meta', path_id, 'at index:', len(info.user_prog.declarations), tag=MODULE_TAG)
+        #     __scope = info.sym_tbl.current_scope
+        #     info.sym_tbl.current_scope = info.sym_tbl.global_scope
+        #     meta.update_symbol_table(info.sym_tbl)
+        #     info.sym_tbl.current_scope = __scope
+        #     # debug('Meta', path_id, 'at index:', len(info.user_prog.declarations), tag=MODULE_TAG)
 
-        text = generate_user_prog(main, info)
+        # text = generate_user_prog(main, info)
         debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     with open(out_user, 'w') as f:

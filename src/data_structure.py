@@ -19,7 +19,7 @@ class Info:
 
     __slots__ = ('sym_tbl', 'prog', 'user_prog', 'io_ctx', 'map_definitions',
             'read_decl', 'func_cost_table', 'failure_paths',
-            'failure_path_new_funcs')
+            'failure_path_new_funcs', 'failure_vars')
 
     @classmethod
     def from_io_ctx(cls, io_ctx):
@@ -49,6 +49,7 @@ class Info:
         self.func_cost_table = None
         self.failure_paths = None
         self.failure_path_new_funcs = None
+        self.failure_vars = None
 
 
 class PacketBuffer:
@@ -341,6 +342,7 @@ class Function(TypeDefinition):
     CTX_FLAG  = 1 << 0
     SEND_FLAG = 1 << 1
     FAIL_FLAG = 1 << 2
+    FALLBACK_VAR = 1 << 5
 
     func_cursor = {}
     # TODO: I need to seperate the directory for BPF and Userspace program
@@ -368,6 +370,8 @@ class Function(TypeDefinition):
         self.calls_send = False
         self.calls_recv = False
         self.complexity = 0
+        self.based_on = None
+        self.fallback_vars = None
 
         self.path_ids = []
         self.last_arg_is_auto_gen = False

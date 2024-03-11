@@ -51,13 +51,27 @@ class TestCase(BasicTest):
         bpf = simplify_code_structure(bpf, info, PassObject())
         bpf = feasibilty_analysis_pass(bpf, info, PassObject())
 
-        # text = gen_code(bpf, info)[0]
-        # print(text)
-
         create_failure_paths(bpf, info, None)
         failure_path_fallback_variables(info)
 
-        pprint.pprint(info.failure_paths)
+        all_paths = info.failure_paths
+        pprint.pprint(all_paths)
+
+        print('------- USER -------')
+        text = gen_code([Function.directory['__f1'], ], info)[0]
+        print(text)
+
+        for pid, path in all_paths.items():
+            print(f'# {pid}')
+            text = gen_code(path, info)[0]
+            print(text)
+            print('~~~~~~~~~')
+
+
+        print('------- BPF -------')
+        text = gen_code(bpf, info)[0]
+        print(text)
+
         assert len(info.failure_paths) == 4
 
         # create_fallback_pass(bpf, info, PassObject())
@@ -94,8 +108,9 @@ class TestCase(BasicTest):
 
 
 if __name__ == '__main__':
-    input_files_dir = os.path.join(current_file_dir, './inputs/')
-    file_path = os.path.join(input_files_dir, 'feasibility_pass.c')
+    input_files_dir = os.path.join(current_file_dir, './inputs/fallback/')
+    # file_path = os.path.join(input_files_dir, 'feasibility_pass.c')
+    file_path = os.path.join(input_files_dir, 'failure_inside_func.c')
     entry_func_name = 'main'
     compiler_args = ''
     test = TestCase(file_path, entry_func_name, compiler_args)

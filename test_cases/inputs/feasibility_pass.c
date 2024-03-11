@@ -86,5 +86,10 @@ int main(int argc, char *argv[])
 		b = a;
 	}
 
+
+	/* This should not become a seperate failure path */
+	fail(99, 11);
+	int x = 10;
+
 	return 0;
 }

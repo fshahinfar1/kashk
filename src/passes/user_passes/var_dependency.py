@@ -75,12 +75,6 @@ class VarAnalysis(Pass):
                 else:
                     sym.is_accessed = SymbolAccessMode.HAS_READ
                     path.var_deps.add(sym)
-                    if sym.name == 'num_messages':
-                        debug('adding:', sym.name, tag=MODULE_TAG)
-                        scp = path.scope
-                        while scp is not None:
-                            print(scp)
-                            scp = scp.parent
         else:
             if ctx == LHS and parent_bin_op and parent_bin_op.op == '=':
                 sym.is_accessed = SymbolAccessMode.FIRST_WRITE

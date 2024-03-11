@@ -5,6 +5,7 @@ from instruction import *
 from data_structure import *
 from passes.code_pass import Pass
 from passes.clone import clone_pass
+from helpers.instruction_helper import show_insts
 
 
 
@@ -114,15 +115,19 @@ class FindFailurePaths(Pass):
             prnt = self.parent_inst
             if prnt is None or ctx == BODY:
                 first_inst = call_inst
+
+                target = inst
             elif prnt.kind == clang.CursorKind.BINARY_OPERATOR:
                 assert prnt.op == '=', 'I think it call instruction should be part of an assignment or a block of code'
                 tmp_clone_lhs = clone_pass(prnt.lhs.children[0])
                 first_inst = BinOp.build(tmp_clone_lhs, '=', call_inst)
+
+                target = prnt
             else:
                 debug(prnt, tag=MODULE_TAG)
                 raise Exception('Conflicting with assumptions: I think a simplified code should have function either in a body of code or in the right handside of an assignment')
 
-            rest = self.get_rest(inst)[1:]
+            rest = self.get_rest(target)[1:]
             gathered = [first_inst, ] + rest
             self.failure_paths[path_id] = gathered
             # debug('For handling a function call that may fail:', path_id, gathered, tag=MODULE_TAG)
@@ -134,19 +139,21 @@ class FindFailurePaths(Pass):
             self.skip_children()
             return inst
 
+        # TODO: if in a branch all possible paths fail, terminate the search
+
         match inst.kind:
             case instruction.TO_USERSPACE_INST:
                 failure_path_id = _get_fail_counter()
                 assert isinstance(failure_path_id, int)
                 self.terminate = True
-                rest = self.get_rest(inst)
+                rest = self.get_rest(inst)[1:]
                 self.failure_paths[failure_path_id] = rest
                 # debug(f'encounter a to-user instruction ({failure_path_id})',
                 #         tag=MODULE_TAG)
                 # debug('instructions for handling it:\n', rest, tag=MODULE_TAG)
             case clang.CursorKind.IF_STMT:
                 self.skip_children()
-                branches = tuple(b for b in (inst.body, inst.other_body)
+                branches = (b for b in (inst.body, inst.other_body)
                         if b.has_children())
                 for b in branches:
                     self._handle_branch(inst, b, False)
