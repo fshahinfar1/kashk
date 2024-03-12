@@ -3,7 +3,7 @@ from data_structure import *
 from instruction import *
 from passes.pass_obj import PassObject
 from passes.clone import clone_pass
-from after import After
+from elements.after import After
 
 PARENT_INST = 1000
 

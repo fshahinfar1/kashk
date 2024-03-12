@@ -1,5 +1,5 @@
 from instruction import *
-from code_pass import Pass
+from passes.code_pass import Pass
 from cfg import CFGJump, CFGNode, Jump, TRUE, FALSE, cfg_leafs
 
 DASH = Literal('-', CODE_LITERAL)

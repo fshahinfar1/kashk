@@ -4,17 +4,16 @@ import clang.cindex as clang
 from basic_test_structure import BasicTest
 from utility import parse_file, find_elem
 from sym_table_gen import build_sym_table, process_source_file
-from understand_logic import gather_instructions_under
-from understand_logic_handler import create_func_objs, add_known_func_objs
+from parser.understand_logic import gather_instructions_under
+from parser.understand_logic_handler import create_func_objs, add_known_func_objs
 
 from data_structure import *
 from instruction import BODY, Block
 from framework_support import InputOutputContext
 
 from offload import (load_other_sources, _prepare_event_handler_args,
-        move_vars_before_event_loop_to_shared_scope, dfs_over_deps_vars,
-        BPF_MAIN)
-from find_ev_loop import get_entry_code
+        move_vars_before_event_loop_to_shared_scope, BPF_MAIN)
+from parser.find_ev_loop import get_entry_code
 from sym_table import Scope
 
 from passes.pass_obj import PassObject
@@ -23,6 +22,10 @@ from passes.primary_annotation_pass import primary_annotation_pass
 from passes.mark_io import mark_io
 from passes.clone import clone_pass
 from passes.simplify_code import simplify_code_structure
+from passes.create_failure_path import create_failure_paths
+from passes.find_unused_vars import find_unused_vars
+from passes.fallback_variables import failure_path_fallback_variables
+from passes.create_meta_struct import create_fallback_meta_structure
 from passes.bpf_passes.loop_end import loop_end_pass
 from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
 from passes.bpf_passes.transform_vars import transform_vars_pass
@@ -33,9 +36,6 @@ from passes.bpf_passes.reduce_params import reduce_params_pass
 from passes.bpf_passes.remove_everything_not_used import remove_everything_not_used
 from passes.bpf_passes.prog_complexity import mitiage_program_comlexity
 from passes.bpf_passes.change_bpf_loop import change_to_bpf_loop
-from passes.user_passes.create_user_graph import create_user_graph
-from passes.user_passes.var_dependency import var_dependency_pass
-from passes.user_passes.create_fallback import create_fallback_pass
 
 from helpers.instruction_helper import show_insts
 from helpers.ast_graphviz import ASTGraphviz
@@ -166,14 +166,8 @@ class BrainTest(BasicTest):
         mark_io(prog, info)
         prog = simplify_code_structure(prog, info, PassObject())
         prog = feasibilty_analysis_pass(prog, info, PassObject())
-        create_user_graph(prog, info, PassObject())
-        # Clone the state
-        user = clone_pass(prog, info, PassObject())
-        info.user_prog.sym_tbl = info.sym_tbl.clone()
-        info.user_prog.func_dir = {}
-        for func in Function.directory.values():
-            new_f = func.clone(info.user_prog.func_dir)
-        if not info.user_prog.graph.is_empty():
-            self._gen_user_code(user)
+        create_failure_paths(prog, info, None)
+        failure_path_fallback_variables(info)
+        create_fallback_meta_structure(info)
         prog = self._gen_bpf_code(prog)
         self.test(prog)

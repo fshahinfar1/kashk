@@ -579,4 +579,4 @@ def gather_instructions_under(cursor, info, context, _state=None):
     return ops
 
 
-from understand_logic_handler import *
+from parser.understand_logic_handler import *

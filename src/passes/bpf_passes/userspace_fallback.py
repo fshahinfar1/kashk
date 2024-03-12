@@ -9,7 +9,7 @@ from my_type import MyType
 from passes.pass_obj import PassObject
 from passes.bpf_passes.transform_vars import FAIL_FLAG_NAME
 from helpers.instruction_helper import ZERO, CHAR, decl_new_var
-from after import After
+from elements.after import After
 
 
 MODULE_TAG = '[Fallback Pass]'
@@ -294,6 +294,10 @@ def _do_pass(inst, info, more):
 
 
 def userspace_fallback_pass(inst, info, more):
+    """
+    This pass implements the communication protocol between BPF and user
+    program inside the generated BPF program.
+    """
     with remember_func(None):
         with _new_top_func_declare_context():
             body = _do_pass(inst, info, more)

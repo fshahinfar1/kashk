@@ -18,7 +18,6 @@ from passes.mark_relevant_code import mark_relevant_code
 from passes.simplify_code import simplify_code_structure
 from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
 from passes.bpf_passes.mark_user_boundary import get_number_of_failure_paths
-from passes.user_passes.create_user_graph import create_user_graph
 
 
 def _print_node_code(node, info):

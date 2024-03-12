@@ -17,8 +17,9 @@ class Info:
     Represents the general understanding of the program
     """
 
-    __slots__ = ('prog', 'sym_tbl', 'user_prog', 'io_ctx', 'map_definitions',
-            'read_decl', 'func_cost_table')
+    __slots__ = ('sym_tbl', 'prog', 'user_prog', 'io_ctx', 'map_definitions',
+            'read_decl', 'func_cost_table', 'failure_paths',
+            'failure_path_new_funcs', 'failure_vars')
 
     @classmethod
     def from_io_ctx(cls, io_ctx):
@@ -36,8 +37,8 @@ class Info:
 
     def __init__(self):
         from user import UserProg
-        self.prog = None
         self.sym_tbl = SymbolTable()
+        self.prog = None
         # Keep track of information about the userspace program
         self.user_prog = UserProg()
         self.io_ctx = None
@@ -46,6 +47,9 @@ class Info:
         # For tracking name of read buffers in a scope (scope name --> set of var names)
         self.read_decl = {}
         self.func_cost_table = None
+        self.failure_paths = None
+        self.failure_path_new_funcs = None
+        self.failure_vars = None
 
 
 class PacketBuffer:
@@ -115,7 +119,7 @@ class CodeBlockRef:
 
 
 class StateObject:
-    __slots__ = ('cursor', 'name', 'kind', 'type_ref')
+    __slots__ = ('cursor', 'name', 'kind', 'type_ref', 'is_unused')
     @classmethod
     def build(cls, name, T):
         obj = StateObject(None)
@@ -135,6 +139,7 @@ class StateObject:
             self.name = None
             self.kind = None
             self.type_ref = None
+        self.is_unused = False
 
     @property
     def type(self):
@@ -157,6 +162,9 @@ class StateObject:
             for f in self.type_ref.fields:
                 if f.name == name:
                     return f
+
+    def set_unused(self):
+        self.is_unused = True
 
     def get_c_code(self):
         T = self.type_ref
@@ -324,7 +332,7 @@ class FunctionBodyEvaluator:
 
     def __call__(self):
         from instruction import Block, BODY
-        from understand_logic import gather_instructions_under
+        from parser.understand_logic import gather_instructions_under
         # Switch scope
         with self.info.sym_tbl.with_func_scope(self.f.name):
             # Process function body recursively
@@ -338,6 +346,7 @@ class Function(TypeDefinition):
     CTX_FLAG  = 1 << 0
     SEND_FLAG = 1 << 1
     FAIL_FLAG = 1 << 2
+    FALLBACK_VAR = 1 << 5
 
     func_cursor = {}
     # TODO: I need to seperate the directory for BPF and Userspace program
@@ -365,6 +374,9 @@ class Function(TypeDefinition):
         self.calls_send = False
         self.calls_recv = False
         self.complexity = 0
+        self.based_on = None
+        self.fallback_vars = None
+        self.removed_args = None
 
         self.path_ids = []
         self.last_arg_is_auto_gen = False

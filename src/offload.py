@@ -7,12 +7,12 @@ from data_structure import *
 from instruction import *
 from utility import (parse_file, find_elem, report_user_program_graph,
         draw_tree)
-from find_ev_loop import get_entry_code
+from parser.find_ev_loop import get_entry_code
 from sym_table import Scope
 from sym_table_gen import build_sym_table, process_source_file
-from understand_logic import  (gather_instructions_from,
+from parser.understand_logic import  (gather_instructions_from,
         get_variable_declaration_before_elem)
-from understand_logic_handler import create_func_objs, add_known_func_objs
+from parser.understand_logic_handler import create_func_objs, add_known_func_objs
 
 from code_gen import generate_bpf_prog, gen_code
 from user import generate_user_prog
@@ -23,6 +23,10 @@ from passes.primary_annotation_pass import primary_annotation_pass
 from passes.mark_io import mark_io
 from passes.clone import clone_pass
 from passes.simplify_code import simplify_code_structure
+from passes.create_failure_path import create_failure_paths
+from passes.find_unused_vars import find_unused_vars
+from passes.fallback_variables import failure_path_fallback_variables
+from passes.create_meta_struct import create_fallback_meta_structure
 
 from passes.bpf_passes.loop_end import loop_end_pass
 from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
@@ -35,10 +39,6 @@ from passes.bpf_passes.remove_everything_not_used import remove_everything_not_u
 from passes.bpf_passes.prog_complexity import mitiage_program_comlexity
 from passes.bpf_passes.change_bpf_loop import change_to_bpf_loop
 from passes.bpf_passes.rewrite_while_loop import rewrite_while_loop
-
-from passes.user_passes.create_user_graph import create_user_graph
-from passes.user_passes.var_dependency import var_dependency_pass
-from passes.user_passes.create_fallback import create_fallback_pass
 
 from helpers.instruction_helper import show_insts
 from helpers.ast_graphviz import ASTGraphviz
@@ -116,11 +116,6 @@ def generate_offload(io_ctx):
     # filter_log(MODULE_TAG, '[Var Dependency]', '[Create Fallback]',
     #         '[User Code]', '[Select Userspace]')
 
-    if io_ctx.bpf_hook == InputOutputContext.HOOK_XDP:
-        set_context_switch_cost(100)
-    else:
-        set_context_switch_cost(100)
-
     info = Info.from_io_ctx(io_ctx)
     build_sym_table(info)
     # Parse source files
@@ -173,205 +168,50 @@ def generate_offload(io_ctx):
 
     debug('Feasibility Analysis', tag=MODULE_TAG)
     prog = feasibilty_analysis_pass(prog, info, PassObject())
-    # for func in sorted(Function.directory.values(), key=lambda x: x.name):
-    #     debug(func.name, 'may succeed:', func.may_succeed, 'may fail', func.may_fail, func.path_ids, tag=MODULE_TAG)
-    # code, _ = gen_code(prog, info)
-    # print(code)
-    # show_insts([prog])
-
-    # func = Function.directory.get('strlen')
-    # assert func is not None
-    # debug(func.name, func.may_succeed, func.may_fail, tag=MODULE_TAG)
-
-    # func = Function.directory.get('tokenize_command')
-    # assert func is not None
-    # debug(func.name, func.may_succeed, func.may_fail, tag=MODULE_TAG)
-    # assert 0
-
-    # func = Function.directory.get('handle_set')
-    # assert func
-    # show_insts(func.body)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Create User Code Graph', tag=MODULE_TAG)
-    create_user_graph(prog, info, PassObject())
-    tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
-    debug('\n', tree, tag=MODULE_TAG)
-    tree = draw_tree(info.user_prog.graph, fn=lambda x: str(x.path_ids))
-    debug('\n', tree, tag=MODULE_TAG)
-    # root = info.user_prog.graph
-    # code = root.paths.code
-    # debug(id(root), root.children, code, tag=MODULE_TAG)
-    # text, _ =  gen_code(code, info)
-    # debug('code:\n', text, '\n---', sep='', tag=MODULE_TAG)
-    # debug('is user empty:', root.is_empty(), tag=MODULE_TAG)
+    debug('Create Failure Paths', tag=MODULE_TAG)
+    create_failure_paths(prog, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Clone All State', tag=MODULE_TAG)
-    user = clone_pass(prog, info, PassObject())
-    info.user_prog.sym_tbl = info.sym_tbl.clone()
-    info.user_prog.func_dir = {}
-    for func in Function.directory.values():
-        new_f = func.clone(info.user_prog.func_dir)
+    debug('Remove Unused Args From Failure Functions', tag=MODULE_TAG)
+    # TODO: Remove unused args from failure functions
+    for func in info.failure_path_new_funcs:
+        tmp_names = set(a.name for a in func.args)
+        unused_vars = find_unused_vars(func.body, info, target=tmp_names)
+        for a in func.args:
+            if a.name in unused_vars:
+                a.set_unused()
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    # debug('Original: AST')
-    # tmp = ASTGraphviz.do(prog, info)
-    # tmp.save_file('/tmp/ast.dot')
-    # tmp.dot.render(filename='ast', directory='/tmp/', format='svg')
+    debug('Failure Path Variables', tag=MODULE_TAG)
+    failure_path_fallback_variables(info)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    debug('Create Fallback Meta Structures', tag=MODULE_TAG)
+    create_fallback_meta_structure(info)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+
+    # debug('Clone All State', tag=MODULE_TAG)
+    # user = clone_pass(prog, info, PassObject())
+    # info.user_prog.sym_tbl = info.sym_tbl.clone()
+    # info.user_prog.func_dir = {}
+    # for func in Function.directory.values():
+    #     new_f = func.clone(info.user_prog.func_dir)
     # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    # debug('Original: Create CFG', tag=MODULE_TAG)
-    # # handle_get = Function.directory.get('strncpy_bpf')
-    # # cfg = make_cfg(handle_get.body)
-    # cfg = make_cfg(prog)
-    # tmp = CFGGraphviz.do(cfg, info)
-    # tmp.dot.save('/tmp/cfg.dot')
-    # tmp.dot.render(filename='cfg', directory='/tmp/', format='svg')
-    # with open('/tmp/index.html', 'w') as f:
-    #     tmp = HTMLWriter().cfg_to_html(cfg, info)
-    #     f.write(tmp)
-    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    # debug('Original: Create Performance Modeling', tag=MODULE_TAG)
-    # tmp_text, _ = gen_code(prog, info)
-    # debug('\n', tmp_text, tag=MODULE_TAG)
-    # model = gen_static_high_level_perf_model(prog, info)
-    # tmp = model.dump()
-    # debug('\n', tmp, tag=MODULE_TAG)
-    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    # NOTE: the order of generating the userspace and then BPF is important
-    if not info.user_prog.graph.is_empty():
-        gen_user_code(user, info, io_ctx.user_out_file)
-    else:
-        report("No user space program was generated. The tool has offloaded everything to BPF.")
     prog = gen_bpf_code(prog, info, io_ctx.bpf_out_file)
+    # if not info.user_prog.graph.is_empty():
+    #     gen_user_code(user, info, io_ctx.user_out_file)
+    # else:
+    #     report("No user space program was generated. The tool has offloaded everything to BPF.")
 
-
-    # debug('BPF Program Performance Modeling', tag=MODULE_TAG)
-    # tmp_text, _ = gen_code(prog, info)
-    # debug('\n', tmp_text, tag=MODULE_TAG)
-    # model2 = gen_static_high_level_perf_model(prog, info)
-    # tmp = model2.dump()
-    # debug('\n', tmp, tag=MODULE_TAG)
-    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
     return info
 
 
-def dfs_over_deps_vars(root, visited=None):
-    """
-    Get organize the variables we need to share with userspace for each failure
-    path.
-
-    Recursion basis is on the length of children.
-
-    @param root: a node of the User Program Graph
-    @param visited: set of nodes already visited (we should not process a node
-    twice, we should not encounter a node twice if the graph is truely a tree)
-
-    @returns a list of set of variables dependencies along with the failure
-    number
-    """
-    if visited is None:
-        visited = set()
-    visited.add(root)
-
-    this_node_deps = root.paths.var_deps
-    if len(root.children) == 0:
-        # Base condition
-        # Reaching a leaf node
-        if len(root.path_ids) != 1:
-            error('This was not expected!!!', root.path_ids)
-            raise Exception(f'Expected the leaf to have one failure number. But it has more/less (list: {root.path_ids})')
-            # return [{'vars': [], 'path_id': '-'}]
-        path_id = tuple(root.path_ids)[0]
-        return ({'vars': list(this_node_deps), 'path_id': path_id},)
-
-    this_node_ids = root.path_ids.copy()
-    have_it = set()
-    results = []
-    for child in root.children:
-        if child in visited:
-            error('The user graph is not a graph? a node has two parents?')
-            raise Exception('Unexpected')
-
-        # Remove the path ids that are in the children. If a path Id is not in
-        # the children then the failure happens in this node (this node would
-        # be the leaf for that failure path)
-        this_node_ids.difference_update(child.path_ids)
-
-        mid_res = dfs_over_deps_vars(child, visited)
-        for r in mid_res:
-            path_id = r['path_id']
-            if path_id in have_it:
-                continue
-            have_it.add(path_id)
-            item = {'vars': r['vars'] + list(this_node_deps), 'path_id': path_id}
-            results.append(item)
-    if len(this_node_ids) > 0:
-        # There are some ids that are not in any of the children
-        for i in this_node_ids:
-            results.append({'vars': list(this_node_deps), 'path_id': i})
-    return tuple(results)
-
-
 def gen_user_code(user, info, out_user):
-    # Switch the symbol table and functions to the snapshot suitable for
-    # userspace analysis
-    with info.user_prog.select_context(info):
-        debug('User Prog: Handle Fallback', tag=MODULE_TAG)
-        main = create_fallback_pass(user, info, PassObject())
-        debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-        debug('User Prog: Calculate Variable Deps', tag=MODULE_TAG)
-        var_dependency_pass(info)
-        debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-        # What graph looks like
-        # report_user_program_graph(info)
-
-        # Look at var deps
-        # debug(MODULE_TAG, 'Tree of variable dependencies', tag=MODULE_TAG)
-        tree = draw_tree(info.user_prog.graph, fn=lambda x: str(x.paths.var_deps))
-        debug('\n', tree, tag=MODULE_TAG)
-        # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(id(x)))
-        # debug(MODULE_TAG, info.user_prog.graph.paths.var_deps, tag=MODULE_TAG)
-        # debug(tree, tag=MODULE_TAG)
-        # tree = draw_tree(info.user_prog.graph, fn=lambda x: str(x.path_ids))
-        # debug(tree, tag=MODULE_TAG)
-        # ----
-
-        meta_structs = dfs_over_deps_vars(info.user_prog.graph)
-        # debug(MODULE_TAG, 'Metadata structures:', pformat(meta_structs), tag=MODULE_TAG)
-
-        for x in meta_structs:
-            state_obj = StateObject(None)
-            state_obj.name = 'failure_number'
-            state_obj.type_ref = BASE_TYPES[clang.TypeKind.INT]
-            fields = [state_obj,]
-            for var in x['vars']:
-                # debug(MODULE_TAG, 'bpf/user-shared:', f'{var.name}:{var.type.spelling}', tag=MODULE_TAG)
-                # TODO: do I need to clone?
-                T = var.type.clone()
-                state_obj = StateObject(None)
-                state_obj.name = var.name
-                state_obj.type_ref = T
-                fields.append(state_obj)
-            path_id = x['path_id']
-            meta = Record(f'meta_{path_id}', fields)
-            meta.is_used_in_bpf_code = True
-            info.prog.add_declaration(meta)
-            info.user_prog.declarations[path_id] = meta
-
-            __scope = info.sym_tbl.current_scope
-            info.sym_tbl.current_scope = info.sym_tbl.global_scope
-            meta.update_symbol_table(info.sym_tbl)
-            info.sym_tbl.current_scope = __scope
-            # debug('Meta', path_id, 'at index:', len(info.user_prog.declarations), tag=MODULE_TAG)
-
-        text = generate_user_prog(main, info)
-        debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
+    text = generate_user_prog(main, info)
     with open(out_user, 'w') as f:
         f.write(text)
 
@@ -395,12 +235,6 @@ def gen_bpf_code(bpf, info, out_bpf):
     bpf = transform_vars_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    # Handle moving to userspace and removing the instruction not possible in
-    # BPF
-    debug('Userspace Fallback', tag=MODULE_TAG)
-    bpf = userspace_fallback_pass(bpf, info, PassObject())
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
     # Verifier
     debug('Verifier', tag=MODULE_TAG)
     bpf = verifier_pass(bpf, info, PassObject())
@@ -421,8 +255,19 @@ def gen_bpf_code(bpf, info, out_bpf):
     bpf = reduce_params_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
+    # Handle moving to userspace and removing the instruction not possible in
+    # BPF
+    debug('Userspace Fallback', tag=MODULE_TAG)
+    bpf = userspace_fallback_pass(bpf, info, PassObject())
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
     debug('[2nd] remove everything that is not used in BPF', tag=MODULE_TAG)
     remove_everything_not_used(bpf, info, None)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    # Verifier
+    debug('[3rd] Verifier', tag=MODULE_TAG)
+    bpf = verifier_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # debug('Program Complexity Pass', tag=MODULE_TAG)

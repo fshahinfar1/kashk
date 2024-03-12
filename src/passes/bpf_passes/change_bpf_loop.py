@@ -1,5 +1,5 @@
 import clang.cindex as clang
-from code_pass import Pass
+from passes.code_pass import Pass
 from utility import find_elems_of_kind, get_tmp_var_name, indent
 from data_structure import *
 from my_type import MyType

@@ -4,7 +4,7 @@ Decide what part of the user program to offload
 from math import inf
 
 from cfg import CFGJump, CFGNode, cfg_leafs
-from code_pass import Pass
+from passes.code_pass import Pass
 from data_structure import Function
 from log import debug, error
 from brain.basic_block import BasicBlock, create_basic_block_cfg

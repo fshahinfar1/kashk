@@ -222,7 +222,7 @@ def get_owner(cursor):
     """
     @returns list of Instruction
     """
-    from understand_logic import gather_instructions_from
+    from parser.understand_logic import gather_instructions_from
     res = []
     children = list(cursor.get_children())
     if len(children) == 0:

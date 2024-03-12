@@ -1,4 +1,4 @@
-from code_pass import Pass, PARENT_INST
+from passes.code_pass import Pass, PARENT_INST
 from instruction import *
 from data_structure import *
 from log import debug, error

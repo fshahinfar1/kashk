@@ -7,8 +7,8 @@ from sym_table import Scope
 from framework_support import InputOutputContext
 
 from utility import parse_file
-from find_ev_loop import get_entry_code, find_event_loop
-from understand_logic_handler import __add_func_definition2
+from parser.find_ev_loop import get_entry_code, find_event_loop
+from parser.understand_logic_handler import __add_func_definition2
 from instruction import * 
 
 USER_EVENT_LOOP_ENTRY = '__user_event_loop_entry__'

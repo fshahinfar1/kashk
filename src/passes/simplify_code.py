@@ -6,7 +6,7 @@ from instruction import *
 from my_type import MyType
 from utility import get_tmp_var_name
 from passes.clone import clone_pass
-from code_pass import Pass
+from passes.code_pass import Pass
 from helpers.instruction_helper import decl_new_var
 
 

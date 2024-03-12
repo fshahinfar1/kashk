@@ -1,6 +1,6 @@
 from cfg import CFGJump
 from brain.basic_block import BasicBlock
-from code_pass import Pass
+from passes.code_pass import Pass
 from elements.likelihood import Likelihood
 
 

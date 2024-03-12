@@ -1,33 +1,30 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <pthread.h>
 
 #ifndef __ANNOTATE_LOOP
 #define __ANNOTATE_LOOP(x)
 #endif
 
-pthread_mutex_t m;
 int arr[100];
 
 void *fail(int a, int b);
 
 int f1()
 {
-	pthread_mutex_lock(&m);
 	for (int i = 0; i < 100; i++)
 		arr[i] = i;
-	pthread_mutex_unlock(&m);
 	return 0;
 }
 
 int f2()
 {
 	char *str;
-	/* should fail here */
-	str = fail(1, 256);
+	str = "1234";
 	if (str == NULL) {
-		return -1;
+		printf("something");
 	}
+	/* should fail here */
+	fail(1, 256);
 	for (unsigned char i = 0; i < 255; i++)
 		str[i] = i;
 	return 0;
@@ -60,7 +57,7 @@ int main(int argc, char *argv[])
 
 	if (b % 5 == 1) {
 		/* should fail on this path right here */
-		pthread_mutex_init(&m, NULL);
+		fail(1, 2);
 		f1();
 	} else if (b % 5 == 2) {
 		b *= 30;
@@ -68,12 +65,12 @@ int main(int argc, char *argv[])
 	} else if (b % 5 == 3) {
 		/* If a function defenately is going to fail then we should not */
 		/* investigate the other failuers of this path. (we have failed */
-		/* at f1 do not create a new path for the pthread_mutex_init). */
+		/* at fail(0,1) do not create a new path for the fail(3, 4). */
 		/* This was a bug :)
 		 * */
-		f1();
+		fail(0, 1);
 		b = a;
-		pthread_mutex_init(&m, NULL);
+		fail(3, 4);
 	} else if (b % 5 == 4) {
 		f4(b);
 	} else {
@@ -85,9 +82,14 @@ int main(int argc, char *argv[])
 
 	/* Should handle the fail path before the while */
 	__ANNOTATE_LOOP(100)
-	while(fail(1, 2) != NULL) {
+	while(fail(5, 6) != NULL) {
 		b = a;
 	}
+
+
+	/* This should not become a seperate failure path */
+	fail(99, 11);
+	int x = 10;
 
 	return 0;
 }
