@@ -223,8 +223,7 @@ def _process_current_inst(inst, info, more):
         failure_num = inst.path_id
         if current_function is None:
             # Found a split point on the BPF entry function
-            # meta = info.user_prog.declarations.get(failure_num)
-            meta = None
+            meta = info.user_prog.declarations.get(failure_num)
             if meta is None:
                 error('did not found the metadata structure declaration for failure', failure_num, tag=MODULE_TAG)
                 return inst

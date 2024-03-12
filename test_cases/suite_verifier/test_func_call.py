@@ -29,7 +29,6 @@ from passes.bpf_passes.verifier import verifier_pass
 from passes.bpf_passes.transform_after_verifier import transform_func_after_verifier
 from passes.bpf_passes.reduce_params import reduce_params_pass
 
-from passes.user_passes.create_user_graph import create_user_graph
 
 
 class TestCase(BasicTest):

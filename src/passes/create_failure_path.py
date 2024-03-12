@@ -103,8 +103,8 @@ class FindFailurePaths(Pass):
             gs = sym_tbl.global_scope
             with sym_tbl.with_scope(gs):
                 new_func.update_symbol_table(sym_tbl)
-            # TODO: I might need to track what was the original function that I
-            # drived the new function from
+
+            self.new_declarations.append(new_func)
 
             # create a call instruction for it
             call_inst = clone_pass(inst)
@@ -159,7 +159,8 @@ class FindFailurePaths(Pass):
                     self._handle_branch(inst, b, False)
             case clang.CursorKind.SWITCH_STMT:
                 self.skip_children()
-                branches = (b for b in inst.body if b.has_children())
+                # NOTE: Expect the children to be CaseSTMT objects
+                branches = (b for b in inst.body.children if b.has_children())
                 for b in branches:
                     self._handle_branch(inst, b, False)
             case clang.CursorKind.DO_STMT | clang.CursorKind.WHILE_STMT:

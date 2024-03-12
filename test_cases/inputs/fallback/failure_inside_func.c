@@ -1,6 +1,7 @@
 void fail(void);
 
-int func(int x) {
+/* t parameter is unused */
+int func(int x, int t) {
 	int z;
 	int y = x * x;
 	if (y % 2 == 0)
@@ -12,7 +13,7 @@ int func(int x) {
 int main() {
 	int a = 123;
 	a = a * 5;
-	a = func(a);
+	a = func(a, 0);
 	a = a * a;
 	return a;
 }

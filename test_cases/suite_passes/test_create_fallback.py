@@ -20,10 +20,10 @@ from passes.simplify_code import simplify_code_structure
 from passes.primary_annotation_pass import primary_annotation_pass
 from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
 from passes.bpf_passes.mark_user_boundary import get_number_of_failure_paths
-# from passes.user_passes.create_user_graph import create_user_graph
-# from passes.user_passes.create_fallback import create_fallback_pass
 from passes.create_failure_path import create_failure_paths
+from passes.find_unused_vars import find_unused_vars
 from passes.fallback_variables import failure_path_fallback_variables
+from passes.create_meta_struct import create_fallback_meta_structure
 
 from passes.mark_relevant_code import mark_relevant_code
 from passes.mark_io import mark_io
@@ -51,9 +51,19 @@ class TestCase(BasicTest):
         bpf = simplify_code_structure(bpf, info, PassObject())
         bpf = feasibilty_analysis_pass(bpf, info, PassObject())
 
+        # Find Failure Paths
         create_failure_paths(bpf, info, None)
+        # Remove Unused Args from New Functions
+        for func in info.failure_path_new_funcs:
+            tmp_names = set(a.name for a in func.args)
+            unused_vars = find_unused_vars(func.body, info, target=tmp_names)
+            print('func', func.name, ': unused:', unused_vars)
+        # Find Fallback Variables
         failure_path_fallback_variables(info)
+        # Declare Meta structures
+        create_fallback_meta_structure(info)
 
+        print('All failure paths:')
         all_paths = info.failure_paths
         pprint.pprint(all_paths)
 
@@ -71,6 +81,10 @@ class TestCase(BasicTest):
         print('------- BPF -------')
         text = gen_code(bpf, info)[0]
         print(text)
+
+        for d in info.user_prog.declarations.values():
+            text = gen_code([d,], info)[0]
+            print(text)
 
         assert len(info.failure_paths) == 4
 
