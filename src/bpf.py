@@ -145,7 +145,8 @@ class BPF_PROG:
                 clang.CursorKind.MEMBER_REF_EXPR, None)
         entry.is_bpf_ctx = True
 
-    def send(self, buf, write_size, info, failure_return, ret=True, do_copy=True):
+    def send(self, buf, write_size, info, func, ret=True, do_copy=True):
+        assert isinstance(func, (Function, type(None))), str(func)
         #TODO: The arguments of this function are crazy ???
         is_size_integer = write_size.kind == clang.CursorKind.INTEGER_LITERAL
         inst, decl = self.adjust_pkt(write_size, info)
@@ -161,8 +162,7 @@ class BPF_PROG:
                 off          = BinOp.build(dst, '+', write_size)
                 cond         = BinOp.build(off, '>', self.get_pkt_end())
                 check        = ControlFlowInst.build_if_inst(cond)
-                ret_inst     = failure_return
-                check.body.add_inst(ret_inst)
+                check.body.add_inst(ToUserspace.from_func_obj(func))
                 check.set_modified(InstructionColor.CHECK)
                 check.likelihood = Likelihood.Unlikely
 
@@ -174,13 +174,10 @@ class BPF_PROG:
                 inst.extend([check, copy])
             else:
                 # variable copy
-                ret_value = None
-                if failure_return.body.has_children():
-                    ret_value = failure_return.body.children[0]
-                loop, decl, tmp_ret = template.variable_memcpy(dst, buf,
-                        write_size, 1470, info, ret_value)
+                tmp_insts, decl, tmp_ret = template.variable_memcpy(dst, buf,
+                        write_size, 1470, info, func)
                 inst.extend(decl)
-                inst.append(loop)
+                inst.extend(tmp_insts)
 
         # Do anything that is needed before sending
         before_send_insts = self.before_send()

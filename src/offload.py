@@ -257,9 +257,9 @@ def gen_bpf_code(bpf, info, out_bpf):
 
     # Handle moving to userspace and removing the instruction not possible in
     # BPF
-    debug('Userspace Fallback', tag=MODULE_TAG)
-    bpf = userspace_fallback_pass(bpf, info, PassObject())
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+    # debug('Userspace Fallback', tag=MODULE_TAG)
+    # bpf = userspace_fallback_pass(bpf, info, PassObject())
+    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('[2nd] remove everything that is not used in BPF', tag=MODULE_TAG)
     remove_everything_not_used(bpf, info, None)

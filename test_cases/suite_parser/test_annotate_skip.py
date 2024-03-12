@@ -13,11 +13,11 @@ from data_structure import *
 from instruction import *
 from sym_table import *
 
-from passes.mark_relevant_code import mark_relevant_code 
+from passes.mark_relevant_code import mark_relevant_code
 from passes.pass_obj import PassObject
 from passes.simplify_code import simplify_code_structure
 from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
-from passes.bpf_passes.mark_user_boundary import get_number_of_failure_paths
+from passes.create_failure_path import create_failure_paths
 
 
 class TestCase(BasicTest):
@@ -37,6 +37,7 @@ class TestCase(BasicTest):
                     f.body = body
 
         bpf = feasibilty_analysis_pass(bpf, self.info, PassObject())
+        create_failure_paths(bpf, self.info, None)
 
         # Generate the code and show it for debuging
         # text, _ = gen_code(bpf, self.info)
@@ -44,7 +45,7 @@ class TestCase(BasicTest):
         # show_insts([bpf])
 
         # Tests
-        failure_paths = get_number_of_failure_paths()
+        failure_paths = len(info.failure_paths)
         assert  failure_paths == 4, f'Expect 4 failure paths found {failure_paths}'
 
         print('Feasibility Pass Test: Okay')

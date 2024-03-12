@@ -118,9 +118,9 @@ def _do_add_bound_check(blk, R, current_function, info, bytes_mode):
     else:
         _ret_inst = None
     if bytes_mode:
-        check_inst = bpf_ctx_bound_check_bytes(ref, index, data_end, _ret_inst)
+        check_inst = bpf_ctx_bound_check_bytes(ref, index, data_end, current_function)
     else:
-        check_inst = bpf_ctx_bound_check(ref, index, data_end, _ret_inst)
+        check_inst = bpf_ctx_bound_check(ref, index, data_end, current_function)
     blk.append(check_inst)
     ref.set_flag(Instruction.BOUND_CHECK_FLAG)
 
@@ -481,6 +481,11 @@ def _handle_array_access(inst, info, more):
     if sym is None:
         debug('Did not found symbol table for', inst, tag=MODULE_TAG)
         return inst
+
+    if is_value_from_bpf_ctx(inst, info, None):
+        debug('it is a buf dereference, we will check it later', tag=MODULE_TAG)
+        return inst
+
     # debug(inst, sym.memory_region, '--->', sym.referencing_memory_region, tag=MODULE_TAG)
     # debug('---', inst, inst.array_ref, inst.array_ref.type)
     array_ref = inst.array_ref
@@ -496,8 +501,7 @@ def _handle_array_access(inst, info, more):
     cond2 = BinOp.build(index, '<', ZERO)
     cond = BinOp.build(cond1, '||', cond2)
     check = ControlFlowInst.build_if_inst(cond)
-    tmp = get_ret_inst(current_function, info)
-    check.body.add_inst(tmp)
+    check.body.add_inst(ToUserspace.from_func_obj(current_function))
     check.likelihood = Likelihood.Unlikely
     blk = cb_ref.get(BODY)
     blk.append(check)

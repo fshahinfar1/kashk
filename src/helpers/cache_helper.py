@@ -125,10 +125,8 @@ def generate_cache_lookup(inst, blk, current_function, parent_children, info):
     check_key_len = ControlFlowInst.build_if_inst(check_key_len_cond)
     check.body.add_inst(check_key_len)
     key_field = val_ref.get_ref_field('key', info)
-    tmp_ret = get_ret_val(current_function, info)
     tmp_insts, tmp_decl, tmp_cmp_res = template.strncmp(key_field, key,
-            key_size, CACHE_KEY_MAX_SIZE, info,
-            fail_return_inst=tmp_ret)
+            key_size, CACHE_KEY_MAX_SIZE, info, current_function)
     declare_at_top_of_func.extend(tmp_decl)
     check_key_len.body.extend_inst(tmp_insts)
 

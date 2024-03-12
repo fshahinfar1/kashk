@@ -99,7 +99,8 @@ def _known_function_substitution(inst, info, more):
         if max_bound is None:
             raise Exception('the strlen should have annotation declaring max number of iterations')
         s1 = inst.args[0]
-        tmp_insts, tmp_decl, tmp_res = template.strlen(s1, max_bound, info)
+        tmp_insts, tmp_decl, tmp_res = template.strlen(s1, max_bound, info,
+                current_function)
         declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
@@ -115,9 +116,8 @@ def _known_function_substitution(inst, info, more):
         s1 = inst.args[0]
         s2 = inst.args[1]
         size = inst.args[2]
-        tmp = get_ret_inst(current_function, info)
-        return_val = tmp.body.children[0] if len(tmp.body.children) > 0 else None
-        tmp_insts, tmp_decl, tmp_res = template.strncmp(s1, s2, size, max_bound, info, return_val)
+        tmp_insts, tmp_decl, tmp_res = template.strncmp(s1, s2, size,
+                max_bound, info, current_function)
         declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
@@ -135,10 +135,8 @@ def _known_function_substitution(inst, info, more):
         s1 = inst.args[0]
         s2 = inst.args[1]
         size = inst.args[2]
-        tmp = get_ret_inst(current_function, info)
-        return_val = tmp.body.children[0] if len(tmp.body.children) > 0 else None
         tmp_insts, tmp_decl, tmp_res = template.strncpy(s1, s2,
-                size, max_bound, info, return_val)
+                size, max_bound, info, current_scope)
         declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
@@ -168,11 +166,10 @@ def _known_function_substitution(inst, info, more):
         # report('Declare map', m, 'for malloc')
 
         # Look the malloc map
-        return_val = get_ret_value_text(current_function, info)
-        lookup_inst, ref = malloc_lookup(name, info, return_val)
+        lookup_inst, tmp_decl, ref = malloc_lookup(name, info, current_function)
+        declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
-        for tmp_inst in lookup_inst:
-            blk.append(tmp_inst)
+        blk.extend(lookup_inst)
         return ref, True
     elif inst.name == 'memcpy':
         assert len(inst.args) == 3
@@ -186,11 +183,11 @@ def _known_function_substitution(inst, info, more):
         assert max_bound is not None, 'The variable memcpy should have annotation declaring max number of iterations'
         dst = inst.args[0]
         src = inst.args[1]
-        return_val = get_ret_inst(current_function, info)
-        loop, decl, tmp_res = template.variable_memcpy(dst, src, size, max_bound, info, return_val)
+        tmp_insts, decl, tmp_res = template.variable_memcpy(dst, src, size,
+                max_bound, info, current_function)
         declare_at_top_of_func.extend(decl)
         blk = cb_ref.get(BODY)
-        blk.append(loop)
+        blk.extend(tmp_insts)
         loop.removed.append(inst)
         return tmp_res, True
     elif inst.name in ('ntohs', 'ntohl', 'htons', 'htonl'):
@@ -214,10 +211,9 @@ def _process_write_call(inst, info):
     ref = inst.wr_buf.ref
     should_copy = not is_bpf_ctx_ptr(ref, info)
     blk = cb_ref.get(BODY)
-    return_val = get_ret_inst(current_function, info)
     if current_function is None:
         # On the main BPF program. feel free to return the verdict value
-        insts = info.prog.send(ref, write_size, info, return_val,
+        insts = info.prog.send(ref, write_size, info, current_function,
                 do_copy=should_copy)
         blk.extend(insts)
         new_inst = insts[-1]
@@ -230,7 +226,7 @@ def _process_write_call(inst, info):
         return None # remove the write call
     else:
         # On a function which is not the main. Do not return
-        copy_inst = info.prog.send(ref, write_size, info, return_val,
+        copy_inst = info.prog.send(ref, write_size, info, current_function,
                 ret=False, do_copy=should_copy)
         # set the flag
         flag_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
@@ -313,8 +309,7 @@ def _process_var_decl(inst, info):
     m = define_bpf_arr_map(map_name, struct_decl.get_name(), 1)
     info.prog.add_declaration(m)
     # Lookup the malloc map
-    return_val = get_ret_value_text(current_function, info)
-    lookup_inst, ref = malloc_lookup(name, info, return_val)
+    lookup_inst, ref = malloc_lookup(name, info, current_function)
     blk = cb_ref.get(BODY)
     blk.extend(lookup_inst)
 

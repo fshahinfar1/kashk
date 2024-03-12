@@ -168,8 +168,7 @@ class TransformVars(Pass):
             return inst
         # debug('load shared map for variable:', inst.name)
         # Perform a lookup on the map for globally shared values
-        ret_inst = get_ret_inst(self.current_function, self.info)
-        new_insts = prepare_shared_state_var(ret_val=ret_inst)
+        new_insts = prepare_shared_state_var(self.current_function)
         blk = self.cb_ref.get(BODY)
         blk.extend(new_insts)
         # Update the symbol table

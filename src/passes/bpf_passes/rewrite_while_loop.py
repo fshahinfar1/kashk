@@ -5,6 +5,7 @@ from instruction import *
 import template
 from helpers.instruction_helper import UINT
 from utility import find_elems_of_kind
+from elements.after import After
 
 
 class RewriteWhileLoop(Pass):
@@ -17,8 +18,10 @@ class RewriteWhileLoop(Pass):
             raise Exception('Missing the upper bound for a while loop')
         upper_bound = Literal(str(upper_bound_int),
                 clang.CursorKind.INTEGER_LITERAL)
-        loop, tmp_decl, loop_var = template.new_bounded_loop(upper_bound,
-                upper_bound, self.info, loop_var_type=UINT)
+        tmp_insts, tmp_decl, loop_var = template.new_bounded_loop(upper_bound,
+                upper_bound, self.info, self.current_function,
+                loop_var_type=UINT)
+        loop = tmp_insts[0]
         self.declare_at_top_of_func.extend(tmp_decl)
 
         while_cond = inst.cond.children[0]
@@ -32,6 +35,9 @@ class RewriteWhileLoop(Pass):
 
         while_body = inst.body
         loop.body.extend_inst(while_body.children)
+        blk = self.cb_ref.get(BODY)
+        after = After(tmp_insts[1:])
+        blk.append(after)
         return loop
 
     def _handle_do_while(self, inst, more):
@@ -40,8 +46,10 @@ class RewriteWhileLoop(Pass):
             raise Exception('Missing the upper bound for a while loop')
         upper_bound = Literal(str(upper_bound_int),
                 clang.CursorKind.INTEGER_LITERAL)
-        loop, tmp_decl, loop_var = template.new_bounded_loop(upper_bound,
-                upper_bound, self.info, loop_var_type=UINT)
+        tmp_insts, tmp_decl, loop_var = template.new_bounded_loop(upper_bound,
+                upper_bound, self.info, self.current_function,
+                loop_var_type=UINT)
+        loop = tmp_insts[0]
         self.declare_at_top_of_func.extend(tmp_decl)
 
         while_cond = inst.cond.children[0]
@@ -59,6 +67,9 @@ class RewriteWhileLoop(Pass):
         # Add the break condition check to the end of the body of the loop
         # TODO: what happens if the loop has a continue statements?
         loop.body.add_inst(check_break)
+        blk = self.cb_ref.get(BODY)
+        after = After(tmp_insts[1:])
+        blk.append(after)
         return loop
 
     def process_current_inst(self, inst, more):

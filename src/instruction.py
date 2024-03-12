@@ -970,27 +970,29 @@ class Block(Instruction):
 
 
 class ToUserspace(Instruction):
-    __slots__ = ('is_bpf_main', 'return_type', 'path_id')
+    __slots__ = ('current_func',)
 
     @classmethod
-    def from_func_obj(cls, func, path_id=None):
+    def from_func_obj(cls, func):
         obj = ToUserspace()
-        obj.is_bpf_main = func is None
-        if func is not None:
-            obj.return_type = func.return_type
-
-        if path_id is None:
-            error('We are not setting the faliure ID for a ToUserspace instruction.')
-        else:
-            obj.path_id = path_id
+        obj.current_func = func
         return obj
-
+    
     def __init__(self):
         super().__init__()
         self.kind = TO_USERSPACE_INST
-        self.is_bpf_main = False
-        self.return_type = None
-        self.path_id = None
+        self.current_func = None
+
+    @property
+    def is_bpf_main(self):
+        return self.current_func is None
+
+    @property
+    def return_type(self):
+        if self.current_func is None:
+            # Assume on the main function
+            return BASE_TYPES[clang.TypeKind.INT]
+        return self.current_func.return_type
 
     def __str__(self):
         return f'<ToUserspace>'
@@ -998,9 +1000,7 @@ class ToUserspace(Instruction):
     def clone(self, _):
         new = ToUserspace()
         _default_clone_operation(new, self)
-        new.is_bpf_main = self.is_bpf_main
-        new.return_type = self.return_type
-        new.path_id = self.path_id
+        new.current_func = self.current_func
         return new
 
     def has_children(self):
