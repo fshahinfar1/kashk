@@ -29,10 +29,11 @@ class TestCase(BrainTest):
         debug('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
         cfg = self.main_cfg
         self.show_cfg(cfg)
-        # self.show_cfg(self.cfg_table['costly_func'])
+        self.show_cfg(self.cfg_table['costly_func'])
 
         leafs = cfg_leafs(cfg)
-        assert len(leafs) == 2
+        print(len(leafs), leafs)
+        assert len(leafs) == 6
         debug([l.insts for l in leafs])
         self.gen_code()
 
