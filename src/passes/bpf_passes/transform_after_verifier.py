@@ -26,9 +26,18 @@ declare_at_top_of_func = None
 skip_to_end = None
 
 def _is_known_integer(inst):
-    return (isinstance(inst, Literal) or
-            (inst.kind == clang.CursorKind.UNARY_OPERATOR
-                and inst.op == 'sizeof'))
+    if (isinstance(inst, Literal) or
+        (inst.kind == clang.CursorKind.UNARY_OPERATOR
+            and inst.op == 'sizeof')):
+        return True
+
+    if inst.kind == clang.CursorKind.BINARY_OPERATOR:
+        lhs = inst.lhs.children[0]
+        rhs = inst.rhs.children[0]
+        if inst.op == '=':
+            return _is_known_integer(rhs)
+        return _is_known_integer(lhs) and _is_known_integer(rhs)
+    return False
 
 
 def _set_skip(val):
@@ -120,6 +129,8 @@ def _known_function_substitution(inst, info, more):
         if max_bound is None and _is_known_integer(inst.args[2]):
             # Try to guess the max bound from the size parameter
             max_bound = gen_code([inst.args[2],], None)[0]
+        text = gen_code(inst, info)[0]
+        debug(text, tag=MODULE_TAG)
         assert max_bound is not None, 'The strncpy should have annotation declaring max number of iterations'
         s1 = inst.args[0]
         s2 = inst.args[1]
