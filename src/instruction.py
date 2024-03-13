@@ -51,6 +51,7 @@ def _default_clone_operation(new, old):
     new.change_applied = old.change_applied
     new.color          = old.color
     new.removed        = old.removed[:]
+    new.original       = old.original
 
 
 class InstructionColor:
@@ -82,7 +83,7 @@ INSTRUCTION_COLORS = (InstructionColor.ORIGINAL, InstructionColor.RED,
 #         Instruction.OFFSET_MASK_FLAG)
 
 class Instruction(PassableObject):
-    __slots__ = ('change_applied', 'color', 'body', 'removed')
+    __slots__ = ('change_applied', 'color', 'body', 'removed', 'original')
 
     BOUND_CHECK_FLAG = 1 << 3 # Have I done the bound check
     OFFSET_MASK_FLAG = 1 << 4 # Have I applied the offset mask
@@ -90,6 +91,14 @@ class Instruction(PassableObject):
     MAY_NOT_OVERLOAD = (clang.CursorKind.BREAK_STMT,
             clang.CursorKind.CONTINUE_STMT, clang.CursorKind.GOTO_STMT,
             clang.CursorKind.LABEL_STMT, clang.CursorKind.INIT_LIST_EXPR)
+
+    @classmethod
+    def build_break_inst(cls, red=False):
+        brk = Instruction()
+        brk.kind = clang.CursorKind.BREAK_STMT
+        if red:
+            brk.set_modified()
+        return brk
 
     def __init__(self):
         super().__init__()
@@ -102,6 +111,7 @@ class Instruction(PassableObject):
         self.color = InstructionColor.ORIGINAL
         # Link the instruction removed by the tool
         self.removed = []
+        self.original = None
 
     def has_children(self):
         if self.kind not in Instruction.MAY_NOT_OVERLOAD:
@@ -378,6 +388,16 @@ class VarDecl(Instruction):
 
 class ControlFlowInst(Instruction):
     __slots__ = ('cond', 'other_body', 'repeat', 'likelihood')
+
+    @classmethod
+    def build_switch(cls, cond, red=False):
+        switch = ControlFlowInst()
+        switch.kind = clang.CursorKind.SWITCH_STMT
+        switch.cond.add_inst(cond)
+        if red:
+            switch.set_modified()
+        return switch
+
 
     @classmethod
     def build_if_inst(cls, condition_inst, red=False):

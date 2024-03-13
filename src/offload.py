@@ -26,7 +26,8 @@ from passes.simplify_code import simplify_code_structure
 from passes.create_failure_path import create_failure_paths
 from passes.find_unused_vars import find_unused_vars
 from passes.fallback_variables import failure_path_fallback_variables
-from passes.create_meta_struct import create_fallback_meta_structure
+from passes.create_meta_struct import create_fallback_meta_structure, FAILURE_NUMBER_FIELD
+from passes.update_original_ref import update_original_ast_references
 
 from passes.bpf_passes.loop_end import loop_end_pass
 from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
@@ -40,7 +41,7 @@ from passes.bpf_passes.prog_complexity import mitiage_program_comlexity
 from passes.bpf_passes.change_bpf_loop import change_to_bpf_loop
 from passes.bpf_passes.rewrite_while_loop import rewrite_while_loop
 
-from helpers.instruction_helper import show_insts
+from helpers.instruction_helper import decl_new_var, show_insts
 from helpers.ast_graphviz import ASTGraphviz
 from helpers.cfg_graphviz import CFGGraphviz
 
@@ -158,6 +159,10 @@ def generate_offload(io_ctx):
     prog = primary_annotation_pass(prog, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
+    update_original_ast_references(prog, info, None)
+    info.original_ast = { k: v for k, v in Function.directory.items() if v.is_used_in_bpf_code }
+    info.original_ast['[[main]]'] =  prog
+
     debug('Mark Read/Write Inst & Buf', tag=MODULE_TAG)
     mark_io(prog, info)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
@@ -169,29 +174,6 @@ def generate_offload(io_ctx):
     debug('Feasibility Analysis', tag=MODULE_TAG)
     prog = feasibilty_analysis_pass(prog, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    debug('Create Failure Paths', tag=MODULE_TAG)
-    create_failure_paths(prog, info, None)
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    debug('Remove Unused Args From Failure Functions', tag=MODULE_TAG)
-    # TODO: Remove unused args from failure functions
-    for func in info.failure_path_new_funcs:
-        tmp_names = set(a.name for a in func.args)
-        unused_vars = find_unused_vars(func.body, info, target=tmp_names)
-        for a in func.args:
-            if a.name in unused_vars:
-                a.set_unused()
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    debug('Failure Path Variables', tag=MODULE_TAG)
-    failure_path_fallback_variables(info)
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    debug('Create Fallback Meta Structures', tag=MODULE_TAG)
-    create_fallback_meta_structure(info)
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
 
     # debug('Clone All State', tag=MODULE_TAG)
     # user = clone_pass(prog, info, PassObject())
@@ -210,7 +192,19 @@ def generate_offload(io_ctx):
     return info
 
 
-def gen_user_code(user, info, out_user):
+def gen_user_code(info, out_user):
+    decl = []
+    failure_num = decl_new_var(INT, info, decl, FAILURE_NUMBER_FIELD)
+    switch = ControlFlowInst.build_switch(failure_num)
+    for path_id, path in info.failure_paths:
+        case_stmt = CaseSTMT(None)
+        case_stmt.case.add_inst(Literal(str(path_id), clang.CursorKind.INTEGER_LITERAL))
+        case_stmt.body.extend_inst(path)
+        brk = Instruction.build_break_inst()
+        case_stmt.body.add_inst(brk)
+        switch.body.add_inst(case_stmt)
+    main = Block(BODY)
+    main.add_inst(switch)
     text = generate_user_prog(main, info)
     with open(out_user, 'w') as f:
         f.write(text)
@@ -255,6 +249,30 @@ def gen_bpf_code(bpf, info, out_bpf):
     bpf = reduce_params_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
+    debug('Create Failure Paths', tag=MODULE_TAG)
+    create_failure_paths(bpf, info, None)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    # debug('Remove Unused Args From Failure Functions', tag=MODULE_TAG)
+    # # TODO: Remove unused args from failure functions
+    # for func in info.failure_path_new_funcs:
+    #     tmp_names = set(a.name for a in func.args)
+    #     unused_vars = find_unused_vars(func.body, info, target=tmp_names)
+    #     for a in func.args:
+    #         if a.name in unused_vars:
+    #             a.set_unused()
+    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    debug('Failure Path Variables', tag=MODULE_TAG)
+    failure_path_fallback_variables(info)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    debug('Create Fallback Meta Structures', tag=MODULE_TAG)
+    create_fallback_meta_structure(info)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    # # TODO: Update the userspace fallback with new implementation of failure
+    # # paths
     # Handle moving to userspace and removing the instruction not possible in
     # BPF
     # debug('Userspace Fallback', tag=MODULE_TAG)

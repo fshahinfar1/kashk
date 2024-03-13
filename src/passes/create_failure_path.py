@@ -12,6 +12,13 @@ from helpers.instruction_helper import show_insts
 MODULE_TAG = "[Create Failure Paths]"
 
 
+__failure_path_func_book = {}
+def _get_fail_path_func_counter(path_id):
+    x = __failure_path_func_book.get(path_id, 0)
+    __failure_path_func_book[path_id] = x + 1
+    return x
+
+
 __fail_counter = 0
 def _get_fail_counter():
     global __fail_counter
@@ -93,7 +100,8 @@ class FindFailurePaths(Pass):
         self.new_declarations.extend(tmp.new_declarations)
         for path_id, internal_path in tmp.failure_paths.items():
             # Define a new function and,
-            tmp_name = f'__f{path_id}'
+            t = _get_fail_path_func_counter(path_id)
+            tmp_name = f'__f{path_id}_{t}'
             new_func = Function(tmp_name, None)
             new_func.args = list(func.args)
             new_func.return_type = func.return_type

@@ -19,7 +19,7 @@ class Info:
 
     __slots__ = ('sym_tbl', 'prog', 'user_prog', 'io_ctx', 'map_definitions',
             'read_decl', 'func_cost_table', 'failure_paths',
-            'failure_path_new_funcs', 'failure_vars')
+            'failure_path_new_funcs', 'failure_vars', 'original_ast')
 
     @classmethod
     def from_io_ctx(cls, io_ctx):
@@ -50,6 +50,7 @@ class Info:
         self.failure_paths = None
         self.failure_path_new_funcs = None
         self.failure_vars = None
+        self.original_ast = None
 
 
 class PacketBuffer:
