@@ -356,6 +356,8 @@ jump_table = {
         clang.CursorKind.CXX_THROW_EXPR: lambda x,y,z: indent('return SK_DROP', z[0]),
         #
         TO_USERSPACE_INST: handle_to_userspace,
+        #
+        BLOCK_OF_CODE: lambda x,y,z: indent(f'// {str(x.children)}\n', z[0]),
         }
 
 

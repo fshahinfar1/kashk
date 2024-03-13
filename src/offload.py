@@ -1,5 +1,5 @@
 import clang.cindex as clang
-from pprint import pformat
+from pprint import pformat, pprint
 
 from framework_support import InputOutputContext
 from log import *
@@ -160,7 +160,7 @@ def generate_offload(io_ctx):
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     update_original_ast_references(prog, info, None)
-    info.original_ast = { k: v for k, v in Function.directory.items() if v.is_used_in_bpf_code }
+    info.original_ast = { k: v.body for k, v in Function.directory.items() if v.is_used_in_bpf_code }
     info.original_ast['[[main]]'] =  prog
 
     debug('Mark Read/Write Inst & Buf', tag=MODULE_TAG)
@@ -251,6 +251,7 @@ def gen_bpf_code(bpf, info, out_bpf):
 
     debug('Create Failure Paths', tag=MODULE_TAG)
     create_failure_paths(bpf, info, None)
+    pprint(info.failure_paths)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # debug('Remove Unused Args From Failure Functions', tag=MODULE_TAG)

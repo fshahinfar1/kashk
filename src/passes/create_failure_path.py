@@ -37,6 +37,9 @@ class GatherRestInstruction(Pass):
         if not self.found and inst == self.target:
             self.found = True
 
+        if more.ctx != BODY:
+            return inst
+
         if self.found:
             self.gathered.append(inst)
             self.skip_children()
@@ -49,15 +52,16 @@ class FindFailurePaths(Pass):
         self.failure_paths = {}
         self.new_declarations = []
         self.terminate = False
-        self.first_inst = None
 
     def get_rest(self, inst):
         """
         Get the rest of the instruction in this block
         @param inst: current instruction
         """
-        tmp = GatherRestInstruction.do(self.first_inst, self.info,
-                target=inst)
+        name = '[[main]]' if self.current_function is None else self.current_function.name
+        ast = self.info.original_ast[name]
+        target = inst.original
+        tmp = GatherRestInstruction.do(ast, self.info, target=target)
         return tmp.gathered
 
     def _handle_branch(self, inst, b, include_current_inst):
@@ -71,7 +75,7 @@ class FindFailurePaths(Pass):
         @param include_current_inst: (used in loops) consider current
             instruction as part of the rest of instruction to be evaluated.
         """
-        tmp = FindFailurePaths.do(b, self.info, first_inst=b)
+        tmp = FindFailurePaths.do(b, self.info)
         if len(tmp.failure_paths) == 0:
             # did not failed
             return False
@@ -94,7 +98,7 @@ class FindFailurePaths(Pass):
         if func is None or func.is_empty():
             return
         b = func.body
-        tmp = FindFailurePaths.do(b, self.info, func=func, first_inst=b)
+        tmp = FindFailurePaths.do(b, self.info, func=func)
         if len(tmp.failure_paths) == 0:
             return
         self.new_declarations.extend(tmp.new_declarations)
@@ -163,14 +167,16 @@ class FindFailurePaths(Pass):
                 self.skip_children()
                 branches = (b for b in (inst.body, inst.other_body)
                         if b.has_children())
+                include_target_inst = inst.is_modified()
                 for b in branches:
-                    self._handle_branch(inst, b, False)
+                    self._handle_branch(inst, b, include_target_inst)
             case clang.CursorKind.SWITCH_STMT:
                 self.skip_children()
                 # NOTE: Expect the children to be CaseSTMT objects
                 branches = (b for b in inst.body.children if b.has_children())
+                include_target_inst = inst.is_modified()
                 for b in branches:
-                    self._handle_branch(inst, b, False)
+                    self._handle_branch(inst, b, include_target_inst)
             case clang.CursorKind.DO_STMT | clang.CursorKind.WHILE_STMT:
                 self.skip_children()
                 branches = (b for b in (inst.body, inst.other_body)
@@ -190,7 +196,7 @@ def create_failure_paths(inst, info, more):
     """
     Find possible failure paths due to unsupported instructions
     """
-    obj = FindFailurePaths.do(inst, info, more, first_inst=inst)
+    obj = FindFailurePaths.do(inst, info, more)
     info.failure_paths = obj.failure_paths
     info.failure_path_new_funcs = obj.new_declarations
     info.user_prog.fallback_funcs_def = list(obj.new_declarations)
