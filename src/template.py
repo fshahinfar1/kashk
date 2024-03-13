@@ -130,7 +130,7 @@ def prepare_shared_state_var(func):
     return insts
 
 
-def prepare_meta_data(failure_number, meta_declaration, info):
+def prepare_meta_data(failure_number, meta_declaration, info, func):
     decl = []
     type_name = f'struct {meta_declaration.name}'
     req_type = MyType.make_simple(type_name, clang.TypeKind.RECORD)
@@ -144,9 +144,9 @@ def prepare_meta_data(failure_number, meta_declaration, info):
     assign = BinOp.build(ref, '=', info.prog.get_pkt_buf())
     assign.set_modified()
 
-    DROP = Literal(info.prog.get_drop(), clang.CursorKind.INTEGER_LITERAL)
-    DROP.set_modified()
-    bound_check = bpf_ctx_bound_check(ref, ZERO, info.prog.get_pkt_end(), DROP)
+    # DROP = Literal(info.prog.get_drop(), clang.CursorKind.INTEGER_LITERAL)
+    # DROP.set_modified()
+    bound_check = bpf_ctx_bound_check(ref, ZERO, info.prog.get_pkt_end(), func)
 
     store = [f'{ref.name}->failure_number = {failure_number};', ]
     for f in meta_declaration.fields[1:]:

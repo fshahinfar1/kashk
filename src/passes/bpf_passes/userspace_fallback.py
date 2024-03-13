@@ -98,7 +98,7 @@ def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
         if failure_number not in info.user_prog.declarations:
             continue
         meta = info.user_prog.declarations[failure_number]
-        prepare_meta_code, tmp_decl = prepare_meta_data(failure_number, meta, info)
+        prepare_meta_code, tmp_decl = prepare_meta_data(failure_number, meta, info, current_function)
         decl.extend(tmp_decl)
 
         # Check the failure number
@@ -145,6 +145,7 @@ def _handle_call_may_fail_or_succeed(inst, func, info, more):
     tmp = Literal('/* check if function fail */\n', CODE_LITERAL)
     after_func_call.append(tmp)
     if current_function == None:
+        print(func.name, func.path_ids)
         assert len(func.path_ids) > 0
         tmp_inst, tmp_decl = _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info)
         declare_at_top_of_func.extend(tmp_decl)
@@ -227,7 +228,7 @@ def _process_current_inst(inst, info, more):
             if meta is None:
                 error('did not found the metadata structure declaration for failure', failure_num, tag=MODULE_TAG)
                 return inst
-            prepare_pkt, tmp_decl = prepare_meta_data(failure_num, meta, info)
+            prepare_pkt, tmp_decl = prepare_meta_data(failure_num, meta, info, current_function)
             declare_at_top_of_func.extend(tmp_decl)
             blk.extend(prepare_pkt)
             # Add instructions needed before passing the packet to the kernel

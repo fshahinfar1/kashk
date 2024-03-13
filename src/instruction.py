@@ -990,10 +990,11 @@ class Block(Instruction):
 
 
 class ToUserspace(Instruction):
-    __slots__ = ('current_func',)
+    __slots__ = ('current_func', 'path_id')
 
     @classmethod
     def from_func_obj(cls, func):
+        assert isinstance(func, (Function, type(None)))
         obj = ToUserspace()
         obj.current_func = func
         return obj
@@ -1002,6 +1003,7 @@ class ToUserspace(Instruction):
         super().__init__()
         self.kind = TO_USERSPACE_INST
         self.current_func = None
+        self.path_id = 0
 
     @property
     def is_bpf_main(self):

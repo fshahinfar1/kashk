@@ -79,10 +79,6 @@ def _process_current_inst(inst, info, more):
             assert body is not None, 'this pass should not remove anything'
             func.body = body
             _have_processed.add(func.name)
-
-        if current_function:
-            # Update the current function with the failure paths
-            current_function.path_ids.extend(func.path_ids)
     elif inst.kind == ANNOTATION_INST and inst.ann_kind == Annotation.ANN_SKIP:
         fail_ref.set(FAILED, YES)
         return inst, YES

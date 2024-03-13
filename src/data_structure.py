@@ -368,7 +368,6 @@ class Function(TypeDefinition):
         self._body = Block(BODY)
         self.is_method = False
         self.is_operator = False
-        self.may_have_context_ptr = False
         self.may_fail = False
         self.may_succeed = False
         self.may_return_bpf_ctx_ptr = False
@@ -377,15 +376,10 @@ class Function(TypeDefinition):
         self.complexity = 0
         self.based_on = None
         self.fallback_vars = None
-        self.removed_args = None
-
-        self.path_ids = []
-        self.last_arg_is_auto_gen = False
+        self.path_ids = set()
 
         # What operations has alread been applied (bitset)
         self.change_applied = 0
-
-        self.function_dependancy = set()
 
         if directory is None:
             directory = Function.directory

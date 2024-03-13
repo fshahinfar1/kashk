@@ -12,6 +12,9 @@ from helpers.instruction_helper import show_insts
 MODULE_TAG = "[Create Failure Paths]"
 
 
+_for_debuging_assigned_failure_numbers = set()
+
+
 __failure_path_func_book = {}
 def _get_fail_path_func_counter(path_id):
     x = __failure_path_func_book.get(path_id, 0)
@@ -75,7 +78,7 @@ class FindFailurePaths(Pass):
         @param include_current_inst: (used in loops) consider current
             instruction as part of the rest of instruction to be evaluated.
         """
-        tmp = FindFailurePaths.do(b, self.info)
+        tmp = FindFailurePaths.do(b, self.info, func=self.current_function)
         if len(tmp.failure_paths) == 0:
             # did not failed
             return False
@@ -101,6 +104,9 @@ class FindFailurePaths(Pass):
         tmp = FindFailurePaths.do(b, self.info, func=func)
         if len(tmp.failure_paths) == 0:
             return
+        if self.current_function is not None:
+            debug('hhhh', func.name, func.path_ids)
+            self.current_function.path_ids.update(func.path_ids)
         self.new_declarations.extend(tmp.new_declarations)
         for path_id, internal_path in tmp.failure_paths.items():
             # Define a new function and,
@@ -147,6 +153,8 @@ class FindFailurePaths(Pass):
         # self.terminate = True
 
     def process_current_inst(self, inst, more):
+        # n = '[[main]]' if self.current_function is None else self.current_function.name
+        # debug(n)
         if self.terminate:
             self.skip_children()
             return inst
@@ -160,6 +168,13 @@ class FindFailurePaths(Pass):
                 self.terminate = True
                 rest = self.get_rest(inst)[1:]
                 self.failure_paths[failure_path_id] = rest
+                assert inst.path_id == 0
+                inst.path_id = failure_path_id
+                assert failure_path_id not in _for_debuging_assigned_failure_numbers, 'Duplicate failure number assignment'
+                _for_debuging_assigned_failure_numbers.add(failure_path_id)
+                if self.current_function is not None:
+                    # debug('xxxx', self.current_function.name, failure_path_id)
+                    self.current_function.path_ids.add(failure_path_id)
                 # debug(f'encounter a to-user instruction ({failure_path_id})',
                 #         tag=MODULE_TAG)
                 # debug('instructions for handling it:\n', rest, tag=MODULE_TAG)
