@@ -136,7 +136,7 @@ def _known_function_substitution(inst, info, more):
         s2 = inst.args[1]
         size = inst.args[2]
         tmp_insts, tmp_decl, tmp_res = template.strncpy(s1, s2,
-                size, max_bound, info, current_scope)
+                size, max_bound, info, current_function)
         declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
@@ -188,7 +188,7 @@ def _known_function_substitution(inst, info, more):
         declare_at_top_of_func.extend(decl)
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
-        loop.removed.append(inst)
+        tmp_insts[0].removed.append(inst)
         return tmp_res, True
     elif inst.name in ('ntohs', 'ntohl', 'htons', 'htonl'):
         inst.name = 'bpf_'+inst.name
@@ -309,7 +309,8 @@ def _process_var_decl(inst, info):
     m = define_bpf_arr_map(map_name, struct_decl.get_name(), 1)
     info.prog.add_declaration(m)
     # Lookup the malloc map
-    lookup_inst, ref = malloc_lookup(name, info, current_function)
+    lookup_inst, decl, ref = malloc_lookup(name, info, current_function)
+    declare_at_top_of_func.extend(decl)
     blk = cb_ref.get(BODY)
     blk.extend(lookup_inst)
 
