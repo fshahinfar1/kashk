@@ -19,7 +19,7 @@ class MemoryRegion:
 
 class SymbolTableEntry:
     __slots__ = ('name', 'type', 'kind', 'ref', 'fields', 'is_bpf_ctx',
-            'is_accessed', 'memory_region', 'referencing_memory_region')
+            'memory_region', 'referencing_memory_region')
     def __init__(self, name, type_, kind, ref, scope_holding_the_entry=None):
         self.name = name
         self.type = type_
@@ -30,7 +30,6 @@ class SymbolTableEntry:
         # This is added to handle the fields of a struct
         self.fields = Scope(scope_holding_the_entry)
         self.is_bpf_ctx = False
-        self.is_accessed = SymbolAccessMode.NOT_ACCESSED
 
         # On what memory region is allocated
         self.memory_region = None

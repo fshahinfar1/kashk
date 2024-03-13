@@ -13,12 +13,14 @@ from instruction import *
 from sym_table import MemoryRegion
 from elements.after import After
 from passes.code_pass import Pass
+from passes.update_original_ref import set_original_ref
 
 
 MODULE_TAG = '[Transform Vars Pass]'
 
 SEND_FLAG_NAME = '__send_flag'
 FAIL_FLAG_NAME = '__fail_flag'
+SHARED_REF_NAME = '__shared'
 
 
 class TransformVars(Pass):
@@ -28,7 +30,7 @@ class TransformVars(Pass):
 
     def _process_call_needing_send_flag(self, inst):
         """
-        @parm inst, a Call object for a Function which needs a send flag
+        @param inst, a Call object for a Function which needs a send flag
         @return Instruction
         """
         assert isinstance(inst, Call)
@@ -85,6 +87,7 @@ class TransformVars(Pass):
             assert sym.type.is_pointer()
             ret_inst = get_ret_inst(self.current_function, self.info)
             check.body.add_inst(ret_inst)
+        set_original_ref(check, info, inst.original)
         after = After([check,])
         blk.append(after)
         return inst
@@ -142,6 +145,7 @@ class TransformVars(Pass):
         rhs.set_modified()
         assign_inst = BinOp.build(lhs, '=', rhs)
         blk.append(assign_inst)
+        set_original_ref(assign_inst, self.info, inst.original)
         # Removing read_system call
         assign_inst.set_modified(InstructionColor.REMOVE_READ)
         assign_inst.removed.append(inst)
@@ -163,7 +167,7 @@ class TransformVars(Pass):
         # map
         # TODO: maybe it is better that I change the owner
         inst.set_modified()
-        sym = self.info.sym_tbl.lookup('shared')
+        sym = self.info.sym_tbl.lookup(SHARED_REF_NAME)
         if sym is not None:
             return inst
         # debug('load shared map for variable:', inst.name)
@@ -171,14 +175,13 @@ class TransformVars(Pass):
         new_insts = prepare_shared_state_var(self.current_function)
         blk = self.cb_ref.get(BODY)
         blk.extend(new_insts)
+        set_original_ref(new_insts, self.info, inst.original)
         # Update the symbol table
         # TODO: because I am not handling blocks as separate scopes (as
         # they should). I will introduce bugs when shared is defined in an
         # inner scope.
-        entry = self.info.sym_tbl.insert_entry('shared', SHARED_OBJ_PTR,
+        entry = self.info.sym_tbl.insert_entry(SHARED_REF_NAME, SHARED_OBJ_PTR,
                 None, None)
-        entry.set_mem_region(MemoryRegion.STACK)
-        entry.set_ref_region(MemoryRegion.BPF_MAP)
         return inst
 
     def process_current_inst(self, inst, more):
@@ -198,6 +201,7 @@ class TransformVars(Pass):
                 T = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
                 new_inst = VarDecl.build(inst.name, T)
                 new_inst.set_modified()
+                new_inst.original = inst.original
                 # removing allocation of arrays, malloc, ...
                 new_inst.removed.append(inst)
                 return new_inst
@@ -212,7 +216,7 @@ class TransformVars(Pass):
                 # should remove this instruction.
                 return self._process_read_call(inst, more)
             elif inst.name in WRITE_PACKET:
-                # NOTE: the writel or libc calls are transformed after verifer pass
+                # NOTE: the write is transformed after verifer pass
                 self.skip_children()
                 return inst
             elif inst.name in KNOWN_FUNCS:

@@ -41,7 +41,7 @@ from passes.bpf_passes.prog_complexity import mitiage_program_comlexity
 from passes.bpf_passes.change_bpf_loop import change_to_bpf_loop
 from passes.bpf_passes.rewrite_while_loop import rewrite_while_loop
 
-from helpers.instruction_helper import decl_new_var, show_insts
+from helpers.instruction_helper import decl_new_var, show_insts, INT
 from helpers.ast_graphviz import ASTGraphviz
 from helpers.cfg_graphviz import CFGGraphviz
 
@@ -184,8 +184,8 @@ def generate_offload(io_ctx):
     # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     prog = gen_bpf_code(prog, info, io_ctx.bpf_out_file)
-    # if not info.user_prog.graph.is_empty():
-    #     gen_user_code(user, info, io_ctx.user_out_file)
+    # if len(info.failure_paths) > 0:
+    #     gen_user_code(info, io_ctx.user_out_file)
     # else:
     #     report("No user space program was generated. The tool has offloaded everything to BPF.")
 
@@ -196,7 +196,7 @@ def gen_user_code(info, out_user):
     decl = []
     failure_num = decl_new_var(INT, info, decl, FAILURE_NUMBER_FIELD)
     switch = ControlFlowInst.build_switch(failure_num)
-    for path_id, path in info.failure_paths:
+    for path_id, path in info.failure_paths.items():
         case_stmt = CaseSTMT(None)
         case_stmt.case.add_inst(Literal(str(path_id), clang.CursorKind.INTEGER_LITERAL))
         case_stmt.body.extend_inst(path)

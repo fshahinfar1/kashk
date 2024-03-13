@@ -19,6 +19,7 @@ from helpers.instruction_helper import (get_ret_inst, get_scalar_variables,
         get_ret_value_text, get_ref_symbol, add_flag_to_func,
         simplify_inst_to_ref, ZERO)
 from sym_table import MemoryRegion
+from passes.update_original_ref import set_original_ref
 
 
 MODULE_TAG = '[Verfier Pass]'
@@ -60,27 +61,27 @@ def new_backward_jump_context(off=False):
         backward_jmp_ctx = tmp
 
 
-class BoundCheckState:
-    MODE_BYTES   = 100
-    MODE_INDEXES = 200
+# class BoundCheckState:
+#     MODE_BYTES   = 100
+#     MODE_INDEXES = 200
 
-    def __init__(self):
-        self.mode = 0
-        self.ref = None
-        self.index = None
+#     def __init__(self):
+#         self.mode = 0
+#         self.ref = None
+#         self.index = None
 
-    def can_merge(self, other):
-        if self.mode != other.mode:
-            return False
-        if (self.ref.name != other.ref.name):
-            return False
-        if (self.index.kind != clang.CursorKind.INTEGER_LITERAL or
-                other.index.kind != clang.CursorKind.INTEGER_LITERAL):
-            return False
-        return True
+#     def can_merge(self, other):
+#         if self.mode != other.mode:
+#             return False
+#         if (self.ref.name != other.ref.name):
+#             return False
+#         if (self.index.kind != clang.CursorKind.INTEGER_LITERAL or
+#                 other.index.kind != clang.CursorKind.INTEGER_LITERAL):
+#             return False
+#         return True
 
-    def __str__(self):
-        return f'MODE: {self.mode}   REF: {self.ref}   INDEX: {self.index}'
+#     def __str__(self):
+#         return f'MODE: {self.mode}   REF: {self.ref}   INDEX: {self.index}'
 
 
 def _check_if_variable_index_should_be_masked(ref, index, blk, info):
@@ -90,7 +91,7 @@ def _check_if_variable_index_should_be_masked(ref, index, blk, info):
     """
     set_of_variables_to_be_masked = get_scalar_variables(ref) + get_scalar_variables(index)
     # debug('these are scalar variables:', set_of_variables_to_be_masked, tag=MODULE_TAG)
-    for var in  set_of_variables_to_be_masked:
+    for var in set_of_variables_to_be_masked:
         # TODO: should I keep the variable intact and define a tmp value for
         # masking? Then I should replace the access instruction and use the
         # masked variables.
@@ -107,6 +108,7 @@ def _check_if_variable_index_should_be_masked(ref, index, blk, info):
         mask_assign = BinOp.build(var, '=', mask_op)
         mask_assign.set_modified(InstructionColor.EXTRA_ALU_OP)
         blk.append(mask_assign)
+        set_original_ref(mask_assign, info, ref.original)
 
 
 def _do_add_bound_check(blk, R, current_function, info, bytes_mode):
@@ -122,6 +124,7 @@ def _do_add_bound_check(blk, R, current_function, info, bytes_mode):
     else:
         check_inst = bpf_ctx_bound_check(ref, index, data_end, current_function)
     blk.append(check_inst)
+    set_original_ref(check_inst, info, ref.original)
     ref.set_flag(Instruction.BOUND_CHECK_FLAG)
 
 
@@ -490,7 +493,7 @@ def _handle_array_access(inst, info, more):
     # debug('---', inst, inst.array_ref, inst.array_ref.type)
     array_ref = inst.array_ref
     if array_ref.type.is_pointer():
-        # debug('Accessing pointer', array_ref, 'does it need bound checking?', tag=MODULE_TAG)
+        debug('Accessing pointer', array_ref, 'does it need bound checking?', tag=MODULE_TAG)
         return inst
     element_count = inst.array_ref.type.element_count
     # debug('doing bound check for array access:', inst, element_count)
@@ -505,7 +508,8 @@ def _handle_array_access(inst, info, more):
     check.likelihood = Likelihood.Unlikely
     blk = cb_ref.get(BODY)
     blk.append(check)
-
+    set_original_ref(check, info, inst.original)
+    check.set_modified(InstructionColor.CHECK)
     inst.set_flag(Instruction.BOUND_CHECK_FLAG)
     return inst
 

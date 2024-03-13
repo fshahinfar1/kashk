@@ -6,6 +6,7 @@ import template
 from helpers.instruction_helper import UINT
 from utility import find_elems_of_kind
 from elements.after import After
+from passes.update_original_ref import set_original_ref
 
 
 class RewriteWhileLoop(Pass):
@@ -23,6 +24,7 @@ class RewriteWhileLoop(Pass):
                 loop_var_type=UINT)
         loop = tmp_insts[0]
         self.declare_at_top_of_func.extend(tmp_decl)
+        set_original_ref(tmp_insts, self.info, inst.original)
 
         while_cond = inst.cond.children[0]
         _tmp = Parenthesis.build(while_cond)
@@ -31,6 +33,7 @@ class RewriteWhileLoop(Pass):
         break_inst = Instruction()
         break_inst.kind = clang.CursorKind.BREAK_STMT
         check_break.body.add_inst(break_inst)
+        set_original_ref(check_break, self.info, while_cond.original)
         loop.body.add_inst(check_break)
 
         while_body = inst.body
@@ -38,6 +41,7 @@ class RewriteWhileLoop(Pass):
         blk = self.cb_ref.get(BODY)
         after = After(tmp_insts[1:])
         blk.append(after)
+        loop.body.original = while_body.original
         return loop
 
     def _handle_do_while(self, inst, more):
@@ -51,6 +55,7 @@ class RewriteWhileLoop(Pass):
                 loop_var_type=UINT)
         loop = tmp_insts[0]
         self.declare_at_top_of_func.extend(tmp_decl)
+        set_original_ref(tmp_insts, self.info, inst.original)
 
         while_cond = inst.cond.children[0]
         _tmp = Parenthesis.build(while_cond)
@@ -59,17 +64,23 @@ class RewriteWhileLoop(Pass):
         break_inst = Instruction()
         break_inst.kind = clang.CursorKind.BREAK_STMT
         check_break.body.add_inst(break_inst)
+        set_original_ref(check_break, self.info, while_cond.original)
 
         while_body = inst.body
         _tmp = find_elems_of_kind(while_body, clang.CursorKind.CONTINUE_STMT)
         assert len(_tmp) == 0, 'I do not expect continue statement in this loop! there will be a bug otherwise'
         loop.body.extend_inst(while_body.children)
+
         # Add the break condition check to the end of the body of the loop
         # TODO: what happens if the loop has a continue statements?
+        tmp_list = find_elems_of_kind(while_body.children, clang.CursorKind.CONTINUE_STMT)
+        assert len(tmp_list) == 0, 'TODO: if there are continue statements inside do-while I need to check the loop condition before continue! Not implemented yet!'
+
         loop.body.add_inst(check_break)
         blk = self.cb_ref.get(BODY)
         after = After(tmp_insts[1:])
         blk.append(after)
+        loop.body.original = while_body.original
         return loop
 
     def process_current_inst(self, inst, more):

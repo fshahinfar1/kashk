@@ -10,6 +10,7 @@ from template import define_bpf_arr_map, malloc_lookup
 from code_gen import gen_code
 from passes.pass_obj import PassObject
 from passes.bpf_passes.transform_vars import SEND_FLAG_NAME
+from passes.update_original_ref import set_original_ref
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr, is_value_from_bpf_ctx
 from helpers.instruction_helper import (get_ret_inst, get_ret_value_text)
 from helpers.cache_helper import generate_cache_lookup, generate_cache_update
@@ -104,6 +105,7 @@ def _known_function_substitution(inst, info, more):
         declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
+        set_original_ref(tmp_insts, info, inst.original)
         tmp_insts[1].removed.append(inst)
         return tmp_res, True
     elif inst.name == 'strncmp':
@@ -121,6 +123,7 @@ def _known_function_substitution(inst, info, more):
         declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
+        set_original_ref(tmp_insts, info, inst.original)
         tmp_insts[1].removed.append(inst)
         return tmp_res, True
     elif inst.name == 'strncpy':
@@ -140,6 +143,7 @@ def _known_function_substitution(inst, info, more):
         declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
+        set_original_ref(tmp_insts, info, inst.original)
         tmp_insts[0].removed.append(inst)
         return tmp_res, True
     elif inst.name == 'malloc':
@@ -170,6 +174,7 @@ def _known_function_substitution(inst, info, more):
         declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
         blk.extend(lookup_inst)
+        set_original_ref(lookup_inst, info, inst.original)
         return ref, True
     elif inst.name == 'memcpy':
         assert len(inst.args) == 3
@@ -188,6 +193,7 @@ def _known_function_substitution(inst, info, more):
         declare_at_top_of_func.extend(decl)
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
+        set_original_ref(tmp_insts, info, inst.original)
         tmp_insts[0].removed.append(inst)
         return tmp_res, True
     elif inst.name in ('ntohs', 'ntohl', 'htons', 'htonl'):
@@ -216,6 +222,7 @@ def _process_write_call(inst, info):
         insts = info.prog.send(ref, write_size, info, current_function,
                 do_copy=should_copy)
         blk.extend(insts)
+        set_original_ref(insts, info, inst.original)
         new_inst = insts[-1]
         new_inst.set_modified(InstructionColor.REMOVE_WRITE)
         new_inst.removed.append(inst)
@@ -240,7 +247,9 @@ def _process_write_call(inst, info):
         set_flag.set_modified(InstructionColor.EXTRA_MEM_ACCESS)
         # add it to the body
         blk.extend(copy_inst)
+        set_original_ref(copy_inst, info, inst.original)
         blk.append(set_flag)
+        set_original_ref(set_flag, info, inst.original)
         # Return from this point to the BPF main
         new_inst = get_ret_inst(current_function, info)
         new_inst.set_modified(InstructionColor.REMOVE_WRITE)
@@ -313,6 +322,7 @@ def _process_var_decl(inst, info):
     declare_at_top_of_func.extend(decl)
     blk = cb_ref.get(BODY)
     blk.extend(lookup_inst)
+    set_original_ref(lookup_inst, info, inst.original)
 
     new_type = None
     def _convert_type(t):
@@ -333,6 +343,7 @@ def _process_var_decl(inst, info):
     var_ref = new_var_decl.get_ref()
     assign = BinOp.build(var_ref, '=', ref)
     assign.set_modified()
+    set_original_ref(assign, info, inst.original)
     return assign
 
 

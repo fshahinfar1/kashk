@@ -7,6 +7,8 @@ from parser.parse_helper import is_identifier
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
 from helpers.instruction_helper import (get_ret_inst, decl_new_var, ZERO, ONE)
 import template
+from passes.update_original_ref import set_original_ref
+
 
 TAG = '[Cache Helper]'
 CACHE_KEY_MAX_SIZE = 255
@@ -149,6 +151,7 @@ def generate_cache_lookup(inst, blk, current_function, parent_children, info):
         info.prog.headers.append(HASH_HELPER_HEADER)
 
     blk.extend(lookup)
+    set_original_ref(lookup, info, inst.origin)
     # Remove annotation
     return None, declare_at_top_of_func
 
@@ -243,4 +246,5 @@ def generate_cache_update(inst, blk, current_function, info):
     null_check.body.add_inst(size_assign)
     insts.append(null_check)
     blk.extend(insts)
+    set_original_ref(insts, info, inst.origin)
     return None, declare_at_top_of_func
