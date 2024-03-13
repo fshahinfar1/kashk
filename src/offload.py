@@ -184,10 +184,10 @@ def generate_offload(io_ctx):
     # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     prog = gen_bpf_code(prog, info, io_ctx.bpf_out_file)
-    # if len(info.failure_paths) > 0:
-    #     gen_user_code(info, io_ctx.user_out_file)
-    # else:
-    #     report("No user space program was generated. The tool has offloaded everything to BPF.")
+    if len(info.failure_paths) > 0:
+        gen_user_code(info, io_ctx.user_out_file)
+    else:
+        report("No user space program was generated. The tool has offloaded everything to BPF.")
 
     return info
 
