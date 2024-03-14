@@ -6,6 +6,8 @@ from helpers.instruction_helper import *
 from code_gen import gen_code
 from . import cast_data
 
+from var_names import SIZE_DELTA_VAR
+
 class XDP_PROG(BPF_PROG):
 
     def __init__(self):
@@ -126,7 +128,12 @@ int xdp_prog(struct xdp_md *xdp)
 
         decl = []
 
-        delta_ref = decl_new_var(INT, info, decl)
+        tmp_name = SIZE_DELTA_VAR
+        sym = info.sym_tbl.lookup(tmp_name)
+        if not sym:
+            delta_ref = decl_new_var(INT, info, decl, name=tmp_name)
+        else:
+            delta_ref = Ref.from_sym(sym)
         compute_size = BinOp.build(req_size, '-', self.get_pkt_size())
         compute_size.set_modified(InstructionColor.EXTRA_ALU_OP)
         delta_assign = BinOp.build(delta_ref, '=', compute_size)

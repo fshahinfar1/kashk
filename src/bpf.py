@@ -147,10 +147,11 @@ class BPF_PROG:
 
     def send(self, buf, write_size, info, func, ret=True, do_copy=True):
         assert isinstance(func, (Function, type(None))), str(func)
+        decl = []
         #TODO: The arguments of this function are crazy ???
         is_size_integer = write_size.kind == clang.CursorKind.INTEGER_LITERAL
-        inst, decl = self.adjust_pkt(write_size, info)
-        inst = decl + inst
+        inst, tmp_decl = self.adjust_pkt(write_size, info)
+        decl.extend(tmp_decl)
         if do_copy:
             # Get a reference to the packet payload in a variable
             pkt = self.get_pkt_buf()
@@ -174,9 +175,9 @@ class BPF_PROG:
                 inst.extend([check, copy])
             else:
                 # variable copy
-                tmp_insts, decl, tmp_ret = template.variable_memcpy(dst, buf,
+                tmp_insts, tmp_decl, tmp_ret = template.variable_memcpy(dst, buf,
                         write_size, 1470, info, func)
-                inst.extend(decl)
+                decl.extend(tmp_decl)
                 inst.extend(tmp_insts)
 
         # Do anything that is needed before sending
@@ -187,7 +188,7 @@ class BPF_PROG:
             ret_val  = self.get_send()
             ret_inst = Return.build([ret_val,])
             inst.append(ret_inst)
-        return inst
+        return inst, decl
 
     def adjust_pkt(self, final_size, info):
         raise Exception('Not implemented!');

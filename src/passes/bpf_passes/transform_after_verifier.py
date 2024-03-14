@@ -113,7 +113,7 @@ def _known_function_substitution(inst, info, more):
         max_bound = inst.repeat
         if max_bound is None and _is_known_integer(inst.args[2]):
             # Try to guess the max bound from the size parameter
-            max_bound = gen_code([inst.args[2],], None)[0]
+            max_bound = inst.args[2]
         assert max_bound is not None, 'The strncmp should have annotation declaring max number of iterations'
         s1 = inst.args[0]
         s2 = inst.args[1]
@@ -131,7 +131,7 @@ def _known_function_substitution(inst, info, more):
         max_bound = inst.repeat
         if max_bound is None and _is_known_integer(inst.args[2]):
             # Try to guess the max bound from the size parameter
-            max_bound = gen_code([inst.args[2],], None)[0]
+            max_bound = inst.args[2]
         text = gen_code(inst, info)[0]
         debug(text, tag=MODULE_TAG)
         assert max_bound is not None, 'The strncpy should have annotation declaring max number of iterations'
@@ -219,9 +219,10 @@ def _process_write_call(inst, info):
     blk = cb_ref.get(BODY)
     if current_function is None:
         # On the main BPF program. feel free to return the verdict value
-        insts = info.prog.send(ref, write_size, info, current_function,
+        insts, decl = info.prog.send(ref, write_size, info, current_function,
                 do_copy=should_copy)
         blk.extend(insts)
+        declare_at_top_of_func.extend(decl)
         set_original_ref(insts, info, inst.original)
         new_inst = insts[-1]
         new_inst.set_modified(InstructionColor.REMOVE_WRITE)
@@ -233,8 +234,9 @@ def _process_write_call(inst, info):
         return None # remove the write call
     else:
         # On a function which is not the main. Do not return
-        copy_inst = info.prog.send(ref, write_size, info, current_function,
-                ret=False, do_copy=should_copy)
+        copy_inst, decl = info.prog.send(ref, write_size, info,
+                current_function, ret=False, do_copy=should_copy)
+        declare_at_top_of_func.extend(decl)
         # set the flag
         flag_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
         flag_ref.name = SEND_FLAG_NAME

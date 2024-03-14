@@ -3,12 +3,13 @@ from data_structure import *
 from my_type import MyType
 from utility import get_tmp_var_name
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
-from helpers.instruction_helper import (decl_new_var, ZERO, NULL, CHAR_PTR,
-        INT, NULL_CHAR, UINT, ONE, VOID_PTR)
+from helpers.instruction_helper import (get_ret_inst, decl_new_var, ZERO, NULL,
+        CHAR_PTR, INT, NULL_CHAR, UINT, ONE, VOID_PTR)
 from elements.likelihood import Likelihood
+from var_names import DATA_VAR, ITERATOR_VAR
 
 
-def bpf_ctx_bound_check(ref, index, data_end, func):
+def bpf_ctx_bound_check(ref, index, data_end, func, abort=False):
     _if = ControlFlowInst()
     _if.kind = clang.CursorKind.IF_STMT
     _if.set_modified(InstructionColor.CHECK)
@@ -40,12 +41,16 @@ def bpf_ctx_bound_check(ref, index, data_end, func):
     cond.set_modified(InstructionColor.EXTRA_ALU_OP)
 
     _if.cond.add_inst(cond)
-    _if.body.add_inst(ToUserspace.from_func_obj(func))
     _if.likelihood = Likelihood.Unlikely
+    if abort:
+        tmp_ret = get_ret_inst(func)
+        _if.body.add_inst(tmp_ret)
+    else:
+        _if.body.add_inst(ToUserspace.from_func_obj(func))
     return _if
 
 
-def bpf_ctx_bound_check_bytes(ref, size, data_end, func):
+def bpf_ctx_bound_check_bytes(ref, size, data_end, func, abort=False):
     _if = ControlFlowInst()
     _if.kind = clang.CursorKind.IF_STMT
     _if.set_modified(InstructionColor.CHECK)
@@ -140,13 +145,20 @@ def prepare_meta_data(failure_number, meta_declaration, info, func):
     adjust_inst, tmp_decl = info.prog.adjust_pkt(target_size_inst, info)
     decl.extend(tmp_decl)
 
+    # tmp_name = DATA_VAR
+    # sym = info.sym_tbl.lookup(tmp_name)
+    # if not sym:
+    #     ref = decl_new_var(T, info, decl, name=DATA_VAR)
+    # else:
+    #     ref = Ref.from_sym(sym)
     ref = decl_new_var(T, info, decl)
     assign = BinOp.build(ref, '=', info.prog.get_pkt_buf())
     assign.set_modified()
 
     # DROP = Literal(info.prog.get_drop(), clang.CursorKind.INTEGER_LITERAL)
     # DROP.set_modified()
-    bound_check = bpf_ctx_bound_check(ref, ZERO, info.prog.get_pkt_end(), func)
+    bound_check = bpf_ctx_bound_check(ref, ZERO, info.prog.get_pkt_end(), func,
+            abort=True)
 
     store = [f'{ref.name}->failure_number = {failure_number};', ]
     for f in meta_declaration.fields[1:]:
@@ -235,8 +247,17 @@ def _get_temp_loop_var_name():
 
 def new_bounded_loop(var_bound, max_bound, info, func, loop_var_type=INT):
     decl = []
+
     _tmp_name = _get_temp_loop_var_name()
     loop_var = decl_new_var(loop_var_type, info, decl, name=_tmp_name)
+
+    # _tmp_name = ITERATOR_VAR
+    # sym = info.sym_tbl.lookup(_tmp_name)
+    # if sym is None:
+    #     loop_var = decl_new_var(loop_var_type, info, decl, name=_tmp_name)
+    # else:
+    #     loop_var = Ref.from_sym(sym)
+
     initialize = BinOp.build(loop_var, '=', ZERO)
 
     if var_bound == max_bound:
@@ -251,10 +272,13 @@ def new_bounded_loop(var_bound, max_bound, info, func, loop_var_type=INT):
     # loop.repeat = max_bound.text # does this work?
     loop.set_modified()
 
-    failure_cond = BinOp.build(loop_var, '>=', max_bound)
-    check_bound_failure = ControlFlowInst.build_if_inst(failure_cond)
-    check_bound_failure.body.add_inst(ToUserspace.from_func_obj(func))
-    return [loop, check_bound_failure], decl, loop_var
+    insts = [loop,]
+    if var_bound != max_bound:
+        failure_cond = BinOp.build(loop_var, '>=', max_bound)
+        check_bound_failure = ControlFlowInst.build_if_inst(failure_cond)
+        check_bound_failure.body.add_inst(ToUserspace.from_func_obj(func))
+        insts.append(check_bound_failure)
+    return insts, decl, loop_var
 
 
 def _add_paranthesis_if_needed(inst):
@@ -301,12 +325,16 @@ def strncmp(s1, s2, size, upper_bound, info, func):
     s2 = _add_paranthesis_if_needed(s2)
 
     decl = []
-    max_bound = Literal(str(upper_bound), clang.CursorKind.INTEGER_LITERAL)
+    if size != upper_bound:
+        max_bound = Literal(str(upper_bound), clang.CursorKind.INTEGER_LITERAL)
+    else:
+        max_bound = size
 
     res_var = decl_new_var(INT, info, decl)
     init_res = BinOp.build(res_var, '=', ZERO)
 
-    tmp_insts, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info, func, UINT)
+    tmp_insts, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info,
+            func, UINT)
     loop = tmp_insts[0]
     decl.extend(tmp_decl)
 
@@ -336,7 +364,8 @@ def strlen(s, max_bound, info, func):
     res_var = decl_new_var(UINT, info, decl)
     init_res = BinOp.build(res_var, '=', ZERO)
 
-    tmp_insts, tmp_decl, loop_var = new_bounded_loop(max_bound, max_bound, info, func, UINT)
+    tmp_insts, tmp_decl, loop_var = new_bounded_loop(max_bound, max_bound,
+            info, func, UINT)
     loop = tmp_insts[0]
     decl.extend(tmp_decl)
 
@@ -363,11 +392,13 @@ def strncpy(s1, s2, size, max_bound, info, func):
     s1 = _add_paranthesis_if_needed(s1)
     s2 = _add_paranthesis_if_needed(s2)
     decl = []
-    max_bound = Literal(str(max_bound), clang.CursorKind.INTEGER_LITERAL)
+    if size != max_bound:
+        max_bound = Literal(str(max_bound), clang.CursorKind.INTEGER_LITERAL)
     # strncpy returns a pointer to the destination string
     res_var = s1
     # Creat the loop
-    tmp_insts, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info, func, UINT)
+    tmp_insts, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info,
+            func, UINT)
     loop = tmp_insts[0]
     decl.extend(tmp_decl)
 
@@ -384,5 +415,3 @@ def strncpy(s1, s2, size, max_bound, info, func):
     tmp_brk.kind = clang.CursorKind.BREAK_STMT
     check.body.add_inst(tmp_brk)
     loop.body.extend_inst([assign, check])
-    
-    return tmp_insts, decl, res_var
