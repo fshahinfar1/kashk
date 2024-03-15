@@ -8,10 +8,12 @@ from instruction import *
 from my_type import MyType
 from passes.pass_obj import PassObject
 from passes.update_original_ref import set_original_ref
-from helpers.instruction_helper import ZERO, CHAR, decl_new_var, VOID, NULL, get_ret_inst
+from helpers.instruction_helper import (UINT, ZERO, CHAR, decl_new_var, VOID,
+        NULL, get_ret_inst, get_or_decl_ref)
 from elements.after import After
 from var_names import (FAIL_FLAG_NAME, UNIT_MEM_FIELD, UNIT_SIZE,
-        CHANNEL_UNITS, CHANNEL_VAR_NAME, UNIT_STRUCT_NMAE, CHANNEL_MAP_NAME)
+        CHANNEL_UNITS, CHANNEL_VAR_NAME, UNIT_STRUCT_NMAE, CHANNEL_MAP_NAME,
+        ZERO_VAR)
 
 
 MODULE_TAG = '[Fallback Pass]'
@@ -58,14 +60,12 @@ def _move_fallback_vars_to_channel(info, index, failure_number):
 
     meta = info.user_prog.declarations[failure_number]
     decls = []
-    sym = tbl.lookup(CHANNEL_VAR_NAME)
-    if sym is None:
-        tmp_name = f'struct {UNIT_STRUCT_NMAE}'
-        T = MyType.make_simple(tmp_name, clang.TypeKind.RECORD)
-        T = MyType.make_pointer(T)
-        c = decl_new_var(T, info, decls, name=CHANNEL_VAR_NAME)
-    else:
-        c = Ref.from_sym(sym)
+
+    tmp_name = f'struct {UNIT_STRUCT_NMAE}'
+    T = MyType.make_simple(tmp_name, clang.TypeKind.RECORD)
+    T = MyType.make_pointer(T)
+    c, tmp = get_or_decl_ref(info, CHANNEL_VAR_NAME, T)
+    decls.extend(tmp)
 
     insts = []
     call = Call(None)
@@ -168,7 +168,11 @@ def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
         # decl.extend(tmp_decl)
 
         # TODO: think about the index value
-        tmp, tmp_decl = _move_fallback_vars_to_channel(info, ZERO, failure_number)
+        zero, tmp = get_or_decl_ref(info, ZERO_VAR, UINT, init=ZERO)
+        decl.extend(tmp)
+        zero_ref = UnaryOp.build('&', zero)
+
+        tmp, tmp_decl = _move_fallback_vars_to_channel(info, zero_ref, failure_number)
         decl.extend(tmp_decl)
 
         # Check the failure number
@@ -309,7 +313,10 @@ def _process_current_inst(inst, info, more):
                 return inst
             # prepare_pkt, tmp_decl = prepare_meta_data(failure_num, meta, info, current_function)
             # TODO: think about the index value
-            prepare_pkt, tmp_decl = _move_fallback_vars_to_channel(info, ZERO, failure_num)
+            zero, tmp = get_or_decl_ref(info, ZERO_VAR, UINT, init=ZERO)
+            declare_at_top_of_func.extend(tmp)
+            zero_ref = UnaryOp.build('&', zero)
+            prepare_pkt, tmp_decl = _move_fallback_vars_to_channel(info, zero_ref, failure_num)
             declare_at_top_of_func.extend(tmp_decl)
             blk.extend(prepare_pkt)
 
@@ -326,7 +333,11 @@ def _process_current_inst(inst, info, more):
             set_failuer.set_modified(InstructionColor.EXTRA_MEM_ACCESS)
             blk.append(set_failuer)
 
-            prepare_pkt, tmp_decl = _move_fallback_vars_to_channel(info, ZERO, failure_num)
+            # TODO: think about the index value
+            zero, tmp = get_or_decl_ref(info, ZERO_VAR, UINT, init=ZERO)
+            declare_at_top_of_func.extend(tmp)
+            zero_ref = UnaryOp.build('&', zero)
+            prepare_pkt, tmp_decl = _move_fallback_vars_to_channel(info, zero_ref, failure_num)
             declare_at_top_of_func.extend(tmp_decl)
             blk.extend(prepare_pkt)
     return inst
