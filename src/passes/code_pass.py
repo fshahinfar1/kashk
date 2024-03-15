@@ -67,6 +67,11 @@ class Pass:
             parent = self.parent_stack.get2(PARENT_INST, at)
         return parent
 
+    @property
+    def current_fname(self):
+        n = '[[main]]' if self.current_function is None else self.current_function.name
+        return n
+
     @contextmanager
     def set_current_func(self, func, change_scope=True):
         """

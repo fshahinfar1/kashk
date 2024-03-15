@@ -250,11 +250,6 @@ def gen_bpf_code(bpf, info, out_bpf):
     bpf = verifier_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    # Reduce number of parameters
-    debug('Reduce Params', tag=MODULE_TAG)
-    bpf = reduce_params_pass(bpf, info, PassObject())
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
     debug('Update Function Failure Status', tag=MODULE_TAG)
     update_function_failure_status(bpf, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
@@ -292,6 +287,11 @@ def gen_bpf_code(bpf, info, out_bpf):
     # BPF
     debug('Userspace Fallback', tag=MODULE_TAG)
     bpf = userspace_fallback_pass(bpf, info, PassObject())
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    # Reduce number of parameters
+    debug('Reduce Params', tag=MODULE_TAG)
+    bpf = reduce_params_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('[2nd] remove everything that is not used in BPF', tag=MODULE_TAG)

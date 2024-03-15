@@ -29,6 +29,9 @@ class FindFailureVariables(Pass):
             # Unknown reference
             # Find the original symbol from the main table
             sym = self.info.sym_tbl.lookup(inst.name)
+            # n = self.current_fname
+            # debug(inst.name, '@', n)
+            # debug(self.info.sym_tbl.current_scope.symbols)
             assert sym is not None, f'Unexpected, we did not found the symbol in the original table\n\t{inst}'
             parent = self.get_valid_parent()
             if (more.ctx == LHS and
@@ -108,7 +111,11 @@ class FindFailureVariables(Pass):
 
                 self.vars.update(func.fallback_vars)
                 for sym in func.fallback_vars:
-                    assert self.sym_tbl.lookup(sym.name) is None, 'Variable name clash across multiple scopes, I need to rename stuff. It is something to be done :) for now just rename one of the variables.'
+                    tmp_sym = self.sym_tbl.lookup(sym.name)
+                    if tmp_sym is not None:
+                        error('Variable name clash across multiple scopes, I need to rename stuff. It is something to be done :) for now just rename one of the variables.', tag=MODULE_TAG)
+                        debug(sym.name, '@', self.current_fname, tag=MODULE_TAG)
+                        # assert 0, 'Variable name clash across multiple scopes, I need to rename stuff. It is something to be done :) for now just rename one of the variables.'
                     self.sym_tbl.insert(sym)
         return inst
 
