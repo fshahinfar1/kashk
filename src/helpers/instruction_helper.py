@@ -13,7 +13,8 @@ CHAR_PTR = MyType.make_pointer(BASE_TYPES[clang.TypeKind.UCHAR])
 UINT = BASE_TYPES[clang.TypeKind.UINT]
 INT  = BASE_TYPES[clang.TypeKind.INT]
 U64  = BASE_TYPES[clang.TypeKind.ULONGLONG]
-VOID_PTR = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+VOID = BASE_TYPES[clang.TypeKind.VOID]
+VOID_PTR = MyType.make_pointer(VOID)
 CHAR     = BASE_TYPES[clang.TypeKind.SCHAR]
 
 

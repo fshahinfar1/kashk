@@ -167,10 +167,7 @@ class BPF_PROG:
                 check.set_modified(InstructionColor.CHECK)
                 check.likelihood = Likelihood.Unlikely
 
-                copy         = Call(None)
-                copy.name    = 'memcpy'
-                args         = [dst, buf, write_size]
-                copy.args = args
+                copy = template.constant_mempcy(dst, buf, write_size)
                 copy.set_modified(InstructionColor.MEM_COPY)
                 inst.extend([check, copy])
             else:

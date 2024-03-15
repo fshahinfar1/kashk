@@ -13,6 +13,7 @@ MODULE_TAG = '[Fallback Vars]'
 class FindFailureVariables(Pass):
     def __init__(self, info):
         super().__init__(info)
+        self.path_id = -1
         self.vars = set()
         self.just_declare = set()
         # Local version of symbol table
@@ -43,6 +44,11 @@ class FindFailureVariables(Pass):
                 self.just_declare.add(sym)
             else:
                 self.vars.add(sym)
+                # Remember, when we are generating the fallback, we should
+                # share this
+                orig_sym = self.info.sym_tbl.lookup(sym.name)
+                assert orig_sym
+                orig_sym.is_fallback_var.add(self.path_id)
             self.sym_tbl.insert(sym)
             return inst
         else:
@@ -51,38 +57,38 @@ class FindFailureVariables(Pass):
         return inst
 
     def _handle_failed_func_analysis(self, inst, more):
-            func = inst.get_function_def()
-            orig_func = func.based_on
-            # Create the internal pass symbol table here so we can initialize it
-            tbl = SymbolTable()
-            tbl.shared_scope.symbols = dict(self.info.sym_tbl.shared_scope.symbols.items())
-            tbl.global_scope.symbols = dict(self.info.sym_tbl.global_scope.symbols.items())
-            gs = tbl.global_scope
-            with tbl.with_scope(gs):
-                func.update_symbol_table(tbl)
-            tbl.current_scope = tbl.scope_mapping[func.name]
-            tmp = FindFailureVariables.do(func.body, self.info,
-                    func=orig_func, sym_tbl=tbl)
-            # debug(func.name, tmp.vars, tag=MODULE_TAG)
+        func = inst.get_function_def()
+        orig_func = func.based_on
+        # Create the internal pass symbol table here so we can initialize it
+        tbl = SymbolTable()
+        tbl.shared_scope.symbols = dict(self.info.sym_tbl.shared_scope.symbols.items())
+        tbl.global_scope.symbols = dict(self.info.sym_tbl.global_scope.symbols.items())
+        gs = tbl.global_scope
+        with tbl.with_scope(gs):
+            func.update_symbol_table(tbl)
+        tbl.current_scope = tbl.scope_mapping[func.name]
+        tmp = FindFailureVariables.do(func.body, self.info, func=orig_func,
+                sym_tbl=tbl, path_id=self.path_id)
+        # debug(func.name, tmp.vars, tag=MODULE_TAG)
 
-            # prepend the do-not-care variable declarations
-            tmp_decl = [VarDecl.build(v.name, v.type)
-                    for v in tmp.just_declare]
-            func.body.children = tmp_decl + func.body.children
-            # add fallback vars to the function signiture
-            tmp_new_args = [StateObject.build(v.name, v.type)
-                    for v in tmp.vars]
-            func.args.extend(tmp_new_args)
+        # prepend the do-not-care variable declarations
+        tmp_decl = [VarDecl.build(v.name, v.type) for v in tmp.just_declare]
+        func.body.children = tmp_decl + func.body.children
+        # add fallback vars to the function signiture
+        tmp_new_args = [StateObject.build(v.name, v.type)
+                for v in tmp.vars]
+        func.args.extend(tmp_new_args)
 
-            func.fallback_vars = tmp.vars
-            func.change_applied |= Function.FALLBACK_VAR
+        func.fallback_vars = tmp.vars
+        func.change_applied |= Function.FALLBACK_VAR
 
     def process_current_inst(self, inst, more):
         match inst.kind:
             case clang.CursorKind.DECL_REF_EXPR:
                 return self._handle_reference(inst, more)
             case clang.CursorKind.MEMBER_REF_EXPR:
-                # TODO: I do not need to copy all the struct, just the fields used.
+                # TODO: I do not need to copy all the struct, just the fields
+                # used.
                 owner = inst.owner[-1]
                 self.process_current_inst(owner, more)
                 return inst
@@ -125,7 +131,7 @@ def failure_path_fallback_variables(info):
     for pid, path in info.failure_paths.items():
         b = Block(BODY)
         b.children = path
-        obj = FindFailureVariables.do(b, info)
+        obj = FindFailureVariables.do(b, info, path_id=pid)
         result[pid] = obj.vars
         # TODO: ? Declare variables at the begining of each path
         # for sym in self.vars:
@@ -135,5 +141,3 @@ def failure_path_fallback_variables(info):
     info.failure_vars = result
     for pid, fvars in result.items():
         debug('Path:', pid, fvars, tag=MODULE_TAG)
-
-    # TODO: Create meta structures

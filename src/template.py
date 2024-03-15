@@ -288,6 +288,14 @@ def _add_paranthesis_if_needed(inst):
     return inst
 
 
+def constant_mempcy(dst, src, size):
+    copy         = Call(None)
+    copy.name    = 'memcpy'
+    args         = [dst, src, size]
+    copy.args = args
+    return copy
+
+
 def variable_memcpy(dst, src, size, up_bound, info, func):
     declare_at_top_of_func = []
     max_bound = Literal(str(up_bound), clang.CursorKind.INTEGER_LITERAL)

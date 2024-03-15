@@ -2,15 +2,16 @@ from contextlib import contextmanager
 import clang.cindex as clang
 
 from log import error, debug
-from template import prepare_meta_data
+import template
 from data_structure import *
 from instruction import *
 from my_type import MyType
 from passes.pass_obj import PassObject
 from passes.update_original_ref import set_original_ref
-from helpers.instruction_helper import ZERO, CHAR, decl_new_var
+from helpers.instruction_helper import ZERO, CHAR, decl_new_var, VOID, NULL, get_ret_inst
 from elements.after import After
-from var_names import FAIL_FLAG_NAME
+from var_names import (FAIL_FLAG_NAME, UNIT_MEM_FIELD, UNIT_SIZE,
+        CHANNEL_UNITS, CHANNEL_VAR_NAME, UNIT_STRUCT_NMAE, CHANNEL_MAP_NAME)
 
 
 MODULE_TAG = '[Fallback Pass]'
@@ -41,6 +42,70 @@ def remember_func(func):
         yield None
     finally:
         current_function = tmp
+
+
+def _move_fallback_vars_to_channel(info, index, failure_number):
+    tbl = info.sym_tbl
+    to_be_moved = []
+    for sym in tbl.current_scope.symbols.values():
+        if failure_number not in sym.is_fallback_var:
+            continue
+        to_be_moved.append(sym)
+
+    if len(to_be_moved) == 0:
+        # Nothing to do
+        return [], []
+
+    meta = info.user_prog.declarations[failure_number]
+    decls = []
+    sym = tbl.lookup(CHANNEL_VAR_NAME)
+    if sym is None:
+        tmp_name = f'struct {UNIT_STRUCT_NMAE}'
+        T = MyType.make_simple(tmp_name, clang.TypeKind.RECORD)
+        T = MyType.make_pointer(T)
+        c = decl_new_var(T, info, decls, name=CHANNEL_VAR_NAME)
+    else:
+        c = Ref.from_sym(sym)
+
+    insts = []
+    call = Call(None)
+    call.name = 'bpf_map_lookup_elem'
+    call.args = [
+                UnaryOp.build('&', Ref.build(CHANNEL_MAP_NAME, VOID)),
+                index
+            ]
+    assign = BinOp.build(c, '=', call)
+
+    cond  = BinOp.build(c, '==', NULL)
+    check = ControlFlowInst.build_if_inst(cond)
+    ret = get_ret_inst(current_function, info)
+    check.body.add_inst(ret)
+    check.likelihood = Likelihood.Unlikely
+
+    insts.append(assign)
+    insts.append(check)
+
+    T = MyType.make_pointer(meta.type)
+    c_casted = decl_new_var(T, info, decls)
+    assign = BinOp.build(c_casted, '=', Cast.build(c, T))
+    insts.append(assign)
+
+    for sym in to_be_moved:
+        var_ref = Ref.from_sym(sym)
+        field = c_casted.get_ref_field(sym.name, info)
+        if sym.type.is_array():
+            size = Literal(str(sym.type.element_count),
+                    clang.CursorKind.INTEGER_LITERAL)
+            copy = template.constant_mempcy(field, var_ref, size)
+            insts.append(copy)
+        elif sym.type.is_pointer():
+            error('How I am going to share a pointer with userspace?')
+            assign = BinOp.build(field, '=', var_ref)
+            insts.append(assign)
+        else:
+            assign = BinOp.build(field, '=', var_ref)
+            insts.append(assign)
+    return insts, decls
 
 
 def _set_failure_flag(failure_number, is_pointer=False):
@@ -99,18 +164,24 @@ def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
         if failure_number not in info.user_prog.declarations:
             continue
         meta = info.user_prog.declarations[failure_number]
-        prepare_meta_code, tmp_decl = prepare_meta_data(failure_number, meta, info, current_function)
+        # prepare_meta_code, tmp_decl = prepare_meta_data(failure_number, meta, info, current_function)
+        # decl.extend(tmp_decl)
+
+        # TODO: think about the index value
+        tmp, tmp_decl = _move_fallback_vars_to_channel(info, ZERO, failure_number)
         decl.extend(tmp_decl)
 
         # Check the failure number
         int_literal = Literal(str(failure_number), clang.CursorKind.INTEGER_LITERAL)
-        case        = CaseSTMT(None)
-        case.case.add_inst(int_literal)
-        case.body.extend_inst(prepare_meta_code)
+        _case        = CaseSTMT(None)
+        _case.case.add_inst(int_literal)
+        # _case.body.extend_inst(prepare_meta_code)
+        _case.body.extend_inst(tmp)
+
         to_user = ToUserspace.from_func_obj(current_function)
         to_user.set_modified(InstructionColor.TO_USER)
-        case.body.add_inst(to_user)
-        switch.body.add_inst(case)
+        _case.body.add_inst(to_user)
+        switch.body.add_inst(_case)
     return switch, decl
 
 
@@ -231,14 +302,17 @@ def _process_current_inst(inst, info, more):
         blk = cb_ref.get(BODY)
         failure_num = inst.path_id
         if current_function is None:
-            # Found a split point on the BPF entry function
+            # Found a fallback point on the BPF entry function
             meta = info.user_prog.declarations.get(failure_num)
             if meta is None:
                 error('did not found the metadata structure declaration for failure', failure_num, tag=MODULE_TAG)
                 return inst
-            prepare_pkt, tmp_decl = prepare_meta_data(failure_num, meta, info, current_function)
+            # prepare_pkt, tmp_decl = prepare_meta_data(failure_num, meta, info, current_function)
+            # TODO: think about the index value
+            prepare_pkt, tmp_decl = _move_fallback_vars_to_channel(info, ZERO, failure_num)
             declare_at_top_of_func.extend(tmp_decl)
             blk.extend(prepare_pkt)
+
             # Add instructions needed before passing the packet to the kernel
             before_pass = info.prog.before_pass()
             blk.extend(before_pass)
@@ -251,6 +325,10 @@ def _process_current_inst(inst, info, more):
             set_failuer = _set_failure_flag(failure_num, sym.type.is_pointer())
             set_failuer.set_modified(InstructionColor.EXTRA_MEM_ACCESS)
             blk.append(set_failuer)
+
+            prepare_pkt, tmp_decl = _move_fallback_vars_to_channel(info, ZERO, failure_num)
+            declare_at_top_of_func.extend(tmp_decl)
+            blk.extend(prepare_pkt)
     return inst
 
 
@@ -302,11 +380,30 @@ def _do_pass(inst, info, more):
     return new_inst
 
 
+def _declare_shared_channel(info):
+    sym_tbl = info.sym_tbl
+    struct_name = UNIT_STRUCT_NMAE
+    T = MyType.make_array('__unset_type_name__', CHAR, UNIT_SIZE)
+    fields = [StateObject.build(UNIT_MEM_FIELD, T),]
+    unit_decl = Record(struct_name, fields)
+    unit_decl.is_used_in_bpf_code = True
+    info.prog.add_declaration(unit_decl)
+    # Update symbol table
+    gs = sym_tbl.global_scope
+    with sym_tbl.with_scope(gs):
+        unit_decl.update_symbol_table(sym_tbl)
+    # Create a BPF ARRAY MAP using this new structure
+    m = template.define_bpf_arr_map(CHANNEL_MAP_NAME, unit_decl.get_name(),
+            CHANNEL_UNITS)
+    info.prog.add_declaration(m)
+
+
 def userspace_fallback_pass(inst, info, more):
     """
     This pass implements the communication protocol between BPF and user
     program inside the generated BPF program.
     """
+    _declare_shared_channel(info)
     with remember_func(None):
         with _new_top_func_declare_context():
             body = _do_pass(inst, info, more)

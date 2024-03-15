@@ -299,9 +299,7 @@ class Record(TypeDefinition):
 
     def update_symbol_table(self, sym_tbl):
         struct_name = self.name
-        T = MyType()
-        T.spelling = self.get_name()
-        T.kind = clang.TypeKind.RECORD
+        T = self.type
         scope_key = f'class_{T.spelling}'
         sym_tbl.insert_entry(scope_key, T, clang.CursorKind.CLASS_DECL, None)
         with sym_tbl.new_scope() as scope:

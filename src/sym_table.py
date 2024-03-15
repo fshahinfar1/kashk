@@ -19,7 +19,7 @@ class MemoryRegion:
 
 class SymbolTableEntry:
     __slots__ = ('name', 'type', 'kind', 'ref', 'fields', 'is_bpf_ctx',
-            'memory_region', 'referencing_memory_region')
+            'memory_region', 'referencing_memory_region', 'is_fallback_var')
     def __init__(self, name, type_, kind, ref, scope_holding_the_entry=None):
         self.name = name
         self.type = type_
@@ -35,6 +35,7 @@ class SymbolTableEntry:
         self.memory_region = None
         # If it is pointer/array, to what memory region it is pointing
         self.referencing_memory_region = None
+        self.is_fallback_var = set()
 
     def clone(self):
         e = SymbolTableEntry(self.name, self.type, self.kind, self.ref)
