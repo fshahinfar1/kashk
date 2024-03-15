@@ -28,6 +28,8 @@ from passes.find_unused_vars import find_unused_vars
 from passes.fallback_variables import failure_path_fallback_variables
 from passes.create_meta_struct import create_fallback_meta_structure, FAILURE_NUMBER_FIELD
 from passes.update_original_ref import update_original_ast_references
+from passes.update_func_signature import update_function_signature
+from passes.update_func_failure_status import update_function_failure_status
 
 from passes.bpf_passes.loop_end import loop_end_pass
 from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
@@ -224,13 +226,17 @@ def gen_bpf_code(bpf, info, out_bpf):
     # bpf = change_to_bpf_loop(bpf, info, None)
     # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
+    debug('[1st] Update Function Signature', tag=MODULE_TAG)
+    update_function_signature(info)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
     # Transform access to variables and read/write buffers.
-    debug('Transform Vars', tag=MODULE_TAG)
+    debug('[1st] Transform Vars', tag=MODULE_TAG)
     bpf = transform_vars_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Verifier
-    debug('Verifier', tag=MODULE_TAG)
+    debug('[1st] Verifier', tag=MODULE_TAG)
     bpf = verifier_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
@@ -247,6 +253,14 @@ def gen_bpf_code(bpf, info, out_bpf):
     # Reduce number of parameters
     debug('Reduce Params', tag=MODULE_TAG)
     bpf = reduce_params_pass(bpf, info, PassObject())
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    debug('Update Function Failure Status', tag=MODULE_TAG)
+    update_function_failure_status(bpf, info, None)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    debug('[2nd] Update Function Signature', tag=MODULE_TAG)
+    update_function_signature(info)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('Create Failure Paths', tag=MODULE_TAG)

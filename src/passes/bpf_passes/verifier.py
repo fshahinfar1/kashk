@@ -124,6 +124,11 @@ def _do_add_bound_check(blk, R, current_function, info, bytes_mode):
     else:
         check_inst = bpf_ctx_bound_check(ref, index, data_end, current_function)
     blk.append(check_inst)
+    # if current_function is not None:
+    #     # The bound check may fail and the function may fail as a result
+    #     current_function.may_fail = True
+    #     n = '[[main]]' if current_function is None else current_function.name
+    #     print('here @', n,  current_function.may_fail, current_function.may_succeed)
     set_original_ref(check_inst, info, ref.original)
     ref.set_flag(Instruction.BOUND_CHECK_FLAG)
 

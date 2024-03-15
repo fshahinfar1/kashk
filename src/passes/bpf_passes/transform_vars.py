@@ -15,12 +15,10 @@ from elements.after import After
 from passes.code_pass import Pass
 from passes.update_original_ref import set_original_ref
 
+from var_names import SHARED_REF_NAME, SEND_FLAG_NAME
 
 MODULE_TAG = '[Transform Vars Pass]'
 
-SEND_FLAG_NAME = '__send_flag'
-FAIL_FLAG_NAME = '__fail_flag'
-SHARED_REF_NAME = '__shared'
 
 
 class TransformVars(Pass):
@@ -248,37 +246,6 @@ class TransformVars(Pass):
         return inst
 
 
-def _check_func_receives_all_the_flags(func, info):
-    """
-    Check if function receives flags it need through its arguments
-    """
-    # debug("check func", func.name, 'send or recv?', func.calls_send, func.calls_recv)
-    if (func.calls_send or func.calls_recv) and (func.change_applied & Function.CTX_FLAG == 0):
-        # Add the BPF context to its arguemt
-        add_flag_to_func(Function.CTX_FLAG, func, info)
-    if func.calls_send and (func.change_applied & Function.SEND_FLAG == 0):
-        # Add the send flag
-        arg = StateObject(None)
-        arg.name = SEND_FLAG_NAME
-        arg.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
-        func.args.append(arg)
-        func.change_applied |= Function.SEND_FLAG
-        scope = info.sym_tbl.scope_mapping.get(func.name)
-        assert scope is not None
-        scope.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
-
-    if func.may_succeed and func.may_fail and (func.change_applied & Function.FAIL_FLAG == 0):
-        arg = StateObject(None)
-        arg.name = FAIL_FLAG_NAME
-        arg.type_ref = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
-        func.args.append(arg)
-        func.change_applied |= Function.FAIL_FLAG
-        scope = info.sym_tbl.scope_mapping.get(func.name)
-        assert scope is not None
-        scope.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
-        # debug('add param:', FAIL_FLAG_NAME, 'to', func.name)
-
-
 def transform_vars_pass(inst, info, more):
     """
     Transformations in this pass
@@ -286,16 +253,8 @@ def transform_vars_pass(inst, info, more):
     * Pass flags to the functions
     * Global variables
     * Read/Recv instruction
-    * Write/Send instructions
-    * Known function substitution
-    * Cache Generation
+    * cache definition
     """
-    # First check function definitions and flags they receive
-    for func in Function.directory.values():
-        if not func.is_used_in_bpf_code:
-            continue
-        with info.sym_tbl.with_func_scope(func.name):
-            _check_func_receives_all_the_flags(func, info)
     # Process the main
     tmp = TransformVars.do(inst, info, more)
     res = tmp.result

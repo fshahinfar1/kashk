@@ -7,9 +7,10 @@ from data_structure import *
 from instruction import *
 from my_type import MyType
 from passes.pass_obj import PassObject
-from passes.bpf_passes.transform_vars import FAIL_FLAG_NAME
+from passes.update_original_ref import set_original_ref
 from helpers.instruction_helper import ZERO, CHAR, decl_new_var
 from elements.after import After
+from var_names import FAIL_FLAG_NAME
 
 
 MODULE_TAG = '[Fallback Pass]'
@@ -150,8 +151,15 @@ def _handle_call_may_fail_or_succeed(inst, func, info, more):
         tmp_inst, tmp_decl = _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info)
         declare_at_top_of_func.extend(tmp_decl)
     else:
-        tmp_inst = ToUserspace.from_func_obj(current_function)
-        tmp_inst.set_modified()
+        flag_val = UnaryOp.build('*', flag_ref)
+        cond = BinOp.build(flag_val , '!=', ZERO)
+        check_failed = ControlFlowInst.build_if_inst(cond)
+        fail = ToUserspace.from_func_obj(current_function)
+        fail.set_modified()
+        check_failed.body.add_inst(fail)
+        check_failed.set_modified(InstructionColor.CHECK)
+        tmp_inst = check_failed
+        set_original_ref(tmp_inst, info, inst.original)
     after_func_call.append(tmp_inst)
 
     # Analyse the called function.

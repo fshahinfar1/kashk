@@ -1,3 +1,6 @@
 SIZE_DELTA_VAR = '__size_delta'
 DATA_VAR = '__data'
 ITERATOR_VAR = '__i'
+FAIL_FLAG_NAME = '__fail_flag'
+SEND_FLAG_NAME = '__send_flag'
+SHARED_REF_NAME = '__shared'
