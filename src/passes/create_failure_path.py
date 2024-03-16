@@ -151,7 +151,7 @@ class FindFailurePaths(Pass):
         self.new_declarations.extend(tmp.new_declarations)
         is_extra = inst.original == b.original
         if is_extra:
-            assert inst.is_modified()
+            assert inst.is_modified(), inst
             # I am assuming this branch was added (not just changed).
             # Make sure this assumption is correct.
             # Due to this assumption, I deduce that the original AST would not

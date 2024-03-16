@@ -21,7 +21,7 @@ class RewriteWhileLoop(Pass):
                 clang.CursorKind.INTEGER_LITERAL)
         tmp_insts, tmp_decl, loop_var = template.new_bounded_loop(upper_bound,
                 upper_bound, self.info, self.current_function,
-                loop_var_type=UINT)
+                loop_var_type=UINT, fail_check=True)
         loop = tmp_insts[0]
         self.declare_at_top_of_func.extend(tmp_decl)
         set_original_ref(tmp_insts, self.info, inst.original)
@@ -52,7 +52,7 @@ class RewriteWhileLoop(Pass):
                 clang.CursorKind.INTEGER_LITERAL)
         tmp_insts, tmp_decl, loop_var = template.new_bounded_loop(upper_bound,
                 upper_bound, self.info, self.current_function,
-                loop_var_type=UINT)
+                loop_var_type=UINT, fail_check=True)
         loop = tmp_insts[0]
         self.declare_at_top_of_func.extend(tmp_decl)
         set_original_ref(tmp_insts, self.info, inst.original)

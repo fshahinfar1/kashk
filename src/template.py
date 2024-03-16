@@ -245,7 +245,8 @@ def _get_temp_loop_var_name():
     return name
 
 
-def new_bounded_loop(var_bound, max_bound, info, func, loop_var_type=INT):
+def new_bounded_loop(var_bound, max_bound, info, func, loop_var_type=INT,
+        fail_check=False):
     decl = []
 
     _tmp_name = _get_temp_loop_var_name()
@@ -273,10 +274,13 @@ def new_bounded_loop(var_bound, max_bound, info, func, loop_var_type=INT):
     loop.set_modified()
 
     insts = [loop,]
-    if var_bound != max_bound:
+    if fail_check:
         failure_cond = BinOp.build(loop_var, '>=', max_bound)
         check_bound_failure = ControlFlowInst.build_if_inst(failure_cond)
         check_bound_failure.body.add_inst(ToUserspace.from_func_obj(func))
+
+        failure_cond.set_modified(InstructionColor.EXTRA_ALU_OP)
+        check_bound_failure.set_modified(InstructionColor.CHECK)
         insts.append(check_bound_failure)
     return insts, decl, loop_var
 
@@ -309,7 +313,7 @@ def variable_memcpy(dst, src, size, up_bound, info, func):
         dst = Cast.build(dst, CHAR_PTR)
 
     tmp_insts, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info,
-            func, UINT)
+            func, UINT, fail_check=True)
     loop = tmp_insts[0]
     declare_at_top_of_func.extend(tmp_decl)
 
@@ -341,8 +345,9 @@ def strncmp(s1, s2, size, upper_bound, info, func):
     res_var = decl_new_var(INT, info, decl)
     init_res = BinOp.build(res_var, '=', ZERO)
 
+    fail_check = max_bound != size
     tmp_insts, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info,
-            func, UINT)
+            func, UINT, fail_check=fail_check)
     loop = tmp_insts[0]
     decl.extend(tmp_decl)
 
@@ -373,7 +378,7 @@ def strlen(s, max_bound, info, func):
     init_res = BinOp.build(res_var, '=', ZERO)
 
     tmp_insts, tmp_decl, loop_var = new_bounded_loop(max_bound, max_bound,
-            info, func, UINT)
+            info, func, UINT, fail_check=True)
     loop = tmp_insts[0]
     decl.extend(tmp_decl)
 
@@ -405,8 +410,9 @@ def strncpy(s1, s2, size, max_bound, info, func):
     # strncpy returns a pointer to the destination string
     res_var = s1
     # Creat the loop
+    fail_check = max_bound != size
     tmp_insts, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info,
-            func, UINT)
+            func, UINT, fail_check=fail_check)
     loop = tmp_insts[0]
     decl.extend(tmp_decl)
 
