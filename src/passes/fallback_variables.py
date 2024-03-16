@@ -6,6 +6,8 @@ from passes.code_pass import Pass
 from passes.clone import clone_pass
 from sym_table import SymbolTable, Scope
 
+from code_gen import gen_code
+
 
 MODULE_TAG = '[Fallback Vars]'
 
@@ -43,6 +45,9 @@ class FindFailureVariables(Pass):
                 debug(f'not caring about {sym.name}', tag=MODULE_TAG)
                 self.just_declare.add(sym)
             else:
+                p = self.parent_inst
+                t = gen_code([p,], self.info)[0]
+                # debug('share variable:', sym.name, 'because:', t)
                 self.vars.add(sym)
                 # Remember, when we are generating the fallback, we should
                 # share this
@@ -126,7 +131,7 @@ class FindFailureVariables(Pass):
         return inst
 
 
-def failure_path_fallback_variables(info): 
+def failure_path_fallback_variables(info):
     result = {}
     for pid, path in info.failure_paths.items():
         b = Block(BODY)
@@ -139,5 +144,5 @@ def failure_path_fallback_variables(info):
         #     insts.insert(0, decl)
 
     info.failure_vars = result
-    for pid, fvars in result.items():
-        debug('Path:', pid, fvars, tag=MODULE_TAG)
+    # for pid, fvars in result.items():
+    #     debug('Path:', pid, fvars, tag=MODULE_TAG)

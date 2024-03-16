@@ -16,7 +16,7 @@ from var_names import (FAIL_FLAG_NAME, UNIT_MEM_FIELD, UNIT_SIZE,
         ZERO_VAR)
 
 
-MODULE_TAG = '[Fallback Pass]'
+MODULE_TAG = '[Userspace Fallback]'
 
 current_function = None
 cb_ref = CodeBlockRef()
@@ -156,11 +156,11 @@ def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
     switch.body.add_inst(case)
 
     failure_ids = set(func.path_ids)
-    debug(f'failure numbers for func {func.name}:', failure_ids, tag=MODULE_TAG)
+    # debug(f'failure numbers for func {func.name}:', failure_ids, tag=MODULE_TAG)
     for failure_number in failure_ids:
         assert failure_number > 0, 'The zero can not be a failure id'
         # TODO: change declaration to a dictionary instead of array
-        debug(info.user_prog.declarations, tag=MODULE_TAG)
+        # debug(info.user_prog.declarations, tag=MODULE_TAG)
         if failure_number not in info.user_prog.declarations:
             continue
         meta = info.user_prog.declarations[failure_number]

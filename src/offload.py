@@ -6,7 +6,7 @@ from log import *
 from data_structure import *
 from instruction import *
 from utility import (parse_file, find_elem, report_user_program_graph,
-        draw_tree)
+        draw_tree, find_elems_of_kind)
 from parser.find_ev_loop import get_entry_code
 from sym_table import Scope
 from sym_table_gen import build_sym_table, process_source_file
@@ -24,7 +24,7 @@ from passes.mark_io import mark_io
 from passes.clone import clone_pass
 from passes.simplify_code import simplify_code_structure
 from passes.create_failure_path import create_failure_paths
-from passes.find_unused_vars import find_unused_vars
+from passes.find_unused_vars import remove_unused_args
 from passes.fallback_variables import failure_path_fallback_variables
 from passes.create_meta_struct import create_fallback_meta_structure, FAILURE_NUMBER_FIELD
 from passes.update_original_ref import update_original_ast_references
@@ -254,27 +254,25 @@ def gen_bpf_code(bpf, info, out_bpf):
     update_function_failure_status(bpf, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('[2nd] Update Function Signature', tag=MODULE_TAG)
-    update_function_signature(info)
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
     debug('Create Failure Paths', tag=MODULE_TAG)
     create_failure_paths(bpf, info, None)
-    pprint(info.failure_paths)
+    # pprint(info.failure_paths)
+    for pid, path in info.failure_paths.items():
+        for call in find_elems_of_kind(path, clang.CursorKind.CALL_EXPR):
+            f = call.get_function_def()
+            assert len(call.args) == len(f.args), f'{pid} @{f.name}:\nfunc: {str(f.args) }\ncall: {str(call.args)}'
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    # debug('Remove Unused Args From Failure Functions', tag=MODULE_TAG)
-    # # TODO: Remove unused args from failure functions
-    # for func in info.failure_path_new_funcs:
-    #     tmp_names = set(a.name for a in func.args)
-    #     unused_vars = find_unused_vars(func.body, info, target=tmp_names)
-    #     for a in func.args:
-    #         if a.name in unused_vars:
-    #             a.set_unused()
-    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+    debug('Remove Unused Args From Failure Functions', tag=MODULE_TAG)
+    remove_unused_args(bpf, info, None)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('Failure Path Variables', tag=MODULE_TAG)
     failure_path_fallback_variables(info)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    debug('[2nd] Update Function Signature', tag=MODULE_TAG)
+    update_function_signature(info)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('Create Fallback Meta Structures', tag=MODULE_TAG)
