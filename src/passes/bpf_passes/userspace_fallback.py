@@ -221,17 +221,20 @@ def _handle_call_may_fail_or_succeed(inst, func, info, more):
     tmp = Literal('/* check if function fail */\n', CODE_LITERAL)
     after_func_call.append(tmp)
     if current_function == None:
-        print(func.name, func.path_ids)
         assert len(func.path_ids) > 0
         tmp_inst, tmp_decl = _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info)
         declare_at_top_of_func.extend(tmp_decl)
     else:
+        assert len(func.path_ids) > 0
         flag_val = UnaryOp.build('*', flag_ref)
         cond = BinOp.build(flag_val , '!=', ZERO)
         check_failed = ControlFlowInst.build_if_inst(cond)
         fail = ToUserspace.from_func_obj(current_function)
         fail.set_modified()
         check_failed.body.add_inst(fail)
+        switch, tmp_decl = _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info)
+        declare_at_top_of_func.extend(tmp_decl)
+        check_failed.body.add_inst(switch)
         check_failed.set_modified(InstructionColor.CHECK)
         tmp_inst = check_failed
         set_original_ref(tmp_inst, info, inst.original)
@@ -296,12 +299,12 @@ def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.CALL_EXPR:
         func = inst.get_function_def()
         # we only need to investigate functions that may fail
-        if func and not func.is_empty() and func.may_fail:
-            if func.may_succeed:
-                tmp = _handle_call_may_fail_or_succeed(inst, func, info, more)
-            else:
-                tmp = _handle_call_may_fail(inst, func, info, more)
-            return tmp
+        if not func or func.is_empty() or not func.may_fail:
+            return inst
+
+        if func.may_succeed:
+            return _handle_call_may_fail_or_succeed(inst, func, info, more)
+        return _handle_call_may_fail(inst, func, info, more)
     elif inst.kind == TO_USERSPACE_INST:
         blk = cb_ref.get(BODY)
         failure_num = inst.path_id

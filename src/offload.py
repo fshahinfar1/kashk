@@ -269,6 +269,27 @@ def gen_bpf_code(bpf, info, out_bpf):
 
     debug('Failure Path Variables', tag=MODULE_TAG)
     failure_path_fallback_variables(info)
+
+    for pid, V in info.failure_vars.items():
+        ignore = False
+        for var in V:
+            T = var.type
+            if T.is_pointer() and not var.is_bpf_ctx:
+                debug('not doing path:', pid, 'because:', var)
+                ignore = True
+
+        if not ignore:
+            continue
+        info.failure_paths[pid] = [Literal('/* from begining */', CODE_LITERAL),]
+        info.failure_vars[pid].clear()
+
+        tbl = info.sym_tbl
+        for scope in tbl.scope_mapping.scope_mapping.values():
+            for e in scope.symbols.values():
+                if pid in e.is_fallback_var:
+                    e.is_fallback_var.remove(pid)
+
+    pprint(info.failure_vars)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('[2nd] Update Function Signature', tag=MODULE_TAG)

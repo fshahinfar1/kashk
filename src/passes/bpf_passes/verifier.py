@@ -210,7 +210,7 @@ def _handle_binop(inst, info, more):
 
             # Report for debuging
             tmp,_ = gen_code([inst], info)
-            debug(f'Add a bound check before:\n    {tmp}', tag=MODULE_TAG)
+            # debug(f'Add a bound check before:\n    {tmp}', tag=MODULE_TAG)
     # Keep the instruction unchanged
     return inst
 
