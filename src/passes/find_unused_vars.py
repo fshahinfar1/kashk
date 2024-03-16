@@ -98,7 +98,7 @@ def _do_remove_unused_args(inst, info, more):
             if a.name in unused_vars:
                 indices.append(i)
         rm_func[func.name] = indices
-        debug(func.name, ':', unused_vars, tag=MODULE_TAG)
+        # debug(func.name, ':', unused_vars, tag=MODULE_TAG)
 
     if len(rm_func) == 0:
         return inst, False

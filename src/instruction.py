@@ -1023,6 +1023,7 @@ class ToUserspace(Instruction):
         new = ToUserspace()
         _default_clone_operation(new, self)
         new.current_func = self.current_func
+        new.path_id = self.path_id
         return new
 
     def has_children(self):
