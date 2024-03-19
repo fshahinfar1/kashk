@@ -42,7 +42,7 @@ class FindFailureVariables(Pass):
                     parent.op == '='):
                 # Writing to the variable
                 # The old value should not be important
-                debug(f'not caring about {sym.name}', tag=MODULE_TAG)
+                # debug(f'not caring about {sym.name}', tag=MODULE_TAG)
                 self.just_declare.add(sym)
             else:
                 p = self.parent_inst
@@ -125,7 +125,9 @@ class FindFailureVariables(Pass):
                     tmp_sym = self.sym_tbl.lookup(sym.name)
                     if tmp_sym is not None:
                         error('Variable name clash across multiple scopes, I need to rename stuff. It is something to be done :) for now just rename one of the variables.', tag=MODULE_TAG)
+                        debug('debug info:')
                         debug(sym.name, '@', self.current_fname, tag=MODULE_TAG)
+                        debug('-----')
                         # assert 0, 'Variable name clash across multiple scopes, I need to rename stuff. It is something to be done :) for now just rename one of the variables.'
                     self.sym_tbl.insert(sym)
         return inst

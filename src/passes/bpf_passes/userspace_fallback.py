@@ -8,12 +8,13 @@ from instruction import *
 from my_type import MyType
 from passes.pass_obj import PassObject
 from passes.update_original_ref import set_original_ref
-from helpers.instruction_helper import (UINT, ZERO, CHAR, decl_new_var, VOID,
-        NULL, get_ret_inst, get_or_decl_ref)
+from helpers.instruction_helper import (UINT, ZERO, CHAR, decl_new_var, VOID, VOID_PTR,
+        NULL, get_ret_inst, get_or_decl_ref, get_ref_symbol)
 from elements.after import After
 from var_names import (FAIL_FLAG_NAME, UNIT_MEM_FIELD, UNIT_SIZE,
         CHANNEL_UNITS, CHANNEL_VAR_NAME, UNIT_STRUCT_NMAE, CHANNEL_MAP_NAME,
-        ZERO_VAR)
+        ZERO_VAR, DATA_VAR)
+from sym_table import SymbolTableEntry
 
 
 MODULE_TAG = '[Userspace Fallback]'
@@ -46,6 +47,64 @@ def remember_func(func):
         current_function = tmp
 
 
+def _do_move_struct(info, struct_ref, variables, field_names):
+    insts = []
+    debug(struct_ref, tag=MODULE_TAG)
+    for v, fname in zip(variables, field_names):
+        debug(fname, v, tag=MODULE_TAG)
+        field = struct_ref.get_ref_field(fname, info)
+        # NOTE: I am assuming that the field and variable are the same type
+        # TODO: Check/Assert that field and variable are the same type
+        T = v.type
+        if T.is_array():
+            size = Literal(str(T.element_count),
+                    clang.CursorKind.INTEGER_LITERAL)
+            copy = template.constant_mempcy(field, v, size)
+            insts.append(copy)
+        elif T.is_pointer():
+            sym = get_ref_symbol(v, info)
+            assert sym is not None, 'Failed to find the symbol for the variable/field reference'
+            if sym.is_bpf_ctx:
+                pkt = info.prog.get_pkt_buf()
+                data, tmp_decl  = get_or_decl_ref(info, DATA_VAR, VOID_PTR,
+                        init=pkt)
+                declare_at_top_of_func.extend(tmp_decl)
+
+                # TODO: this code snippet should not exist. But since we are
+                # not expecting var_decl + init after simplification, I have to
+                # do it manually. Updating the verifier to support init block
+                # would solve the issue (or splitting the declaration from
+                # initialization for __data)
+                sym = info.sym_tbl.lookup(data.name)
+                assert sym is not None, 'we have just declared the __data, it should not be None'
+                sym.is_bpf_ctx = True
+
+                off  = BinOp.build(v, '-', data)
+                assign = BinOp.build(field, '=', off)
+                insts.append(assign)
+            else:
+                error('How I am going to share a pointer with userspace?')
+                comment = Literal('/* Copying an address to the shared memory is useless! */', CODE_LITERAL)
+                insts.append(comment)
+                assign = BinOp.build(field, '=', v)
+                insts.append(assign)
+        elif T.is_record():
+            record = T.get_decl()
+            if record is None:
+                error(f'Failed to find the struct declaration for {T.spelling}', tag=MODULE_TAG)
+                comment = Literal(f'/* failed to copy field {v} to {field} */', CODE_LITERAL)
+                insts.append(comment)
+            else:
+                field_refs = [v.get_ref_field(f.name, info) for f in record.fields]
+                subfield_names = [f.name for f in field_refs]
+                tmp_insts = _do_move_struct(info, v, field_refs, subfield_names)
+                insts.extend(tmp_insts)
+        else:
+            assign = BinOp.build(field, '=', v)
+            insts.append(assign)
+    return insts
+
+
 def _move_fallback_vars_to_channel(info, index, failure_number):
     tbl = info.sym_tbl
     to_be_moved = []
@@ -70,10 +129,8 @@ def _move_fallback_vars_to_channel(info, index, failure_number):
     insts = []
     call = Call(None)
     call.name = 'bpf_map_lookup_elem'
-    call.args = [
-                UnaryOp.build('&', Ref.build(CHANNEL_MAP_NAME, VOID)),
-                index
-            ]
+    tmp_map_ref = UnaryOp.build('&', Ref.build(CHANNEL_MAP_NAME, VOID))
+    call.args = [tmp_map_ref, index]
     assign = BinOp.build(c, '=', call)
 
     cond  = BinOp.build(c, '==', NULL)
@@ -85,26 +142,17 @@ def _move_fallback_vars_to_channel(info, index, failure_number):
     insts.append(assign)
     insts.append(check)
 
+    mem_field = c.get_ref_field(UNIT_MEM_FIELD, info)
+
     T = MyType.make_pointer(meta.type)
     c_casted = decl_new_var(T, info, decls)
-    assign = BinOp.build(c_casted, '=', Cast.build(c, T))
+    assign = BinOp.build(c_casted, '=', Cast.build(mem_field, T))
     insts.append(assign)
 
-    for sym in to_be_moved:
-        var_ref = Ref.from_sym(sym)
-        field = c_casted.get_ref_field(sym.name, info)
-        if sym.type.is_array():
-            size = Literal(str(sym.type.element_count),
-                    clang.CursorKind.INTEGER_LITERAL)
-            copy = template.constant_mempcy(field, var_ref, size)
-            insts.append(copy)
-        elif sym.type.is_pointer():
-            error('How I am going to share a pointer with userspace?')
-            assign = BinOp.build(field, '=', var_ref)
-            insts.append(assign)
-        else:
-            assign = BinOp.build(field, '=', var_ref)
-            insts.append(assign)
+    variables = [Ref.from_sym(sym) for sym in to_be_moved]
+    field_names = [r.name for r in variables]
+    tmp_insts = _do_move_struct(info, c_casted, variables, field_names)
+    insts.extend(tmp_insts)
     return insts, decls
 
 
@@ -139,7 +187,7 @@ def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
     @returns: Instruction
     """
     # We must be in BPF main function
-    current_function = None
+    # current_function = None
 
     decl = []
 
@@ -232,7 +280,9 @@ def _handle_call_may_fail_or_succeed(inst, func, info, more):
         fail = ToUserspace.from_func_obj(current_function)
         fail.set_modified()
         check_failed.body.add_inst(fail)
-        switch, tmp_decl = _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info)
+        switch, tmp_decl = \
+            _generate_failure_flag_check_in_main_func_switch_case(flag_val,
+                    func, info)
         declare_at_top_of_func.extend(tmp_decl)
         check_failed.body.add_inst(switch)
         check_failed.set_modified(InstructionColor.CHECK)

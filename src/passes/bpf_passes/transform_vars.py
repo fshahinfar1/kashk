@@ -5,8 +5,8 @@ from code_gen import gen_code
 from template import (prepare_shared_state_var, define_bpf_arr_map,
         SHARED_OBJ_PTR)
 from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS
-from helpers.instruction_helper import get_ret_inst, add_flag_to_func, ZERO
-
+from helpers.instruction_helper import (get_ret_inst, add_flag_to_func, ZERO,
+        VOID_PTR, get_or_decl_ref)
 from data_structure import *
 from my_type import MyType
 from instruction import *
@@ -15,7 +15,8 @@ from elements.after import After
 from passes.code_pass import Pass
 from passes.update_original_ref import set_original_ref
 
-from var_names import SHARED_REF_NAME, SEND_FLAG_NAME
+from var_names import SHARED_REF_NAME, SEND_FLAG_NAME, DATA_VAR
+
 
 MODULE_TAG = '[Transform Vars Pass]'
 
@@ -138,8 +139,19 @@ class TransformVars(Pass):
         #           if there is no issues?
         # report('Assigning packet buffer to var:', inst.rd_buf.name)
         # Assign packet pointer on a previouse line
+
+        pkt = self.info.prog.get_pkt_buf()
+        data, tmp_decl  = get_or_decl_ref(self.info, DATA_VAR, VOID_PTR,
+                init=pkt)
+        self.declare_at_top_of_func.extend(tmp_decl)
+
+        # TODO:
+        sym = self.info.sym_tbl.lookup(data.name)
+        assert sym is not None
+        sym.is_bpf_ctx = True
+
         lhs = inst.rd_buf.ref
-        rhs = self.info.prog.get_pkt_buf()
+        rhs = data
         rhs.set_modified()
         assign_inst = BinOp.build(lhs, '=', rhs)
         blk.append(assign_inst)

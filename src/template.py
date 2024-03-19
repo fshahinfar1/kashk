@@ -6,7 +6,7 @@ from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
 from helpers.instruction_helper import (get_ret_inst, decl_new_var, ZERO, NULL,
         CHAR_PTR, INT, NULL_CHAR, UINT, ONE, VOID_PTR)
 from elements.likelihood import Likelihood
-from var_names import DATA_VAR, ITERATOR_VAR
+from var_names import DATA_VAR, ITERATOR_VAR, DATA_VAR
 
 
 def bpf_ctx_bound_check(ref, index, data_end, func, abort=False):
@@ -145,14 +145,14 @@ def prepare_meta_data(failure_number, meta_declaration, info, func):
     adjust_inst, tmp_decl = info.prog.adjust_pkt(target_size_inst, info)
     decl.extend(tmp_decl)
 
-    # tmp_name = DATA_VAR
-    # sym = info.sym_tbl.lookup(tmp_name)
-    # if not sym:
-    #     ref = decl_new_var(T, info, decl, name=DATA_VAR)
-    # else:
-    #     ref = Ref.from_sym(sym)
     ref = decl_new_var(T, info, decl)
-    assign = BinOp.build(ref, '=', info.prog.get_pkt_buf())
+
+    pkt = info.prog.get_pkt_buf()
+    data, tmp_decl  = get_or_decl_ref(info, DATA_VAR, VOID_PTR,
+            init=pkt)
+    decl.extend(tmp_decl)
+
+    assign = BinOp.build(ref, '=', data)
     assign.set_modified()
 
     # DROP = Literal(info.prog.get_drop(), clang.CursorKind.INTEGER_LITERAL)

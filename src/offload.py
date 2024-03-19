@@ -177,14 +177,6 @@ def generate_offload(io_ctx):
     prog = feasibilty_analysis_pass(prog, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    # debug('Clone All State', tag=MODULE_TAG)
-    # user = clone_pass(prog, info, PassObject())
-    # info.user_prog.sym_tbl = info.sym_tbl.clone()
-    # info.user_prog.func_dir = {}
-    # for func in Function.directory.values():
-    #     new_f = func.clone(info.user_prog.func_dir)
-    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
     prog = gen_bpf_code(prog, info, io_ctx.bpf_out_file)
     if len(info.failure_paths) > 0:
         gen_user_code(info, io_ctx.user_out_file)
@@ -275,7 +267,7 @@ def gen_bpf_code(bpf, info, out_bpf):
         for var in V:
             T = var.type
             if T.is_pointer() and not var.is_bpf_ctx:
-                debug('not doing path:', pid, 'because:', var)
+                # debug('not doing path:', pid, 'because:', var)
                 ignore = True
 
         if not ignore:
@@ -288,8 +280,7 @@ def gen_bpf_code(bpf, info, out_bpf):
             for e in scope.symbols.values():
                 if pid in e.is_fallback_var:
                     e.is_fallback_var.remove(pid)
-
-    pprint(info.failure_vars)
+    # pprint(info.failure_vars)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('[2nd] Update Function Signature', tag=MODULE_TAG)

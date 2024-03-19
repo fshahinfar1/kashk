@@ -244,9 +244,9 @@ def _has_bpf_ctx_in_field(ref, info, field_name=None):
                     field_name.fields.append([ref_field,])
                     found = True
                     field_name.count_bpf_fields += 1
-                    debug(ref, field.name, 'is BPF CTX', tag=MODULE_TAG)
+                    # debug(ref, field.name, 'is BPF CTX', tag=MODULE_TAG)
             else:
-                debug('The field is not BPF', ref_field, tag=MODULE_TAG)
+                # debug('The field is not BPF', ref_field, tag=MODULE_TAG)
                 pass
 
         # Check if any of the field has an object which is BPF context
@@ -268,7 +268,7 @@ def _check_passing_bpf_context(inst, func, info):
         if is_bpf_ctx_ptr(a, info):
             # First check if the argument it self is a pointer to BPF ctx
             text = gen_code(a, info)[0]
-            debug(f'func: {func.name} | Passing BPF_CTX as argument {param.name} <-- {text}', tag=MODULE_TAG)
+            # debug(f'func: {func.name} | Passing BPF_CTX as argument {param.name} <-- {text}', tag=MODULE_TAG)
             sym = callee_scope.lookup(param.name)
             sym.set_is_bpf_ctx(True)
             receives_bpf_ctx = True
@@ -360,7 +360,7 @@ def _check_setting_bpf_context_in_callee(inst, func, info):
                 continue
             ref = tmp
 
-        debug(f'Parameter {param.name} ({param.type_ref.kind}) is given argument {ref.owner} {ref.name} ({ref.type})', tag=MODULE_TAG)
+        # debug(f'Parameter {param.name} ({param.type_ref.kind}) is given argument {ref.owner} {ref.name} ({ref.type})', tag=MODULE_TAG)
 
         # If the pointer it self is set to be BPF context, then the pointer
         # will be BPF context in this scope too.
@@ -464,7 +464,7 @@ def _handle_call(inst, info, more):
             # debug(text, tag=MODULE_TAG)
             _check_if_variable_index_should_be_masked(ref, size, blk, info)
             # Add the check a line before this access
-            debug('add bound check because calling known function accessing packet' , tag=MODULE_TAG)
+            # debug('add bound check because calling known function accessing packet' , tag=MODULE_TAG)
             _add_bound_check(blk, (ref, size, ZERO), current_function, info, bytes_mode=True, more=more)
         elif inst.name not in itertools.chain(OUR_IMPLEMENTED_FUNC, WRITE_PACKET):
             # We can not modify this function
@@ -491,7 +491,7 @@ def _handle_array_access(inst, info, more):
         return inst
 
     if is_value_from_bpf_ctx(inst, info, None):
-        debug('it is a buf dereference, we will check it later', tag=MODULE_TAG)
+        # debug('it is a buf dereference, we will check it later', tag=MODULE_TAG)
         return inst
 
     # debug(inst, sym.memory_region, '--->', sym.referencing_memory_region, tag=MODULE_TAG)
@@ -536,12 +536,12 @@ def _handle_unary_op(inst, info, more):
     assert isinstance(index, Instruction)
     _check_if_variable_index_should_be_masked(ref, index, blk, info)
 
-    debug('add bound check because unary operator dereferences packet', tag=MODULE_TAG)
+    # debug('add bound check because unary operator dereferences packet', tag=MODULE_TAG)
     _add_bound_check(blk, r, current_function, info, bytes_mode=False,
             more=more)
     # Report for debuging
     tmp,_ = gen_code([inst], info)
-    debug(f'Add a bound check before:\n    {tmp}', tag=MODULE_TAG)
+    # debug(f'Add a bound check before:\n    {tmp}', tag=MODULE_TAG)
     return inst
 
 

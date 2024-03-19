@@ -1,5 +1,6 @@
 SIZE_DELTA_VAR = '__size_delta'
 DATA_VAR = '__data'
+DATA_END_VAR = '__data_end'
 ITERATOR_VAR = '__i'
 FAIL_FLAG_NAME = '__fail_flag'
 SEND_FLAG_NAME = '__send_flag'

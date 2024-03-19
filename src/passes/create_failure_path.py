@@ -172,7 +172,7 @@ class FindFailurePaths(Pass):
         return
 
     def _handle_call(self, inst, more):
-        debug(f'processing call {inst.name}', tag=MODULE_TAG)
+        # debug(f'processing call {inst.name}', tag=MODULE_TAG)
         ctx = more.ctx
         func = inst.get_function_def()
         if func is None or func.is_empty():
@@ -219,7 +219,7 @@ class FindFailurePaths(Pass):
 
                 target = prnt
             else:
-                debug(prnt, tag=MODULE_TAG)
+                # debug(prnt, tag=MODULE_TAG)
                 raise Exception('Conflicting with assumptions: I think a simplified code should have function either in a body of code or in the right handside of an assignment')
 
             rest = self.get_rest(target)[1:]
@@ -231,7 +231,7 @@ class FindFailurePaths(Pass):
         failure_path_id = _get_fail_counter()
         if inst.path_id != 0:
             # NOTE: Ignore this issue for now TODO: I need to address this
-            debug('we are trying to overwrite another failure id (there is collision)', tag=MODULE_TAG)
+            error('we are trying to overwrite another failure id (there is collision)', tag=MODULE_TAG)
         # assert inst.path_id == 0, 'we are trying to overwrite another failure id (there is collision)'
         assert failure_path_id not in _for_debuging_assigned_failure_numbers, 'We are assigning the same failure id to two different fallback points'
         _for_debuging_assigned_failure_numbers.add(failure_path_id)

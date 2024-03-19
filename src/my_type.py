@@ -154,15 +154,12 @@ class MyType:
         elif self.is_record():
             # assume it is a packed struct (assume no padding is added)
             size = 0
-            # TODO: I should consider having access to the type definition in
-            # this object instead of a seperate object
-            tmp_hack = self.spelling[len('struct '):]
-            record = MyType.type_table.get(tmp_hack)
+            record = self.get_decl()
             if record is None:
-                debug(f'did not found declaration for struct {tmp_hack} (is it a type I do not track in the compiler?)')
+                error(f'did not found declaration for struct {self.spelling} (is it a type I do not track in the compiler?)')
                 return 0
             # debug(Record.directory)
-            assert record is not None, f'did not found declaration for {tmp_hack}'
+            assert record is not None, f'did not found declaration for {self.spelling}'
             for field in record.fields:
                 size += field.type_ref.mem_size
             return size
@@ -175,6 +172,14 @@ class MyType:
         else:
             error('Does not know the size (unhandled case)?', self.kind)
             return 0
+
+    def get_decl(self):
+        if self.is_record():
+            tmp_hack = self.spelling[len('struct '):]
+            record = MyType.type_table.get(tmp_hack)
+            return record
+        else:
+            raise Exception(f'Not implemented for {self}')
 
     def is_array(self):
         return self.kind == clang.TypeKind.CONSTANTARRAY
