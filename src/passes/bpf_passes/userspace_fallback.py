@@ -51,7 +51,6 @@ def _do_move_struct(info, struct_ref, variables, field_names):
     insts = []
     debug(struct_ref, tag=MODULE_TAG)
     for v, fname in zip(variables, field_names):
-        debug(fname, v, tag=MODULE_TAG)
         field = struct_ref.get_ref_field(fname, info)
         # NOTE: I am assuming that the field and variable are the same type
         # TODO: Check/Assert that field and variable are the same type
@@ -145,7 +144,9 @@ def _move_fallback_vars_to_channel(info, index, failure_number):
     mem_field = c.get_ref_field(UNIT_MEM_FIELD, info)
 
     T = MyType.make_pointer(meta.type)
-    c_casted = decl_new_var(T, info, decls)
+    common_number = meta.name.split('_')[1]
+    c_casted, tmp = get_or_decl_ref(info, f'__m{common_number}', T)
+    decls.extend(tmp)
     assign = BinOp.build(c_casted, '=', Cast.build(mem_field, T))
     insts.append(assign)
 
@@ -186,9 +187,31 @@ def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
     @param info:
     @returns: Instruction
     """
-    # We must be in BPF main function
-    # current_function = None
+    # Group failure paths that are similar
+    failure_ids = sorted(list(func.path_ids))
+    all_symbols = tuple(info.sym_tbl.current_scope.symbols.values())
+    get_path_vars = lambda p: tuple(sym
+                            for sym in all_symbols
+                                if p in sym.is_fallback_var)
+    groups = []
+    skip = set()
+    for i, path_id1 in enumerate(failure_ids):
+        if path_id1 in skip:
+            continue
+        V1 = get_path_vars(path_id1)
+        group = [path_id1,]
+        for path_id2 in failure_ids[i+1:]:
+            V2 = get_path_vars(path_id2)
+            if len(V1) != len(V2):
+                continue
+            same = all(map(lambda x: x[0] == x[1], zip(V1,V2)))
+            if not same:
+                continue
+            group.append(path_id2)
+            skip.add(path_id2)
+        groups.append(group)
 
+    # Prepare instructions
     decl = []
 
     switch      = ControlFlowInst()
@@ -203,17 +226,26 @@ def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
     case.body.add_inst(break_inst)
     switch.body.add_inst(case)
 
-    failure_ids = set(func.path_ids)
     # debug(f'failure numbers for func {func.name}:', failure_ids, tag=MODULE_TAG)
-    for failure_number in failure_ids:
+    # for failure_number in failure_ids:
+    for group in groups:
+        old_case = None
+        # Created fall-through cases
+        for path_id in group:
+            int_literal = Literal(str(path_id),
+                                        clang.CursorKind.INTEGER_LITERAL)
+            tmp_case = CaseSTMT(None)
+            tmp_case.case.add_inst(int_literal)
+            # if old_case is not None:
+            #     old_case.body.add_inst(tmp_case)
+            switch.body.add_inst(tmp_case)
+            old_case = tmp_case
+        
+        # Create instructions moving values
+        failure_number = group[0]
         assert failure_number > 0, 'The zero can not be a failure id'
-        # TODO: change declaration to a dictionary instead of array
-        # debug(info.user_prog.declarations, tag=MODULE_TAG)
         if failure_number not in info.user_prog.declarations:
-            continue
-        meta = info.user_prog.declarations[failure_number]
-        # prepare_meta_code, tmp_decl = prepare_meta_data(failure_number, meta, info, current_function)
-        # decl.extend(tmp_decl)
+            raise Exception('Did not found the declaration of failure path meta-data')
 
         # TODO: think about the index value
         zero, tmp = get_or_decl_ref(info, ZERO_VAR, UINT, init=ZERO)
@@ -223,17 +255,12 @@ def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
         tmp, tmp_decl = _move_fallback_vars_to_channel(info, zero_ref, failure_number)
         decl.extend(tmp_decl)
 
-        # Check the failure number
-        int_literal = Literal(str(failure_number), clang.CursorKind.INTEGER_LITERAL)
-        _case        = CaseSTMT(None)
-        _case.case.add_inst(int_literal)
-        # _case.body.extend_inst(prepare_meta_code)
+        _case = old_case
         _case.body.extend_inst(tmp)
 
         to_user = ToUserspace.from_func_obj(current_function)
         to_user.set_modified(InstructionColor.TO_USER)
         _case.body.add_inst(to_user)
-        switch.body.add_inst(_case)
     return switch, decl
 
 
@@ -361,10 +388,8 @@ def _process_current_inst(inst, info, more):
         if current_function is None:
             # Found a fallback point on the BPF entry function
             meta = info.user_prog.declarations.get(failure_num)
-            if meta is None:
-                error('did not found the metadata structure declaration for failure', failure_num, tag=MODULE_TAG)
-                return inst
-            # prepare_pkt, tmp_decl = prepare_meta_data(failure_num, meta, info, current_function)
+            assert meta is not None, f'did not found the metadata structure declaration for failure: {failure_num}'
+
             # TODO: think about the index value
             zero, tmp = get_or_decl_ref(info, ZERO_VAR, UINT, init=ZERO)
             declare_at_top_of_func.extend(tmp)

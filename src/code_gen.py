@@ -490,8 +490,8 @@ def __sort_declarations(decls):
     deps = {}
     for r in record:
         name = r.name
-        assert name not in R
-        assert name not in deps
+        assert name not in R, f'multiple declaration of same thing {r}'
+        assert name not in deps, f'multiple declaration of same thing {r}'
         R[name] = r
         dep_list = set()
         for f in r.fields:

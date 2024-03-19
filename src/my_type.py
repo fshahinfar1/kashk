@@ -119,6 +119,21 @@ class MyType:
         self._element_count = 0
         self.func_proto_obj = None
 
+    def __eq__(self, other):
+        if id(self) == id(other):
+            # It is the same reference
+            return True
+        if self.spelling != other.spelling:
+            return False
+        if self.under_type != other.under_type:
+            return False
+        if self.kind != other.kind:
+            return False
+        if self._element_count != other._element_count:
+            return False
+        # TODO: how to check the function proto?
+        return True
+
     def __str__(self):
         if self.is_pointer() and self.under_type.is_array():
             tmp = '(*) {str(self.under_type)}'

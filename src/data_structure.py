@@ -120,7 +120,7 @@ class CodeBlockRef:
 
 
 class StateObject:
-    __slots__ = ('cursor', 'name', 'kind', 'type_ref', 'is_unused')
+    __slots__ = ('cursor', 'name', 'kind', 'type_ref')
     @classmethod
     def build(cls, name, T):
         obj = StateObject(None)
@@ -140,7 +140,17 @@ class StateObject:
             self.name = None
             self.kind = None
             self.type_ref = None
-        self.is_unused = False
+
+    def __eq__(self, other):
+        if id(self) == id(other):
+            return True
+        if self.kind != other.kind:
+            return False
+        if self.name != other.name:
+            return False
+        if self.type_ref != other.type_ref:
+            return False
+        return True
 
     @property
     def type(self):
@@ -163,9 +173,6 @@ class StateObject:
             for f in self.type_ref.fields:
                 if f.name == name:
                     return f
-
-    def set_unused(self):
-        self.is_unused = True
 
     def get_c_code(self):
         T = self.type_ref

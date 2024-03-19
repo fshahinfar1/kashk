@@ -834,28 +834,25 @@ class Ref(Instruction):
         new.owner  = list(self.owner)
         return new
 
-    def get_ref_field(self, name, info=None):
+    def get_ref_field(self, name, info):
+        assert info is not None
         ref = Ref(None, clang.CursorKind.MEMBER_REF_EXPR)
         ref.name = name
-        if info:
-            T = self.type
-            T = get_actual_type(T)
-            key = f'class_{T.spelling}'
-            if key not in info.sym_tbl.scope_mapping:
-                error(info.sym_tbl.scope_mapping)
-            struct_scope = info.sym_tbl.scope_mapping[key]
-            sym = struct_scope.lookup(name)
-            if sym is None:
-                error('Failed to find the field in the struct! field name:', name)
-                debug('debug info:')
-                debug(struct_scope.symbols)
-                debug('-------------------')
-            assert sym is not None
-            ref.type = sym.type
-            assert isinstance(ref.type, MyType)
-        else:
-            ref.type = None
-            assert 0, 'This should not happen'
+        T = self.type
+        T = get_actual_type(T)
+        key = f'class_{T.spelling}'
+        if key not in info.sym_tbl.scope_mapping:
+            error(info.sym_tbl.scope_mapping)
+            raise Exception(f'we do not know about the declaration of record: {key}')
+        struct_scope = info.sym_tbl.scope_mapping[key]
+        sym = struct_scope.lookup(name)
+        if sym is None:
+            error('Failed to find the field in the struct! field name:', name)
+            debug('debug info:')
+            debug(struct_scope.symbols)
+            debug('-------------------')
+            raise Exception('Failed to find the field in the struct!')
+        ref.type = sym.type
         ref.owner.append(self)
         return ref
 
