@@ -5,7 +5,7 @@ from data_structure import *
 from passes.code_pass import Pass
 from passes.clone import clone_pass
 
-from helpers.instruction_helper import INT
+from helpers.instruction_helper import UINT
 from var_names import FAILURE_NUMBER_FIELD, UNIT_SIZE
 
 
@@ -13,7 +13,7 @@ def create_fallback_meta_structure(info):
     book = {}
     similar_paths = {}
     for path_id, V in info.failure_vars.items():
-        state_obj = StateObject.build(FAILURE_NUMBER_FIELD, INT)
+        state_obj = StateObject.build(FAILURE_NUMBER_FIELD, UINT)
         fields = [state_obj,]
         for sym in V:
             T = sym.type.clone()

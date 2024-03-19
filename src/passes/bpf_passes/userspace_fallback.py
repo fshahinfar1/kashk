@@ -56,6 +56,11 @@ def _do_move_struct(info, struct_ref, variables, field_names):
         # TODO: Check/Assert that field and variable are the same type
         T = v.type
         if T.is_array():
+            el_T = T.element_type
+            if el_T.is_pointer() or el_T.is_array() or el_T.is_record():
+                error('How am I going to share an array of elements with non-primitive type?')
+                comment = Literal('/* Copying this array may not be helpful */', CODE_LITERAL)
+                insts.append(comment)
             size = Literal(str(T.element_count),
                     clang.CursorKind.INTEGER_LITERAL)
             copy = template.constant_mempcy(field, v, size)
@@ -78,7 +83,9 @@ def _do_move_struct(info, struct_ref, variables, field_names):
                 assert sym is not None, 'we have just declared the __data, it should not be None'
                 sym.is_bpf_ctx = True
 
-                off  = BinOp.build(v, '-', data)
+                tmp_v  = Cast.build(v, VOID_PTR)
+                off    = BinOp.build(tmp_v, '-', data)
+                off    = Cast.build(off, VOID_PTR)
                 assign = BinOp.build(field, '=', off)
                 insts.append(assign)
             else:
@@ -96,7 +103,7 @@ def _do_move_struct(info, struct_ref, variables, field_names):
             else:
                 field_refs = [v.get_ref_field(f.name, info) for f in record.fields]
                 subfield_names = [f.name for f in field_refs]
-                tmp_insts = _do_move_struct(info, v, field_refs, subfield_names)
+                tmp_insts = _do_move_struct(info, field, field_refs, subfield_names)
                 insts.extend(tmp_insts)
         else:
             assign = BinOp.build(field, '=', v)
