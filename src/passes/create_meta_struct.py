@@ -41,7 +41,6 @@ def create_fallback_meta_structure(info):
             same = all(map(lambda x: x[0]==x[1],
                             zip(meta1.fields, meta2.fields)))
             if not same:
-                print(path_id1,'not similar to', path_id2, 'because:', x)
                 continue
             book[path_id2] = meta1
             # similar_paths[path_id1].add(path_id2)

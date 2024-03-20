@@ -55,7 +55,7 @@ from decide import analyse_offload
 
 
 MODULE_TAG = '[Gen Offload]'
-BPF_MAIN = 'MAIN_SCOPE'
+MAIN = '[[main]]'
 
 
 def _print_code(prog, info):
@@ -127,7 +127,7 @@ def generate_offload(io_ctx):
     load_other_sources(io_ctx, info)
     # Build and select the entry function scope
     scope = Scope(info.sym_tbl.global_scope)
-    info.sym_tbl.scope_mapping[BPF_MAIN] = scope
+    info.sym_tbl.scope_mapping[MAIN] = scope
     info.sym_tbl.current_scope = scope
     info.prog.add_args_to_scope(scope)
     # Find the entry function
@@ -161,9 +161,19 @@ def generate_offload(io_ctx):
     prog = primary_annotation_pass(prog, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
+    debug('Clone the original code', tag=MODULE_TAG)
     update_original_ast_references(prog, info, None)
-    info.original_ast = { k: v.body for k, v in Function.directory.items() if v.is_used_in_bpf_code }
-    info.original_ast['[[main]]'] =  prog
+    # Store the original version of the source code (unchanged) for future use
+    tmp_fn_dir = {}
+    for k, f in Function.directory.items():
+        f.clone(tmp_fn_dir)
+    tmp_f = Function(MAIN, None, tmp_fn_dir)
+    tmp_f.body = prog
+    info.original_ast = tmp_fn_dir
+
+    # info.original_ast = { k: v.body for k, v in Function.directory.items() if v.is_used_in_bpf_code }
+    # info.original_ast['[[main]]'] =  prog
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('Mark Read/Write Inst & Buf', tag=MODULE_TAG)
     mark_io(prog, info)
@@ -219,11 +229,11 @@ def gen_bpf_code(bpf, info, out_bpf):
     # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('[1st] Update Function Signature', tag=MODULE_TAG)
-    update_function_signature(info)
+    bpf = update_function_signature(bpf, info)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Transform access to variables and read/write buffers.
-    debug('[1st] Transform Vars', tag=MODULE_TAG)
+    debug('Transform Vars', tag=MODULE_TAG)
     bpf = transform_vars_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
@@ -233,7 +243,7 @@ def gen_bpf_code(bpf, info, out_bpf):
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Second transform
-    debug('[2nd] Transform', tag=MODULE_TAG)
+    debug('Transform: Part II', tag=MODULE_TAG)
     bpf = transform_func_after_verifier(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
@@ -242,18 +252,30 @@ def gen_bpf_code(bpf, info, out_bpf):
     bpf = verifier_pass(bpf, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Update Function Failure Status', tag=MODULE_TAG)
-    update_function_failure_status(bpf, info, None)
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
     debug('Create Failure Paths', tag=MODULE_TAG)
     create_failure_paths(bpf, info, None)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    # Juggle function directory ---------------------------
+    tmp_fn_dir = Function.directory
+    Function.directory = info.original_ast
+    # Move failure functions to the original_ast list
+    for f in info.failure_path_new_funcs:
+        assert f.name not in Function.directory, 'We are adding failure functions to the original ast, one of them were already here ?!'
+        Function.directory[f.name] = f
+        # f.clone(info.original_ast)
+        # print(f.name, f.args)
+    # -----------------------------------------------------
+
+    # Some checks for failure paths -----------------------
     # pprint(info.failure_paths)
     for pid, path in info.failure_paths.items():
         for call in find_elems_of_kind(path, clang.CursorKind.CALL_EXPR):
             f = call.get_function_def()
+            # f = info.original_ast.get(call.name)
             assert len(call.args) == len(f.args), f'{pid} @{f.name}:\nfunc: {str(f.args) }\ncall: {str(call.args)}'
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+    debug('number of failure paths:', len(info.failure_paths), tag=MODULE_TAG)
+    # -----------------------------------------------------
 
     debug('Remove Unused Args From Failure Functions', tag=MODULE_TAG)
     remove_unused_args(bpf, info, None)
@@ -283,16 +305,27 @@ def gen_bpf_code(bpf, info, out_bpf):
     # pprint(info.failure_vars)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('[2nd] Update Function Signature', tag=MODULE_TAG)
-    update_function_signature(info)
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
     debug('Create Fallback Meta Structures', tag=MODULE_TAG)
     create_fallback_meta_structure(info)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    # # TODO: Update the userspace fallback with new implementation of failure
-    # # paths
+    # Juggle function directory ---------------------------
+    for f in Function.directory.values():
+        other_f = tmp_fn_dir.get(f.name)
+        if other_f is None:
+            continue
+        other_f.path_ids = set(f.path_ids)
+    Function.directory = tmp_fn_dir
+    # -----------------------------------------------------
+
+    debug('Update Function Failure Status', tag=MODULE_TAG)
+    update_function_failure_status(bpf, info, None)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    debug('[2nd] Update Function Signature', tag=MODULE_TAG)
+    bpf = update_function_signature(bpf, info)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
     # Handle moving to userspace and removing the instruction not possible in
     # BPF
     debug('Userspace Fallback', tag=MODULE_TAG)

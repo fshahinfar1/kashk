@@ -12,7 +12,7 @@ from instruction import BODY, Block
 from framework_support import InputOutputContext
 
 from offload import (load_other_sources, _prepare_event_handler_args,
-        move_vars_before_event_loop_to_shared_scope, BPF_MAIN)
+        move_vars_before_event_loop_to_shared_scope, MAIN)
 from parser.find_ev_loop import get_entry_code
 from sym_table import Scope
 
@@ -68,7 +68,7 @@ class VerifierTest(BasicTest):
         load_other_sources(info.io_ctx, info)
         # Select the main scope
         scope = Scope(info.sym_tbl.global_scope)
-        info.sym_tbl.scope_mapping[BPF_MAIN] = scope
+        info.sym_tbl.scope_mapping[MAIN] = scope
         info.sym_tbl.current_scope = scope
         info.prog.add_args_to_scope(scope)
         # Find the entry function

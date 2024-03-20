@@ -14,7 +14,11 @@ def remove_indicies_from_arr(arr, indicies):
     # NOTE: indicies must be sorted
     orig_count = len(arr)
     new_count = (orig_count - len(indicies))
-    assert new_count > 0
+    # debug('---', new_count, orig_count, len(indicies), tag=MODULE_TAG)
+    # debug(indicies, tag=MODULE_TAG)
+
+    assert all([i < orig_count for i in indicies]), 'index out of range of function arguments'
+    assert new_count >= 0
     new = [None] * new_count
     j = 0 # index on the old arr
     k = 0 # index on the new arr
@@ -65,6 +69,10 @@ def find_unused_vars(inst, info, target):
 
 
 class CheckForFuncCall(Pass):
+    """
+    Find function calls inside a body of code and remove arguments indicated by
+    a list of indices in `rm_func` map.
+    """
     def __init__(self, info):
         super().__init__(info)
         self.rm_func = None
@@ -81,6 +89,7 @@ class CheckForFuncCall(Pass):
         new_inst = clone_pass(inst)
         # NOTE: indicies must be sorted
         indicies = self.rm_func[inst.name]
+
         new_args = remove_indicies_from_arr(new_inst.args, indicies)
         new_inst.args = new_args
         return new_inst
@@ -88,6 +97,8 @@ class CheckForFuncCall(Pass):
 
 def _do_remove_unused_args(inst, info, more):
     rm_func = {}
+    # TODO: may be do this on all the function instead of just the failure
+    # functions
     for func in info.failure_path_new_funcs:
         arg_names = set(a.name for a in func.args)
         unused_vars = find_unused_vars(func.body, info, target=arg_names)

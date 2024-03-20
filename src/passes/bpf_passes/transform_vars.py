@@ -14,82 +14,16 @@ from sym_table import MemoryRegion
 from elements.after import After
 from passes.code_pass import Pass
 from passes.update_original_ref import set_original_ref
-
 from var_names import SHARED_REF_NAME, SEND_FLAG_NAME, DATA_VAR
 
 
 MODULE_TAG = '[Transform Vars Pass]'
 
 
-
 class TransformVars(Pass):
     def __init__(self, info):
         super().__init__(info)
         self._may_remove = True
-
-    def _process_call_needing_send_flag(self, inst):
-        """
-        @param inst, a Call object for a Function which needs a send flag
-        @return Instruction
-        """
-        assert isinstance(inst, Call)
-        assert not inst.has_flag(Function.SEND_FLAG)
-        blk = self.cb_ref.get(BODY)
-        inst.set_flag(Function.SEND_FLAG)
-        sym = self.info.sym_tbl.lookup(SEND_FLAG_NAME)
-        if self.current_function is None:
-            if sym is None:
-                # Allocate the flag on the stack and pass a poitner
-                CHAR = BASE_TYPES[clang.TypeKind.SCHAR]
-                decl = VarDecl.build(SEND_FLAG_NAME, CHAR)
-                decl.init.add_inst(ZERO)
-                decl.set_modified(InstructionColor.EXTRA_STACK_ALOC)
-                self.declare_at_top_of_func.append(decl)
-                sym = decl.update_symbol_table(self.info.sym_tbl)
-                flag_ref = decl.get_ref()
-            else:
-                flag_ref = Ref.from_sym(sym)
-                assert not flag_ref.type.is_pointer()
-            ref = UnaryOp.build('&', flag_ref)
-            inst.args.append(ref)
-            inst.set_modified(InstructionColor.ADD_ARGUMENT)
-        else:
-            # Just pass the reference, the function must have received a flag from
-            # the entry scope
-            assert sym is not None and sym.type.is_pointer()
-            flag_ref = Ref.from_sym(sym)
-            inst.args.append(flag_ref)
-            inst.set_modified(InstructionColor.ADD_ARGUMENT)
-        # Check the flag after the function
-        if flag_ref.type.is_pointer():
-            flag_val = UnaryOp.build('*', flag_ref)
-        else:
-            flag_val = flag_ref
-        cond  = BinOp.build(flag_val, '!=', ZERO)
-        cond.set_modified()
-        check = ControlFlowInst.build_if_inst(cond)
-        check.set_modified(InstructionColor.CHECK)
-        if self.current_function is None:
-            # Do we need modify the packet before sending? (e.g., swap IP address)
-            before_send_insts = self.info.prog.before_send()
-            check.body.extend_inst(before_send_insts)
-            # Return the verdict
-            ret_val  = self.info.prog.get_send()
-            ret_inst = Return.build([ret_val,])
-            # It is not marked as 'InstructionColor.REMOVE_WRITE'
-            # because the instruction was removed inside the
-            # called funcation and we count it there.
-            ret_inst.set_modified()
-            check.body.add_inst(ret_inst)
-        else:
-            # Return to the caller func
-            assert sym.type.is_pointer()
-            ret_inst = get_ret_inst(self.current_function, self.info)
-            check.body.add_inst(ret_inst)
-        set_original_ref(check, info, inst.original)
-        after = After([check,])
-        blk.append(after)
-        return inst
 
     def _process_annotation(self, inst):
         if inst.ann_kind == Annotation.ANN_CACNE_DEFINE:
@@ -198,11 +132,7 @@ class TransformVars(Pass):
         if inst.kind == clang.CursorKind.DECL_REF_EXPR:
             return self._check_if_ref_is_global_state(inst)
         elif inst.kind == clang.CursorKind.VAR_DECL:
-            if self.current_function is None:
-                cur_func_name = '[[main]]'
-            else:
-                cur_func_name = self.current_function.name
-            names = self.info.read_decl.get(cur_func_name, set())
+            names = self.info.read_decl.get(self.current_fname, set())
             if inst.name in names:
                 # This will become a packet pointer, change the type if needed!
                 # TODO: this code does not consider shadowing variables and scopes
@@ -232,27 +162,9 @@ class TransformVars(Pass):
             elif inst.name in KNOWN_FUNCS:
                 return inst
             else:
-                # Check if the function being invoked needs to
-                # receive any flag and pass.
-                func = inst.get_function_def()
-                if not func:
-                    return inst
-                tmp = func.calls_recv or func.calls_send
-                req_ctx = tmp and not inst.has_flag(Function.CTX_FLAG)
-                if req_ctx:
-                    # Add context
-                    assert func.change_applied & Function.CTX_FLAG != 0, 'The function call is determined to requier context pointer but the function signiture is not updated'
-                    inst.change_applied |= Function.CTX_FLAG
-                    inst.args.append(self.info.prog.get_ctx_ref())
-                    inst.set_modified(InstructionColor.ADD_ARGUMENT)
-                    # debug('add ctx ref to call:', inst.name)
-
-                # Add send flag
-                if func.calls_send and not inst.has_flag(Function.SEND_FLAG):
-                    new_inst = self._process_call_needing_send_flag(inst)
-                    return new_inst
-
-                # NOTE: fail flag is added in userspace_fallback (future pass)
+                # NOTE: previously, here, I was check if the send flag was set
+                # inside the callee
+                pass
         elif inst.kind == ANNOTATION_INST:
             return self._process_annotation(inst)
         return inst
@@ -261,8 +173,6 @@ class TransformVars(Pass):
 def transform_vars_pass(inst, info, more):
     """
     Transformations in this pass
-
-    * Pass flags to the functions
     * Global variables
     * Read/Recv instruction
     * cache definition

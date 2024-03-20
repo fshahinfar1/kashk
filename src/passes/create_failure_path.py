@@ -125,7 +125,7 @@ class FindFailurePaths(Pass):
         @param inst: current instruction
         """
         name = '[[main]]' if self.current_function is None else self.current_function.name
-        ast = self.info.original_ast[name]
+        ast = self.info.original_ast[name].body
         target = inst.original
         tmp = GatherRestInstruction.do(ast, self.info, target=target)
         # debug('found:', tmp.found, 'looking:', target, tag=MODULE_TAG)

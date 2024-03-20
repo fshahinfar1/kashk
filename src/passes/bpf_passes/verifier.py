@@ -89,7 +89,8 @@ def _check_if_variable_index_should_be_masked(ref, index, blk, info):
     The ref, index are taken from range (R) list used for checking access to
     the BPF context. blk is the current block of code to add the masking operation to.
     """
-    set_of_variables_to_be_masked = get_scalar_variables(ref) + get_scalar_variables(index)
+    set_of_variables_to_be_masked = (get_scalar_variables(ref) +
+            get_scalar_variables(index))
     # debug('these are scalar variables:', set_of_variables_to_be_masked, tag=MODULE_TAG)
     for var in set_of_variables_to_be_masked:
         # TODO: should I keep the variable intact and define a tmp value for
@@ -120,9 +121,11 @@ def _do_add_bound_check(blk, R, current_function, info, bytes_mode):
     else:
         _ret_inst = None
     if bytes_mode:
-        check_inst = bpf_ctx_bound_check_bytes(ref, index, data_end, current_function)
+        check_inst = bpf_ctx_bound_check_bytes(ref, index, data_end,
+                current_function)
     else:
-        check_inst = bpf_ctx_bound_check(ref, index, data_end, current_function)
+        check_inst = bpf_ctx_bound_check(ref, index, data_end,
+                current_function)
     blk.append(check_inst)
     # if current_function is not None:
     #     # The bound check may fail and the function may fail as a result
@@ -206,7 +209,8 @@ def _handle_binop(inst, info, more):
 
             _check_if_variable_index_should_be_masked(ref, index, blk, info)
             # debug('add bound check because binary operator access packet' , tag=MODULE_TAG)
-            _add_bound_check(blk, r, current_function, info, bytes_mode=False, more=more)
+            _add_bound_check(blk, r, current_function, info, bytes_mode=False,
+                    more=more)
 
             # Report for debuging
             tmp,_ = gen_code([inst], info)
@@ -300,7 +304,8 @@ def _check_passing_bpf_context(inst, func, info):
             _tmp = get_actual_type(param.type_ref)
             if _tmp.spelling != T.spelling:
                 error('There is a type cast when passing the argument. I lose track of BPF context when there is a type cast! [1]')
-                debug(f'param: {_tmp.spelling}    argument: {T.spelling}', tag=MODULE_TAG)
+                debug(f'param: {_tmp.spelling}    argument: {T.spelling}',
+                        tag=MODULE_TAG)
                 continue
 
             # if not isinstance(a, Ref):
@@ -316,7 +321,8 @@ def _check_passing_bpf_context(inst, func, info):
             # debug(callee_scope.symbols, tag=MODULE_TAG)
             if _has_bpf_ctx_in_field(a, info, fields):
                 text, _ = gen_code([a, ], info)
-                debug('Has bpf context in the field:', a, '|', text, tag=MODULE_TAG)
+                debug('Has bpf context in the field:', a, '|', text,
+                        tag=MODULE_TAG)
                 param_sym = callee_scope.lookup(param.name)
                 assert param_sym is not None, 'We should have all the parameters in the scope of functions'
                 # debug('fields:', field, tag=MODULE_TAG)
@@ -325,14 +331,16 @@ def _check_passing_bpf_context(inst, func, info):
                     for ref in reversed(field):
                         sym = scope.lookup(ref.name)
                         if sym is None:
-                                sym = scope.insert_entry(ref.name, ref.type, clang.CursorKind.MEMBER_REF_EXPR, None)
+                                sym = scope.insert_entry(ref.name, ref.type,
+                                        clang.CursorKind.MEMBER_REF_EXPR, None)
                         scope = sym.fields
                     sym.set_is_bpf_ctx(True)
                     receives_bpf_ctx = True
                     # debug(f'Set the {param.name} .. {sym.name} to BPF_CTX', tag=MODULE_TAG)
             else:
                 text, _ = gen_code([a, ], info)
-                debug(f'Does not have BPF CTX in its field', a, '|', text, tag=MODULE_TAG)
+                debug(f'Does not have BPF CTX in its field', a, '|', text,
+                        tag=MODULE_TAG)
                 pass
     return receives_bpf_ctx
 
@@ -385,9 +393,10 @@ def _check_setting_bpf_context_in_callee(inst, func, info):
         _tmp1 = get_actual_type(param.type)
         _tmp2 = get_actual_type(argum.type)
         if (one_type_is_record and _tmp1.spelling != _tmp2.spelling):
-            error('There is a type cast when passing the argument. I lose track of BPF context when there is a type cast!')
+            error('There is a type cast when passing the argument. I lose track of BPF context when there is a type cast!',
+                    tag=MODULE_TAG)
             debug('argument type:', _tmp1.spelling, 'parameter type:',
-                    _tmp2.spelling)
+                    _tmp2.spelling, tag=MODULE_TAG)
             continue
 
         if param.type_ref.is_pointer():
@@ -401,7 +410,8 @@ def _check_setting_bpf_context_in_callee(inst, func, info):
                     # callee scope to caller scope
                     e2 = argum_sym.fields.lookup(key)
                     if e2 is None:
-                        e2 = argum_sym.fields.insert_entry(entry.name, entry.type, entry.kind, None)
+                        e2 = argum_sym.fields.insert_entry(entry.name,
+                                entry.type, entry.kind, None)
                     e2.set_is_bpf_ctx(entry.is_bpf_ctx)
                     # report(argum.name, e2.name, 'is bpf ctx:', entry.is_bpf_ctx)
                     if backward_jmp_ctx and e2.is_bpf_ctx:

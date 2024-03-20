@@ -13,7 +13,7 @@ from helpers.instruction_helper import (UINT, ZERO, CHAR, decl_new_var, VOID, VO
 from elements.after import After
 from var_names import (FAIL_FLAG_NAME, UNIT_MEM_FIELD, UNIT_SIZE,
         CHANNEL_UNITS, CHANNEL_VAR_NAME, UNIT_STRUCT_NMAE, CHANNEL_MAP_NAME,
-        ZERO_VAR, DATA_VAR)
+        ZERO_VAR, DATA_VAR, SEND_FLAG_NAME)
 from sym_table import SymbolTableEntry
 
 
@@ -179,7 +179,7 @@ def _set_failure_flag(failure_number, is_pointer=False):
 
 
 def _decl_failure_flag_on_stack(info):
-    decl_new_var(CHAR, info, declare_at_top_of_func, name=FAIL_FLAG_NAME)
+    decl_new_var(UINT, info, declare_at_top_of_func, name=FAIL_FLAG_NAME)
     flag_decl = declare_at_top_of_func[-1]
     flag_decl.init.add_inst(ZERO)
 
@@ -271,43 +271,69 @@ def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
     return switch, decl
 
 
+def _process_call_needing_send_flag(inst, info):
+    """
+    @param inst, a Call object for a Function which needs a send flag
+    @return Instruction
+    """
+    assert isinstance(inst, Call)
+
+    blk = cb_ref.get(BODY)
+    sym = info.sym_tbl.lookup(SEND_FLAG_NAME)
+    assert sym is not None, 'The function shuold alread received the send flag!'
+    flag_ref = Ref.from_sym(sym)
+    if flag_ref.type.is_pointer():
+        assert current_function is not None, 'We are not at the main function scope, expecting the send flag to be a pointer'
+        flag_val = UnaryOp.build('*', flag_ref)
+    else:
+        assert current_function is None, 'We are not at the main function scope, expecting the send flag to be a scalar'
+        flag_val = flag_ref
+    cond  = BinOp.build(flag_val, '!=', ZERO)
+    cond.set_modified()
+    check = ControlFlowInst.build_if_inst(cond)
+    check.set_modified(InstructionColor.CHECK)
+    if current_function is None:
+        # Do we need modify the packet before sending? (e.g., swap IP address)
+        before_send_insts = info.prog.before_send()
+        check.body.extend_inst(before_send_insts)
+        # Return the verdict
+        ret_val  = info.prog.get_send()
+        ret_inst = Return.build([ret_val,])
+        # It is not marked as 'InstructionColor.REMOVE_WRITE'
+        # because the instruction was removed inside the
+        # called funcation and we count it there.
+        ret_inst.set_modified()
+        check.body.add_inst(ret_inst)
+    else:
+        # Return to the caller func
+        ret_inst = get_ret_inst(current_function, info)
+        check.body.add_inst(ret_inst)
+    set_original_ref(check, info, inst.original)
+    after = After([check,])
+    blk.append(after)
+    return inst
+
+
 def _handle_call_may_fail_or_succeed(inst, func, info, more):
     ctx = more.ctx
     blk = cb_ref.get(BODY)
     after_func_call = []
-    ## we need to pass a flag
-    if inst.has_flag(Function.FAIL_FLAG):
-        # Nothing to do, this instruction was processed before
-        return inst
-    inst.set_flag(Function.FAIL_FLAG)
     assert (func.change_applied & Function.FAIL_FLAG) != 0, f'The fail flag should alread be added to the function definition (func:{func.name})'
-    # Pass the flag when invoking the function
-    # First check if we need to allocate the flag on the stack memory
+    assert len(func.path_ids) > 0, f'why there is no associated failure path? {func.name}'
+
     sym = info.sym_tbl.lookup(FAIL_FLAG_NAME)
-    is_defined = sym is not None
-    # debug('on func:', current_function.name if current_function else 'MAIN', ' and the fail flag is defined on stack[T/F]?:', is_on_the_stack)
-    if not is_defined:
-        _decl_failure_flag_on_stack(info)
-        sym = info.sym_tbl.lookup(FAIL_FLAG_NAME)
     assert sym is not None, 'By now the flag should be defined'
-    is_flag_pointer = sym.type.is_pointer()
-    # Now add the argument to the invocation instruction
     flag_ref = Ref.from_sym(sym)
-    if is_flag_pointer:
-        inst.args.append(flag_ref)
-    else:
-        addr_op = UnaryOp.build('&', flag_ref)
-        inst.args.append(addr_op)
-    inst.set_modified(InstructionColor.ADD_ARGUMENT)
-    # Check the flag after the function call
+
     tmp = Literal('/* check if function fail */\n', CODE_LITERAL)
     after_func_call.append(tmp)
+
     if current_function == None:
-        assert len(func.path_ids) > 0
-        tmp_inst, tmp_decl = _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info)
+        tmp_inst, tmp_decl = \
+            _generate_failure_flag_check_in_main_func_switch_case(flag_ref,
+                    func, info)
         declare_at_top_of_func.extend(tmp_decl)
     else:
-        assert len(func.path_ids) > 0
         flag_val = UnaryOp.build('*', flag_ref)
         cond = BinOp.build(flag_val , '!=', ZERO)
         check_failed = ControlFlowInst.build_if_inst(cond)
@@ -324,7 +350,7 @@ def _handle_call_may_fail_or_succeed(inst, func, info, more):
         set_original_ref(tmp_inst, info, inst.original)
     after_func_call.append(tmp_inst)
 
-    # Analyse the called function.
+    # Analyse the called function
     if func.name not in _has_processed:
         _has_processed.add(func.name)
         with remember_func(func):
@@ -339,6 +365,7 @@ def _handle_call_may_fail_or_succeed(inst, func, info, more):
 
 def _handle_call_may_fail(inst, func, info, more):
     assert not func.may_succeed, 'handling calls that may fail or succeed are moved to another function'
+    assert 0, 'is this code path used at all?'
     ctx = more.ctx
     blk = cb_ref.get(BODY)
     before_func_call = []
@@ -383,9 +410,16 @@ def _process_current_inst(inst, info, more):
     if inst.kind == clang.CursorKind.CALL_EXPR:
         func = inst.get_function_def()
         # we only need to investigate functions that may fail
-        if not func or func.is_empty() or not func.may_fail:
+        if not func or func.is_empty():
             return inst
 
+        orig_inst = inst
+        if func.calls_send:
+            inst = _process_call_needing_send_flag(inst, info)
+
+        # Check for function failures
+        if not func.may_fail:
+            return inst
         if func.may_succeed:
             return _handle_call_may_fail_or_succeed(inst, func, info, more)
         return _handle_call_may_fail(inst, func, info, more)
