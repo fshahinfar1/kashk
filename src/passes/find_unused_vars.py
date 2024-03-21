@@ -49,7 +49,7 @@ class FindUnusedVar(Pass):
                 if inst.name in self.target:
                     self.target.remove(inst.name)
             case clang.CursorKind.MEMBER_REF_EXPR:
-                assert len(inst.owner) == 1
+                assert len(inst.owner) == 1, f'The number of owners for the member instruction was unexpected? {inst} {inst.owner}'
                 owner = inst.owner[-1]
                 self.process_current_inst(owner, more)
         return inst

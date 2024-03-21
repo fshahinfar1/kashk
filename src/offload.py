@@ -315,7 +315,7 @@ def generate_offload(io_ctx):
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('[2nd] remove everything that is not used in BPF', tag=MODULE_TAG)
-    remove_everything_not_used(prog, info, None)
+    prog = remove_everything_not_used(prog, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Verifier

@@ -8,10 +8,10 @@ from utility import indent, get_tmp_var_name
 from code_gen import gen_code
 from passes.pass_obj import PassObject
 from helpers.instruction_helper import decl_new_var
+from var_names import EXTRA_PARAM_NAME
 
 
 PARAMETER_LIMIT = 5
-EXTRA_PARAM_NAME = '__ex'
 MODULE_TAG = '[Reduce Param Pass]'
 
 cb_ref = CodeBlockRef()
@@ -164,26 +164,27 @@ def _handle_ref(inst, info, more):
             top_lvl_var_name = 'self'
 
     flag = current_change_ctx.should_update_ref(top_lvl_var_name)
-    if flag:
-        new_inst = inst.clone([])
-        struct_name = current_change_ctx.struct_name
-        tmp = f'struct {struct_name}'
-        tmp_T = MyType.make_simple(tmp, clang.TypeKind.RECORD)
-        tmp_T = MyType.make_pointer(tmp_T)
-        ex_ref = Ref.build(EXTRA_PARAM_NAME, tmp_T, False, red=True)
-        last_owner = new_inst
-        if new_inst.owner:
-            last_owner = new_inst.owner[-1]
-        last_owner.kind = clang.CursorKind.MEMBER_REF_EXPR
-        last_owner.owner.append(ex_ref)
-        new_inst.owner.append(ex_ref)
-        new_inst.kind = clang.CursorKind.MEMBER_REF_EXPR
-        new_inst.color = InstructionColor.ORIGINAL
-        new_inst.set_modified(InstructionColor.EXTRA_MEM_ACCESS)
-        # debug(MODULE_TAG, 'updated!', new_inst, new_inst.owner)
-        return new_inst
-    # debug(MODULE_TAG, 'should not update')
-    return inst
+    if not flag:
+        # debug(MODULE_TAG, 'should not update')
+        return inst
+    new_inst = inst.clone([])
+    struct_name = current_change_ctx.struct_name
+    tmp = f'struct {struct_name}'
+    tmp_T = MyType.make_simple(tmp, clang.TypeKind.RECORD)
+    tmp_T = MyType.make_pointer(tmp_T)
+    ex_ref = Ref.build(EXTRA_PARAM_NAME, tmp_T, False, red=True)
+
+    last_owner = new_inst
+    while last_owner.owner:
+        last_owner = last_owner.owner[-1]
+    last_owner.kind = clang.CursorKind.MEMBER_REF_EXPR
+    last_owner.owner.append(ex_ref)
+    assert len(last_owner.owner) == 1, f'too many owner was added ({len(last_owner.owner)})? owners: {last_owner.owner}'
+    new_inst.kind = clang.CursorKind.MEMBER_REF_EXPR
+    new_inst.color = InstructionColor.ORIGINAL
+    new_inst.set_modified(InstructionColor.EXTRA_MEM_ACCESS)
+    # debug(MODULE_TAG, 'updated!', new_inst, new_inst.owner)
+    return new_inst
 
 
 def _process_current_inst(inst, info, more):

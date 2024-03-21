@@ -7,6 +7,7 @@ SEND_FLAG_NAME = '__send_flag'
 SHARED_REF_NAME = '__shared'
 FAILURE_NUMBER_FIELD = 'failure_number'
 ZERO_VAR = '__zero'
+EXTRA_PARAM_NAME = '__ex'
 # For struct __unit:
 UNIT_STRUCT_NMAE = '__unit'
 UNIT_MEM_FIELD = 'mem'
