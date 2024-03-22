@@ -58,7 +58,7 @@ def _do_move_struct(info, struct_ref, variables, field_names):
         if T.is_array():
             el_T = T.element_type
             if el_T.is_pointer() or el_T.is_array() or el_T.is_record():
-                error('How am I going to share an array of elements with non-primitive type?')
+                error(f'How am I going to share an array of elements with non-primitive type? ({v})', tag=MODULE_TAG)
                 comment = Literal('/* Copying this array may not be helpful */', CODE_LITERAL)
                 insts.append(comment)
             size = Literal(str(T.element_count),
