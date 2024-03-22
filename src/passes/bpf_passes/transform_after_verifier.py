@@ -209,7 +209,7 @@ def _known_function_substitution(inst, info, more):
     return inst, False
 
 
-def _process_write_call(inst, info):
+def _process_write_call(inst, info, more):
     if inst.wr_buf.size_cursor is None:
         write_size = Literal('<UNKNOWN WRITE BUF SIZE>', CODE_LITERAL)
     else:
@@ -256,12 +256,14 @@ def _process_write_call(inst, info):
         new_inst = get_ret_inst(current_function, info)
         new_inst.set_modified(InstructionColor.REMOVE_WRITE)
         new_inst.removed.append(inst)
-    return new_inst
+        blk.append(new_inst)
+        return None
+    return None
 
 
 def _process_call_inst(inst, info, more):
     if inst.name in WRITE_PACKET:
-        return _process_write_call(inst, info)
+        return _process_write_call(inst, info, more)
     elif inst.name in KNOWN_FUNCS:
         tmp, is_ret_val = _known_function_substitution(inst, info, more)
         if is_ret_val and more.ctx == BODY:
