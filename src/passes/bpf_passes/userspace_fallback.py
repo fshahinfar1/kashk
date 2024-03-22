@@ -337,9 +337,6 @@ def _handle_call_may_fail_or_succeed(inst, func, info, more):
         flag_val = UnaryOp.build('*', flag_ref)
         cond = BinOp.build(flag_val , '!=', ZERO)
         check_failed = ControlFlowInst.build_if_inst(cond)
-        fail = ToUserspace.from_func_obj(current_function)
-        fail.set_modified()
-        check_failed.body.add_inst(fail)
         switch, tmp_decl = \
             _generate_failure_flag_check_in_main_func_switch_case(flag_val,
                     func, info)
