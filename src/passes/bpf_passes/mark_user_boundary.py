@@ -90,6 +90,7 @@ def _process_current_inst(inst, info, more):
 def _to_userspace(i, info, body):
     to_user_inst = ToUserspace.from_func_obj(current_function)
     to_user_inst.set_modified(InstructionColor.TO_USER)
+    to_user_inst.original = i.original
     body.append(to_user_inst)
     # debug(MODULE_TAG, 'new failure path:', to_user_inst.path_id)
 

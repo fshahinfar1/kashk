@@ -8,6 +8,7 @@ from utility import get_tmp_var_name
 from passes.clone import clone_pass
 from passes.code_pass import Pass
 from helpers.instruction_helper import decl_new_var
+from passes.update_original_ref import set_original_ref
 
 
 MODULE_TAG = '[Linear Code Pass]'
@@ -74,7 +75,7 @@ class SimplifyCode(Pass):
             assign = _assign_block_to(if_stmt.cond, tmp_ref)
         if_stmt.other_body.add_inst(assign)
         blk.append(if_stmt)
-
+        set_original_ref(if_stmt, self.info, inst.original)
         return tmp_ref
 
     def _separate_var_decl_and_init(self, inst, more):
@@ -88,6 +89,7 @@ class SimplifyCode(Pass):
         bin_op = BinOp.build(ref, '=', rhs)
         # If the declartion was ignored, also ignore the initialization
         bin_op.ignore = clone.ignore
+        set_original_ref(bin_op, self.info, inst.original)
         blk.append(clone)
         if more.ctx != BODY:
             blk.append(bin_op)
@@ -133,7 +135,9 @@ class SimplifyCode(Pass):
             blk.append(bin_op)
 
             tmp_decl.ignore = cloned_inst.ignore
+            tmp_decl.original = cloned_inst.original
             bin_op.ignore = cloned_inst.ignore
+            bin_op.original = cloned_inst.original
 
             # Use a variable instead of function call
             return tmp_ref.clone([])
@@ -146,6 +150,9 @@ class SimplifyCode(Pass):
         T = index.type
         ref = decl_new_var(T, self.info, self.declare_at_top_of_func)
         assign = BinOp.build(ref, '=', index)
+
+        ref.original = index.original
+        assign.original = index.original
 
         blk = self.cb_ref.get(BODY)
         blk.append(assign)

@@ -163,7 +163,8 @@ class BPF_PROG:
                 off          = BinOp.build(dst, '+', write_size)
                 cond         = BinOp.build(off, '>', self.get_pkt_end())
                 check        = ControlFlowInst.build_if_inst(cond)
-                check.body.add_inst(ToUserspace.from_func_obj(func))
+                fail         = ToUserspace.from_func_obj(func)
+                check.body.add_inst(fail)
                 check.set_modified(InstructionColor.CHECK)
                 check.likelihood = Likelihood.Unlikely
 

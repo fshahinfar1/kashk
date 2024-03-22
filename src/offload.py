@@ -231,6 +231,10 @@ def generate_offload(io_ctx):
 
     debug('Create Failure Paths', tag=MODULE_TAG)
     create_failure_paths(prog, info, None)
+    # for pid, path in info.failure_paths.items():
+    #     txt, _ = gen_code(path, info)
+    #     debug(pid, ':\n', txt, tag=MODULE_TAG)
+    #     debug('~~~')
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Juggle function directory ---------------------------
@@ -333,7 +337,7 @@ def generate_offload(io_ctx):
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('[Decide What to Offload]', tag=MODULE_TAG)
-    analyse_offload(prog, info)
+    # analyse_offload(prog, info)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Write the code we have generated

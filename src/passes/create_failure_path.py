@@ -6,6 +6,7 @@ from data_structure import *
 from passes.code_pass import Pass
 from passes.clone import clone_pass
 from helpers.instruction_helper import show_insts
+from code_gen import gen_code
 
 
 
@@ -127,6 +128,7 @@ class FindFailurePaths(Pass):
         name = '[[main]]' if self.current_function is None else self.current_function.name
         ast = self.info.original_ast[name].body
         target = inst.original
+        assert target is not None, 'broken alignment with original source code'
         tmp = GatherRestInstruction.do(ast, self.info, target=target)
         # debug('found:', tmp.found, 'looking:', target, tag=MODULE_TAG)
         # show_insts(ast)
@@ -216,6 +218,7 @@ class FindFailurePaths(Pass):
                 assert prnt.op == '=', 'I think it call instruction should be part of an assignment or a block of code'
                 tmp_clone_lhs = clone_pass(prnt.lhs.children[0])
                 first_inst = BinOp.build(tmp_clone_lhs, '=', call_inst)
+                first_inst.original = prnt.original
 
                 target = prnt
             else:
@@ -239,6 +242,11 @@ class FindFailurePaths(Pass):
         self.terminate = True
         self.skip_children()
         rest = self.get_rest(inst)
+        if len(rest) == 0:
+            txt, _ = gen_code(inst.original, self.info)
+            debug(inst, inst.original, tag=MODULE_TAG)
+            debug(txt, tag=MODULE_TAG)
+        assert len(rest) > 0, 'Empty failure path on a sequence of instructions!'
         self.failure_paths[failure_path_id] = rest
         inst.path_id = failure_path_id
         if self.current_function is not None:
@@ -257,7 +265,6 @@ class FindFailurePaths(Pass):
             return inst
 
         # TODO: if in a branch all possible paths fail, terminate the search
-
         match inst.kind:
             case instruction.TO_USERSPACE_INST:
                 self._handle_fallback_point(inst, more)

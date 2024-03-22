@@ -519,7 +519,9 @@ def _handle_array_access(inst, info, more):
     cond2 = BinOp.build(index, '<', ZERO)
     cond = BinOp.build(cond1, '||', cond2)
     check = ControlFlowInst.build_if_inst(cond)
-    check.body.add_inst(ToUserspace.from_func_obj(current_function))
+    fail = ToUserspace.from_func_obj(current_function)
+    fail.original = inst.original
+    check.body.add_inst(fail)
     check.likelihood = Likelihood.Unlikely
     blk = cb_ref.get(BODY)
     blk.append(check)
