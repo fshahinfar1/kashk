@@ -202,7 +202,7 @@ __m = (struct {meta.name} *)__b;
 
 def _load_meta(info):
     # TODO: load the correct data structure based on the failure number
-    debug('--', info.user_prog.declarations, tag=MODULE_TAG)
+    # debug('--', info.user_prog.declarations, tag=MODULE_TAG)
     meta = list(info.user_prog.declarations.values())[0]
     declare = []
     load = []
@@ -221,6 +221,7 @@ def generate_user_prog(main, info):
     """
     assert isinstance(main, Block)
     code = []
+    sym_tbl = info.sym_tbl
 
     # New type declarations
     declarations, _ = gen_code(list(info.user_prog.declarations.values()), info)
@@ -240,7 +241,10 @@ def generate_user_prog(main, info):
     # Find the entry function again and replace the event loop
     index, tu, cursor = parse_file(info.io_ctx.input_file, info.io_ctx.cflags)
     _, entry_func = get_entry_code(cursor, info)
-    f = __add_func_definition2(USER_EVENT_LOOP_ENTRY, entry_func, info)
+    gs = sym_tbl.global_scope
+    with sym_tbl.with_scope(gs):
+        f = __add_func_definition2(USER_EVENT_LOOP_ENTRY, entry_func, info)
+        f.update_symbol_table(sym_tbl)
     ev_loop = find_event_loop(f.body)
     if ev_loop is None:
         ev_loop = f

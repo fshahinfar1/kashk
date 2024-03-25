@@ -19,7 +19,7 @@ class Info:
 
     __slots__ = ('sym_tbl', 'prog', 'user_prog', 'io_ctx', 'map_definitions',
             'read_decl', 'func_cost_table', 'failure_paths',
-            'failure_path_new_funcs', 'failure_vars')
+            'failure_path_new_funcs', 'failure_vars', 'original_ast')
 
     @classmethod
     def from_io_ctx(cls, io_ctx):
@@ -50,6 +50,7 @@ class Info:
         self.failure_paths = None
         self.failure_path_new_funcs = None
         self.failure_vars = None
+        self.original_ast = None
 
 
 class PacketBuffer:
@@ -119,7 +120,7 @@ class CodeBlockRef:
 
 
 class StateObject:
-    __slots__ = ('cursor', 'name', 'kind', 'type_ref', 'is_unused')
+    __slots__ = ('cursor', 'name', 'kind', 'type_ref')
     @classmethod
     def build(cls, name, T):
         obj = StateObject(None)
@@ -139,7 +140,17 @@ class StateObject:
             self.name = None
             self.kind = None
             self.type_ref = None
-        self.is_unused = False
+
+    def __eq__(self, other):
+        if id(self) == id(other):
+            return True
+        if self.kind != other.kind:
+            return False
+        if self.name != other.name:
+            return False
+        if self.type_ref != other.type_ref:
+            return False
+        return True
 
     @property
     def type(self):
@@ -162,9 +173,6 @@ class StateObject:
             for f in self.type_ref.fields:
                 if f.name == name:
                     return f
-
-    def set_unused(self):
-        self.is_unused = True
 
     def get_c_code(self):
         T = self.type_ref
@@ -298,9 +306,7 @@ class Record(TypeDefinition):
 
     def update_symbol_table(self, sym_tbl):
         struct_name = self.name
-        T = MyType()
-        T.spelling = self.get_name()
-        T.kind = clang.TypeKind.RECORD
+        T = self.type
         scope_key = f'class_{T.spelling}'
         sym_tbl.insert_entry(scope_key, T, clang.CursorKind.CLASS_DECL, None)
         with sym_tbl.new_scope() as scope:
@@ -367,7 +373,6 @@ class Function(TypeDefinition):
         self._body = Block(BODY)
         self.is_method = False
         self.is_operator = False
-        self.may_have_context_ptr = False
         self.may_fail = False
         self.may_succeed = False
         self.may_return_bpf_ctx_ptr = False
@@ -376,15 +381,10 @@ class Function(TypeDefinition):
         self.complexity = 0
         self.based_on = None
         self.fallback_vars = None
-        self.removed_args = None
-
-        self.path_ids = []
-        self.last_arg_is_auto_gen = False
+        self.path_ids = set()
 
         # What operations has alread been applied (bitset)
         self.change_applied = 0
-
-        self.function_dependancy = set()
 
         if directory is None:
             directory = Function.directory
@@ -449,7 +449,7 @@ class Function(TypeDefinition):
                 e = sym_tbl.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
 
 
-VOID_PTR = 999
+VOID_PTR_ = 999
 BASE_TYPES = {}
 def prepare_base_types():
     kind_name_map = {
@@ -468,7 +468,7 @@ def prepare_base_types():
 
     for kind, name in kind_name_map.items():
         BASE_TYPES[kind] = MyType.make_simple(name, kind)
-    BASE_TYPES[VOID_PTR] = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+    BASE_TYPES[VOID_PTR_] = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
 
 
 prepare_base_types()

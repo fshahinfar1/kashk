@@ -18,16 +18,10 @@ PARENT_INST = 1000
 current_function = None
 cb_ref = None
 fail_ref = None
-failure_path_id = 1
 
 NO = 0
 YES = 1
 MARKED = 2
-
-
-def get_number_of_failure_paths():
-    # Number of failure paths that we have already found
-    return failure_path_id - 1
 
 
 @contextmanager
@@ -85,10 +79,6 @@ def _process_current_inst(inst, info, more):
             assert body is not None, 'this pass should not remove anything'
             func.body = body
             _have_processed.add(func.name)
-
-        if current_function:
-            # Update the current function with the failure paths
-            current_function.path_ids.extend(func.path_ids)
     elif inst.kind == ANNOTATION_INST and inst.ann_kind == Annotation.ANN_SKIP:
         fail_ref.set(FAILED, YES)
         return inst, YES
@@ -98,15 +88,11 @@ def _process_current_inst(inst, info, more):
 
 
 def _to_userspace(i, info, body):
-    global failure_path_id
-    to_user_inst = ToUserspace.from_func_obj(current_function, failure_path_id)
+    to_user_inst = ToUserspace.from_func_obj(current_function)
     to_user_inst.set_modified(InstructionColor.TO_USER)
-    failure_path_id += 1
+    to_user_inst.original = i.original
     body.append(to_user_inst)
     # debug(MODULE_TAG, 'new failure path:', to_user_inst.path_id)
-
-    if current_function:
-        current_function.path_ids.append(to_user_inst.path_id)
 
 
 def _process_child(child, inst, info, more):

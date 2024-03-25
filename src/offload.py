@@ -1,12 +1,12 @@
 import clang.cindex as clang
-from pprint import pformat
+from pprint import pformat, pprint
 
 from framework_support import InputOutputContext
 from log import *
 from data_structure import *
 from instruction import *
 from utility import (parse_file, find_elem, report_user_program_graph,
-        draw_tree)
+        draw_tree, find_elems_of_kind)
 from parser.find_ev_loop import get_entry_code
 from sym_table import Scope
 from sym_table_gen import build_sym_table, process_source_file
@@ -24,9 +24,12 @@ from passes.mark_io import mark_io
 from passes.clone import clone_pass
 from passes.simplify_code import simplify_code_structure
 from passes.create_failure_path import create_failure_paths
-from passes.find_unused_vars import find_unused_vars
+from passes.find_unused_vars import remove_unused_args
 from passes.fallback_variables import failure_path_fallback_variables
-from passes.create_meta_struct import create_fallback_meta_structure
+from passes.create_meta_struct import create_fallback_meta_structure, FAILURE_NUMBER_FIELD
+from passes.update_original_ref import update_original_ast_references
+from passes.update_func_signature import update_function_signature
+from passes.update_func_failure_status import update_function_failure_status
 
 from passes.bpf_passes.loop_end import loop_end_pass
 from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
@@ -40,7 +43,7 @@ from passes.bpf_passes.prog_complexity import mitiage_program_comlexity
 from passes.bpf_passes.change_bpf_loop import change_to_bpf_loop
 from passes.bpf_passes.rewrite_while_loop import rewrite_while_loop
 
-from helpers.instruction_helper import show_insts
+from helpers.instruction_helper import decl_new_var, show_insts, INT
 from helpers.ast_graphviz import ASTGraphviz
 from helpers.cfg_graphviz import CFGGraphviz
 
@@ -52,7 +55,7 @@ from decide import analyse_offload
 
 
 MODULE_TAG = '[Gen Offload]'
-BPF_MAIN = 'MAIN_SCOPE'
+MAIN = '[[main]]'
 
 
 def _print_code(prog, info):
@@ -112,6 +115,9 @@ def load_other_sources(io_ctx, info):
 
 
 def generate_offload(io_ctx):
+    """
+    Main logic of the compiler. It defines the order of passes that are needed.
+    """
     # filter_log(MODULE_TAG, '[Select Userspace Pass]', '[Var Dependency]')
     # filter_log(MODULE_TAG, '[Var Dependency]', '[Create Fallback]',
     #         '[User Code]', '[Select Userspace]')
@@ -124,7 +130,7 @@ def generate_offload(io_ctx):
     load_other_sources(io_ctx, info)
     # Build and select the entry function scope
     scope = Scope(info.sym_tbl.global_scope)
-    info.sym_tbl.scope_mapping[BPF_MAIN] = scope
+    info.sym_tbl.scope_mapping[MAIN] = scope
     info.sym_tbl.current_scope = scope
     info.prog.add_args_to_scope(scope)
     # Find the entry function
@@ -158,6 +164,22 @@ def generate_offload(io_ctx):
     prog = primary_annotation_pass(prog, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
+    # TODO: I do not like this, because it resulted in maintaining two function
+    # directories. Maybe if we rename the function so we have bpf and userspace
+    # version of the function with different names the reference management
+    # become easier. At least it would be obviouse which version of the
+    # function we want to access.
+    debug('Clone the original code', tag=MODULE_TAG)
+    update_original_ast_references(prog, info, None)
+    # Store the original version of the source code (unchanged) for future use
+    tmp_fn_dir = {}
+    for k, f in Function.directory.items():
+        f.clone(tmp_fn_dir)
+    tmp_f = Function(MAIN, None, tmp_fn_dir)
+    tmp_f.body = prog
+    info.original_ast = tmp_fn_dir
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
     debug('Mark Read/Write Inst & Buf', tag=MODULE_TAG)
     mark_io(prog, info)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
@@ -170,123 +192,186 @@ def generate_offload(io_ctx):
     prog = feasibilty_analysis_pass(prog, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Create Failure Paths', tag=MODULE_TAG)
-    create_failure_paths(prog, info, None)
+    # End event loop with packet drop
+    debug('Loop End', tag=MODULE_TAG)
+    prog = loop_end_pass(prog, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
+    debug('Rewrite While/Do-While', tag=MODULE_TAG)
+    prog = rewrite_while_loop(prog, info, None)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    # debug('Change loop to bpf_loop', tag=MODULE_TAG)
+    # prog = change_to_bpf_loop(prog, info, None)
+    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    debug('[1st] Update Function Signature', tag=MODULE_TAG)
+    prog = update_function_signature(prog, info)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    # Transform access to variables and read/write buffers.
+    debug('Transform Vars', tag=MODULE_TAG)
+    prog = transform_vars_pass(prog, info, PassObject())
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    # Verifier
+    debug('[1st] Verifier', tag=MODULE_TAG)
+    prog = verifier_pass(prog, info, PassObject())
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    # Second transform
+    debug('Transform: Part II', tag=MODULE_TAG)
+    prog = transform_func_after_verifier(prog, info, PassObject())
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    # Verifier
+    debug('[2nd] Verifier', tag=MODULE_TAG)
+    prog = verifier_pass(prog, info, PassObject())
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    debug('Create Failure Paths', tag=MODULE_TAG)
+    create_failure_paths(prog, info, None)
+    # for pid, path in info.failure_paths.items():
+    #     txt, _ = gen_code(path, info)
+    #     debug(pid, ':\n', txt, tag=MODULE_TAG)
+    #     debug('~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    # Juggle function directory ---------------------------
+    tmp_fn_dir = Function.directory
+    Function.directory = info.original_ast
+    # Move failure functions to the original_ast list
+    for f in info.failure_path_new_funcs:
+        assert f.name not in Function.directory, 'We are adding failure functions to the original ast, one of them were already here ?!'
+        Function.directory[f.name] = f
+        # f.clone(info.original_ast)
+        # print(f.name, f.args)
+    # -----------------------------------------------------
+
+    # Some checks for failure paths -----------------------
+    # pprint(info.failure_paths)
+    for pid, path in info.failure_paths.items():
+        for call in find_elems_of_kind(path, clang.CursorKind.CALL_EXPR):
+            f = call.get_function_def()
+            # f = info.original_ast.get(call.name)
+            assert len(call.args) == len(f.args), f'{pid} @{f.name}:\nfunc: {str(f.args) }\ncall: {str(call.args)}'
+    debug('number of failure paths:', len(info.failure_paths), tag=MODULE_TAG)
+    # -----------------------------------------------------
+
     debug('Remove Unused Args From Failure Functions', tag=MODULE_TAG)
-    # TODO: Remove unused args from failure functions
-    for func in info.failure_path_new_funcs:
-        tmp_names = set(a.name for a in func.args)
-        unused_vars = find_unused_vars(func.body, info, target=tmp_names)
-        for a in func.args:
-            if a.name in unused_vars:
-                a.set_unused()
+    remove_unused_args(prog, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('Failure Path Variables', tag=MODULE_TAG)
     failure_path_fallback_variables(info)
+
+    for pid, V in info.failure_vars.items():
+        ignore = False
+        for var in V:
+            T = var.type
+            if T.is_pointer() and not var.is_bpf_ctx:
+                # debug('not doing path:', pid, 'because:', var)
+                ignore = True
+
+        if not ignore:
+            continue
+        info.failure_paths[pid] = [Literal('/* from begining */', CODE_LITERAL),]
+        info.failure_vars[pid].clear()
+
+        tbl = info.sym_tbl
+        for scope in tbl.scope_mapping.scope_mapping.values():
+            for e in scope.symbols.values():
+                if pid in e.is_fallback_var:
+                    e.is_fallback_var.remove(pid)
+    # pprint(info.failure_vars)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('Create Fallback Meta Structures', tag=MODULE_TAG)
     create_fallback_meta_structure(info)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
+    # Juggle function directory ---------------------------
+    for f in Function.directory.values():
+        other_f = tmp_fn_dir.get(f.name)
+        if other_f is None:
+            continue
+        other_f.path_ids = set(f.path_ids)
+    Function.directory = tmp_fn_dir
+    # -----------------------------------------------------
 
-    # debug('Clone All State', tag=MODULE_TAG)
-    # user = clone_pass(prog, info, PassObject())
-    # info.user_prog.sym_tbl = info.sym_tbl.clone()
-    # info.user_prog.func_dir = {}
-    # for func in Function.directory.values():
-    #     new_f = func.clone(info.user_prog.func_dir)
-    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    prog = gen_bpf_code(prog, info, io_ctx.bpf_out_file)
-    # if not info.user_prog.graph.is_empty():
-    #     gen_user_code(user, info, io_ctx.user_out_file)
-    # else:
-    #     report("No user space program was generated. The tool has offloaded everything to BPF.")
-
-    return info
-
-
-def gen_user_code(user, info, out_user):
-    text = generate_user_prog(main, info)
-    with open(out_user, 'w') as f:
-        f.write(text)
-
-
-def gen_bpf_code(bpf, info, out_bpf):
-    # End event loop with packet drop
-    debug('Loop End', tag=MODULE_TAG)
-    bpf = loop_end_pass(bpf, info, PassObject())
+    debug('Update Function Failure Status', tag=MODULE_TAG)
+    update_function_failure_status(prog, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Rewrite While/Do-While', tag=MODULE_TAG)
-    bpf = rewrite_while_loop(bpf, info, None)
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    # debug('Change loop to bpf_loop', tag=MODULE_TAG)
-    # bpf = change_to_bpf_loop(bpf, info, None)
-    # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    # Transform access to variables and read/write buffers.
-    debug('Transform Vars', tag=MODULE_TAG)
-    bpf = transform_vars_pass(bpf, info, PassObject())
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    # Verifier
-    debug('Verifier', tag=MODULE_TAG)
-    bpf = verifier_pass(bpf, info, PassObject())
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    # Second transform
-    debug('[2nd] Transform', tag=MODULE_TAG)
-    bpf = transform_func_after_verifier(bpf, info, PassObject())
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    # Verifier
-    debug('[2nd] Verifier', tag=MODULE_TAG)
-    bpf = verifier_pass(bpf, info, PassObject())
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    # Reduce number of parameters
-    debug('Reduce Params', tag=MODULE_TAG)
-    bpf = reduce_params_pass(bpf, info, PassObject())
+    debug('[2nd] Update Function Signature', tag=MODULE_TAG)
+    prog = update_function_signature(prog, info)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Handle moving to userspace and removing the instruction not possible in
     # BPF
     debug('Userspace Fallback', tag=MODULE_TAG)
-    bpf = userspace_fallback_pass(bpf, info, PassObject())
+    prog = userspace_fallback_pass(prog, info, PassObject())
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    # Reduce number of parameters
+    debug('Reduce Params', tag=MODULE_TAG)
+    prog = reduce_params_pass(prog, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('[2nd] remove everything that is not used in BPF', tag=MODULE_TAG)
-    remove_everything_not_used(bpf, info, None)
+    prog = remove_everything_not_used(prog, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Verifier
     debug('[3rd] Verifier', tag=MODULE_TAG)
-    bpf = verifier_pass(bpf, info, PassObject())
+    prog = verifier_pass(prog, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # debug('Program Complexity Pass', tag=MODULE_TAG)
-    # list_bpf_progs = mitiage_program_comlexity(bpf, info, None)
+    # list_bpf_progs = mitiage_program_comlexity(prog, info, None)
     # debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # TODO: split the code between parser and verdict
     debug('[Parser/Verdict Split Code]', tag=MODULE_TAG)
-    info.prog.set_code(bpf)
+    info.prog.set_code(prog)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     debug('[Decide What to Offload]', tag=MODULE_TAG)
-    analyse_offload(bpf, info)
+    # analyse_offload(prog, info)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Write the code we have generated
-    debug('BPF Code Generation', tag=MODULE_TAG)
+    debug('Write BPF Code', tag=MODULE_TAG)
     text = generate_bpf_prog(info)
-    with open(out_bpf, 'w') as f:
+    with open(io_ctx.bpf_out_file, 'w') as f:
         f.write(text)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-    return bpf
+
+    # Check for the userspace code
+    if len(info.failure_paths) > 0:
+        gen_user_code(info, io_ctx.user_out_file)
+    else:
+        report("No user space program was generated. The tool has offloaded everything to BPF.")
+
+    return info
+
+
+def gen_user_code(info, out_user):
+    """
+    Generate the userspace program code from the prepared Info object.
+    """
+    decl = []
+    failure_num = decl_new_var(INT, info, decl, FAILURE_NUMBER_FIELD)
+    switch = ControlFlowInst.build_switch(failure_num)
+    for path_id, path in info.failure_paths.items():
+        case_stmt = CaseSTMT(None)
+        case_stmt.case.add_inst(Literal(str(path_id), clang.CursorKind.INTEGER_LITERAL))
+        case_stmt.body.extend_inst(path)
+        brk = Instruction.build_break_inst()
+        case_stmt.body.add_inst(brk)
+        switch.body.add_inst(case_stmt)
+    main = Block(BODY)
+    main.add_inst(switch)
+    text = generate_user_prog(main, info)
+    with open(out_user, 'w') as f:
+        f.write(text)

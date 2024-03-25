@@ -36,6 +36,7 @@ from passes.bpf_passes.reduce_params import reduce_params_pass
 from passes.bpf_passes.remove_everything_not_used import remove_everything_not_used
 from passes.bpf_passes.prog_complexity import mitiage_program_comlexity
 from passes.bpf_passes.change_bpf_loop import change_to_bpf_loop
+from passes.bpf_passes.rewrite_while_loop import rewrite_while_loop
 
 from helpers.instruction_helper import show_insts
 from helpers.ast_graphviz import ASTGraphviz
@@ -51,86 +52,9 @@ root_dir = os.path.join(curdir, '..')
 script_dir = os.path.abspath(os.path.join(root_dir, '../compile_scripts'))
 
 
-class BrainTest(BasicTest):
+class VerifierTest(BasicTest):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.cfg_table = None
-
-    @property
-    def main_cfg(self):
-        return self.cfg_table['__main__']
-
-    def show_cfg(self, cfg):
-        tmp = CFGGraphviz.do(cfg, self.info)
-        # tmp.dot.save('/tmp/test_cfg.dot')
-        tmp.dot.render(filename='test_cfg', directory='/tmp/', format='svg')
-
-    def gen_code(self):
-        info = self.info
-        out_user = '/tmp/test_user.c'
-        out_bpf  = '/tmp/test_bpf.c'
-        with info.user_prog.select_context(info):
-            text = generate_user_prog(info)
-        with open(out_user, 'w') as f:
-            f.write(text)
-        text = generate_bpf_prog(info)
-        with open(out_bpf, 'w') as f:
-            f.write(text)
-        # Try to compile the user <-- This will fail unfortunately
-        # ...
-        # Try to compile the BPF
-        bpf_bin_out = '/tmp/test_bpf.o'
-        compile_script = os.path.join(script_dir, 'compile_bpf_source.sh')
-        cmd = ['/bin/bash', compile_script, out_bpf, bpf_bin_out]
-        proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        ret = proc.returncode
-        assert ret == 0, f'The generated source code should compile (ret code: {ret})'
-
-        return [out_bpf, out_user]
-
-    def _gen_user_code(self, user):
-        info = self.info
-        with info.user_prog.select_context(info):
-            create_fallback_pass(user, info, PassObject())
-            var_dependency_pass(info)
-            meta_structs = dfs_over_deps_vars(info.user_prog.graph)
-            for x in meta_structs:
-                state_obj = StateObject(None)
-                state_obj.name = 'failure_number'
-                state_obj.type_ref = BASE_TYPES[clang.TypeKind.INT]
-                fields = [state_obj,]
-                for var in x['vars']:
-                    T = var.type.clone()
-                    state_obj = StateObject(None)
-                    state_obj.name = var.name
-                    state_obj.type_ref = T
-                    fields.append(state_obj)
-                path_id = x['path_id']
-                meta = Record(f'meta_{path_id}', fields)
-                meta.is_used_in_bpf_code = True
-                info.prog.add_declaration(meta)
-                info.user_prog.declarations[path_id] = meta
-                __scope = info.sym_tbl.current_scope
-                info.sym_tbl.current_scope = info.sym_tbl.global_scope
-                meta.update_symbol_table(info.sym_tbl)
-                info.sym_tbl.current_scope = __scope
-
-
-    def _gen_bpf_code(self, bpf):
-        info = self.info
-        bpf = loop_end_pass(bpf, info, PassObject())
-        bpf = transform_vars_pass(bpf, info, PassObject())
-        bpf = userspace_fallback_pass(bpf, info, PassObject())
-        bpf = verifier_pass(bpf, info, PassObject())
-        bpf = transform_func_after_verifier(bpf, info, PassObject())
-        bpf = reduce_params_pass(bpf, info, PassObject())
-        remove_everything_not_used(bpf, info, None)
-        # bpf = change_to_bpf_loop(bpf, info, None)
-        # list_bpf_progs = mitiage_program_comlexity(bpf, info, None)
-        info.prog.set_code(bpf)
-        cfg_table = analyse_offload(bpf, info)
-        self.cfg_table = cfg_table
-        return bpf
 
     def run_test(self):
         info = self.info
@@ -167,7 +91,11 @@ class BrainTest(BasicTest):
         prog = simplify_code_structure(prog, info, PassObject())
         prog = feasibilty_analysis_pass(prog, info, PassObject())
         create_failure_paths(prog, info, None)
+        # TODO: remove unused arguments of new functions
         failure_path_fallback_variables(info)
         create_fallback_meta_structure(info)
-        prog = self._gen_bpf_code(prog)
-        self.test(prog)
+        bpf = loop_end_pass(prog, info, PassObject())
+        bpf = rewrite_while_loop(bpf, info, None)
+        bpf = transform_vars_pass(bpf, info, PassObject())
+        bpf = verifier_pass(bpf, info, PassObject())
+        self.test(bpf)

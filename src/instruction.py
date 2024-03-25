@@ -51,6 +51,7 @@ def _default_clone_operation(new, old):
     new.change_applied = old.change_applied
     new.color          = old.color
     new.removed        = old.removed[:]
+    new.original       = old.original
 
 
 class InstructionColor:
@@ -82,7 +83,7 @@ INSTRUCTION_COLORS = (InstructionColor.ORIGINAL, InstructionColor.RED,
 #         Instruction.OFFSET_MASK_FLAG)
 
 class Instruction(PassableObject):
-    __slots__ = ('change_applied', 'color', 'body', 'removed')
+    __slots__ = ('change_applied', 'color', 'body', 'removed', 'original')
 
     BOUND_CHECK_FLAG = 1 << 3 # Have I done the bound check
     OFFSET_MASK_FLAG = 1 << 4 # Have I applied the offset mask
@@ -90,6 +91,14 @@ class Instruction(PassableObject):
     MAY_NOT_OVERLOAD = (clang.CursorKind.BREAK_STMT,
             clang.CursorKind.CONTINUE_STMT, clang.CursorKind.GOTO_STMT,
             clang.CursorKind.LABEL_STMT, clang.CursorKind.INIT_LIST_EXPR)
+
+    @classmethod
+    def build_break_inst(cls, red=False):
+        brk = Instruction()
+        brk.kind = clang.CursorKind.BREAK_STMT
+        if red:
+            brk.set_modified()
+        return brk
 
     def __init__(self):
         super().__init__()
@@ -102,6 +111,7 @@ class Instruction(PassableObject):
         self.color = InstructionColor.ORIGINAL
         # Link the instruction removed by the tool
         self.removed = []
+        self.original = None
 
     def has_children(self):
         if self.kind not in Instruction.MAY_NOT_OVERLOAD:
@@ -378,6 +388,16 @@ class VarDecl(Instruction):
 
 class ControlFlowInst(Instruction):
     __slots__ = ('cond', 'other_body', 'repeat', 'likelihood')
+
+    @classmethod
+    def build_switch(cls, cond, red=False):
+        switch = ControlFlowInst()
+        switch.kind = clang.CursorKind.SWITCH_STMT
+        switch.cond.add_inst(cond)
+        if red:
+            switch.set_modified()
+        return switch
+
 
     @classmethod
     def build_if_inst(cls, condition_inst, red=False):
@@ -814,28 +834,25 @@ class Ref(Instruction):
         new.owner  = list(self.owner)
         return new
 
-    def get_ref_field(self, name, info=None):
+    def get_ref_field(self, name, info):
+        assert info is not None
         ref = Ref(None, clang.CursorKind.MEMBER_REF_EXPR)
         ref.name = name
-        if info:
-            T = self.type
-            T = get_actual_type(T)
-            key = f'class_{T.spelling}'
-            if key not in info.sym_tbl.scope_mapping:
-                error(info.sym_tbl.scope_mapping)
-            struct_scope = info.sym_tbl.scope_mapping[key]
-            sym = struct_scope.lookup(name)
-            if sym is None:
-                error('Failed to find the field in the struct! field name:', name)
-                debug('debug info:')
-                debug(struct_scope.symbols)
-                debug('-------------------')
-            assert sym is not None
-            ref.type = sym.type
-            assert isinstance(ref.type, MyType)
-        else:
-            ref.type = None
-            assert 0, 'This should not happen'
+        T = self.type
+        T = get_actual_type(T)
+        key = f'class_{T.spelling}'
+        if key not in info.sym_tbl.scope_mapping:
+            error(info.sym_tbl.scope_mapping)
+            raise Exception(f'we do not know about the declaration of record: {key}')
+        struct_scope = info.sym_tbl.scope_mapping[key]
+        sym = struct_scope.lookup(name)
+        if sym is None:
+            error('Failed to find the field in the struct! field name:', name)
+            debug('debug info:')
+            debug(struct_scope.symbols)
+            debug('-------------------')
+            raise Exception('Failed to find the field in the struct!')
+        ref.type = sym.type
         ref.owner.append(self)
         return ref
 
@@ -970,27 +987,31 @@ class Block(Instruction):
 
 
 class ToUserspace(Instruction):
-    __slots__ = ('is_bpf_main', 'return_type', 'path_id')
+    __slots__ = ('current_func', 'path_id')
 
     @classmethod
-    def from_func_obj(cls, func, path_id=None):
+    def from_func_obj(cls, func):
+        assert isinstance(func, (Function, type(None)))
         obj = ToUserspace()
-        obj.is_bpf_main = func is None
-        if func is not None:
-            obj.return_type = func.return_type
-
-        if path_id is None:
-            error('We are not setting the faliure ID for a ToUserspace instruction.')
-        else:
-            obj.path_id = path_id
+        obj.current_func = func
         return obj
-
+    
     def __init__(self):
         super().__init__()
         self.kind = TO_USERSPACE_INST
-        self.is_bpf_main = False
-        self.return_type = None
-        self.path_id = None
+        self.current_func = None
+        self.path_id = 0
+
+    @property
+    def is_bpf_main(self):
+        return self.current_func is None
+
+    @property
+    def return_type(self):
+        if self.current_func is None:
+            # Assume on the main function
+            return BASE_TYPES[clang.TypeKind.INT]
+        return self.current_func.return_type
 
     def __str__(self):
         return f'<ToUserspace>'
@@ -998,8 +1019,7 @@ class ToUserspace(Instruction):
     def clone(self, _):
         new = ToUserspace()
         _default_clone_operation(new, self)
-        new.is_bpf_main = self.is_bpf_main
-        new.return_type = self.return_type
+        new.current_func = self.current_func
         new.path_id = self.path_id
         return new
 

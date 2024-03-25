@@ -145,11 +145,13 @@ class BPF_PROG:
                 clang.CursorKind.MEMBER_REF_EXPR, None)
         entry.is_bpf_ctx = True
 
-    def send(self, buf, write_size, info, failure_return, ret=True, do_copy=True):
+    def send(self, buf, write_size, info, func, ret=True, do_copy=True):
+        assert isinstance(func, (Function, type(None))), str(func)
+        decl = []
         #TODO: The arguments of this function are crazy ???
         is_size_integer = write_size.kind == clang.CursorKind.INTEGER_LITERAL
-        inst, decl = self.adjust_pkt(write_size, info)
-        inst = decl + inst
+        inst, tmp_decl = self.adjust_pkt(write_size, info)
+        decl.extend(tmp_decl)
         if do_copy:
             # Get a reference to the packet payload in a variable
             pkt = self.get_pkt_buf()
@@ -161,26 +163,20 @@ class BPF_PROG:
                 off          = BinOp.build(dst, '+', write_size)
                 cond         = BinOp.build(off, '>', self.get_pkt_end())
                 check        = ControlFlowInst.build_if_inst(cond)
-                ret_inst     = failure_return
-                check.body.add_inst(ret_inst)
+                fail         = ToUserspace.from_func_obj(func)
+                check.body.add_inst(fail)
                 check.set_modified(InstructionColor.CHECK)
                 check.likelihood = Likelihood.Unlikely
 
-                copy         = Call(None)
-                copy.name    = 'memcpy'
-                args         = [dst, buf, write_size]
-                copy.args = args
+                copy = template.constant_mempcy(dst, buf, write_size)
                 copy.set_modified(InstructionColor.MEM_COPY)
                 inst.extend([check, copy])
             else:
                 # variable copy
-                ret_value = None
-                if failure_return.body.has_children():
-                    ret_value = failure_return.body.children[0]
-                loop, decl, tmp_ret = template.variable_memcpy(dst, buf,
-                        write_size, 1470, info, ret_value)
-                inst.extend(decl)
-                inst.append(loop)
+                tmp_insts, tmp_decl, tmp_ret = template.variable_memcpy(dst, buf,
+                        write_size, 1470, info, func)
+                decl.extend(tmp_decl)
+                inst.extend(tmp_insts)
 
         # Do anything that is needed before sending
         before_send_insts = self.before_send()
@@ -190,7 +186,7 @@ class BPF_PROG:
             ret_val  = self.get_send()
             ret_inst = Return.build([ret_val,])
             inst.append(ret_inst)
-        return inst
+        return inst, decl
 
     def adjust_pkt(self, final_size, info):
         raise Exception('Not implemented!');

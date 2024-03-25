@@ -16,8 +16,8 @@ from sym_table import *
 from passes.pass_obj import PassObject
 from passes.mark_relevant_code import mark_relevant_code
 from passes.simplify_code import simplify_code_structure
+from passes.create_failure_path import create_failure_paths
 from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
-from passes.bpf_passes.mark_user_boundary import get_number_of_failure_paths
 
 
 class TestCase(BasicTest):
@@ -28,6 +28,7 @@ class TestCase(BasicTest):
         mark_relevant_code(bpf, self.info, None)
         bpf = simplify_code_structure(bpf, self.info, PassObject())
         bpf = feasibilty_analysis_pass(bpf, self.info, PassObject())
+        create_failure_paths(bpf, self.info, None)
 
         # Generate the code and show it for debuging
         # text, _ = gen_code(bpf, self.info)
@@ -54,7 +55,7 @@ class TestCase(BasicTest):
                 continue
             assert (func.may_succeed, func.may_fail) == expected_state[func.name], f'For funct {func.name} the expectation does not match (s:{func.may_succeed}, f:{func.may_fail})'
 
-        failure_paths = get_number_of_failure_paths()
+        failure_paths = len(self.info.failure_paths)
         count_expected_failures = 5
         assert  failure_paths == count_expected_failures, f'Expect {count_expected_failures} failure paths found {failure_paths}'
         # Find the first failure point

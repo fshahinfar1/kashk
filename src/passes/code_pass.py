@@ -67,6 +67,11 @@ class Pass:
             parent = self.parent_stack.get2(PARENT_INST, at)
         return parent
 
+    @property
+    def current_fname(self):
+        n = '[[main]]' if self.current_function is None else self.current_function.name
+        return n
+
     @contextmanager
     def set_current_func(self, func, change_scope=True):
         """
@@ -125,6 +130,7 @@ class Pass:
             # Continue deeper
             parent = inst if inst.kind != BLOCK_OF_CODE else self.parent_inst
             with self.parent_stack.new_ref(PARENT_INST, parent):
+                __exit_loop = False
                 for child, tag in inst.get_children_context_marked():
                     if isinstance(child, list):
                         new_child = []
@@ -135,8 +141,9 @@ class Pass:
                                 assert self._may_remove, 'This pass is not allowed to remove instructions'
                                 if tag != BODY:
                                     # Remove the whole block
-                                    self.end_current_inst(_old_inst, more)
-                                    return None
+                                    __exit_loop = True
+                                    inst = None
+                                    break
                                 # Omit this child from the block
                                 continue
                             # Look for "After" box
@@ -147,13 +154,14 @@ class Pass:
                             new_child.append(new_inst)
                             for a in reversed(after):
                                 new_child.extend(a.box)
+                        if __exit_loop:
+                            break
                     else:
                         obj = PassObject.pack(lvl+1, tag, parent_list)
                         new_child = self.do_pass(child, obj)
                         if new_child is None:
-                            assert self._may_remove, 'This pass is not allowed to remove instructions'
-                            self.end_current_inst(_old_inst, more)
-                            return None
+                            inst = None
+                            break
                     new_children.append(new_child)
         # TODO: The returned value is ignored
         new_inst = self.end_current_inst(_old_inst, more)

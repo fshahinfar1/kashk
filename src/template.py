@@ -3,12 +3,13 @@ from data_structure import *
 from my_type import MyType
 from utility import get_tmp_var_name
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
-from helpers.instruction_helper import (decl_new_var, ZERO, NULL, CHAR_PTR,
-        INT, NULL_CHAR, UINT, ONE, VOID_PTR)
+from helpers.instruction_helper import (get_ret_inst, decl_new_var, ZERO, NULL,
+        CHAR_PTR, INT, NULL_CHAR, UINT, ONE, VOID_PTR)
 from elements.likelihood import Likelihood
+from var_names import DATA_VAR, ITERATOR_VAR, DATA_VAR
 
 
-def bpf_ctx_bound_check(ref, index, data_end, return_value=None):
+def bpf_ctx_bound_check(ref, index, data_end, func, abort=False):
     _if = ControlFlowInst()
     _if.kind = clang.CursorKind.IF_STMT
     _if.set_modified(InstructionColor.CHECK)
@@ -39,22 +40,17 @@ def bpf_ctx_bound_check(ref, index, data_end, return_value=None):
     cond.rhs.add_inst(data_end)
     cond.set_modified(InstructionColor.EXTRA_ALU_OP)
 
-    # return 0
-    ret = Return()
-    if return_value is None:
-        # ret.body.add_inst(Literal('0', kind=clang.CursorKind.INTEGER_LITERAL))
-        ret = ret
-    else:
-        ret.body.add_inst(return_value)
-    ret.set_modified()
-
     _if.cond.add_inst(cond)
-    _if.body.add_inst(ret)
     _if.likelihood = Likelihood.Unlikely
+    if abort:
+        tmp_ret = get_ret_inst(func)
+        _if.body.add_inst(tmp_ret)
+    else:
+        _if.body.add_inst(ToUserspace.from_func_obj(func))
     return _if
 
 
-def bpf_ctx_bound_check_bytes(ref, size, data_end, return_value=None):
+def bpf_ctx_bound_check_bytes(ref, size, data_end, func, abort=False):
     _if = ControlFlowInst()
     _if.kind = clang.CursorKind.IF_STMT
     _if.set_modified(InstructionColor.CHECK)
@@ -85,17 +81,8 @@ def bpf_ctx_bound_check_bytes(ref, size, data_end, return_value=None):
     cond.rhs.add_inst(data_end)
     cond.set_modified(InstructionColor.EXTRA_ALU_OP)
 
-    # return 0
-    ret = Return()
-    if return_value is None:
-        # ret.body.add_inst(Literal('0', kind=clang.CursorKind.INTEGER_LITERAL))
-        ret = ret
-    else:
-        ret.body.add_inst(return_value)
-    ret.set_modified()
-
     _if.cond.add_inst(cond)
-    _if.body.add_inst(ret)
+    _if.body.add_inst(ToUserspace.from_func_obj(func))
     _if.likelihood = Likelihood.Unlikely
     return _if
 
@@ -118,7 +105,7 @@ shared_struct = MyType.make_simple('struct shared_state',
         clang.TypeKind.RECORD)
 SHARED_OBJ_PTR = MyType.make_pointer(shared_struct)
 SHARED_MAP_PTR = Literal('&shared_map', CODE_LITERAL)
-def prepare_shared_state_var(ret_val=None):
+def prepare_shared_state_var(func):
     var_decl = VarDecl.build('shared', SHARED_OBJ_PTR, red=True)
     var_decl.init.add_inst(NULL)
     var_ref = var_decl.get_ref()
@@ -141,16 +128,14 @@ def prepare_shared_state_var(ret_val=None):
 
     cond  = BinOp.build(var_ref, '==', NULL, red=True)
     check = ControlFlowInst.build_if_inst(cond)
-    if ret_val is None:
-        ret_val = Return.build([], red=True)
-    check.body.add_inst(ret_val)
+    check.body.add_inst(ToUserspace.from_func_obj(func))
     check.likelihood = Likelihood.Unlikely
     check.set_modified(InstructionColor.CHECK)
     insts = [var_decl, zero_decl, lookup_assign,  check]
     return insts
 
 
-def prepare_meta_data(failure_number, meta_declaration, info):
+def prepare_meta_data(failure_number, meta_declaration, info, func):
     decl = []
     type_name = f'struct {meta_declaration.name}'
     req_type = MyType.make_simple(type_name, clang.TypeKind.RECORD)
@@ -161,12 +146,19 @@ def prepare_meta_data(failure_number, meta_declaration, info):
     decl.extend(tmp_decl)
 
     ref = decl_new_var(T, info, decl)
-    assign = BinOp.build(ref, '=', info.prog.get_pkt_buf())
+
+    pkt = info.prog.get_pkt_buf()
+    data, tmp_decl  = get_or_decl_ref(info, DATA_VAR, VOID_PTR,
+            init=pkt)
+    decl.extend(tmp_decl)
+
+    assign = BinOp.build(ref, '=', data)
     assign.set_modified()
 
-    DROP = Literal(info.prog.get_drop(), clang.CursorKind.INTEGER_LITERAL)
-    DROP.set_modified()
-    bound_check = bpf_ctx_bound_check(ref, ZERO, info.prog.get_pkt_end(), DROP)
+    # DROP = Literal(info.prog.get_drop(), clang.CursorKind.INTEGER_LITERAL)
+    # DROP.set_modified()
+    bound_check = bpf_ctx_bound_check(ref, ZERO, info.prog.get_pkt_end(), func,
+            abort=True)
 
     store = [f'{ref.name}->failure_number = {failure_number};', ]
     for f in meta_declaration.fields[1:]:
@@ -189,44 +181,50 @@ def define_bpf_map(map_name, map_type, key_type, val_type, entries):
 
 
 def define_bpf_arr_map(map_name, val_type, entries):
-    return define_bpf_map(map_name, 'BPF_MAP_TYPE_ARRAY', 'unsigned int', val_type, entries)
+    return define_bpf_map(map_name, 'BPF_MAP_TYPE_ARRAY',
+            'unsigned int', val_type, entries)
 
 
 def define_bpf_hash_map(map_name, key_type, val_type, entries):
-    return define_bpf_map(map_name, 'BPF_MAP_TYPE_HASH', key_type, val_type, entries)
+    return define_bpf_map(map_name, 'BPF_MAP_TYPE_HASH', key_type,
+            val_type, entries)
 
 
-def malloc_lookup(name, info, return_val):
+def malloc_lookup(name, info, func):
     """
     """
-    tmp_name = get_tmp_var_name()
+    decls = []
+    insts = []
     type_name = f'struct {name}'
-    T = MyType.make_pointer(MyType.make_simple(type_name, clang.TypeKind.RECORD))
+    struct_T = MyType.make_simple(type_name, clang.TypeKind.RECORD)
+    T = MyType.make_pointer(struct_T)
 
     # Add var decl to symbol table
-    info.sym_tbl.insert_entry(tmp_name, T, clang.CursorKind.VAR_DECL, None)
+    ref = decl_new_var(T, info, decls)
+    zero = decl_new_var(T, info, decls)
 
-    var_decl = VarDecl(None)
-    var_decl.name = tmp_name
-    var_decl.type = T
-    var_decl.init.add_inst(Literal('NULL', clang.CursorKind.INTEGER_LITERAL))
-    var_decl.update_symbol_table(info.sym_tbl)
+    # zero = 0
+    tmp_assign = BinOp.build(zero, '=', ZERO, red=True)
+    insts.append(tmp_assign)
 
-    text = f'''
-{{
-  const int zero = 0;
-  {tmp_name} = bpf_map_lookup_elem(&{name}_map, &zero);
-  if ({tmp_name} == NULL) {{
-    return {return_val};
-  }}
-}}
-'''
-    lookup_inst = Literal(text, CODE_LITERAL)
-    lookup_inst.set_modified(InstructionColor.MAP_LOOKUP)
+    # ref = bpf_map_lookup_elem(&map, &zero)
+    lookup = Call(None)
+    lookup.name = 'bpf_map_lookup_elem'
+    map_ref = UnaryOp.build('&', Ref.build(f'{name}_map', struct_T))
+    lookup.args = [map_ref, UnaryOp.build('&', zero)]
+    lookup.set_modified(InstructionColor.MAP_LOOKUP)
+    tmp_assign = BinOp.build(ref, '=', lookup, red=True)
+    insts.append(tmp_assign)
+
+    # if (ref == NULL) {}
+    cond = BinOp.build(ref, '==', NULL)
+    check = ControlFlowInst.build_if_inst(cond, red=True)
+    check.body.add_inst(ToUserspace.from_func_obj(func))
+    insts.append(check)
 
     #Inst: tmp->data
     owner = Ref(None)
-    owner.name = tmp_name
+    owner.name = ref.name
     owner.type = T
     owner.kind = clang.CursorKind.DECL_REF_EXPR
     ref = Ref(None)
@@ -236,7 +234,7 @@ def malloc_lookup(name, info, return_val):
     ref.owner.append(owner)
     ref.set_modified()
 
-    return [var_decl, lookup_inst], ref
+    return insts, decls, ref
 
 
 _loop_var_name_counter = 0
@@ -247,10 +245,20 @@ def _get_temp_loop_var_name():
     return name
 
 
-def new_bounded_loop(var_bound, max_bound, info, loop_var_type=INT):
+def new_bounded_loop(var_bound, max_bound, info, func, loop_var_type=INT,
+        fail_check=False):
     decl = []
+
     _tmp_name = _get_temp_loop_var_name()
     loop_var = decl_new_var(loop_var_type, info, decl, name=_tmp_name)
+
+    # _tmp_name = ITERATOR_VAR
+    # sym = info.sym_tbl.lookup(_tmp_name)
+    # if sym is None:
+    #     loop_var = decl_new_var(loop_var_type, info, decl, name=_tmp_name)
+    # else:
+    #     loop_var = Ref.from_sym(sym)
+
     initialize = BinOp.build(loop_var, '=', ZERO)
 
     if var_bound == max_bound:
@@ -264,7 +272,17 @@ def new_bounded_loop(var_bound, max_bound, info, loop_var_type=INT):
     loop = ForLoop.build(initialize, condition, post)
     # loop.repeat = max_bound.text # does this work?
     loop.set_modified()
-    return loop, decl, loop_var
+
+    insts = [loop,]
+    if fail_check:
+        failure_cond = BinOp.build(loop_var, '>=', max_bound)
+        check_bound_failure = ControlFlowInst.build_if_inst(failure_cond)
+        check_bound_failure.body.add_inst(ToUserspace.from_func_obj(func))
+
+        failure_cond.set_modified(InstructionColor.EXTRA_ALU_OP)
+        check_bound_failure.set_modified(InstructionColor.CHECK)
+        insts.append(check_bound_failure)
+    return insts, decl, loop_var
 
 
 def _add_paranthesis_if_needed(inst):
@@ -274,7 +292,15 @@ def _add_paranthesis_if_needed(inst):
     return inst
 
 
-def variable_memcpy(dst, src, size, up_bound, info, fail_return_inst=None):
+def constant_mempcy(dst, src, size):
+    copy         = Call(None)
+    copy.name    = 'memcpy'
+    args         = [dst, src, size]
+    copy.args = args
+    return copy
+
+
+def variable_memcpy(dst, src, size, up_bound, info, func):
     declare_at_top_of_func = []
     max_bound = Literal(str(up_bound), clang.CursorKind.INTEGER_LITERAL)
 
@@ -286,7 +312,9 @@ def variable_memcpy(dst, src, size, up_bound, info, fail_return_inst=None):
     if not hasattr(dst, 'type'):
         dst = Cast.build(dst, CHAR_PTR)
 
-    loop, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info, UINT)
+    tmp_insts, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info,
+            func, UINT, fail_check=True)
+    loop = tmp_insts[0]
     declare_at_top_of_func.extend(tmp_decl)
 
     at_src = ArrayAccess.build(src, loop_var)
@@ -294,10 +322,10 @@ def variable_memcpy(dst, src, size, up_bound, info, fail_return_inst=None):
     copy = BinOp.build(at_dst, '=', at_src)
     copy.set_modified()
     loop.body.add_inst(copy)
-    return loop, declare_at_top_of_func, dst
+    return tmp_insts, declare_at_top_of_func, dst
 
 
-def strncmp(s1, s2, size, upper_bound, info, fail_return_inst=None):
+def strncmp(s1, s2, size, upper_bound, info, func):
     assert hasattr(s1, 'type')
     assert hasattr(s2, 'type')
     assert s1.type.is_pointer() or s1.type.is_array()
@@ -309,12 +337,18 @@ def strncmp(s1, s2, size, upper_bound, info, fail_return_inst=None):
     s2 = _add_paranthesis_if_needed(s2)
 
     decl = []
-    max_bound = Literal(str(upper_bound), clang.CursorKind.INTEGER_LITERAL)
+    if size != upper_bound:
+        max_bound = Literal(str(upper_bound), clang.CursorKind.INTEGER_LITERAL)
+    else:
+        max_bound = size
 
     res_var = decl_new_var(INT, info, decl)
     init_res = BinOp.build(res_var, '=', ZERO)
 
-    loop, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info, UINT)
+    fail_check = max_bound != size
+    tmp_insts, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info,
+            func, UINT, fail_check=fail_check)
+    loop = tmp_insts[0]
     decl.extend(tmp_decl)
 
     at_s1 = ArrayAccess.build(s1, loop_var)
@@ -329,11 +363,11 @@ def strncmp(s1, s2, size, upper_bound, info, fail_return_inst=None):
     check.body.add_inst(tmp_brk)
     loop.body.extend_inst([assign, check])
 
-    insts = [init_res, loop]
-    return insts, decl, res_var
+    tmp_insts.insert(0, init_res)
+    return tmp_insts, decl, res_var
 
 
-def strlen(s, max_bound, info):
+def strlen(s, max_bound, info, func):
     assert hasattr(s, 'type')
     assert s.type.is_pointer() or s.type.is_array()
     assert s.type.under_type.spelling in ('char', 'unsigned char'), f'unexpected type {s.type.under_type.spelling}'
@@ -343,7 +377,9 @@ def strlen(s, max_bound, info):
     res_var = decl_new_var(UINT, info, decl)
     init_res = BinOp.build(res_var, '=', ZERO)
 
-    loop, tmp_decl, loop_var = new_bounded_loop(max_bound, max_bound, info, UINT)
+    tmp_insts, tmp_decl, loop_var = new_bounded_loop(max_bound, max_bound,
+            info, func, UINT, fail_check=True)
+    loop = tmp_insts[0]
     decl.extend(tmp_decl)
 
     at_s = ArrayAccess.build(s, loop_var)
@@ -356,10 +392,10 @@ def strlen(s, max_bound, info):
     check.body.add_inst(tmp_brk)
     loop.body.add_inst(check)
 
-    insts = [init_res, loop]
-    return insts, decl, res_var
+    tmp_insts.insert(0, init_res)
+    return tmp_insts, decl, res_var
 
-def strncpy(s1, s2, size, max_bound, info, fail_return_inst=None):
+def strncpy(s1, s2, size, max_bound, info, func):
     assert hasattr(s1, 'type')
     assert hasattr(s2, 'type')
     assert s1.type.is_pointer() or s1.type.is_array()
@@ -369,11 +405,15 @@ def strncpy(s1, s2, size, max_bound, info, fail_return_inst=None):
     s1 = _add_paranthesis_if_needed(s1)
     s2 = _add_paranthesis_if_needed(s2)
     decl = []
-    max_bound = Literal(str(max_bound), clang.CursorKind.INTEGER_LITERAL)
+    if size != max_bound:
+        max_bound = Literal(str(max_bound), clang.CursorKind.INTEGER_LITERAL)
     # strncpy returns a pointer to the destination string
     res_var = s1
     # Creat the loop
-    loop, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info, UINT)
+    fail_check = max_bound != size
+    tmp_insts, tmp_decl, loop_var = new_bounded_loop(size, max_bound, info,
+            func, UINT, fail_check=fail_check)
+    loop = tmp_insts[0]
     decl.extend(tmp_decl)
 
     at_s1 = ArrayAccess.build(s1, loop_var)
@@ -389,6 +429,3 @@ def strncpy(s1, s2, size, max_bound, info, fail_return_inst=None):
     tmp_brk.kind = clang.CursorKind.BREAK_STMT
     check.body.add_inst(tmp_brk)
     loop.body.extend_inst([assign, check])
-
-    insts = [loop]
-    return insts, decl, res_var

@@ -76,7 +76,7 @@ class _ConverLoopFuncInst(Pass):
             self.skip_children()
             return ret
         elif inst.kind == clang.CursorKind.CALL_EXPR:
-            self.current_function.function_dependancy.add(inst.name)
+            pass
         return inst
 
 
@@ -276,9 +276,6 @@ class BPFLoopPass(Pass):
         ctx_pointer = UnaryOp.build('&', ctx_ref)
         call.args = [iters, func_ref, ctx_pointer, ZERO]
         blk.append(call)
-        # Mark current function dependant on the loop func
-        if self.current_function is not None:
-            self.current_function.function_dependancy.add(iter_func.name)
         # Also move values out of struct
         for field in struct.fields:
             # TODO: only values that have actually changed

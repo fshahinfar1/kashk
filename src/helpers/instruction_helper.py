@@ -13,7 +13,8 @@ CHAR_PTR = MyType.make_pointer(BASE_TYPES[clang.TypeKind.UCHAR])
 UINT = BASE_TYPES[clang.TypeKind.UINT]
 INT  = BASE_TYPES[clang.TypeKind.INT]
 U64  = BASE_TYPES[clang.TypeKind.ULONGLONG]
-VOID_PTR = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+VOID = BASE_TYPES[clang.TypeKind.VOID]
+VOID_PTR = MyType.make_pointer(VOID)
 CHAR     = BASE_TYPES[clang.TypeKind.SCHAR]
 
 
@@ -212,3 +213,16 @@ def simplify_inst_to_ref(inst):
         child = inst.child.children[0]
         return simplify_inst_to_ref(child)
     return None
+
+
+def get_or_decl_ref(info, name, T, init=None):
+    tmp = []
+    sym = info.sym_tbl.lookup(name)
+    if sym is None:
+        # declare and initialize __zero
+        ref = decl_new_var(T, info, tmp, name=name)
+        if init is not None:
+            tmp[0].init.add_inst(init)
+    else:
+        ref = Ref.from_sym(sym)
+    return ref, tmp

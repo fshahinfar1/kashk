@@ -9,10 +9,11 @@ from prune import WRITE_PACKET, KNOWN_FUNCS
 from template import define_bpf_arr_map, malloc_lookup
 from code_gen import gen_code
 from passes.pass_obj import PassObject
-from passes.bpf_passes.transform_vars import SEND_FLAG_NAME
+from passes.update_original_ref import set_original_ref
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr, is_value_from_bpf_ctx
 from helpers.instruction_helper import (get_ret_inst, get_ret_value_text)
 from helpers.cache_helper import generate_cache_lookup, generate_cache_update
+from var_names import SEND_FLAG_NAME
 import template
 
 
@@ -99,10 +100,12 @@ def _known_function_substitution(inst, info, more):
         if max_bound is None:
             raise Exception('the strlen should have annotation declaring max number of iterations')
         s1 = inst.args[0]
-        tmp_insts, tmp_decl, tmp_res = template.strlen(s1, max_bound, info)
+        tmp_insts, tmp_decl, tmp_res = template.strlen(s1, max_bound, info,
+                current_function)
         declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
+        set_original_ref(tmp_insts, info, inst.original)
         tmp_insts[1].removed.append(inst)
         return tmp_res, True
     elif inst.name == 'strncmp':
@@ -110,17 +113,17 @@ def _known_function_substitution(inst, info, more):
         max_bound = inst.repeat
         if max_bound is None and _is_known_integer(inst.args[2]):
             # Try to guess the max bound from the size parameter
-            max_bound = gen_code([inst.args[2],], None)[0]
+            max_bound = inst.args[2]
         assert max_bound is not None, 'The strncmp should have annotation declaring max number of iterations'
         s1 = inst.args[0]
         s2 = inst.args[1]
         size = inst.args[2]
-        tmp = get_ret_inst(current_function, info)
-        return_val = tmp.body.children[0] if len(tmp.body.children) > 0 else None
-        tmp_insts, tmp_decl, tmp_res = template.strncmp(s1, s2, size, max_bound, info, return_val)
+        tmp_insts, tmp_decl, tmp_res = template.strncmp(s1, s2, size,
+                max_bound, info, current_function)
         declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
+        set_original_ref(tmp_insts, info, inst.original)
         tmp_insts[1].removed.append(inst)
         return tmp_res, True
     elif inst.name == 'strncpy':
@@ -128,20 +131,19 @@ def _known_function_substitution(inst, info, more):
         max_bound = inst.repeat
         if max_bound is None and _is_known_integer(inst.args[2]):
             # Try to guess the max bound from the size parameter
-            max_bound = gen_code([inst.args[2],], None)[0]
+            max_bound = inst.args[2]
         text = gen_code(inst, info)[0]
         debug(text, tag=MODULE_TAG)
         assert max_bound is not None, 'The strncpy should have annotation declaring max number of iterations'
         s1 = inst.args[0]
         s2 = inst.args[1]
         size = inst.args[2]
-        tmp = get_ret_inst(current_function, info)
-        return_val = tmp.body.children[0] if len(tmp.body.children) > 0 else None
         tmp_insts, tmp_decl, tmp_res = template.strncpy(s1, s2,
-                size, max_bound, info, return_val)
+                size, max_bound, info, current_function)
         declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
+        set_original_ref(tmp_insts, info, inst.original)
         tmp_insts[0].removed.append(inst)
         return tmp_res, True
     elif inst.name == 'malloc':
@@ -168,11 +170,11 @@ def _known_function_substitution(inst, info, more):
         # report('Declare map', m, 'for malloc')
 
         # Look the malloc map
-        return_val = get_ret_value_text(current_function, info)
-        lookup_inst, ref = malloc_lookup(name, info, return_val)
+        lookup_inst, tmp_decl, ref = malloc_lookup(name, info, current_function)
+        declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
-        for tmp_inst in lookup_inst:
-            blk.append(tmp_inst)
+        blk.extend(lookup_inst)
+        set_original_ref(lookup_inst, info, inst.original)
         return ref, True
     elif inst.name == 'memcpy':
         assert len(inst.args) == 3
@@ -186,12 +188,13 @@ def _known_function_substitution(inst, info, more):
         assert max_bound is not None, 'The variable memcpy should have annotation declaring max number of iterations'
         dst = inst.args[0]
         src = inst.args[1]
-        return_val = get_ret_inst(current_function, info)
-        loop, decl, tmp_res = template.variable_memcpy(dst, src, size, max_bound, info, return_val)
+        tmp_insts, decl, tmp_res = template.variable_memcpy(dst, src, size,
+                max_bound, info, current_function)
         declare_at_top_of_func.extend(decl)
         blk = cb_ref.get(BODY)
-        blk.append(loop)
-        loop.removed.append(inst)
+        blk.extend(tmp_insts)
+        set_original_ref(tmp_insts, info, inst.original)
+        tmp_insts[0].removed.append(inst)
         return tmp_res, True
     elif inst.name in ('ntohs', 'ntohl', 'htons', 'htonl'):
         inst.name = 'bpf_'+inst.name
@@ -206,7 +209,7 @@ def _known_function_substitution(inst, info, more):
     return inst, False
 
 
-def _process_write_call(inst, info):
+def _process_write_call(inst, info, more):
     if inst.wr_buf.size_cursor is None:
         write_size = Literal('<UNKNOWN WRITE BUF SIZE>', CODE_LITERAL)
     else:
@@ -214,12 +217,13 @@ def _process_write_call(inst, info):
     ref = inst.wr_buf.ref
     should_copy = not is_bpf_ctx_ptr(ref, info)
     blk = cb_ref.get(BODY)
-    return_val = get_ret_inst(current_function, info)
     if current_function is None:
         # On the main BPF program. feel free to return the verdict value
-        insts = info.prog.send(ref, write_size, info, return_val,
+        insts, decl = info.prog.send(ref, write_size, info, current_function,
                 do_copy=should_copy)
         blk.extend(insts)
+        declare_at_top_of_func.extend(decl)
+        set_original_ref(insts, info, inst.original)
         new_inst = insts[-1]
         new_inst.set_modified(InstructionColor.REMOVE_WRITE)
         new_inst.removed.append(inst)
@@ -230,8 +234,9 @@ def _process_write_call(inst, info):
         return None # remove the write call
     else:
         # On a function which is not the main. Do not return
-        copy_inst = info.prog.send(ref, write_size, info, return_val,
-                ret=False, do_copy=should_copy)
+        copy_inst, decl = info.prog.send(ref, write_size, info,
+                current_function, ret=False, do_copy=should_copy)
+        declare_at_top_of_func.extend(decl)
         # set the flag
         flag_ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
         flag_ref.name = SEND_FLAG_NAME
@@ -244,17 +249,21 @@ def _process_write_call(inst, info):
         set_flag.set_modified(InstructionColor.EXTRA_MEM_ACCESS)
         # add it to the body
         blk.extend(copy_inst)
+        set_original_ref(copy_inst, info, inst.original)
         blk.append(set_flag)
+        set_original_ref(set_flag, info, inst.original)
         # Return from this point to the BPF main
         new_inst = get_ret_inst(current_function, info)
         new_inst.set_modified(InstructionColor.REMOVE_WRITE)
         new_inst.removed.append(inst)
-    return new_inst
+        blk.append(new_inst)
+        return None
+    return None
 
 
 def _process_call_inst(inst, info, more):
     if inst.name in WRITE_PACKET:
-        return _process_write_call(inst, info)
+        return _process_write_call(inst, info, more)
     elif inst.name in KNOWN_FUNCS:
         tmp, is_ret_val = _known_function_substitution(inst, info, more)
         if is_ret_val and more.ctx == BODY:
@@ -313,10 +322,11 @@ def _process_var_decl(inst, info):
     m = define_bpf_arr_map(map_name, struct_decl.get_name(), 1)
     info.prog.add_declaration(m)
     # Lookup the malloc map
-    return_val = get_ret_value_text(current_function, info)
-    lookup_inst, ref = malloc_lookup(name, info, return_val)
+    lookup_inst, decl, ref = malloc_lookup(name, info, current_function)
+    declare_at_top_of_func.extend(decl)
     blk = cb_ref.get(BODY)
     blk.extend(lookup_inst)
+    set_original_ref(lookup_inst, info, inst.original)
 
     new_type = None
     def _convert_type(t):
@@ -337,6 +347,7 @@ def _process_var_decl(inst, info):
     var_ref = new_var_decl.get_ref()
     assign = BinOp.build(var_ref, '=', ref)
     assign.set_modified()
+    set_original_ref(assign, info, inst.original)
     return assign
 
 

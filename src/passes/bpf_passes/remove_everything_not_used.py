@@ -1,15 +1,35 @@
 import clang.cindex as clang
-from utility import get_actual_type
+from utility import get_actual_type, find_elems_of_kind
+from data_structure import Function
 from dfs import DFSPass
 from log import debug, error, report
 from instruction import Ref
 from my_type import MyType
+from passes.code_pass import Pass
+from passes.find_unused_vars import find_unused_vars
 
 
 MODULE_TAG = '[Remove]'
 
 
+class RemoveDecl(Pass):
+    def __init__(self, info):
+        super().__init__(info)
+        self.target = None
+        self._may_remove = True
+
+    def process_current_inst(self, inst, more):
+        if self.target is not None and inst.kind == clang.CursorKind.VAR_DECL:
+            if inst.name in self.target:
+                return None
+        return inst
+
+
 def _do_pass(bpf, all_declarations, shared_vars, info):
+    """
+    Go through a block of code and body of functions it calls. Look for types
+    and global variables that are used. Mark the rest to be removed.
+    """
     d = DFSPass(bpf)
     for inst, _ in d:
         keys = None
@@ -46,7 +66,7 @@ def _do_pass(bpf, all_declarations, shared_vars, info):
                 type_name = get_actual_type(inst.type).spelling
                 keys = [type_name,]
 
-        # Remove the types that was found useful
+        # Remove the types that was found useful from the list
         if keys is not None:
             for k in keys:
                 if k in all_declarations:
@@ -56,7 +76,27 @@ def _do_pass(bpf, all_declarations, shared_vars, info):
     return bpf
 
 
+def remove_unused_local_variables(bpf, info, more):
+    var_decls = find_elems_of_kind(bpf, clang.CursorKind.VAR_DECL)
+    var_names = set(v.name for v in var_decls)
+    to_be_removed = find_unused_vars(bpf, info, var_names)
+    debug('remove local vars:', to_be_removed, tag=MODULE_TAG)
+    res = RemoveDecl.do(bpf, info, more, target=to_be_removed)
+    return res.result
+
+
+def global_remove_unused_local_variables(bpf, info, more):
+    bpf = remove_unused_local_variables(bpf, info, None)
+    for func in Function.directory.values():
+        if func.is_empty() or not func.is_used_in_bpf_code:
+            continue
+        tmp = remove_unused_local_variables(func.body, info, None)
+        func.body = tmp
+    return bpf
+
+
 def remove_everything_not_used(bpf, info, more):
+    bpf = global_remove_unused_local_variables(bpf, info, more)
     shared_scope_vars = [v.name
             for v in info.sym_tbl.shared_scope.symbols.values()]
     all_declarations = [decl.get_name()
@@ -86,3 +126,4 @@ def remove_everything_not_used(bpf, info, more):
         else:
             new_list.append(decl)
     info.prog.declarations = new_list
+    return bpf

@@ -15,7 +15,7 @@ from data_structure import Info, Function
 from instruction import BODY
 from framework_support import InputOutputContext
 
-from offload import load_other_sources, _prepare_event_handler_args, BPF_MAIN
+from offload import load_other_sources, _prepare_event_handler_args, MAIN
 from parser.find_ev_loop import get_entry_code
 from sym_table import Scope
 
@@ -39,7 +39,7 @@ class BasicTest:
         load_other_sources(self.info.io_ctx, self.info)
         # Select the main scope
         scope = Scope(self.info.sym_tbl.global_scope)
-        self.info.sym_tbl.scope_mapping[BPF_MAIN] = scope
+        self.info.sym_tbl.scope_mapping[MAIN] = scope
         self.info.sym_tbl.current_scope = scope
         self.info.prog.add_args_to_scope(scope)
         # Find the entry function

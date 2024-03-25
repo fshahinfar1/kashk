@@ -71,8 +71,6 @@ def _do_pass(inst, info, more):
         if inst.kind == clang.CursorKind.CALL_EXPR:
             func = inst.get_function_def()
             if func:
-                if current_function is not None:
-                    current_function.function_dependancy.add(func.name)
                 if not func.is_empty() and not func.is_used_in_bpf_code:
                     # debug(MODULE_TAG, 'Add func:', func.name)
                     # Only include functions that have concrete implementation
