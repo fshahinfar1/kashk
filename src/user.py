@@ -203,7 +203,10 @@ __m = (struct {meta.name} *)__b;
 def _load_meta(info):
     # TODO: load the correct data structure based on the failure number
     # debug('--', info.user_prog.declarations, tag=MODULE_TAG)
-    meta = list(info.user_prog.declarations.values())[0]
+    list_meta = list(info.user_prog.declarations.values())
+    if len(list_meta) == 0:
+        return ''
+    meta = list_meta[0]
     declare = []
     load = []
     for f in meta.fields:

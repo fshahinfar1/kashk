@@ -123,6 +123,9 @@ def _move_fallback_vars_to_channel(info, index, failure_number):
         # Nothing to do
         return [], []
 
+    if failure_number not in info.user_prog.declarations:
+        error('Did not found the failure meta-data structure defenition', tag=MODULE_TAG)
+        return [], []
     meta = info.user_prog.declarations[failure_number]
     decls = []
 
@@ -251,8 +254,6 @@ def _generate_failure_flag_check_in_main_func_switch_case(flag_ref, func, info):
         # Create instructions moving values
         failure_number = group[0]
         assert failure_number > 0, 'The zero can not be a failure id'
-        if failure_number not in info.user_prog.declarations:
-            raise Exception('Did not found the declaration of failure path meta-data')
 
         # TODO: think about the index value
         zero, tmp = get_or_decl_ref(info, ZERO_VAR, UINT, init=ZERO)
@@ -333,6 +334,7 @@ def _handle_call_may_fail_or_succeed(inst, func, info, more):
             _generate_failure_flag_check_in_main_func_switch_case(flag_ref,
                     func, info)
         declare_at_top_of_func.extend(tmp_decl)
+        set_original_ref(tmp_inst, info, inst.original)
     else:
         flag_val = UnaryOp.build('*', flag_ref)
         cond = BinOp.build(flag_val , '!=', ZERO)
@@ -425,8 +427,8 @@ def _process_current_inst(inst, info, more):
         failure_num = inst.path_id
         if current_function is None:
             # Found a fallback point on the BPF entry function
-            meta = info.user_prog.declarations.get(failure_num)
-            assert meta is not None, f'did not found the metadata structure declaration for failure: {failure_num}'
+            # meta = info.user_prog.declarations.get(failure_num)
+            # assert meta is not None, f'did not found the metadata structure declaration for failure: {failure_num}'
 
             # TODO: think about the index value
             zero, tmp = get_or_decl_ref(info, ZERO_VAR, UINT, init=ZERO)

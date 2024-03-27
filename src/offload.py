@@ -114,6 +114,71 @@ def load_other_sources(io_ctx, info):
         process_source_file(other_cursor, info)
 
 
+def prepare_userspace_fallback(prog, info):
+    # Juggle function directory ---------------------------
+    tmp_fn_dir = Function.directory
+    Function.directory = info.original_ast
+    # Move failure functions to the original_ast list
+    for f in info.failure_path_new_funcs:
+        assert f.name not in Function.directory, 'We are adding failure functions to the original ast, one of them were already here ?!'
+        Function.directory[f.name] = f
+        # f.clone(info.original_ast)
+        # print(f.name, f.args)
+    # -----------------------------------------------------
+
+    # Some checks for failure paths -----------------------
+    # pprint(info.failure_paths)
+    for pid, path in info.failure_paths.items():
+        for call in find_elems_of_kind(path, clang.CursorKind.CALL_EXPR):
+            f = call.get_function_def()
+            # f = info.original_ast.get(call.name)
+            assert len(call.args) == len(f.args), f'{pid} @{f.name}:\nfunc: {str(f.args) }\ncall: {str(call.args)}'
+    debug('number of failure paths:', len(info.failure_paths), tag=MODULE_TAG)
+    # -----------------------------------------------------
+
+    debug('Remove Unused Args From Failure Functions', tag=MODULE_TAG)
+    remove_unused_args(prog, info, None)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    debug('Failure Path Variables', tag=MODULE_TAG)
+    failure_path_fallback_variables(info)
+
+    for pid, V in info.failure_vars.items():
+        ignore = False
+        for var in V:
+            T = var.type
+            if T.is_pointer() and not var.is_bpf_ctx:
+                # debug('not doing path:', pid, 'because:', var)
+                ignore = True
+
+        if not ignore:
+            continue
+        info.failure_paths[pid] = [Literal('/* from begining */', CODE_LITERAL),]
+        info.failure_vars[pid].clear()
+
+        tbl = info.sym_tbl
+        for scope in tbl.scope_mapping.scope_mapping.values():
+            for e in scope.symbols.values():
+                if pid in e.is_fallback_var:
+                    e.is_fallback_var.remove(pid)
+    # pprint(info.failure_vars)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    debug('Create Fallback Meta Structures', tag=MODULE_TAG)
+    create_fallback_meta_structure(info)
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    # Juggle function directory ---------------------------
+    for f in Function.directory.values():
+        other_f = tmp_fn_dir.get(f.name)
+        if other_f is None:
+            continue
+        other_f.path_ids = set(f.path_ids)
+    Function.directory = tmp_fn_dir
+    # -----------------------------------------------------
+    return prog
+
+
 def generate_offload(io_ctx):
     """
     Main logic of the compiler. It defines the order of passes that are needed.
@@ -237,67 +302,7 @@ def generate_offload(io_ctx):
     #     debug('~~~')
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    # Juggle function directory ---------------------------
-    tmp_fn_dir = Function.directory
-    Function.directory = info.original_ast
-    # Move failure functions to the original_ast list
-    for f in info.failure_path_new_funcs:
-        assert f.name not in Function.directory, 'We are adding failure functions to the original ast, one of them were already here ?!'
-        Function.directory[f.name] = f
-        # f.clone(info.original_ast)
-        # print(f.name, f.args)
-    # -----------------------------------------------------
-
-    # Some checks for failure paths -----------------------
-    # pprint(info.failure_paths)
-    for pid, path in info.failure_paths.items():
-        for call in find_elems_of_kind(path, clang.CursorKind.CALL_EXPR):
-            f = call.get_function_def()
-            # f = info.original_ast.get(call.name)
-            assert len(call.args) == len(f.args), f'{pid} @{f.name}:\nfunc: {str(f.args) }\ncall: {str(call.args)}'
-    debug('number of failure paths:', len(info.failure_paths), tag=MODULE_TAG)
-    # -----------------------------------------------------
-
-    debug('Remove Unused Args From Failure Functions', tag=MODULE_TAG)
-    remove_unused_args(prog, info, None)
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    debug('Failure Path Variables', tag=MODULE_TAG)
-    failure_path_fallback_variables(info)
-
-    for pid, V in info.failure_vars.items():
-        ignore = False
-        for var in V:
-            T = var.type
-            if T.is_pointer() and not var.is_bpf_ctx:
-                # debug('not doing path:', pid, 'because:', var)
-                ignore = True
-
-        if not ignore:
-            continue
-        info.failure_paths[pid] = [Literal('/* from begining */', CODE_LITERAL),]
-        info.failure_vars[pid].clear()
-
-        tbl = info.sym_tbl
-        for scope in tbl.scope_mapping.scope_mapping.values():
-            for e in scope.symbols.values():
-                if pid in e.is_fallback_var:
-                    e.is_fallback_var.remove(pid)
-    # pprint(info.failure_vars)
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    debug('Create Fallback Meta Structures', tag=MODULE_TAG)
-    create_fallback_meta_structure(info)
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
-    # Juggle function directory ---------------------------
-    for f in Function.directory.values():
-        other_f = tmp_fn_dir.get(f.name)
-        if other_f is None:
-            continue
-        other_f.path_ids = set(f.path_ids)
-    Function.directory = tmp_fn_dir
-    # -----------------------------------------------------
+    # prepare_userspace_fallback(prog, info)
 
     debug('Update Function Failure Status', tag=MODULE_TAG)
     update_function_failure_status(prog, info, None)

@@ -13,38 +13,6 @@ from elements.likelihood import Likelihood
 MODULE_TAG = '[BPF Prog]'
 
 
-def _use_memcpy(info):
-    func = Function.directory['bpf_memcpy']
-    if not func.is_used_in_bpf_code:
-        func.is_used_in_bpf_code = True
-        info.prog.declarations.insert(0, func)
-        prerequisite = Literal('''struct bpf_memcpy_ctx {
-  unsigned short i;
-  char *dest;
-  char *src;
-  unsigned short n;
-  void *end_dest;
-  void *end_src;
-};
-
-static long
-bpf_memcpy_loop(unsigned int index, void *arg)
-{
-  struct bpf_memcpy_ctx *ll = arg;
-  if ((void *)(ll->dest + ll->i + 1) > ll->end_dest)
-    return 1;
-  if ((void *)(ll->src  + ll->i + 1) > ll->end_src)
-    return 1;
-  ll->dest[ll->i] = ll->src[ll->i];
-  if (ll->i >= ll->n - 1) {
-    return 1;
-  }
-  ll->i++;
-  return 0;
-}''', CODE_LITERAL)
-        info.prog.add_declaration(prerequisite)
-
-
 class BPF_PROG:
     def __init__(self):
         self.declarations = [
