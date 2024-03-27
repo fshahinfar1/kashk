@@ -127,11 +127,8 @@ def _do_add_bound_check(blk, R, current_function, info, bytes_mode):
         check_inst = bpf_ctx_bound_check(ref, index, data_end,
                 current_function)
     blk.append(check_inst)
-    # if current_function is not None:
-    #     # The bound check may fail and the function may fail as a result
-    #     current_function.may_fail = True
-    #     n = '[[main]]' if current_function is None else current_function.name
-    #     print('here @', n,  current_function.may_fail, current_function.may_succeed)
+    if ref.original is None:
+        debug(ref, ref.original, tag=MODULE_TAG)
     set_original_ref(check_inst, info, ref.original)
     ref.set_flag(Instruction.BOUND_CHECK_FLAG)
 
@@ -241,17 +238,16 @@ def _has_bpf_ctx_in_field(ref, info, field_name=None):
         for field in decl.fields:
             ref_field = Ref.build(field.name, field.type_ref, is_member=True)
             ref_field.owner = [ref,]
+            ref_field.original = ref.original
             if hasattr(ref, 'owner'):
                 ref_field.owner +=  ref.owner
-            if is_bpf_ctx_ptr(ref_field, info):
-                if field_name is not None:
-                    field_name.fields.append([ref_field,])
-                    found = True
-                    field_name.count_bpf_fields += 1
-                    # debug(ref, field.name, 'is BPF CTX', tag=MODULE_TAG)
-            else:
-                # debug('The field is not BPF', ref_field, tag=MODULE_TAG)
-                pass
+            if not is_bpf_ctx_ptr(ref_field, info):
+                continue
+            if field_name is not None:
+                field_name.fields.append([ref_field,])
+                found = True
+                field_name.count_bpf_fields += 1
+                # debug(ref, field.name, 'is BPF CTX', tag=MODULE_TAG)
 
         # Check if any of the field has an object which is BPF context
         # for field in decl.fields:

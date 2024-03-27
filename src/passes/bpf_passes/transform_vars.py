@@ -6,7 +6,7 @@ from template import (prepare_shared_state_var, define_bpf_arr_map,
         SHARED_OBJ_PTR)
 from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS
 from helpers.instruction_helper import (get_ret_inst, add_flag_to_func, ZERO,
-        VOID_PTR, get_or_decl_ref)
+        VOID_PTR, get_or_decl_ref, CHAR_PTR)
 from data_structure import *
 from my_type import MyType
 from instruction import *
@@ -14,6 +14,7 @@ from sym_table import MemoryRegion
 from elements.after import After
 from passes.code_pass import Pass
 from passes.update_original_ref import set_original_ref
+from passes.clone import clone_pass
 from var_names import SHARED_REF_NAME, SEND_FLAG_NAME, DATA_VAR
 
 
@@ -24,6 +25,12 @@ class TransformVars(Pass):
     def __init__(self, info):
         super().__init__(info)
         self._may_remove = True
+
+    def _is_packet_pointer(self, inst):
+        names = self.info.read_decl.get(self.current_fname)
+        if names is None:
+            return False
+        return inst.name in names
 
     def _process_annotation(self, inst):
         if inst.ann_kind == Annotation.ANN_CACNE_DEFINE:
@@ -77,9 +84,12 @@ class TransformVars(Pass):
         pkt = self.info.prog.get_pkt_buf()
         data, tmp_decl  = get_or_decl_ref(self.info, DATA_VAR, VOID_PTR,
                 init=pkt)
+        data.original = inst.original
         self.declare_at_top_of_func.extend(tmp_decl)
 
-        # TODO:
+        # TODO: __data should be set as bpf_ctx in verifier pass, but since it
+        # is a var_decl with initialization, we are not doing it. As a result,
+        # I am setting it manually here.
         sym = self.info.sym_tbl.lookup(data.name)
         assert sym is not None
         sym.is_bpf_ctx = True
@@ -104,42 +114,64 @@ class TransformVars(Pass):
 
     def _check_if_ref_is_global_state(self, inst):
         sym, scope = self.info.sym_tbl.lookup2(inst.name)
-        is_shared = scope == self.info.sym_tbl.shared_scope
+        is_shared  = scope == self.info.sym_tbl.shared_scope
         if not is_shared:
             return inst
+
+        # Get a reference to the shared object. Perform map lookup if needed.
+        sym = self.info.sym_tbl.lookup(SHARED_REF_NAME)
+        if sym is None:
+            # Declare the shared ref
+            # debug('load shared map for variable:', inst.name)
+            # Perform a lookup on the map for globally shared values
+            new_insts = prepare_shared_state_var(self.current_function)
+            blk = self.cb_ref.get(BODY)
+            blk.extend(new_insts)
+            set_original_ref(new_insts, self.info, inst.original)
+            # Update the symbol table
+            # TODO: because I am not handling blocks as separate scopes (as
+            # they should). I will introduce bugs when shared is defined in an
+            # inner scope.
+            sym = self.info.sym_tbl.insert_entry(SHARED_REF_NAME, SHARED_OBJ_PTR,
+                    None, None)
+        shared = Ref.from_sym(sym)
+
         # Mark the instruction as red, because it will become a lookup from a
         # map
-        # TODO: maybe it is better that I change the owner
         inst.set_modified()
-        sym = self.info.sym_tbl.lookup(SHARED_REF_NAME)
-        if sym is not None:
-            return inst
-        # debug('load shared map for variable:', inst.name)
-        # Perform a lookup on the map for globally shared values
-        new_insts = prepare_shared_state_var(self.current_function)
-        blk = self.cb_ref.get(BODY)
-        blk.extend(new_insts)
-        set_original_ref(new_insts, self.info, inst.original)
-        # Update the symbol table
-        # TODO: because I am not handling blocks as separate scopes (as
-        # they should). I will introduce bugs when shared is defined in an
-        # inner scope.
-        entry = self.info.sym_tbl.insert_entry(SHARED_REF_NAME, SHARED_OBJ_PTR,
-                None, None)
+        # Update the owner
+        top_owner = inst
+        while top_owner.kind == clang.CursorKind.MEMBER_REF_EXPR:
+            assert len(top_owner.owner) == 1, f'len is {len(inst.owner)}'
+            top_owner = top_owner.owner[-1]
+        top_owner.kind = clang.CursorKind.MEMBER_REF_EXPR
+        top_owner.owner.append(shared)
         return inst
 
     def process_current_inst(self, inst, more):
         if inst.kind == clang.CursorKind.DECL_REF_EXPR:
+            if self._is_packet_pointer(inst):
+                # is packet pointer
+                assert inst.type.is_mem_ref(), f'Unexpected type {inst.type}'
+                new_inst = clone_pass(inst)
+                new_inst.type = CHAR_PTR
+                inst = new_inst
+                # TODO: maybe I also need to update the type set in the symbol
+                # table
             return self._check_if_ref_is_global_state(inst)
+        elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
+            assert len(inst.owner) != 0, 'I do not expect a member with out an owner (which probably means an owner from the current class but I am not doing c++)'
+            assert len(inst.owner) == 1, 'I expect the instruction to have only one owner (previously more than one was allowed)'
+            parent = inst.owner[-1]
+            self.process_current_inst(parent, more)
+            return inst
         elif inst.kind == clang.CursorKind.VAR_DECL:
-            names = self.info.read_decl.get(self.current_fname, set())
-            if inst.name in names:
+            if self._is_packet_pointer(inst):
                 # This will become a packet pointer, change the type if needed!
                 # TODO: this code does not consider shadowing variables and scopes
                 # other than those given to each function.
                 # Change the declaration
-                T = MyType.make_pointer(BASE_TYPES[clang.TypeKind.SCHAR])
-                new_inst = VarDecl.build(inst.name, T)
+                new_inst = VarDecl.build(inst.name, CHAR_PTR)
                 new_inst.set_modified()
                 new_inst.original = inst.original
                 # removing allocation of arrays, malloc, ...

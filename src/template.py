@@ -6,7 +6,7 @@ from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
 from helpers.instruction_helper import (get_ret_inst, decl_new_var, ZERO, NULL,
         CHAR_PTR, INT, NULL_CHAR, UINT, ONE, VOID_PTR)
 from elements.likelihood import Likelihood
-from var_names import DATA_VAR, ITERATOR_VAR, DATA_VAR
+from var_names import DATA_VAR, ITERATOR_VAR, DATA_VAR, SHARED_REF_NAME
 
 
 def bpf_ctx_bound_check(ref, index, data_end, func, abort=False):
@@ -106,7 +106,7 @@ shared_struct = MyType.make_simple('struct shared_state',
 SHARED_OBJ_PTR = MyType.make_pointer(shared_struct)
 SHARED_MAP_PTR = Literal('&shared_map', CODE_LITERAL)
 def prepare_shared_state_var(func):
-    var_decl = VarDecl.build('shared', SHARED_OBJ_PTR, red=True)
+    var_decl = VarDecl.build(SHARED_REF_NAME, SHARED_OBJ_PTR, red=True)
     var_decl.init.add_inst(NULL)
     var_ref = var_decl.get_ref()
     var_ref.set_modified()

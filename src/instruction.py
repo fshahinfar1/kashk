@@ -47,7 +47,7 @@ def _generate_marked_children(groups):
 
 
 def _default_clone_operation(new, old):
-    new.ignore     = old.ignore
+    new.ignore         = old.ignore
     new.change_applied = old.change_applied
     new.color          = old.color
     new.removed        = old.removed[:]
@@ -829,9 +829,9 @@ class Ref(Instruction):
     def clone(self, _):
         new = Ref(self.cursor, self.kind)
         _default_clone_operation(new, self)
-        new.name = self.name
-        new.type = self.type
-        new.owner  = list(self.owner)
+        new.name  = self.name
+        new.type  = self.type
+        new.owner = list(self.owner)
         return new
 
     def get_ref_field(self, name, info):

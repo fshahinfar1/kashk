@@ -7,6 +7,7 @@ from instruction import Ref
 from my_type import MyType
 from passes.code_pass import Pass
 from passes.find_unused_vars import find_unused_vars
+from var_names import SHARED_REF_NAME
 
 
 MODULE_TAG = '[Remove]'
@@ -58,13 +59,24 @@ def _do_pass(bpf, all_declarations, shared_vars, info):
                 else:
                     # debug(MODULE_TAG, 'Did not found decleration for', type_name2)
                     pass
-        elif isinstance(inst, Ref):
+        elif inst.kind == clang.CursorKind.DECL_REF_EXPR:
             # Found a used variable, check if it is in our list.
             var_name = inst.name
             if var_name in shared_vars:
                 shared_vars.remove(var_name)
                 type_name = get_actual_type(inst.type).spelling
                 keys = [type_name,]
+        elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
+            assert len(inst.owner) == 1, f'unexpected length: {len(inst.owner)}'
+            owner = inst.owner[-1]
+            if owner.name == SHARED_REF_NAME:
+                var_name = inst.name
+                if var_name in shared_vars:
+                    shared_vars.remove(var_name)
+                    type_name = get_actual_type(inst.type).spelling
+                    keys = [type_name,]
+
+            _do_pass(owner, all_declarations, shared_vars, info)
 
         # Remove the types that was found useful from the list
         if keys is not None:
@@ -107,7 +119,7 @@ def remove_everything_not_used(bpf, info, more):
     # The names which remain in the lists (i.e., `all_declarations' and
     # `shared_scope_vars') after the pass must be removed
 
-    # debug('These shared scope variables should be removed:', shared_scope_vars)
+    debug('These shared scope variables should be removed:', shared_scope_vars, tag=MODULE_TAG)
     for var_name in shared_scope_vars:
         # NOTE: assuming variable name and scope keys are the same.
         info.sym_tbl.shared_scope.delete(var_name)

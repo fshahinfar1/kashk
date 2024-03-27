@@ -5,8 +5,13 @@ from data_structure import *
 from passes.code_pass import Pass
 from passes.clone import clone_pass
 
-from helpers.instruction_helper import UINT
+from helpers.instruction_helper import UINT, CHAR_PTR
 from var_names import FAILURE_NUMBER_FIELD, UNIT_SIZE
+
+from code_gen import gen_code
+
+
+MODULE_TAG = '[Create Meta Struct]'
 
 
 def create_fallback_meta_structure(info):
@@ -17,12 +22,18 @@ def create_fallback_meta_structure(info):
         fields = [state_obj,]
         for sym in V:
             T = sym.type.clone()
+            if sym.is_bpf_ctx:
+                T = CHAR_PTR
             f = StateObject.build(sym.name, T)
             fields.append(f)
-            
+
         meta = Record(f'meta_{path_id}', fields)
         book[path_id] = meta
-        assert meta.type.mem_size < UNIT_SIZE, 'we want to share more data that we can put on a channel unit'
+        if meta.type.mem_size > UNIT_SIZE:
+            txt = gen_code([meta,], info)[0]
+            debug(txt, tag=MODULE_TAG)
+            debug(f'{meta.type.mem_size} > {UNIT_SIZE}', tag=MODULE_TAG)
+            raise Exception('we want to share more data than we can put on a channel unit')
 
     path_ids = tuple(book.keys())
     for p in path_ids:

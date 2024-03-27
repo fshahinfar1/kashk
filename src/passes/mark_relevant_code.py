@@ -93,6 +93,11 @@ def _do_pass(inst, info, more):
             # Global variables do not have declerations on function scope. If
             # we do not have this we may miss them.
             _add_type_to_declarations(inst.type, info)
+        elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
+            _add_type_to_declarations(inst.type, info)
+            for o in inst.owner:
+                _do_pass(o, info, more)
+
         d.go_deep()
 
 def mark_relevant_code(bpf, info, more):

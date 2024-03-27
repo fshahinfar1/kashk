@@ -55,6 +55,8 @@ class GatherRestInstruction(Pass):
             return inst
 
         if not self.found and inst == self.target:
+            assert self.target is not None, 'no target and we are still searching!'
+            debug('found something', tag=MODULE_TAG)
             self.target = None
             self.found = True
 
@@ -67,6 +69,7 @@ class GatherRestInstruction(Pass):
             self.target_parent = self.parent_inst
             assert self.target_parent is not None
             self.found = False
+            debug('lets look at the parent', self.parent_inst, tag=MODULE_TAG)
         else:
             self.gathered.append(inst)
 
@@ -129,7 +132,10 @@ class FindFailurePaths(Pass):
         ast = self.info.original_ast[name].body
         target = inst.original
         assert target is not None, 'broken alignment with original source code'
+        # debug('looking for:', target)
+        # show_insts(ast)
         tmp = GatherRestInstruction.do(ast, self.info, target=target)
+        assert tmp.found == 1, 'failed to find the target!'
         # debug('found:', tmp.found, 'looking:', target, tag=MODULE_TAG)
         # show_insts(ast)
         return tmp.gathered
@@ -246,7 +252,7 @@ class FindFailurePaths(Pass):
             txt, _ = gen_code(inst.original, self.info)
             debug(inst, inst.original, tag=MODULE_TAG)
             debug(txt, tag=MODULE_TAG)
-        assert len(rest) > 0, 'Empty failure path on a sequence of instructions!'
+            raise Exception('Empty failure path on a sequence of instructions!')
         self.failure_paths[failure_path_id] = rest
         inst.path_id = failure_path_id
         if self.current_function is not None:
