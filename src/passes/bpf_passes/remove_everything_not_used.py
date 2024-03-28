@@ -33,20 +33,20 @@ def _do_pass(bpf, all_declarations, shared_vars, info):
     """
     d = DFSPass(bpf)
     for inst, _ in d:
-        keys = None
+        keys = []
         if inst.kind == clang.CursorKind.CALL_EXPR:
             # step into the function
             func = inst.get_function_def()
             if func and not func.is_empty():
                 _do_pass(func.body, all_declarations, shared_vars, info)
-            keys = [inst.name,] # Keep this function
-            if func is not None:
-                for arg in func.args:
-                    type_name = get_actual_type(arg.type).spelling
-                    keys.append(type_name) # Keep this type
+            keys.append(inst.name) # Keep this function
+            # if func is not None:
+            #     for arg in func.args:
+            #         type_name = get_actual_type(arg.type).spelling
+            #         keys.append(type_name) # Keep this type
         elif inst.kind == clang.CursorKind.VAR_DECL:
             type_name = get_actual_type(inst.type).spelling
-            keys = [type_name,] # Keep this type
+            keys.append(type_name) # Keep this type
             if inst.type.is_record():
                 # This type is compound, also keep every type in the fields
                 type_name2 = type_name[len('struct '):]
@@ -65,7 +65,11 @@ def _do_pass(bpf, all_declarations, shared_vars, info):
             if var_name in shared_vars:
                 shared_vars.remove(var_name)
                 type_name = get_actual_type(inst.type).spelling
-                keys = [type_name,]
+                keys.append(type_name)
+            # NOTE: this is a hack that I need to think about
+            if var_name.endswith('_map'):
+                if var_name in all_declarations:
+                    keys.append(var_name)
         elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
             assert len(inst.owner) == 1, f'unexpected length: {len(inst.owner)}'
             owner = inst.owner[-1]
@@ -74,16 +78,15 @@ def _do_pass(bpf, all_declarations, shared_vars, info):
                 if var_name in shared_vars:
                     shared_vars.remove(var_name)
                     type_name = get_actual_type(inst.type).spelling
-                    keys = [type_name,]
+                    keys.append(type_name)
 
             _do_pass(owner, all_declarations, shared_vars, info)
 
         # Remove the types that was found useful from the list
-        if keys is not None:
-            for k in keys:
-                if k in all_declarations:
-                    all_declarations.remove(k)
-            continue
+        for k in keys:
+            if k in all_declarations:
+                all_declarations.remove(k)
+
         d.go_deep()
     return bpf
 

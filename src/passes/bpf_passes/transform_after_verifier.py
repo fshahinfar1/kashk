@@ -6,7 +6,7 @@ from data_structure import *
 from instruction import *
 from my_type import MyType
 from prune import WRITE_PACKET, KNOWN_FUNCS
-from template import define_bpf_arr_map, malloc_lookup
+from template import malloc_lookup
 from code_gen import gen_code
 from passes.pass_obj import PassObject
 from passes.update_original_ref import set_original_ref
@@ -138,8 +138,8 @@ def _known_function_substitution(inst, info, more):
         s1 = inst.args[0]
         s2 = inst.args[1]
         size = inst.args[2]
-        tmp_insts, tmp_decl, tmp_res = template.strncpy(s1, s2,
-                size, max_bound, info, current_function)
+        tmp_insts, tmp_decl, tmp_res = template.strncpy(s1, s2, size,
+                max_bound, info, current_function)
         declare_at_top_of_func.extend(tmp_decl)
         blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
@@ -165,7 +165,8 @@ def _known_function_substitution(inst, info, more):
         # report('Declare', value_type, 'as malloc object')
 
         # Define the map
-        m = define_bpf_arr_map(map_name, f'struct {name}', 1)
+        m = BPFMap.build_arr_map(map_name, value_type.type, 1)
+        m.is_used_in_bpf_code = True
         info.prog.add_declaration(m)
         # report('Declare map', m, 'for malloc')
 
@@ -319,7 +320,8 @@ def _process_var_decl(inst, info):
     struct_decl.update_symbol_table(info.sym_tbl)
     info.sym_tbl.current_scope = __scope
     # Define the BPF map
-    m = define_bpf_arr_map(map_name, struct_decl.get_name(), 1)
+    m = BPFMap.build_arr_map(map_name, struct_decl.type, 1)
+    m.is_used_in_bpf_code = True
     info.prog.add_declaration(m)
     # Lookup the malloc map
     lookup_inst, decl, ref = malloc_lookup(name, info, current_function)

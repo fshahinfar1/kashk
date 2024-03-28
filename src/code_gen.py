@@ -472,7 +472,7 @@ def __generate_global_shared_state(info):
                 '/* The globaly shared state is in this structure */\n'
                 + shared_state.get_c_code()
                 + '\n'
-                + shared_map_decl()
+                + shared_map_decl().get_c_code()
                 + '\n'
                 )
     else:

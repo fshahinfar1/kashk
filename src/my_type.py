@@ -43,7 +43,7 @@ class MyType:
     @classmethod
     def make_array(cls, name, T, count):
         obj = MyType()
-        obj.spelling = name
+        obj.spelling = f'{T.spelling}[{count}]'
         obj.under_type = T
         obj._element_count = count
         obj.kind = clang.TypeKind.CONSTANTARRAY

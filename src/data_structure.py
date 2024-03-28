@@ -312,14 +312,8 @@ class Record(TypeDefinition):
         with sym_tbl.new_scope() as scope:
             sym_tbl.scope_mapping[scope_key] = scope
             for f in self.fields:
-                T = MyType()
-                T.spelling = f.type_ref.spelling
-                if f.is_pointer:
-                    T.kind = clang.TypeKind.POINTER
-                    T.under_type = None
-                else:
-                    T.kind = f.kind
-                sym_tbl.insert_entry(f.name, T, clang.CursorKind.FIELD_DECL, None)
+                sym_tbl.insert_entry(f.name, f.type,
+                        clang.CursorKind.FIELD_DECL, None)
 
     def __repr__(self):
         return f'<Record {self.name} >'
@@ -447,6 +441,37 @@ class Function(TypeDefinition):
             # Add function parameters to the scope
             for arg in self.args:
                 e = sym_tbl.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
+
+
+class BPFMap(TypeDefinition):
+    BPF_MAP_TYPES = ('BPF_MAP_TYPE_ARRAY', )
+
+    @classmethod
+    def build_arr_map(cls, map_name, val_type, entries):
+        key_type = BASE_TYPES[clang.TypeKind.UINT]
+        obj = BPFMap(map_name, 'BPF_MAP_TYPE_ARRAY', key_type, val_type,
+                entries)
+        return obj
+
+    def __init__(self, map_name, map_type, key_type, val_type, entries):
+        assert map_type in BPFMap.BPF_MAP_TYPES
+        assert isinstance(key_type, MyType)
+        assert isinstance(val_type, MyType)
+        assert isinstance(entries, int)
+
+        super().__init__(map_name)
+        self.map_type = map_type
+        self.key_type = key_type
+        self.val_type = val_type
+        self.entries  = entries
+
+    def get_c_code(self):
+        return f'''struct {{
+  __uint(type,  {self.map_type});
+  __type(key,   {self.key_type.spelling});
+  __type(value, {self.val_type.spelling});
+  __uint(max_entries, {str(self.entries)});
+}} {self.name} SEC(".maps");'''
 
 
 VOID_PTR_ = 999

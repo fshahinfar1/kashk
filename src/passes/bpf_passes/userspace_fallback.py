@@ -522,8 +522,8 @@ def _declare_shared_channel(info):
     with sym_tbl.with_scope(gs):
         unit_decl.update_symbol_table(sym_tbl)
     # Create a BPF ARRAY MAP using this new structure
-    m = template.define_bpf_arr_map(CHANNEL_MAP_NAME, unit_decl.get_name(),
-            CHANNEL_UNITS)
+    m = BPFMap.build_arr_map(CHANNEL_MAP_NAME, unit_decl.type, CHANNEL_UNITS)
+    m.is_used_in_bpf_code = True
     info.prog.add_declaration(m)
 
 

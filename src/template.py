@@ -6,7 +6,15 @@ from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
 from helpers.instruction_helper import (get_ret_inst, decl_new_var, ZERO, NULL,
         CHAR_PTR, INT, NULL_CHAR, UINT, ONE, VOID_PTR)
 from elements.likelihood import Likelihood
-from var_names import DATA_VAR, ITERATOR_VAR, DATA_VAR, SHARED_REF_NAME
+from var_names import (DATA_VAR, ITERATOR_VAR, DATA_VAR, SHARED_REF_NAME,
+        SHARED_MAP_NAME)
+
+
+# Some things defined in global scope
+SHARED_STRUCT_TYPE = MyType.make_simple('struct shared_state',
+        clang.TypeKind.RECORD)
+SHARED_OBJ_PTR = MyType.make_pointer(SHARED_STRUCT_TYPE)
+SHARED_MAP_PTR = Literal(f'&{SHARED_MAP_NAME}', CODE_LITERAL)
 
 
 def bpf_ctx_bound_check(ref, index, data_end, func, abort=False):
@@ -92,19 +100,9 @@ def license_text(license):
 
 
 def shared_map_decl():
-    return '''struct {
-  __uint(type,  BPF_MAP_TYPE_ARRAY);
-  __type(key,   __u32);
-  __type(value, struct shared_state);
-  __uint(max_entries, 1);
-} shared_map SEC(".maps");
-'''
+    return BPFMap.build_arr_map(SHARED_MAP_NAME, SHARED_STRUCT_TYPE, 1)
 
 
-shared_struct = MyType.make_simple('struct shared_state',
-        clang.TypeKind.RECORD)
-SHARED_OBJ_PTR = MyType.make_pointer(shared_struct)
-SHARED_MAP_PTR = Literal('&shared_map', CODE_LITERAL)
 def prepare_shared_state_var(func):
     var_decl = VarDecl.build(SHARED_REF_NAME, SHARED_OBJ_PTR, red=True)
     var_decl.init.add_inst(NULL)
@@ -133,61 +131,6 @@ def prepare_shared_state_var(func):
     check.set_modified(InstructionColor.CHECK)
     insts = [var_decl, zero_decl, lookup_assign,  check]
     return insts
-
-
-def prepare_meta_data(failure_number, meta_declaration, info, func):
-    decl = []
-    type_name = f'struct {meta_declaration.name}'
-    req_type = MyType.make_simple(type_name, clang.TypeKind.RECORD)
-    T = MyType.make_pointer(req_type)
-
-    target_size_inst = Literal(f'sizeof({req_type.spelling})', CODE_LITERAL)
-    adjust_inst, tmp_decl = info.prog.adjust_pkt(target_size_inst, info)
-    decl.extend(tmp_decl)
-
-    ref = decl_new_var(T, info, decl)
-
-    pkt = info.prog.get_pkt_buf()
-    data, tmp_decl  = get_or_decl_ref(info, DATA_VAR, VOID_PTR,
-            init=pkt)
-    decl.extend(tmp_decl)
-
-    assign = BinOp.build(ref, '=', data)
-    assign.set_modified()
-
-    # DROP = Literal(info.prog.get_drop(), clang.CursorKind.INTEGER_LITERAL)
-    # DROP.set_modified()
-    bound_check = bpf_ctx_bound_check(ref, ZERO, info.prog.get_pkt_end(), func,
-            abort=True)
-
-    store = [f'{ref.name}->failure_number = {failure_number};', ]
-    for f in meta_declaration.fields[1:]:
-        store.append(f'{ref.name}->{f.name} = {f.name};')
-    code = '\n'.join(store) + '\n'
-    populate = Literal(code, CODE_LITERAL)
-    populate.set_modified(InstructionColor.MEM_COPY)
-
-    insts = adjust_inst + [assign, bound_check, populate]
-    return insts, decl
-
-
-def define_bpf_map(map_name, map_type, key_type, val_type, entries):
-    return Literal(f'''struct {{
-  __uint(type,  {map_type});
-  __type(key,   {key_type});
-  __type(value, {val_type});
-  __uint(max_entries, {entries});
-}} {map_name} SEC(".maps");''', CODE_LITERAL)
-
-
-def define_bpf_arr_map(map_name, val_type, entries):
-    return define_bpf_map(map_name, 'BPF_MAP_TYPE_ARRAY',
-            'unsigned int', val_type, entries)
-
-
-def define_bpf_hash_map(map_name, key_type, val_type, entries):
-    return define_bpf_map(map_name, 'BPF_MAP_TYPE_HASH', key_type,
-            val_type, entries)
 
 
 def malloc_lookup(name, info, func):
@@ -328,6 +271,7 @@ def variable_memcpy(dst, src, size, up_bound, info, func):
 def strncmp(s1, s2, size, upper_bound, info, func):
     assert hasattr(s1, 'type')
     assert hasattr(s2, 'type')
+
     assert s1.type.is_pointer() or s1.type.is_array()
     assert s1.type.under_type.spelling in ('char', 'unsigned char')
     assert s2.type.is_pointer() or s2.type.is_array()
@@ -429,3 +373,5 @@ def strncpy(s1, s2, size, max_bound, info, func):
     tmp_brk.kind = clang.CursorKind.BREAK_STMT
     check.body.add_inst(tmp_brk)
     loop.body.extend_inst([assign, check])
+    insts = [loop]
+    return insts, decl, res_var

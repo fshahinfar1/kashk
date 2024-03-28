@@ -2,11 +2,11 @@ import json
 import clang.cindex as clang
 from log import error, debug, report
 from code_gen import gen_code
-from template import (prepare_shared_state_var, define_bpf_arr_map,
-        SHARED_OBJ_PTR)
+from template import (prepare_shared_state_var, SHARED_OBJ_PTR)
 from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS
 from helpers.instruction_helper import (get_ret_inst, add_flag_to_func, ZERO,
         VOID_PTR, get_or_decl_ref, CHAR_PTR)
+from helpers.cache_helper import define_internal_cache
 from data_structure import *
 from my_type import MyType
 from instruction import *
@@ -34,27 +34,10 @@ class TransformVars(Pass):
 
     def _process_annotation(self, inst):
         if inst.ann_kind == Annotation.ANN_CACNE_DEFINE:
-            conf = json.loads(inst.msg)
-            map_id   = conf['id']
-            map_name = map_id  + '_map'
-            val_type = conf['value_type']
-            # TODO: get the map size from the annotation
-            conf['entries'] = '1024'
-            entries = conf['entries']
-            m = define_bpf_arr_map(map_name, val_type, entries)
-
-            # check if value was defined before
-            for d in self.info.prog.declarations:
-                if isinstance(d, TypeDefinition) and d.name == val_type:
-                    # Found the type
-                    break
-            else:
-                # The value type is not declared yet
-                from passes.mark_relevant_code import _add_type_to_declarations
-                T = MyType.make_simple(val_type, clang.TypeKind.RECORD)
-                _add_type_to_declarations(T, self.info)
-
-            self.info.prog.add_declaration(m)
+            decls, conf = define_internal_cache(inst, self.info)
+            for d in decls:
+                self.info.prog.add_declaration(d)
+            map_id = conf['id']
             assert map_id not in self.info.map_definitions, 'Multiple deffinition of the same map id'
             self.info.map_definitions[map_id] = conf
             # report('Declare map', m, 'for malloc')
