@@ -380,6 +380,7 @@ class VarDecl(Instruction):
         ref      = Ref(None, clang.CursorKind.DECL_REF_EXPR)
         ref.name = self.name
         ref.type = self.type
+        ref.original = self.original
         return ref
 
     def update_symbol_table(self, sym_tbl):

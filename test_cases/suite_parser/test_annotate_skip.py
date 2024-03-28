@@ -18,6 +18,7 @@ from passes.pass_obj import PassObject
 from passes.simplify_code import simplify_code_structure
 from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
 from passes.create_failure_path import create_failure_paths
+from passes.update_original_ref import update_original_ast_references
 
 
 class TestCase(BasicTest):
@@ -28,14 +29,19 @@ class TestCase(BasicTest):
 
         mark_relevant_code(bpf, info, None)
 
-        bpf = simplify_code_structure(bpf, info, PassObject())
-        for f in Function.directory.values():
-            if not f.is_empty():
-                with self.info.sym_tbl.with_func_scope(f.name):
-                    body = simplify_code_structure(f.body, self.info, PassObject())
-                    assert body is not None
-                    f.body = body
+        # TODO: copying this in different test is a bit hard. Do something
+        # about it.
+        update_original_ast_references(bpf, info, None)
+        # Store the original version of the source code (unchanged) for future use
+        tmp_fn_dir = {}
+        for k, f in Function.directory.items():
+            f.clone(tmp_fn_dir)
+        tmp_f = Function('[[main]]', None, tmp_fn_dir)
+        tmp_f.body = bpf
+        info.original_ast = tmp_fn_dir
+        # ---------------------------------------------------------------------
 
+        bpf = simplify_code_structure(bpf, info, PassObject())
         bpf = feasibilty_analysis_pass(bpf, self.info, PassObject())
         create_failure_paths(bpf, self.info, None)
 

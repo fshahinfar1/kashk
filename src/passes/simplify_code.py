@@ -89,10 +89,12 @@ class SimplifyCode(Pass):
         bin_op = BinOp.build(ref, '=', rhs)
         # If the declartion was ignored, also ignore the initialization
         bin_op.ignore = clone.ignore
+
         set_original_ref(bin_op, self.info, inst.original)
         blk.append(clone)
         if more.ctx != BODY:
             blk.append(bin_op)
+            return None
         return bin_op
 
     def _move_function_out(self, inst):

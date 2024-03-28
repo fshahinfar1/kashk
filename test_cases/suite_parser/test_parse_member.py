@@ -16,7 +16,6 @@ from sym_table import *
 from passes.pass_obj import PassObject
 from passes.simplify_code import simplify_code_structure
 from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
-from passes.bpf_passes.mark_user_boundary import get_number_of_failure_paths
 
 
 class TestCase(BasicTest):
