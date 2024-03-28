@@ -12,7 +12,7 @@ from passes.update_original_ref import set_original_ref
 
 
 MODULE_TAG = '[Linear Code Pass]'
-NOPE = Literal('(;)', CODE_LITERAL)
+NOPE = Literal('/*;*/', CODE_LITERAL)
 
 
 def _make_sure_void_func_return(func, info):
