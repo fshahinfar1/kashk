@@ -37,6 +37,8 @@ from passes.bpf_passes.remove_everything_not_used import remove_everything_not_u
 from passes.bpf_passes.prog_complexity import mitiage_program_comlexity
 from passes.bpf_passes.change_bpf_loop import change_to_bpf_loop
 from passes.bpf_passes.rewrite_while_loop import rewrite_while_loop
+from passes.update_original_ref import update_original_ast_references
+from passes.update_func_signature import update_function_signature
 
 from helpers.instruction_helper import show_insts
 from helpers.ast_graphviz import ASTGraphviz
@@ -87,15 +89,22 @@ class VerifierTest(BasicTest):
         # Passes
         mark_relevant_code(prog, info, PassObject())
         prog = primary_annotation_pass(prog, info, None)
+
+        update_original_ast_references(prog, info, None)
+        # Store the original version of the source code (unchanged) for future use
+        tmp_fn_dir = {}
+        for k, f in Function.directory.items():
+            f.clone(tmp_fn_dir)
+        tmp_f = Function(MAIN, None, tmp_fn_dir)
+        tmp_f.body = prog
+        info.original_ast = tmp_fn_dir
+
         mark_io(prog, info)
         prog = simplify_code_structure(prog, info, PassObject())
         prog = feasibilty_analysis_pass(prog, info, PassObject())
-        create_failure_paths(prog, info, None)
-        # TODO: remove unused arguments of new functions
-        failure_path_fallback_variables(info)
-        create_fallback_meta_structure(info)
         bpf = loop_end_pass(prog, info, PassObject())
         bpf = rewrite_while_loop(bpf, info, None)
+        prog = update_function_signature(prog, info)
         bpf = transform_vars_pass(bpf, info, PassObject())
         bpf = verifier_pass(bpf, info, PassObject())
         self.test(bpf)

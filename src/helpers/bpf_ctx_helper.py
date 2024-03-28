@@ -2,6 +2,7 @@ from instruction import *
 from data_structure import *
 from my_type import MyType
 from helpers.instruction_helper import symbol_for_inst, simplify_inst_to_ref, ZERO
+from utility import get_top_owner
 
 MODULE_TAG = "[BPF CTX Helper]"
 
@@ -50,7 +51,7 @@ def is_value_from_bpf_ctx(inst, info, R=None):
         return False
     elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
         # TODO: what if there are multiple member access?
-        owner = inst.owner[-1]
+        owner = get_top_owner(inst)
         if isinstance(owner, ArrayAccess):
             # TODO: is it possible that there are nested array accesses?
             assert isinstance(owner.array_ref, Ref)
@@ -68,9 +69,8 @@ def is_value_from_bpf_ctx(inst, info, R=None):
             return False
         if sym.is_bpf_ctx:
             # We are accessing BPF context
-            ref = Ref(None)
-            ref.name = sym.name
-            ref.type = sym.type # TODO: is sym.type an instance of MyType?
+            ref = Ref.from_sym(sym)
+            ref.original = inst.original
             assert isinstance(ref.type, MyType)
             ref.kind = clang.CursorKind.DECL_REF_EXPR
             index = Literal('0', clang.CursorKind.INTEGER_LITERAL)

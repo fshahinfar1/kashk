@@ -49,13 +49,13 @@ class TestCase(BasicTest):
         assert fnptr.is_method == False, 'The function invokation is not a method'
         assert len(fnptr.owner) > 0, 'The call expression is not recognized as member'
         assert fnptr.is_func_ptr == True, 'This should be recognized as function pointer invocation'
-        assert fnptr.owner[-1].name == 'r2', 'The owner of the function pointer should be variable `r`'
+        assert fnptr.owner[-1].name == 'r2', 'The owner of the function pointer should be variable `r2`'
         assert fnptr.owner[-1].type.spelling == 'struct record *', 'The owner of the function pointer should be variable `r`'
 
         fnptr = funcs[2]
         assert len(fnptr.args) == 1, 'The function should have one arguments'
         assert fnptr.is_method == False, 'The function invokation is not a method'
-        assert len(fnptr.owner) == 1, 'It should not have any owner'
+        assert len(fnptr.owner) == 0, 'It should not have any owner'
         assert fnptr.is_func_ptr == True, 'This should be recognized as function pointer invocation'
 
 

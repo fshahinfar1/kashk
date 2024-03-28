@@ -12,6 +12,7 @@ from passes.update_original_ref import set_original_ref
 
 
 MODULE_TAG = '[Linear Code Pass]'
+NOPE = Literal('(;)', CODE_LITERAL)
 
 
 def _make_sure_void_func_return(func, info):
@@ -94,14 +95,14 @@ class SimplifyCode(Pass):
         blk.append(clone)
         if more.ctx != BODY:
             blk.append(bin_op)
-            return None
+            return NOPE
         return bin_op
 
     def _move_function_out(self, inst):
         info = self.info
         return_type = None
         if inst.is_func_ptr:
-            ref = inst.owner[0]
+            ref = inst.func_ptr
             ref_type = ref.type
             while ref_type.kind == clang.TypeKind.TYPEDEF:
                 ref_type = ref_type.under_type

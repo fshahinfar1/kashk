@@ -18,6 +18,7 @@ from passes.mark_relevant_code import mark_relevant_code
 from passes.simplify_code import simplify_code_structure
 from passes.create_failure_path import create_failure_paths
 from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
+from passes.update_original_ref import update_original_ast_references
 
 
 class TestCase(BasicTest):
@@ -26,6 +27,16 @@ class TestCase(BasicTest):
         bpf.extend_inst(insts)
 
         mark_relevant_code(bpf, self.info, None)
+
+        update_original_ast_references(bpf, self.info, None)
+        # Store the original version of the source code (unchanged) for future use
+        tmp_fn_dir = {}
+        for k, f in Function.directory.items():
+            f.clone(tmp_fn_dir)
+        tmp_f = Function('[[main]]', None, tmp_fn_dir)
+        tmp_f.body = bpf
+        self.info.original_ast = tmp_fn_dir
+
         bpf = simplify_code_structure(bpf, self.info, PassObject())
         bpf = feasibilty_analysis_pass(bpf, self.info, PassObject())
         create_failure_paths(bpf, self.info, None)

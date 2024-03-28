@@ -4,6 +4,7 @@ import subprocess
 import time
 
 from log import error, debug, report
+from passes.clone import clone_pass
 
 
 PRIMITIVE_TYPES = [
@@ -218,7 +219,7 @@ def report_on_cursor(c):
                 debug(' ' * (c.location.column -1) + '^')
 
 
-def get_owner(cursor):
+def _get_owner(cursor):
     """
     @returns list of Instruction
     """
@@ -239,7 +240,7 @@ def get_owner(cursor):
         if hasattr(ref, 'owner'):
             res = res + ref.owner
     elif parent.kind == clang.CursorKind.UNEXPOSED_EXPR:
-        res += get_owner(parent)
+        res += _get_owner(parent)
     elif parent.kind == clang.CursorKind.PAREN_EXPR:
         first_child = next(parent.get_children())
         ref = gather_instructions_from(first_child, None)
@@ -249,11 +250,27 @@ def get_owner(cursor):
         if hasattr(ref, 'owner'):
             res = res + ref.owner
     else:
-        error('get_owner: unhandled cursor kind', parent.kind)
+        error('_get_owner: unhandled cursor kind', parent.kind)
         report_on_cursor(cursor)
         report_on_cursor(parent)
 
     return res
+
+
+def get_owner(cursor):
+    tmp = _get_owner(cursor)
+    if len(tmp) == 0:
+        return tmp
+
+    tmp = [clone_pass(x) for x in tmp]
+    tmp.reverse()
+    first = x = tmp.pop()
+    while tmp:
+        y = tmp.pop()
+        x.owner = [y,]
+        x.kind = clang.CursorKind.MEMBER_REF_EXPR
+        x = y
+    return [first,]
 
 
 def get_actual_type(_T):
@@ -271,6 +288,13 @@ def get_actual_type(_T):
             break
     T = skip_typedef(T)
     return T
+
+
+def get_top_owner(inst):
+    x = inst
+    while x.owner:
+        x = x.owner[0]
+    return x
 
 
 INDENT='  '

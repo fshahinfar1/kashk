@@ -1,7 +1,7 @@
 from data_structure import *
 from instruction import *
 from my_type import MyType
-from utility import get_tmp_var_name
+from utility import get_tmp_var_name, get_top_owner
 
 
 ZERO = Literal('0', clang.CursorKind.INTEGER_LITERAL)
@@ -118,7 +118,8 @@ def get_ref_symbol(ref, info):
     if ref.is_member():
         owner_sym = None
         scope     = info.sym_tbl.current_scope
-        assert scope.lookup(ref.owner[-1].name) is not None, 'The argument parent should be recognized in the caller scope'
+        top_owner = get_top_owner(ref)
+        assert scope.lookup(top_owner.name) is not None, 'The argument parent should be recognized in the caller scope'
         for o in reversed(ref.owner):
             owner_sym = scope.lookup(o.name)
             if owner_sym is None:
@@ -139,7 +140,7 @@ def symbol_for_inst(inst, info):
     elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
         # TODO: THERE IS A BUG HERE, WHAT IF THERE ARE MULTIPLE NESTED STRUCTS? I NEED A RECURSION HERE.
         # debug("THERE IS A BUG HERE, WHAT IF THERE ARE MULTIPLE NESTED STRUCTS? I NEED A RECURSION HERE.")
-        owner = inst.owner[-1]
+        owner = get_top_owner(inst)
         if not isinstance(owner, Ref):
             error('Failed to find symbol: owner is not a reference and handling this case is not implemented yet')
             debug('more info:')

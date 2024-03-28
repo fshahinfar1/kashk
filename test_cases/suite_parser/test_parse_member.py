@@ -18,6 +18,16 @@ from passes.simplify_code import simplify_code_structure
 from passes.bpf_passes.feasibility_analysis import feasibilty_analysis_pass
 
 
+def all_owners(inst):
+    tmp = []
+    x = inst
+    while len(x.owner) > 0:
+        o = x.owner[0]
+        tmp.append(o)
+        x = o
+    return tmp
+
+
 class TestCase(BasicTest):
     def test(self, insts):
         info = self.info
@@ -34,17 +44,20 @@ class TestCase(BasicTest):
         # and the generated code is right.
         elems = find_elems_of_kind(bpf, clang.CursorKind.MEMBER_REF_EXPR)
         ptr = elems[-2]
+        ptr_owners = all_owners(ptr)
         assert ptr.name == 'ptr', 'The wrong Ref object is selected for future tests'
-        assert len(ptr.owner) == 2, 'The ptr should have 2 owners'
-        assert ptr.owner[0].name == 'resp', 'The first owner should be the resp field'
-        assert ptr.owner[1].name == 'c', 'The second owner should be the `c` pointer'
-        assert ptr.owner[0].owner[0].name == ptr.owner[1].name
+        assert len(ptr_owners) == 2, 'The ptr should have 2 owners'
+        assert ptr_owners[0].name == 'resp', 'The first owner should be the resp field'
+        assert ptr_owners[1].name == 'c', 'The second owner should be the `c` pointer'
+        assert ptr_owners[0].owner[0].name == ptr_owners[1].name
 
         e = elems[-3]
+        e_owners = all_owners(e)
+        print(e_owners)
         assert e.name == 'size'
-        assert len(e.owner) == 2
-        assert e.owner[0].name == 'arr'
-        assert e.owner[1].name == 'c'
+        assert len(e_owners) == 2
+        assert e_owners[0].name == 'arr'
+        assert e_owners[1].name == 'c'
 
         text, _ = gen_code([ptr], info)
         expect = 'c->resp.ptr'

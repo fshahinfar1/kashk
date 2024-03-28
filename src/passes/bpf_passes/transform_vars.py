@@ -129,6 +129,7 @@ class TransformVars(Pass):
             top_owner = top_owner.owner[-1]
         top_owner.kind = clang.CursorKind.MEMBER_REF_EXPR
         top_owner.owner.append(shared)
+        assert len(top_owner.owner) == 1
         return inst
 
     def process_current_inst(self, inst, more):
