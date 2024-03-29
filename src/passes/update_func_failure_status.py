@@ -5,6 +5,9 @@ from data_structure import *
 from passes.code_pass import Pass
 
 
+MODULE_TAG = '[Update Func Failure Status]'
+
+
 # TODO: we need to also check if the function may succeed again (I guess not
 # neccessary with the current transformations but in general would be good)
 
@@ -27,3 +30,8 @@ class UpdateFuncFailureStatus(Pass):
 
 def update_function_failure_status(inst, info, more):
     UpdateFuncFailureStatus.do(inst, info, more)
+    for f in Function.directory.values():
+        if not f.is_used_in_bpf_code:
+            continue
+        UpdateFuncFailureStatus.do(f.body, info)
+        # debug(f.name, f.may_fail, f.may_succeed, tag=MODULE_TAG)

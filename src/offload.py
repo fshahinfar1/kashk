@@ -115,6 +115,14 @@ def load_other_sources(io_ctx, info):
 
 
 def prepare_userspace_fallback(prog, info):
+    debug('Create Failure Paths', tag=MODULE_TAG)
+    create_failure_paths(prog, info, None)
+    # for pid, path in info.failure_paths.items():
+    #     txt, _ = gen_code(path, info)
+    #     debug(pid, ':\n', txt, tag=MODULE_TAG)
+    #     debug('~~~')
+    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
     # Juggle function directory ---------------------------
     tmp_fn_dir = Function.directory
     Function.directory = info.original_ast
@@ -294,19 +302,19 @@ def generate_offload(io_ctx):
     prog = verifier_pass(prog, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
-    debug('Create Failure Paths', tag=MODULE_TAG)
-    create_failure_paths(prog, info, None)
-    # for pid, path in info.failure_paths.items():
-    #     txt, _ = gen_code(path, info)
-    #     debug(pid, ':\n', txt, tag=MODULE_TAG)
-    #     debug('~~~')
-    debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
-
     # prepare_userspace_fallback(prog, info)
 
     debug('Update Function Failure Status', tag=MODULE_TAG)
     update_function_failure_status(prog, info, None)
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
+
+    # NOTE: since I do not care about sharing data with userspace, lets just
+    # mark each function that fails with the failure path number one
+    for f in Function.directory.values():
+        if not f.is_used_in_bpf_code or not f.may_fail:
+            continue
+        f.path_ids.add(1)
+        # print(f.name)
 
     debug('[2nd] Update Function Signature', tag=MODULE_TAG)
     prog = update_function_signature(prog, info)
@@ -353,7 +361,7 @@ def generate_offload(io_ctx):
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # Check for the userspace code
-    if len(info.failure_paths) > 0:
+    if info.failure_paths and len(info.failure_paths) > 0:
         gen_user_code(info, io_ctx.user_out_file)
     else:
         report("No user space program was generated. The tool has offloaded everything to BPF.")

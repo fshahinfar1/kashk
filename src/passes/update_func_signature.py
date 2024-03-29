@@ -28,7 +28,8 @@ class UpdateCallInst(Pass):
         ctx = ((func.calls_recv or func.calls_send) and
                 not inst.has_flag(Function.CTX_FLAG))
         send = func.calls_send and not inst.has_flag(Function.SEND_FLAG)
-        fail = (func.may_succeed and func.may_fail and
+        # func.may_succeed and 
+        fail = (func.may_fail and
                 not inst.has_flag(Function.FAIL_FLAG))
         if not (ctx or send or fail):
             return inst
@@ -68,7 +69,7 @@ class UpdateCallInst(Pass):
                 assert self.current_function is not None, 'Expecting to be inside a intermediate function'
                 fail_flag_ref = fail_flag
             else:
-                assert self.current_function is None, 'Expecting to be at the main function'
+                assert self.current_function is None, f'Expecting to be at the main function but at {self.current_fname}'
                 fail_flag_ref = UnaryOp.build('&', fail_flag)
             new_inst.set_flag(Function.FAIL_FLAG)
             new_inst.args.append(fail_flag_ref)
@@ -101,7 +102,8 @@ def _check_func_receives_all_the_flags(func, info):
         assert scope is not None
         scope.insert_entry(arg.name, arg.type_ref, clang.CursorKind.PARM_DECL, None)
 
-    if func.may_succeed and func.may_fail and (func.change_applied & Function.FAIL_FLAG == 0):
+    # func.may_succeed and 
+    if func.may_fail and (func.change_applied & Function.FAIL_FLAG == 0):
         arg = StateObject(None)
         arg.name = FAIL_FLAG_NAME
         arg.type_ref = MyType.make_pointer(UINT)
