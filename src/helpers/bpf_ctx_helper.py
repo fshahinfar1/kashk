@@ -128,7 +128,7 @@ def is_bpf_ctx_ptr(inst, info):
         assert len(inst.owner) > 0
         # TODO: THERE IS A BUG HERE, WHAT IF THERE ARE MULTIPLE NESTED STRUCTS? I NEED A RECURSION HERE.
         # debug("THERE IS A BUG HERE, WHAT IF THERE ARE MULTIPLE NESTED STRUCTS? I NEED A RECURSION HERE.")
-        owner = inst.owner[-1]
+        owner = get_top_owner(inst)
         if not isinstance(owner, Ref):
             tmp = simplify_inst_to_ref(owner)
             if tmp is None:

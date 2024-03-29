@@ -176,7 +176,10 @@ def _track_bpf_ctx_pointer_propagation(inst, info, more):
     if not T.is_pointer() and not T.is_array():
         return
     rhs_is_ptr = is_bpf_ctx_ptr(rhs, info)
-    # debug("***", gen_code([inst,], info)[0], '|| LHS kind:', lhs.kind, '|| RHS kind:', rhs.kind, '|| is rhs ctx:', rhs_is_ptr, tag=MODULE_TAG)
+    # fname = '[[main]]' if current_function is None else current_function.name
+    # debug(f"++ @{fname}", gen_code([inst,], info)[0], '|| LHS kind:', lhs.kind,
+    #         '|| RHS kind:', rhs.kind, '|| is rhs ctx:', rhs_is_ptr,
+    #         tag=MODULE_TAG)
     set_ref_bpf_ctx_state(lhs, rhs_is_ptr, info)
     # assert is_bpf_ctx_ptr(lhs, info) == rhs_is_ptr, 'Check if set_ref_bpf_ctx_state and is_bpf_ctx_ptr work correctly'
     if is_bpf_ctx_ptr(lhs, info) != rhs_is_ptr:
@@ -531,9 +534,11 @@ def _handle_unary_op(inst, info, more):
     assert isinstance(inst, UnaryOp)
     if inst.op != '*':
         return inst
-    x = inst.operand
+    # x = inst.operand
     R = []
-    is_ctx = is_value_from_bpf_ctx(x, info, R)
+    # is_ctx = is_value_from_bpf_ctx(x, info, R)
+    # is_ctx = is_bpf_ctx_ptr(x, info, R)
+    is_ctx = is_value_from_bpf_ctx(inst, info, R)
     if not is_ctx:
         return inst
     r = R.pop()
@@ -542,6 +547,7 @@ def _handle_unary_op(inst, info, more):
         return inst
     assert isinstance(ref, Instruction)
     assert isinstance(index, Instruction)
+    blk = cb_ref.get(BODY)
     _check_if_variable_index_should_be_masked(ref, index, blk, info)
 
     # debug('add bound check because unary operator dereferences packet', tag=MODULE_TAG)
