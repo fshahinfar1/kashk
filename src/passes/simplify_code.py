@@ -11,7 +11,7 @@ from helpers.instruction_helper import decl_new_var
 from passes.update_original_ref import set_original_ref
 
 
-MODULE_TAG = '[Linear Code Pass]'
+MODULE_TAG = '[Simplify Code]'
 NOPE = Literal('/*;*/', CODE_LITERAL)
 
 
@@ -123,22 +123,13 @@ class SimplifyCode(Pass):
         assert blk is not None
 
         if return_type.spelling != 'void':
-            tmp_var_name = get_tmp_var_name()
-            # Declare tmp
-            T = return_type
-            assert isinstance(T, MyType)
-            tmp_decl = VarDecl.build(tmp_var_name, T)
-            blk.append(tmp_decl)
-            tmp_decl.update_symbol_table(info.sym_tbl)
-
+            tmp_ref = decl_new_var(return_type, self.info,
+                    self.declare_at_top_of_func)
             # Assign function return value to tmp
-            tmp_ref = tmp_decl.get_ref()
             cloned_inst = clone_pass(inst)
             bin_op = BinOp.build(tmp_ref, '=', cloned_inst)
             blk.append(bin_op)
 
-            tmp_decl.ignore = cloned_inst.ignore
-            tmp_decl.original = cloned_inst.original
             bin_op.ignore = cloned_inst.ignore
             bin_op.original = cloned_inst.original
 

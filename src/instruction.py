@@ -1004,7 +1004,7 @@ class ToUserspace(Instruction):
         super().__init__()
         self.kind = TO_USERSPACE_INST
         self.current_func = None
-        self.path_id = 0
+        self.path_id = 1
 
     @property
     def is_bpf_main(self):
