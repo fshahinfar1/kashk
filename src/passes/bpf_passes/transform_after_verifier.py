@@ -84,6 +84,18 @@ def _rename_func_to_a_known_one(inst, info, target_name):
     return inst
 
 
+def _get_upper_bound_for(repeat, size_argum):
+    max_bound = repeat
+    if max_bound is None:
+        if size_argum is not None and _is_known_integer(size_argum):
+            # Try to guess the max bound from the size parameter
+            max_bound = size_argum
+        else:
+            error('the strlen should have annotation declaring max number of iterations')
+            max_bound = 32
+    return max_bound
+
+
 def _known_function_substitution(inst, info, more):
     """
     Replace some famous functions with implementations that work in BPF
@@ -94,11 +106,7 @@ def _known_function_substitution(inst, info, more):
     if inst.name == 'free':
         return None, False
     elif inst.name == 'strlen':
-        # new_name = 'bpf_' + inst.name
-        # return _rename_func_to_a_known_one(inst, info, new_name)
-        max_bound = inst.repeat
-        if max_bound is None:
-            raise Exception('the strlen should have annotation declaring max number of iterations')
+        max_bound = _get_upper_bound_for(inst.repeat, None)
         s1 = inst.args[0]
         tmp_insts, tmp_decl, tmp_res = template.strlen(s1, max_bound, info,
                 current_function)
@@ -110,14 +118,13 @@ def _known_function_substitution(inst, info, more):
         return tmp_res, True
     elif inst.name == 'strncmp':
         assert len(inst.args) == 3
-        max_bound = inst.repeat
-        if max_bound is None and _is_known_integer(inst.args[2]):
-            # Try to guess the max bound from the size parameter
-            max_bound = inst.args[2]
-        assert max_bound is not None, 'The strncmp should have annotation declaring max number of iterations'
         s1 = inst.args[0]
         s2 = inst.args[1]
         size = inst.args[2]
+        max_bound = _get_upper_bound_for(inst.repeat, size)
+
+        if s1.type is None or s2.type is None:
+            breakpoint()
         tmp_insts, tmp_decl, tmp_res = template.strncmp(s1, s2, size,
                 max_bound, info, current_function)
         declare_at_top_of_func.extend(tmp_decl)
@@ -128,16 +135,10 @@ def _known_function_substitution(inst, info, more):
         return tmp_res, True
     elif inst.name == 'strncpy':
         assert len(inst.args) == 3, 'Assumption on the number of arguments'
-        max_bound = inst.repeat
-        if max_bound is None and _is_known_integer(inst.args[2]):
-            # Try to guess the max bound from the size parameter
-            max_bound = inst.args[2]
-        text = gen_code(inst, info)[0]
-        debug(text, tag=MODULE_TAG)
-        assert max_bound is not None, 'The strncpy should have annotation declaring max number of iterations'
         s1 = inst.args[0]
         s2 = inst.args[1]
         size = inst.args[2]
+        max_bound = _get_upper_bound_for(inst.repeat, size)
         tmp_insts, tmp_decl, tmp_res = template.strncpy(s1, s2, size,
                 max_bound, info, current_function)
         declare_at_top_of_func.extend(tmp_decl)
@@ -184,8 +185,7 @@ def _known_function_substitution(inst, info, more):
         if is_constant:
             # No change is needed the builtin memcpy would work
             return inst, False
-        assert isinstance(inst.repeat, int), 'The max bound is not set for variable-sized memcpy'
-        max_bound = inst.repeat
+        max_bound = _get_upper_bound_for(inst.repeat, size)
         assert max_bound is not None, 'The variable memcpy should have annotation declaring max number of iterations'
         dst = inst.args[0]
         src = inst.args[1]

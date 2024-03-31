@@ -4,7 +4,7 @@ from data_structure import *
 from instruction import *
 from my_type import MyType
 from sym_table import SymbolTableEntry
-from utility import indent, get_tmp_var_name
+from utility import indent, get_tmp_var_name, get_top_owner
 from code_gen import gen_code
 from passes.pass_obj import PassObject
 from helpers.instruction_helper import decl_new_var
@@ -158,7 +158,12 @@ def _handle_ref(inst, info, more):
     top_lvl_var_name = inst.name
     if inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
         if inst.owner:
-            top_lvl_var_name = inst.owner[-1].name
+            tmp = get_top_owner(inst)
+            if tmp.kind == clang.CursorKind.DECL_REF_EXPR:
+                top_lvl_var_name = tmp.name
+            else:
+                debug('The owner does not have a name', tag=MODULE_TAG)
+                return inst
         else:
             # using c++ implicit `this'
             top_lvl_var_name = 'self'

@@ -73,7 +73,11 @@ def _do_pass(bpf, all_declarations, shared_vars, info):
         elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
             assert len(inst.owner) == 1, f'unexpected length: {len(inst.owner)}'
             owner = inst.owner[-1]
-            if owner.name == SHARED_REF_NAME:
+            if owner.kind not in (clang.CursorKind.DECL_REF_EXPR,
+                    clang.CursorKind.MEMBER_REF_EXPR):
+                # Seems there is nothing to do
+                pass
+            elif owner.name == SHARED_REF_NAME:
                 var_name = inst.name
                 if var_name in shared_vars:
                     shared_vars.remove(var_name)

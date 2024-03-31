@@ -1,12 +1,12 @@
 import clang.cindex as clang
-
+from log import debug, error
 from data_structure import *
 from instruction import *
 from utility import (indent, INDENT, report_on_cursor, get_actual_type)
 from prune import READ_PACKET, WRITE_PACKET
-
 from template import (license_text, shared_map_decl)
 from helpers.function_call_dependency import find_function_call_dependencies2
+
 
 MODULE_TAG = '[BPF Code Gen]'
 
@@ -430,7 +430,7 @@ def __generate_code_type_definition(inst, info):
         for a in inst.args:
             if isinstance(a, str):
                 args.append(a)
-                error('Unexpected: Function argument is a string!')
+                error('Unexpected: Function argument is a string!', tag=MODULE_TAG)
             else:
                 # remove the semicolon
                 text = a.get_c_code()[:-1]
@@ -480,7 +480,7 @@ def __generate_global_shared_state(info):
     return shared_state_struct_decl
 
 
-def __sort_declarations(decls):
+def __sort_declarations(decls, ignore_self_dep=True):
     orig_len = len(decls)
     res = [d for d in decls if not isinstance(d, Record)]
     record = tuple(filter(lambda d: isinstance(d, Record), decls))
@@ -496,10 +496,14 @@ def __sort_declarations(decls):
         dep_list = set()
         for f in r.fields:
             T = get_actual_type(f.type)
-            if T.is_record():
-                type_name = T.spelling[len('struct '):]
-                if type_name in relevant_record_names:
-                    dep_list.add(type_name)
+            if not T.is_record():
+                continue
+            type_name = T.spelling[len('struct '):]
+            if type_name not in relevant_record_names:
+                continue
+            if ignore_self_dep and type_name == name:
+                continue
+            dep_list.add(type_name)
         # debug(name, ':', dep_list, tag=MODULE_TAG)
         deps[name] = dep_list
 
@@ -507,7 +511,12 @@ def __sort_declarations(decls):
         # Get records with out any dependency
         no_dep = tuple(name for name, v in deps.items() if len(v) == 0)
         if len(no_dep) == 0:
-            raise Exception('Circular dependancy between records')
+            # debug(list(deps.items()))
+            error('Circular dependancy found between records! Failed to sort them based on dependencies.')
+            for name in deps:
+                r = R[name]
+                res.append(r)
+            break
         for record_name in no_dep:
             r = R[record_name]
             res.append(r)

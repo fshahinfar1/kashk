@@ -67,7 +67,7 @@ class TestCase(BasicTest):
             assert (func.may_succeed, func.may_fail) == expected_state[func.name], f'For funct {func.name} the expectation does not match (s:{func.may_succeed}, f:{func.may_fail})'
 
         failure_paths = len(self.info.failure_paths)
-        count_expected_failures = 5
+        count_expected_failures = 6
         assert  failure_paths == count_expected_failures, f'Expect {count_expected_failures} failure paths found {failure_paths}'
         # Find the first failure point
         ifs = find_elems_of_kind(bpf, clang.CursorKind.IF_STMT)

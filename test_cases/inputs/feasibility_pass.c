@@ -8,6 +8,7 @@
 int arr[100];
 
 void *fail(int a, int b);
+char *global_ptr;
 
 int f1()
 {
@@ -47,6 +48,10 @@ void f4(int a) {
 	}
 }
 
+void global_pointer_acess(void) {
+	*global_ptr = 'p';
+}
+
 int main(int argc, char *argv[])
 {
 	int a;
@@ -80,12 +85,18 @@ int main(int argc, char *argv[])
 	}
 	f3(&d);
 
+	if (b % 5 == 1) {
+		f1();
+	} else {
+		/* Should fail on this path */
+		global_pointer_acess();
+	}
+
 	/* Should handle the fail path before the while */
 	__ANNOTATE_LOOP(100)
 	while(fail(5, 6) != NULL) {
 		b = a;
 	}
-
 
 	/* This should not become a seperate failure path */
 	fail(99, 11);
