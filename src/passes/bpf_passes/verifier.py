@@ -268,79 +268,83 @@ def _check_passing_bpf_context(inst, func, info):
     # Find BPF pointers passed to a function
     for pos, a in enumerate(inst.args):
         param = func.args[pos]
+
+        # First check if the argument it self is a pointer to BPF ctx
         if is_bpf_ctx_ptr(a, info):
-            # First check if the argument it self is a pointer to BPF ctx
-            text = gen_code(a, info)[0]
+            # text = gen_code(a, info)[0]
             # debug(f'func: {func.name} | Passing BPF_CTX as argument {param.name} <-- {text}', tag=MODULE_TAG)
             sym = callee_scope.lookup(param.name)
             sym.set_is_bpf_ctx(True)
             receives_bpf_ctx = True
+            continue
+
+        # Otherwise, check if the argument has a field, which is a pointer
+        # to BPF context
+        if not hasattr(a, 'type'):
+            error('do not know the type for', a, a.kind)
+            continue
+        arg_type = a.type
+        if arg_type is None:
+            error('do not know the type for', a, a.kind)
+            continue
+        if not arg_type.is_mem_ref():
+            # We are not passing a reference. Passing a value copies data.
+            # So it is not the BPF context anymore.
+            continue
+
+        # check if the argument is a record or not
+        # (Not record --> Not composit type --> no BPF_CTX field)
+        # [ignore pointers, get the underlying type]
+        arg_type = get_actual_type(arg_type)
+        if not arg_type.is_record():
+            continue
+
+        # I am not handling typecasting!
+        # NOTE: if we figure that this argument is a BPF context,
+        # then we will want to mark the parameter in the function scope as
+        # receiving a BPF context pointer. But when there is a typecase, I
+        # will not understand which field of the parameter object is
+        # receiving the pointer (we are checking the compound data
+        # structure here).
+        param_type = get_actual_type(param.type_ref)
+        if param_type.spelling != arg_type.spelling:
+            error('There is a type cast when passing the argument. I lose track of BPF context when there is a type cast! [1]')
+            debug(f'param: {param_type.spelling}    argument: {arg_type.spelling}',
+                    tag=MODULE_TAG)
+            continue
+
+        # if not isinstance(a, Ref):
+        #     debug('I am not checking whether the argument which are not simple references (e.g, are operations) have BPF context as a field or not', tag=MODULE_TAG)
+        #     debug('debug info:', tag=MODULE_TAG)
+        #     text, _ = gen_code([a,], info)
+        #     debug(a, tag=MODULE_TAG)
+        #     debug(text, tag=MODULE_TAG)
+        #     debug('--------', tag=MODULE_TAG)
+        #     continue
+
+        fields = FoundFields()
+        if _has_bpf_ctx_in_field(a, info, fields):
+            text, _ = gen_code([a, ], info)
+            debug('Has bpf context in the field:', a, '|', text,
+                    tag=MODULE_TAG)
+            param_sym = callee_scope.lookup(param.name)
+            assert param_sym is not None, 'We should have all the parameters in the scope of functions'
+            for field in fields.fields:
+                scope = param_sym.fields
+                for ref in reversed(field):
+                    sym = scope.lookup(ref.name)
+                    if sym is None:
+                            sym = scope.insert_entry(ref.name, ref.type,
+                                    clang.CursorKind.MEMBER_REF_EXPR, None)
+                    scope = sym.fields
+                sym.set_is_bpf_ctx(True)
+                receives_bpf_ctx = True
+                # debug(f'Set the {param.name} .. {sym.name} to BPF_CTX', tag=MODULE_TAG)
         else:
-            # Otherwise, check if the argument has a field, which is a pointer
-            # to BPF context
-            if not hasattr(a, 'type') and not isinstance(a, Literal):
-                error('do not know the type for', a, a.kind)
-                continue
-            if not (a.type.is_pointer() or a.type.is_array()):
-                # We are not passing a reference. Passing a value copies data.
-                # So it is not the BPF context anymore.
-                continue
-
-            # check if the argument is a record or not
-            # (Not record --> Not composit type --> no BPF_CTX field)
-            # [ignore pointers, get the underlying type]
-            T = get_actual_type(a.type)
-            if not T.is_record():
-                continue
-
-            # I am not handling typecasting!
-            # NOTE: if we figure that this argument is a BPF context,
-            # then we will want to mark the parameter in the function scope as
-            # receiving a BPF context pointer. But when there is a typecase, I
-            # will not understand which field of the parameter object is
-            # receiving the pointer (we are checking the compound data
-            # structure here).
-            _tmp = get_actual_type(param.type_ref)
-            if _tmp.spelling != T.spelling:
-                error('There is a type cast when passing the argument. I lose track of BPF context when there is a type cast! [1]')
-                debug(f'param: {_tmp.spelling}    argument: {T.spelling}',
-                        tag=MODULE_TAG)
-                continue
-
-            # if not isinstance(a, Ref):
-            #     debug('I am not checking whether the argument which are not simple references (e.g, are operations) have BPF context as a field or not', tag=MODULE_TAG)
-            #     debug('debug info:', tag=MODULE_TAG)
-            #     text, _ = gen_code([a,], info)
-            #     debug(a, tag=MODULE_TAG)
-            #     debug(text, tag=MODULE_TAG)
-            #     debug('--------', tag=MODULE_TAG)
-            #     continue
-
-            fields = FoundFields()
-            # debug(callee_scope.symbols, tag=MODULE_TAG)
-            if _has_bpf_ctx_in_field(a, info, fields):
-                text, _ = gen_code([a, ], info)
-                debug('Has bpf context in the field:', a, '|', text,
-                        tag=MODULE_TAG)
-                param_sym = callee_scope.lookup(param.name)
-                assert param_sym is not None, 'We should have all the parameters in the scope of functions'
-                # debug('fields:', field, tag=MODULE_TAG)
-                for field in fields.fields:
-                    scope = param_sym.fields
-                    for ref in reversed(field):
-                        sym = scope.lookup(ref.name)
-                        if sym is None:
-                                sym = scope.insert_entry(ref.name, ref.type,
-                                        clang.CursorKind.MEMBER_REF_EXPR, None)
-                        scope = sym.fields
-                    sym.set_is_bpf_ctx(True)
-                    receives_bpf_ctx = True
-                    # debug(f'Set the {param.name} .. {sym.name} to BPF_CTX', tag=MODULE_TAG)
-            else:
-                text, _ = gen_code([a, ], info)
-                debug(f'Does not have BPF CTX in its field', a, '|', text,
-                        tag=MODULE_TAG)
-                pass
+            # text, _ = gen_code([a, ], info)
+            # debug(f'Does not have BPF CTX in its field', a, '|', text,
+            #         tag=MODULE_TAG)
+            pass
     return receives_bpf_ctx
 
 
@@ -354,7 +358,7 @@ def _check_setting_bpf_context_in_callee(inst, func, info):
     for param, argum in zip(func.get_arguments(), inst.get_arguments()):
         # TODO: do I need to skip typedef to get to the udner type ?
         # get_typedef_under(param.type_ref)
-        if not param.type_ref.is_pointer() and not param.type_ref.is_array():
+        if not param.type.is_mem_ref():
             # Only pointer and arrays can carry the BPF context to this scope
             continue
 
@@ -364,8 +368,11 @@ def _check_setting_bpf_context_in_callee(inst, func, info):
             if tmp is None:
                 # TODO: I have not implemented the other cases.
                 # A question, How complex can it get?
+                debug('skiping because the instance is not a reference',
+                        tag=MODULE_TAG)
                 continue
-            ref = tmp
+            else:
+                ref = tmp
 
         # debug(f'Parameter {param.name} ({param.type_ref.kind}) is given argument {ref.owner} {ref.name} ({ref.type})', tag=MODULE_TAG)
 
@@ -375,8 +382,9 @@ def _check_setting_bpf_context_in_callee(inst, func, info):
         assert param_sym is not None, f'The function parameters should be found in its symbol table\'s scope ({param.name})'
         argum_sym = get_ref_symbol(ref, info)
         if argum_sym is None:
-            error(MODULE_TAG, '(Checking BPF_CTX set in callee)',
-                    'Did not found the symbol for argument', ref)
+            error('(Checking BPF_CTX set in callee)',
+                    'Did not found the symbol for argument', ref,
+                    tag=MODULE_TAG)
             continue
 
         if param_sym.is_bpf_ctx:
@@ -386,6 +394,12 @@ def _check_setting_bpf_context_in_callee(inst, func, info):
             if backward_jmp_ctx:
                 # TODO: check if this should be argum or ref
                 backward_jmp_ctx.append(argum)
+
+        if argum.type.is_mem_ref() != True:
+            breakpoint()
+        assert argum.type.is_mem_ref() == True, 'Type of argument is not consistent with function parameter!'
+        assert param.type.under_type is not None, 'How come we do not know the unsedlying type of reference'
+        assert argum.type.under_type is not None, 'How come we do not know the unsedlying type of reference'
 
         one_type_is_record = (param.type_ref.under_type.is_record() or
                 argum.type.under_type.is_record())
@@ -599,6 +613,8 @@ def _end_current_inst(inst, info, more):
 def _do_pass(inst, info, more):
     lvl, ctx, parent_list = more.unpack()
     new_children = []
+    if inst.ignore:
+        return inst
     with cb_ref.new_ref(ctx, parent_list):
         # Process current instruction
         inst = _process_current_inst(inst, info, more)

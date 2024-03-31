@@ -781,6 +781,12 @@ class Cast(Instruction):
 class Ref(Instruction):
     __slots__ = ('cursor', 'name', 'type')
 
+    def is_shared(self, info):
+        sym, scope = info.sym_tbl.lookup2(self.name)
+        if scope == info.sym_tbl.shared_scope:
+            return True
+        return False
+
     @classmethod
     def from_sym(cls, sym):
         ref = Ref(None, clang.CursorKind.DECL_REF_EXPR)
@@ -878,7 +884,9 @@ class Literal(Instruction):
             return BASE_TYPES[clang.TypeKind.SCHAR]
         else:
             debug('Trying to guess the type for', self, self.kind)
-            raise Exception('I do not know the type')
+            error('I do not know the type')
+            # raise Exception('I do not know the type')
+            return None
 
     def __str__(self):
         return f'<Literal {self.text}>'
@@ -1121,14 +1129,17 @@ class Initialization(Instruction):
         self.kind = clang.CursorKind.INIT_LIST_EXPR
 
     def has_children(self):
-        return len(self.body) > 0
+        return False
+        # return len(self.body) > 0
 
     def get_children(self):
-        return self.body[:]
+        return []
+        # return self.body[:]
 
     def get_children_context_marked(self):
-        tmp = [(c, RHS) for c in self.body]
-        return tmp
+        return []
+        # tmp = [(c, RHS) for c in self.body]
+        # return tmp
 
     def clone(self, children):
         new = Initialization()

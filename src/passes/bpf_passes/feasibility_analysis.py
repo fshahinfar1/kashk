@@ -122,6 +122,10 @@ def _process_current_inst(inst, info, more):
         return inst, not func.may_succeed
     elif inst.kind == ANNOTATION_INST and inst.ann_kind == Annotation.ANN_SKIP:
         return inst, True
+    elif inst.kind == clang.CursorKind.DECL_REF_EXPR:
+        if inst.is_shared(info) and inst.type.is_pointer():
+            # We are not handling access to global pointers
+            return inst, True
     return inst, False
 
 

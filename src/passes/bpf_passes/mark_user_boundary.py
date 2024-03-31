@@ -82,6 +82,11 @@ def _process_current_inst(inst, info, more):
     elif inst.kind == ANNOTATION_INST and inst.ann_kind == Annotation.ANN_SKIP:
         fail_ref.set(FAILED, YES)
         return inst, YES
+    elif inst.kind == clang.CursorKind.DECL_REF_EXPR:
+        if inst.is_shared(info) and inst.type.is_pointer():
+            # We are not handling access to global pointers
+            fail_ref.set(FAILED, YES)
+            return inst, YES
 
     failed = fail_ref.get(FAILED)
     return inst, failed

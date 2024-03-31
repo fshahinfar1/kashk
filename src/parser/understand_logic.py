@@ -497,8 +497,7 @@ def __convert_cursor_to_inst(c, info, _state):
         # It will be a list of tuples. The first t.0 is field name t.1 is its value.
         # The t.0 may be None.
         children = [_get_init_field(child) for child in c.get_children()]
-        inst = Instruction()
-        inst.kind = c.kind
+        inst = Initialization()
         inst.body = children
         # debug(MODULE_TAG, 'INIT_LIST:', inst.body)
         return inst
@@ -527,6 +526,7 @@ def gather_instructions_from(cursor, info, context=BODY, _state=None):
         if should_ignore_cursor(c):
             txt = ''.join(map(lambda x: x.spelling, c.get_tokens()))
             inst = Literal(f'/*<placeholder {txt}>*/', CODE_LITERAL)
+            inst.ignore = True
             ops.append(inst)
             continue
 

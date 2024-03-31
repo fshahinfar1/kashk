@@ -13,12 +13,17 @@ class RewriteWhileLoop(Pass):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def _handle_while(self, inst, more):
+    def _get_upper_bound_for(seslf, inst):
         upper_bound_int = inst.repeat
         if upper_bound_int is None:
-            raise Exception('Missing the upper bound for a while loop')
+            upper_bound_int = 32
+            error('Missing the upper bound for a while loop')
         upper_bound = Literal(str(upper_bound_int),
                 clang.CursorKind.INTEGER_LITERAL)
+        return upper_bound
+
+    def _handle_while(self, inst, more):
+        upper_bound = self._get_upper_bound_for(inst)
         tmp_insts, tmp_decl, loop_var = template.new_bounded_loop(upper_bound,
                 upper_bound, self.info, self.current_function,
                 loop_var_type=UINT, fail_check=True)
@@ -45,11 +50,7 @@ class RewriteWhileLoop(Pass):
         return loop
 
     def _handle_do_while(self, inst, more):
-        upper_bound_int = inst.repeat
-        if upper_bound_int is None:
-            raise Exception('Missing the upper bound for a while loop')
-        upper_bound = Literal(str(upper_bound_int),
-                clang.CursorKind.INTEGER_LITERAL)
+        upper_bound = self._get_upper_bound_for(inst)
         tmp_insts, tmp_decl, loop_var = template.new_bounded_loop(upper_bound,
                 upper_bound, self.info, self.current_function,
                 loop_var_type=UINT, fail_check=True)
