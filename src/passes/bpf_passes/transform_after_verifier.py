@@ -373,7 +373,8 @@ def _process_var_decl(inst, info):
     declare_at_top_of_func.append(new_var_decl)
     # blk.append(new_var_decl)
     var_ref = new_var_decl.get_ref()
-    assign = BinOp.build(var_ref, '=', ref)
+    casted_ref = Cast.build(UnaryOp.build('&', ref), var_ref.type)
+    assign = BinOp.build(var_ref, '=', casted_ref)
     assign.set_modified()
     set_original_ref(assign, info, inst.original)
     return assign
