@@ -1,5 +1,5 @@
 import clang.cindex as clang
-from utility import get_actual_type, find_elems_of_kind
+from utility import get_actual_type, find_elems_of_kind, PRIMITIVE_TYPES
 from data_structure import Function
 from dfs import DFSPass
 from log import debug, error, report
@@ -26,6 +26,25 @@ class RemoveDecl(Pass):
         return inst
 
 
+def __keep_this_type(T):
+    if T.is_mem_ref() or T.spelling in PRIMITIVE_TYPES:
+        return []
+
+    type_names = []
+    type_name = get_actual_type(T).spelling
+    type_names.append(type_name)
+    if T.is_record():
+        # This type is compound. Also keep every type in the fields
+        decl = T.get_decl()
+        if not decl:
+            return type_names
+        for field in decl.fields:
+            tmp_type = get_actual_type(field.type)
+            tmp = __keep_this_type(tmp_type)
+            type_names.extend(tmp)
+    return type_names
+
+
 def _do_pass(bpf, all_declarations, shared_vars, info):
     """
     Go through a block of code and body of functions it calls. Look for types
@@ -45,20 +64,9 @@ def _do_pass(bpf, all_declarations, shared_vars, info):
             #         type_name = get_actual_type(arg.type).spelling
             #         keys.append(type_name) # Keep this type
         elif inst.kind == clang.CursorKind.VAR_DECL:
-            type_name = get_actual_type(inst.type).spelling
-            keys.append(type_name) # Keep this type
-            if inst.type.is_record():
-                # This type is compound, also keep every type in the fields
-                type_name2 = type_name[len('struct '):]
-                decl = MyType.type_table.get(type_name2)
-                if decl:
-                    for field in decl.fields:
-                        if field.type_ref.is_record():
-                            t_name = get_actual_type(field.type_ref).spelling
-                            keys.append(t_name)
-                else:
-                    # debug(MODULE_TAG, 'Did not found decleration for', type_name2)
-                    pass
+            tmp_type = get_actual_type(inst.type)
+            tmp_k = __keep_this_type(tmp_type)
+            keys.extend(tmp_k)
         elif inst.kind == clang.CursorKind.DECL_REF_EXPR:
             # Found a used variable, check if it is in our list.
             var_name = inst.name

@@ -6,6 +6,7 @@ from utility import PRIMITIVE_TYPES, get_actual_type
 from prune import should_process_this_cursor
 
 from parser.understand_program_state import generate_decleration_for
+from data_structure import Record
 
 MODULE_TAG = '[Mark Used Func]'
 _has_processed = set()
@@ -63,6 +64,10 @@ def _add_type_to_declarations(T, info):
         decl.is_used_in_bpf_code = True
         info.prog.declarations.append(decl)
         _has_processed.add(decl.name)
+        if isinstance(decl, Record):
+            for f in decl.fields:
+                T = f.type
+                _add_type_to_declarations(T, info)
 
 
 def _do_pass(inst, info, more):
