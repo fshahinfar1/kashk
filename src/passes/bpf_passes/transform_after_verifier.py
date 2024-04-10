@@ -104,117 +104,134 @@ def _known_function_substitution(inst, info, more):
         of the function or not.
     """
     blk = cb_ref.get(BODY)
-    if inst.name == 'free':
-        return None, False
-    elif inst.name == 'strlen':
-        max_bound = _get_upper_bound_for(inst.repeat, None)
-        s1 = inst.args[0]
-        tmp_insts, tmp_decl, tmp_res = template.strlen(s1, max_bound, info,
-                current_function)
-        declare_at_top_of_func.extend(tmp_decl)
-        blk.extend(tmp_insts)
-        set_original_ref(tmp_insts, info, inst.original)
-        tmp_insts[1].removed.append(inst)
-        return tmp_res, True
-    elif inst.name == 'strncmp':
-        assert len(inst.args) == 3
-        s1 = inst.args[0]
-        s2 = inst.args[1]
-        size = inst.args[2]
-        max_bound = _get_upper_bound_for(inst.repeat, size)
+    match inst.name:
+        case 'free':
+            return None, False
+        case 'strlen':
+            max_bound = _get_upper_bound_for(inst.repeat, None)
+            s1 = inst.args[0]
+            tmp_insts, tmp_decl, tmp_res = template.strlen(s1, max_bound, info,
+                    current_function)
+            declare_at_top_of_func.extend(tmp_decl)
+            blk.extend(tmp_insts)
+            set_original_ref(tmp_insts, info, inst.original)
+            tmp_insts[1].removed.append(inst)
+            return tmp_res, True
+        case 'strncmp':
+            assert len(inst.args) == 3
+            s1 = inst.args[0]
+            s2 = inst.args[1]
+            size = inst.args[2]
+            max_bound = _get_upper_bound_for(inst.repeat, size)
 
-        if s1.type is None or s2.type is None:
-            breakpoint()
-        tmp_insts, tmp_decl, tmp_res = template.strncmp(s1, s2, size,
-                max_bound, info, current_function)
-        declare_at_top_of_func.extend(tmp_decl)
-        blk.extend(tmp_insts)
-        set_original_ref(tmp_insts, info, inst.original)
-        tmp_insts[1].removed.append(inst)
-        return tmp_res, True
-    elif inst.name == 'strcmp':
-        assert len(inst.args) == 2
-        s1 = inst.args[0]
-        s2 = inst.args[1]
-        max_bound = _get_upper_bound_for(inst.repeat, None)
-        size = Literal(str(max_bound), clang.CursorKind.INTEGER_LITERAL)
-        tmp_insts, tmp_decl, tmp_res = template.strncmp(s1, s2, size, max_bound,
-                info, current_function)
-        declare_at_top_of_func.extend(tmp_decl)
-        blk.extend(tmp_insts)
-        set_original_ref(tmp_insts, info, inst.original)
-        tmp_insts[1].removed.append(inst)
-        return tmp_res, True
-    elif inst.name == 'strncpy':
-        assert len(inst.args) == 3, 'Assumption on the number of arguments'
-        s1 = inst.args[0]
-        s2 = inst.args[1]
-        size = inst.args[2]
-        max_bound = _get_upper_bound_for(inst.repeat, size)
-        tmp_insts, tmp_decl, tmp_res = template.strncpy(s1, s2, size,
-                max_bound, info, current_function)
-        declare_at_top_of_func.extend(tmp_decl)
-        blk.extend(tmp_insts)
-        set_original_ref(tmp_insts, info, inst.original)
-        tmp_insts[0].removed.append(inst)
-        return tmp_res, True
-    elif inst.name == 'malloc':
-        map_value_size,_ = gen_code([inst.args[0]], info)
-        name = _get_malloc_name()
-        map_name = name + '_map'
-        # Define structure which will be the value of the malloc map
-        field = StateObject(None)
-        field.name = 'data'
-        field.type_ref = MyType.make_array('_unset_type_name_', BASE_TYPES[clang.TypeKind.SCHAR], map_value_size)
-        value_type = Record(name, [field])
-        value_type.is_used_in_bpf_code = True
-        info.prog.add_declaration(value_type)
+            if s1.type is None or s2.type is None:
+                breakpoint()
+            tmp_insts, tmp_decl, tmp_res = template.strncmp(s1, s2, size,
+                    max_bound, info, current_function)
+            declare_at_top_of_func.extend(tmp_decl)
+            blk.extend(tmp_insts)
+            set_original_ref(tmp_insts, info, inst.original)
+            tmp_insts[1].removed.append(inst)
+            return tmp_res, True
+        case 'strcmp':
+            assert len(inst.args) == 2
+            s1 = inst.args[0]
+            s2 = inst.args[1]
+            max_bound = _get_upper_bound_for(inst.repeat, None)
+            size = Literal(str(max_bound), clang.CursorKind.INTEGER_LITERAL)
+            tmp_insts, tmp_decl, tmp_res = template.strncmp(s1, s2, size, max_bound,
+                    info, current_function)
+            declare_at_top_of_func.extend(tmp_decl)
+            blk.extend(tmp_insts)
+            set_original_ref(tmp_insts, info, inst.original)
+            tmp_insts[1].removed.append(inst)
+            return tmp_res, True
+        case 'strncpy':
+            assert len(inst.args) == 3, 'Assumption on the number of arguments'
+            s1 = inst.args[0]
+            s2 = inst.args[1]
+            size = inst.args[2]
+            max_bound = _get_upper_bound_for(inst.repeat, size)
+            tmp_insts, tmp_decl, tmp_res = template.strncpy(s1, s2, size,
+                    max_bound, info, current_function)
+            declare_at_top_of_func.extend(tmp_decl)
+            blk.extend(tmp_insts)
+            set_original_ref(tmp_insts, info, inst.original)
+            tmp_insts[0].removed.append(inst)
+            return tmp_res, True
+        case 'strcpy':
+            assert len(inst.args) == 2
+            s1 = inst.args[0]
+            s2 = inst.args[1]
+            max_bound = _get_upper_bound_for(inst.repeat, None)
+            size = Literal(str(max_bound), clang.CursorKind.INTEGER_LITERAL)
+            tmp_insts, tmp_decl, tmp_res = template.strncpy(s1, s2, size,
+                    max_bound, info, current_function)
+            declare_at_top_of_func.extend(tmp_decl)
+            blk.extend(tmp_insts)
+            set_original_ref(tmp_insts, info, inst.original)
+            tmp_insts[0].removed.append(inst)
+            return tmp_res, True
+        case 'malloc':
+            map_value_size,_ = gen_code([inst.args[0]], info)
+            name = _get_malloc_name()
+            map_name = name + '_map'
+            # Define structure which will be the value of the malloc map
+            field = StateObject(None)
+            field.name = 'data'
+            field.type_ref = MyType.make_array('_unset_type_name_', BASE_TYPES[clang.TypeKind.SCHAR], map_value_size)
+            value_type = Record(name, [field])
+            value_type.is_used_in_bpf_code = True
+            info.prog.add_declaration(value_type)
 
-        __scope = info.sym_tbl.current_scope
-        info.sym_tbl.current_scope = info.sym_tbl.global_scope
-        value_type.update_symbol_table(info.sym_tbl)
-        info.sym_tbl.current_scope = __scope
-        # report('Declare', value_type, 'as malloc object')
+            __scope = info.sym_tbl.current_scope
+            info.sym_tbl.current_scope = info.sym_tbl.global_scope
+            value_type.update_symbol_table(info.sym_tbl)
+            info.sym_tbl.current_scope = __scope
+            # report('Declare', value_type, 'as malloc object')
 
-        # Define the map
-        m = BPFMap.build_arr_map(map_name, value_type.type, 1)
-        m.is_used_in_bpf_code = True
-        info.prog.add_declaration(m)
-        # report('Declare map', m, 'for malloc')
+            # Define the map
+            m = BPFMap.build_arr_map(map_name, value_type.type, 1)
+            m.is_used_in_bpf_code = True
+            info.prog.add_declaration(m)
+            # report('Declare map', m, 'for malloc')
 
-        # Look the malloc map
-        lookup_inst, tmp_decl, ref = malloc_lookup(name, info, current_function)
-        declare_at_top_of_func.extend(tmp_decl)
-        blk.extend(lookup_inst)
-        set_original_ref(lookup_inst, info, inst.original)
-        return ref, True
-    elif inst.name == 'memcpy':
-        assert len(inst.args) == 3
-        size = inst.args[2]
-        is_constant = _is_known_integer(size)
-        if is_constant:
-            # No change is needed the builtin memcpy would work
+            # Look the malloc map
+            lookup_inst, tmp_decl, ref = malloc_lookup(name, info, current_function)
+            declare_at_top_of_func.extend(tmp_decl)
+            blk.extend(lookup_inst)
+            set_original_ref(lookup_inst, info, inst.original)
+            return ref, True
+        case 'memcpy':
+            assert len(inst.args) == 3
+            size = inst.args[2]
+            is_constant = _is_known_integer(size)
+            if is_constant:
+                # No change is needed the builtin memcpy would work
+                return inst, False
+            max_bound = _get_upper_bound_for(inst.repeat, size)
+            assert max_bound is not None, 'The variable memcpy should have annotation declaring max number of iterations'
+            dst = inst.args[0]
+            src = inst.args[1]
+            tmp_insts, decl, tmp_res = template.variable_memcpy(dst, src, size,
+                    max_bound, info, current_function)
+            declare_at_top_of_func.extend(decl)
+            blk.extend(tmp_insts)
+            set_original_ref(tmp_insts, info, inst.original)
+            tmp_insts[0].removed.append(inst)
+            return tmp_res, True
+        case ['ntohs' | 'ntohl' | 'htons' | 'htonl']:
+            inst.name = 'bpf_'+inst.name
             return inst, False
-        max_bound = _get_upper_bound_for(inst.repeat, size)
-        assert max_bound is not None, 'The variable memcpy should have annotation declaring max number of iterations'
-        dst = inst.args[0]
-        src = inst.args[1]
-        tmp_insts, decl, tmp_res = template.variable_memcpy(dst, src, size,
-                max_bound, info, current_function)
-        declare_at_top_of_func.extend(decl)
-        blk.extend(tmp_insts)
-        set_original_ref(tmp_insts, info, inst.original)
-        tmp_insts[0].removed.append(inst)
-        return tmp_res, True
-    elif inst.name in ('ntohs', 'ntohl', 'htons', 'htonl'):
-        inst.name = 'bpf_'+inst.name
-        return inst, False
-    elif inst.name == 'htonll':
-        inst.name = 'bpf_cpu_to_be64'
-        return inst, False
-    elif inst.name == 'ntohll':
-        inst.name = 'bpf_be64_to_cpu'
-        return inst, False
+        case 'htonll':
+            inst.name = 'bpf_cpu_to_be64'
+            return inst, False
+        case 'ntohll':
+            inst.name = 'bpf_be64_to_cpu'
+            return inst, False
+        case 'printk':
+            inst.name = 'bpf_printk'
+            return inst, False
     error(f'Known function {inst.name} is not implemented yet')
     return inst, False
 

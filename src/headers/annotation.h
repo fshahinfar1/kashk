@@ -17,6 +17,7 @@ enum {
 	ANN_LOOP,
 	ANN_IGNORE_INST,
 };
+void printk(const char *str, ...);
 #define __ANNOTATE(_m, _k) (struct __annotation){ \
 	.message = _m, \
 	.kind = _k,  \
