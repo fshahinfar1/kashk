@@ -91,7 +91,7 @@ def _get_upper_bound_for(repeat, size_argum):
             # Try to guess the max bound from the size parameter
             max_bound = size_argum
         else:
-            error('the strlen should have annotation declaring max number of iterations')
+            error('the operation should have annotation declaring max number of iterations')
             max_bound = 32
     return max_bound
 
@@ -103,6 +103,7 @@ def _known_function_substitution(inst, info, more):
         boolean. The boolean determines if the instruciton is the return value
         of the function or not.
     """
+    blk = cb_ref.get(BODY)
     if inst.name == 'free':
         return None, False
     elif inst.name == 'strlen':
@@ -111,7 +112,6 @@ def _known_function_substitution(inst, info, more):
         tmp_insts, tmp_decl, tmp_res = template.strlen(s1, max_bound, info,
                 current_function)
         declare_at_top_of_func.extend(tmp_decl)
-        blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
         set_original_ref(tmp_insts, info, inst.original)
         tmp_insts[1].removed.append(inst)
@@ -128,7 +128,19 @@ def _known_function_substitution(inst, info, more):
         tmp_insts, tmp_decl, tmp_res = template.strncmp(s1, s2, size,
                 max_bound, info, current_function)
         declare_at_top_of_func.extend(tmp_decl)
-        blk = cb_ref.get(BODY)
+        blk.extend(tmp_insts)
+        set_original_ref(tmp_insts, info, inst.original)
+        tmp_insts[1].removed.append(inst)
+        return tmp_res, True
+    elif inst.name == 'strcmp':
+        assert len(inst.args) == 2
+        s1 = inst.args[0]
+        s2 = inst.args[1]
+        max_bound = _get_upper_bound_for(inst.repeat, None)
+        size = Literal(str(max_bound), clang.CursorKind.INTEGER_LITERAL)
+        tmp_insts, tmp_decl, tmp_res = template.strncmp(s1, s2, size, max_bound,
+                info, current_function)
+        declare_at_top_of_func.extend(tmp_decl)
         blk.extend(tmp_insts)
         set_original_ref(tmp_insts, info, inst.original)
         tmp_insts[1].removed.append(inst)
@@ -142,7 +154,6 @@ def _known_function_substitution(inst, info, more):
         tmp_insts, tmp_decl, tmp_res = template.strncpy(s1, s2, size,
                 max_bound, info, current_function)
         declare_at_top_of_func.extend(tmp_decl)
-        blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
         set_original_ref(tmp_insts, info, inst.original)
         tmp_insts[0].removed.append(inst)
@@ -174,7 +185,6 @@ def _known_function_substitution(inst, info, more):
         # Look the malloc map
         lookup_inst, tmp_decl, ref = malloc_lookup(name, info, current_function)
         declare_at_top_of_func.extend(tmp_decl)
-        blk = cb_ref.get(BODY)
         blk.extend(lookup_inst)
         set_original_ref(lookup_inst, info, inst.original)
         return ref, True
@@ -192,7 +202,6 @@ def _known_function_substitution(inst, info, more):
         tmp_insts, decl, tmp_res = template.variable_memcpy(dst, src, size,
                 max_bound, info, current_function)
         declare_at_top_of_func.extend(decl)
-        blk = cb_ref.get(BODY)
         blk.extend(tmp_insts)
         set_original_ref(tmp_insts, info, inst.original)
         tmp_insts[0].removed.append(inst)
