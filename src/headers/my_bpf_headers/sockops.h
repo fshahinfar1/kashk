@@ -19,7 +19,7 @@ struct __five_tuple {
 
 /* Context of a socket */
 struct sock_context {
-	/* __u32 sock_map_index; */
+	__u32 sock_map_index;
 	struct connection_state state;
 };
 
@@ -39,7 +39,7 @@ struct {
 /* } sock_hash SEC(".maps"); */
 
 struct {
-	__uint(type, BPF_MAP_TYPE_PERCPU_HASH);
+	__uint(type, BPF_MAP_TYPE_HASH);
 	__type(key,   struct __five_tuple);
 	__type(value, struct sock_context);
 	__uint(max_entries, MAX_CONN);

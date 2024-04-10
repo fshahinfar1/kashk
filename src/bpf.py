@@ -16,26 +16,8 @@ MODULE_TAG = '[BPF Prog]'
 class BPF_PROG:
     def __init__(self):
         self.declarations = [
-                Literal('''#ifndef memcpy
-#define memcpy(d, s, len) __builtin_memcpy(d, s, len)
-#endif
-
-#ifndef memmove
-#define memmove(d, s, len) __builtin_memmove(d, s, len)
-#endif
-
-#ifndef memset
-#define memset(d, c, len) __builtin_memset(d, c, len)
-#endif
-''', CODE_LITERAL),
                 Literal('typedef char bool;', CODE_LITERAL),
                 Literal('#define PKT_OFFSET_MASK 0xfff', CODE_LITERAL),
-                #Literal('''#ifndef bpf_loop
-#static long (*bpf_loop)(__u32 nr_loops, void *callback_fn, void *callback_ctx, __u64 flags) = (void *) 181;
-##endif
-##ifndef bpf_strncmp
-#static long (*bpf_strncmp)(const char *s1, __u32 s1_sz, const char *s2) = (void *) 182;
-##endif''', CODE_LITERAL),
                 ]
         self.headers = [
                 '/* vim: set et ts=2 sw=2: */',
