@@ -151,7 +151,10 @@ class BPF_PROG:
         inst.extend(before_send_insts)
 
         if ret is True:
-            ret_val  = self.get_send()
+            tmp_inst, tmp_decl  = self.get_send(info)
+            decl.extend(tmp_decl)
+            inst.extend(tmp_inst[:-1])
+            ret_val = tmp_inst[-1]
             ret_inst = Return.build([ret_val,])
             inst.append(ret_inst)
         return inst, decl

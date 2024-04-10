@@ -4,6 +4,7 @@ from my_type import MyType
 from instruction import *
 from helpers.instruction_helper import *
 from code_gen import gen_code
+from internal_types import FLOW_ID_TYPE, FLOW_ID_PTR
 
 
 class SK_SKB_PROG(BPF_PROG):
@@ -63,18 +64,19 @@ class SK_SKB_PROG(BPF_PROG):
 
 
     def _load_connection_state(self):
-        return '''struct sock_context *sock_ctx;
+        return ''
+        # return '''struct sock_context *sock_ctx;
 
-if (skb->sk == NULL) {
-  bpf_printk("The socket reference is NULL");
-  return SK_DROP;
-}
-sock_ctx = bpf_sk_storage_get(&sock_ctx_map, skb->sk, NULL, 0);
-if (!sock_ctx) {
-  bpf_printk("Failed to get socket context!");
-  return SK_DROP;
-}
-'''
+# if (skb->sk == NULL) {
+  # bpf_printk("The socket reference is NULL");
+  # return SK_DROP;
+# }
+# sock_ctx = bpf_sk_storage_get(&sock_ctx_map, skb->sk, NULL, 0);
+# if (!sock_ctx) {
+  # bpf_printk("Failed to get socket context!");
+  # return SK_DROP;
+# }
+# '''
 
     def _pull_packet_data(self):
         return '''if (bpf_skb_pull_data(skb, skb->len) != 0) {
@@ -150,18 +152,34 @@ if (!sock_ctx) {
     def get_pass(self):
         return 'SK_PASS'
 
-    def get_send(self):
-        # raise Exception('not implemented')
-        map_ref_addr = UnaryOp.build('&', Literal('sock_map', CODE_LITERAL))
+    def get_send(self, info):
+        insts = []
+        decl = []
+
+        sk = Literal(f'{self.ctx}->sk', CODE_LITERAL)
+        cond = BinOp.build(sk, '==', NULL)
+        check_null = ControlFlowInst.build_if_inst(cond)
+        ret = Literal('return SK_DROP;', CODE_LITERAL)
+        check_null.body.add_inst(ret)
+        check_null.set_modified(InstructionColor.CHECK)
+        insts.append(check_null)
+
+        key = decl_new_var(FLOW_ID_TYPE, info, decl, FLOW_ID_VAR_NAME)
+        key.set_modified()
+        get_flow_id = Call(None)
+        get_flow_id.name = GET_FLOW_ID
+        get_flow_id.args = [sk, UnaryOp.build('&', key)]
+        get_flow_id.set_modified(InstructionColor.KNOWN_FUNC_IMPL)
+        inst.append(get_flow_id)
+
+        map_ref_addr = UnaryOp.build('&', Literal(SOCK_MAP_NAME, CODE_LITERAL))
         map_ref_addr.set_modified()
-        index_ref = Literal('sock_ctx->sock_map_index', CODE_LITERAL)
-        index_ref.set_modified()
-        name = 'bpf_sk_redirect_map'
-        args= [self.get_ctx_ref(), map_ref_addr, index_ref, ZERO]
+
+        name = 'bpf_sk_redirect_hash'
         call_redir = Call(None)
         call_redir.name = name
-        call_redir.args.extend(args)
+        call_redir.args = [self.get_ctx_ref(), map_ref_addr, key, ZERO]
         call_redir.set_modified(InstructionColor.KNOWN_FUNC_IMPL)
-        # ret_inst = Return.build([call_redir,])
-        # ret_inst.set_modified(InstructionColor.REMOVE_WRITE)
-        return call_redir
+        insts.append(call_redir)
+
+        return insts, decl

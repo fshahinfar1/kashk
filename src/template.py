@@ -6,15 +6,12 @@ from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
 from helpers.instruction_helper import (get_ret_inst, decl_new_var, ZERO, NULL,
         CHAR_PTR, INT, NULL_CHAR, UINT, ONE, VOID_PTR)
 from elements.likelihood import Likelihood
-from var_names import (DATA_VAR, ITERATOR_VAR, DATA_VAR, SHARED_REF_NAME,
-        SHARED_MAP_NAME)
-
+from var_names import *
+from internal_types import SHARED_STRUCT_TYPE, SHARED_OBJ_PTR
 
 # Some things defined in global scope
-SHARED_STRUCT_TYPE = MyType.make_simple('struct shared_state',
-        clang.TypeKind.RECORD)
-SHARED_OBJ_PTR = MyType.make_pointer(SHARED_STRUCT_TYPE)
 SHARED_MAP_PTR = Literal(f'&{SHARED_MAP_NAME}', CODE_LITERAL)
+
 
 
 def bpf_ctx_bound_check(ref, index, data_end, func, abort=False):

@@ -1,11 +1,20 @@
 #ifndef __MY_BPF_COMMONS
 #define __MY_BPF_COMMONS
+#include <linux/bpf.h>
+#include <bpf/bpf_helpers.h>
+
 /* Make sure these types are defined */
 #ifndef __u32
 typedef unsigned char        __u8;
 typedef unsigned short      __u16;
 typedef unsigned int        __u32;
 typedef unsigned long long  __u64;
+#endif
+
+#define MAX_CONN 65536
+
+#ifndef AF_INET
+#define AF_INET 2
 #endif
 
 #ifndef NULL
@@ -21,6 +30,10 @@ typedef unsigned long long  __u64;
 
 #ifndef memmove
 #define memmove(d, s, len) __builtin_memmove(d, s, len)
+#endif
+
+#ifndef memset
+#define memset(d, c, len) __builtin_memset(d, c, len)
 #endif
 
 #define ABS(val) ((val) < 0) ? (-(val)) : (val)

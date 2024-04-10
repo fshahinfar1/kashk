@@ -9,10 +9,15 @@ FAIL_FLAG_NAME = '__fail_flag'
 SEND_FLAG_NAME = '__send_flag'
 SHARED_REF_NAME = '__shared'
 CHANNEL_VAR_NAME = '__c'
+FLOW_ID_VAR_NAME = '__flow_id'
+
+# Internal function names
+GET_FLOW_ID = '__get_conn_id'
 
 # Map names
 SHARED_MAP_NAME = '__shared_map'
 CHANNEL_MAP_NAME = '__channel'
+SOCK_MAP_NAME = 'sock_map'
 
 # Map entry count
 CHANNEL_UNITS = 4096 # means shared channel size is (4096 x 1024) = 4MB
@@ -21,12 +26,14 @@ CACHE_SIZE = 1024 # Number of elements in the internal cache
 # Struct names
 UNIT_STRUCT_NMAE = '__unit'
 CACHE_ITEM_STRUCT_NAME = '__cache_item'
+SHARED_STATE_STRUCT_NAME = 'shared_state'
+FIVE_TUPLE_STRUCT_NAME  = '__five_tuple'
 
 # For struct __unit:
 UNIT_MEM_FIELD = 'mem'
 FAILURE_NUMBER_FIELD = 'failure_number'
-
 UNIT_SIZE = 1024
+
 # For struct __cache_item
 CACHE_KEY_MAX_SIZE = 255
 CACHE_VALUE_MAX_SIZE = 255

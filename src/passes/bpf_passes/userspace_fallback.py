@@ -298,7 +298,10 @@ def _process_call_needing_send_flag(inst, info):
         before_send_insts = info.prog.before_send()
         check.body.extend_inst(before_send_insts)
         # Return the verdict
-        ret_val  = info.prog.get_send()
+        tmp_inst, tmp_decl = info.prog.get_send(info)
+        declare_at_top_of_func.extend(tmp_decl)
+        check.body.extend_inst(tmp_inst[:-1])
+        ret_val  = tmp_inst[-1]
         ret_inst = Return.build([ret_val,])
         # It is not marked as 'InstructionColor.REMOVE_WRITE'
         # because the instruction was removed inside the

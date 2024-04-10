@@ -152,8 +152,10 @@ int xdp_prog(struct xdp_md *xdp)
     def get_pass(self):
         return 'XDP_PASS'
 
-    def get_send(self):
-        return Literal('XDP_TX', clang.CursorKind.INTEGER_LITERAL)
+    def get_send(self, info):
+        insts = [Literal('XDP_TX', clang.CursorKind.INTEGER_LITERAL), ]
+        decl = []
+        return insts, decl
 
     def before_send(self):
         if XDP_HELPER_HEADER not in self.headers:
