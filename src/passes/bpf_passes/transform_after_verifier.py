@@ -10,6 +10,7 @@ from template import malloc_lookup
 from code_gen import gen_code
 from passes.pass_obj import PassObject
 from passes.update_original_ref import set_original_ref
+from passes.clone import clone_pass
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr, is_value_from_bpf_ctx
 from helpers.instruction_helper import (get_ret_inst, get_ret_value_text)
 from helpers.cache_helper import generate_cache_lookup, generate_cache_update
@@ -25,6 +26,7 @@ _has_processed_func = set()
 declare_at_top_of_func = None
 # Skip until the cache END
 skip_to_end = None
+_changed_type = None
 
 def _is_known_integer(inst):
     if (isinstance(inst, Literal) or
@@ -329,6 +331,8 @@ def _process_var_decl(inst, info):
     # the map.
     if inst.type.mem_size <= 255:
         return inst
+    debug('Moving large vars to BPF map is a work in progress!', tag=MODULE_TAG)
+    raise Exception(f'Large variable declared on stack! {inst}')
     debug(MODULE_TAG, f'moving {inst.name}:{inst.type.spelling} to BPF map')
     debug(MODULE_TAG, f'{inst.name}:{inst.type.spelling} ({inst.type.mem_size} bytes)')
 
@@ -377,7 +381,19 @@ def _process_var_decl(inst, info):
     assign = BinOp.build(var_ref, '=', casted_ref)
     assign.set_modified()
     set_original_ref(assign, info, inst.original)
+
+    _changed_type[var_ref.name] = new_type
     return assign
+
+
+def _process_ref(inst, info):
+    if inst.name not in _changed_type:
+        return inst
+    new_type = _changed_type[inst.name]
+    debug(f'Changing type of {inst.name} to {new_type}', tag=MODULE_TAG)
+    new_inst = clone_pass(inst)
+    new_inst.type = new_type
+    return new_inst
 
 
 def _process_current_inst(inst, info, more):
@@ -387,6 +403,8 @@ def _process_current_inst(inst, info, more):
         return _process_annotation(inst, info)
     elif inst.kind == clang.CursorKind.VAR_DECL:
         return _process_var_decl(inst, info)
+    elif inst.kind == clang.CursorKind.DECL_REF_EXPR:
+        return _process_ref(inst, info)
     return inst
 
 
@@ -434,6 +452,8 @@ def transform_func_after_verifier(bpf, info, more):
     from a buffer to the packet or it is already on the packet.
     """
     global declare_at_top_of_func
+    global _changed_type
+    _changed_type = {}
     declare_at_top_of_func = []
     with set_current_func(None):
         res = _do_pass(bpf, info, more)
@@ -441,6 +461,7 @@ def transform_func_after_verifier(bpf, info, more):
         for inst in declare_at_top_of_func:
             res.children.insert(0, inst)
     declare_at_top_of_func = []
+    _changed_type = {}
 
     for func in Function.directory.values():
         if func.is_used_in_bpf_code:
@@ -451,4 +472,5 @@ def transform_func_after_verifier(bpf, info, more):
                         for inst in declare_at_top_of_func:
                             func.body.children.insert(0, inst)
                     declare_at_top_of_func = []
+                    _changed_type = {}
     return res

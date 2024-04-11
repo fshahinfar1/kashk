@@ -828,17 +828,19 @@ class Ref(Instruction):
         return self.kind == clang.CursorKind.MEMBER_REF_EXPR
 
     def has_children(self):
-        return False
+        return len(self.owner) != 0
 
     def get_children(self):
-        return []
+        return list(self.owner)
 
     def get_children_context_marked(self):
-        return []
+        tmp = ((o, ARG) for o in self.owner)
+        return tmp
 
-    def clone(self, _):
+    def clone(self, owner):
         new = Ref(self.cursor, self.kind)
         _default_clone_operation(new, self)
+        new.owner = owner
         new.name  = self.name
         new.type  = self.type
         return new
