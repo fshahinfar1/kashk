@@ -1,8 +1,10 @@
 import json
 import clang.cindex as clang
+import template
 from log import error, debug, report
+from utility import get_top_owner
 from code_gen import gen_code
-from template import (prepare_shared_state_var, SHARED_OBJ_PTR)
+from template import SHARED_OBJ_PTR
 from prune import READ_PACKET, WRITE_PACKET, KNOWN_FUNCS
 from helpers.instruction_helper import (get_ret_inst, add_flag_to_func, ZERO,
         VOID_PTR, get_or_decl_ref, CHAR_PTR)
@@ -15,7 +17,8 @@ from elements.after import After
 from passes.code_pass import Pass
 from passes.update_original_ref import set_original_ref
 from passes.clone import clone_pass
-from var_names import SHARED_REF_NAME, SEND_FLAG_NAME, DATA_VAR
+from var_names import *
+from internal_types import *
 
 
 MODULE_TAG = '[Transform Vars Pass]'
@@ -96,18 +99,20 @@ class TransformVars(Pass):
         return new_inst
 
     def _check_if_ref_is_global_state(self, inst):
+        """
+        @return (inst, bool) the new instruction and a flag indicating if it
+        was a match or not
+        """
         sym, scope = self.info.sym_tbl.lookup2(inst.name)
         is_shared  = scope == self.info.sym_tbl.shared_scope
         if not is_shared:
-            return inst
+            return inst, False
 
         # Get a reference to the shared object. Perform map lookup if needed.
         sym = self.info.sym_tbl.lookup(SHARED_REF_NAME)
         if sym is None:
-            # Declare the shared ref
-            # debug('load shared map for variable:', inst.name)
             # Perform a lookup on the map for globally shared values
-            new_insts = prepare_shared_state_var(self.current_function)
+            new_insts = template.prepare_shared_state_var(self.current_function)
             blk = self.cb_ref.get(BODY)
             blk.extend(new_insts)
             set_original_ref(new_insts, self.info, inst.original)
@@ -115,22 +120,50 @@ class TransformVars(Pass):
             # TODO: because I am not handling blocks as separate scopes (as
             # they should). I will introduce bugs when shared is defined in an
             # inner scope.
-            sym = self.info.sym_tbl.insert_entry(SHARED_REF_NAME, SHARED_OBJ_PTR,
-                    None, None)
+            sym = self.info.sym_tbl.insert_entry(SHARED_REF_NAME,
+                    SHARED_OBJ_PTR, None, None)
         shared = Ref.from_sym(sym)
 
         # Mark the instruction as red, because it will become a lookup from a
         # map
-        inst.set_modified()
+        new_inst = clone_pass(inst)
+        new_inst.set_modified()
         # Update the owner
-        top_owner = inst
-        while top_owner.kind == clang.CursorKind.MEMBER_REF_EXPR:
-            assert len(top_owner.owner) == 1, f'len is {len(inst.owner)}'
-            top_owner = top_owner.owner[-1]
+        top_owner = get_top_owner(new_inst)
         top_owner.kind = clang.CursorKind.MEMBER_REF_EXPR
         top_owner.owner.append(shared)
         assert len(top_owner.owner) == 1
-        return inst
+        return inst, True
+
+    def _check_if_sock_state(self, inst):
+        sym, scope = self.info.sym_tbl.lookup2(inst.name)
+        is_sock_state = scope == self.info.sym_tbl.global_scope
+        if not is_sock_state:
+            return inst, False
+
+        sym = self.info.sym_tbl.lookup(SOCK_STATE_VAR_NAME)
+        if sym is None:
+            tmp_insts, decl = template.prepare_sock_state_var(self.current_function, self.info)
+            self.declare_at_top_of_func.extend(decl)
+            blk = self.cb_ref.get(BODY)
+            blk.extend(tmp_insts)
+            set_original_ref(tmp_insts, self.info, inst.original)
+            sym = self.info.sym_tbl.insert_entry(SOCK_STATE_VAR_NAME,
+                    SOCK_STATE_PTR, None, None)
+        state = Ref.from_sym(sym)
+        # Mark the instruction as red, because it will become a lookup from a
+        # map
+        new_inst = clone_pass(inst)
+        new_inst.set_modified()
+        # Update the owner
+        top_owner = get_top_owner(new_inst)
+        top_owner.kind = clang.CursorKind.MEMBER_REF_EXPR
+        top_owner.owner.append(state)
+        assert len(top_owner.owner) == 1
+        return new_inst, True
+            
+
+        return inst, True
 
     def process_current_inst(self, inst, more):
         if inst.kind == clang.CursorKind.DECL_REF_EXPR:
@@ -142,7 +175,11 @@ class TransformVars(Pass):
                 inst = new_inst
                 # TODO: maybe I also need to update the type set in the symbol
                 # table
-            return self._check_if_ref_is_global_state(inst)
+            inst, ret = self._check_if_ref_is_global_state(inst)
+            if ret:
+                return inst
+            inst, ret = self._check_if_sock_state(inst)
+            return inst
         elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
             assert len(inst.owner) != 0, 'I do not expect a member with out an owner (which probably means an owner from the current class but I am not doing c++)'
             assert len(inst.owner) == 1, 'I expect the instruction to have only one owner (previously more than one was allowed)'

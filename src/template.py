@@ -4,14 +4,27 @@ from my_type import MyType
 from utility import get_tmp_var_name
 from helpers.bpf_ctx_helper import is_bpf_ctx_ptr
 from helpers.instruction_helper import (get_ret_inst, decl_new_var, ZERO, NULL,
-        CHAR_PTR, INT, NULL_CHAR, UINT, ONE, VOID_PTR)
+        CHAR_PTR, INT, NULL_CHAR, UINT, ONE, VOID_PTR, VOID)
 from elements.likelihood import Likelihood
 from var_names import *
-from internal_types import SHARED_STRUCT_TYPE, SHARED_OBJ_PTR
+from internal_types import *
 
 # Some things defined in global scope
 SHARED_MAP_PTR = Literal(f'&{SHARED_MAP_NAME}', CODE_LITERAL)
 
+
+def bpf_map_lookup_elem(map_name: str, index: Instruction, out: Ref):
+    insts = []
+    decl = []
+    lookup = Call(None)
+    lookup.name = 'bpf_map_lookup_elem'
+    map_obj_name = Ref.build(map_name, VOID)
+    map_ref = UnaryOp.build('&', map_obj_name)
+    lookup.args = [map_ref, index]
+    lookup.set_modified(InstructionColor.MAP_LOOKUP)
+    assign = BinOp.build(out, '=', lookup, red=True)
+    insts.append(assign)
+    return insts, decl
 
 
 def bpf_ctx_bound_check(ref, index, data_end, func, abort=False):
@@ -100,7 +113,43 @@ def shared_map_decl():
     return BPFMap.build_arr_map(SHARED_MAP_NAME, SHARED_STRUCT_TYPE, 1)
 
 
+def skskb_get_flow_id(cur_func, info):
+    """
+    @returns a tuple of size 3
+     0. New instruction to add
+     1. New variable declarations
+     2. reference to the flow-id object
+    """
+    from bpf_hook.skskb import SK_SKB_PROG
+    assert isinstance(info.prog, SK_SKB_PROG), 'This function is only relevant to SK_SKB hook'
+    insts = []
+    decl = []
+
+    skb = info.prog.get_ctx_ref()
+    sk = skb.get_ref_field('sk', info)
+    # sk = Literal(f'{info.prog.ctx}->sk', CODE_LITERAL)
+    cond = BinOp.build(sk, '==', NULL)
+    check_null = ControlFlowInst.build_if_inst(cond)
+    fail = ToUserspace.from_func_obj(cur_func)
+    check_null.body.add_inst(fail)
+    check_null.set_modified(InstructionColor.CHECK)
+    insts.append(check_null)
+
+    key = decl_new_var(FLOW_ID_TYPE, info, decl, FLOW_ID_VAR_NAME)
+    key.set_modified()
+    get_flow_id = Call(None)
+    get_flow_id.name = GET_FLOW_ID
+    get_flow_id.args = [sk, UnaryOp.build('&', key)]
+    get_flow_id.set_modified(InstructionColor.KNOWN_FUNC_IMPL)
+    insts.append(get_flow_id)
+    return insts, decl, key
+
+
 def prepare_shared_state_var(func):
+    """
+    @param func: Function the function decleration of the current function
+    holding the code we are processing.
+    """
     var_decl = VarDecl.build(SHARED_REF_NAME, SHARED_OBJ_PTR, red=True)
     var_decl.init.add_inst(NULL)
     var_ref = var_decl.get_ref()
@@ -128,6 +177,25 @@ def prepare_shared_state_var(func):
     check.set_modified(InstructionColor.CHECK)
     insts = [var_decl, zero_decl, lookup_assign,  check]
     return insts
+
+
+def prepare_sock_state_var(cur_func, info):
+    from bpf_hook.skskb import SK_SKB_PROG
+    assert isinstance(info.prog, SK_SKB_PROG), 'This function is only relevant to SK_SKB hook'
+    insts = []
+    decl = []
+    ref = decl_new_var(SOCK_STATE_PTR, info, decl, name=SOCK_STATE_VAR_NAME)
+
+    tmp_inst, tmp_decl, flow_id = skskb_get_flow_id(cur_func, info)
+    decl.extend(tmp_decl)
+    insts.extend(tmp_inst)
+
+    flow_id_ref = UnaryOp.build('&', flow_id)
+    tmp_inst, tmp_decl = bpf_map_lookup_elem(SOCK_STATE_MAP_NAME, flow_id_ref, ref)
+    insts.extend(tmp_inst)
+    decl.extend(tmp_decl)
+
+    return insts, decl
 
 
 def malloc_lookup(name, info, func):
@@ -169,7 +237,7 @@ def malloc_lookup(name, info, func):
     owner.kind = clang.CursorKind.DECL_REF_EXPR
     ref = Ref(None)
     ref.name = 'data'
-    ref.type = MyType.make_pointer(BASE_TYPES[clang.TypeKind.VOID])
+    ref.type = VOID_PTR
     ref.kind = clang.CursorKind.MEMBER_REF_EXPR
     ref.owner.append(owner)
     ref.set_modified()

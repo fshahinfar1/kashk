@@ -1,3 +1,4 @@
+import template
 from bpf import BPF_PROG
 from data_structure import BASE_TYPES, Record, StateObject
 from my_type import MyType
@@ -42,10 +43,13 @@ class SK_SKB_PROG(BPF_PROG):
             entry.is_bpf_ctx = True
             entry = sym_tbl.insert_entry('len', U32, clang.CursorKind.FIELD_DECL, None)
             entry.is_bpf_ctx = False
+            entry = sym_tbl.insert_entry('sk', U64, clang.CursorKind.FIELD_DECL, None)
+            entry.is_bpf_ctx = False
             # Just creat a record object for the sk_skb context
             fields = [StateObject.build('data', U32),
                     StateObject.build('data_end', U32),
-                    StateObject.build('len', U32)]
+                    StateObject.build('len', U32),
+                    StateObject.build('sk', U64),]
             rec = Record('__sk_buff', fields)
 
     def set_code(self, code):
@@ -156,21 +160,9 @@ class SK_SKB_PROG(BPF_PROG):
         insts = []
         decl = []
 
-        sk = Literal(f'{self.ctx}->sk', CODE_LITERAL)
-        cond = BinOp.build(sk, '==', NULL)
-        check_null = ControlFlowInst.build_if_inst(cond)
-        ret = Literal('return SK_DROP;', CODE_LITERAL)
-        check_null.body.add_inst(ret)
-        check_null.set_modified(InstructionColor.CHECK)
-        insts.append(check_null)
-
-        key = decl_new_var(FLOW_ID_TYPE, info, decl, FLOW_ID_VAR_NAME)
-        key.set_modified()
-        get_flow_id = Call(None)
-        get_flow_id.name = GET_FLOW_ID
-        get_flow_id.args = [sk, UnaryOp.build('&', key)]
-        get_flow_id.set_modified(InstructionColor.KNOWN_FUNC_IMPL)
-        inst.append(get_flow_id)
+        tmp_insts, tmp_decl, key = template.skskb_get_flow_id(None, info)
+        insts.extend(tmp_insts)
+        decl.extend(tmp_decl)
 
         map_ref_addr = UnaryOp.build('&', Literal(SOCK_MAP_NAME, CODE_LITERAL))
         map_ref_addr.set_modified()

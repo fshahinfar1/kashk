@@ -269,7 +269,6 @@ class BPFLoopPass(Pass):
         # Call bpf_loop
         call = Call(None)
         call.name = 'bpf_loop'
-        # iters = self.info.prog.max_loop_iteration
         iters = Literal(str(inst.repeat), clang.CursorKind.INTEGER_LITERAL)
         ref_t = MyType.make_simple(None, clang.TypeKind.FUNCTIONPROTO)
         func_ref = Ref.build(iter_func.name, ref_t)

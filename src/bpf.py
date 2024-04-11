@@ -35,8 +35,6 @@ class BPF_PROG:
         self.server_config = ('127.0.0.1', '8080')
         self.index_mask = Literal('PKT_OFFSET_MASK',
                 clang.CursorKind.MACRO_INSTANTIATION)
-        self.max_loop_iteration = Literal('256',
-                clang.CursorKind.INTEGER_LITERAL)
 
     def get_ctx_ref(self):
         return Ref.build(self.ctx, self.ctx_type)
