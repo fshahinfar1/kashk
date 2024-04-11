@@ -31,7 +31,7 @@ class XDP_PROG(BPF_PROG):
         """
         T = self.ctx_type.under_type
         scope_key = f'class_{T.spelling}'
-        entry = sym_tbl.global_scope.insert_entry(scope_key, T, clang.CursorKind.CLASS_DECL, None)
+        entry = sym_tbl.shared_scope.insert_entry(scope_key, T, clang.CursorKind.CLASS_DECL, None)
         entry.is_bpf_ctx = False
         with sym_tbl.new_scope() as scope:
             sym_tbl.scope_mapping[scope_key] = scope

@@ -204,7 +204,7 @@ def _declare_func(info, name, args, return_type, code, comp):
     func.args = args
     func.return_type = return_type
     func.may_succeed = True
-    scope = Scope(info.sym_tbl.global_scope)
+    scope = Scope(info.sym_tbl.shared_scope)
     info.sym_tbl.scope_mapping[name] = scope
     for a in func.args:
         scope.insert_entry(a.name, a.type_ref, a.kind, None)

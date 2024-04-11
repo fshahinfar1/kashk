@@ -27,7 +27,7 @@ class SK_SKB_PROG(BPF_PROG):
     def set_bpf_context_struct_sym_tbl(self, sym_tbl):
         T = self.ctx_type.under_type
         scope_key = f'class_{T.spelling}'
-        sym_tbl.global_scope.insert_entry(scope_key, T, clang.CursorKind.CLASS_DECL, None)
+        sym_tbl.shared_scope.insert_entry(scope_key, T, clang.CursorKind.CLASS_DECL, None)
         with sym_tbl.new_scope() as scope:
             sym_tbl.scope_mapping[scope_key] = scope
             # # map __class__ identifier to the class representing current scope -

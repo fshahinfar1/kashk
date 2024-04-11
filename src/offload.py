@@ -88,7 +88,7 @@ def _prepare_event_handler_args(cursor, info):
             # NOTE: the arguments of the event handler function are put on a
             # map for future access (connection context)
             assert not arg.type_ref.is_pointer(), 'Putting a pointer on the shared map is incorrect'
-            info.sym_tbl.shared_scope.insert_entry(arg.name,
+            info.sym_tbl.global_scope.insert_entry(arg.name,
                     arg.type_ref, clang.CursorKind.PARM_DECL, None)
     # No instructions to be added
     return []

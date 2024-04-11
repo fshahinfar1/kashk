@@ -239,7 +239,7 @@ class BPFLoopPass(Pass):
         struct = _define_type_for_passing_state(inst, name, ret_type)
         # Update symbol table with the new type
         tmp = self.info.sym_tbl.current_scope
-        self.info.sym_tbl.current_scope = self.info.sym_tbl.global_scope
+        self.info.sym_tbl.current_scope = self.info.sym_tbl.shared_scope
         struct.update_symbol_table(self.info.sym_tbl)
         self.info.sym_tbl.current_scope = tmp
         self.info.prog.add_declaration(struct)
