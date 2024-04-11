@@ -299,7 +299,8 @@ def generate_offload(io_ctx):
 
     # Verifier
     debug('[2nd] Verifier', tag=MODULE_TAG)
-    prog = verifier_pass(prog, info, PassObject())
+    with log_silent():
+        prog = verifier_pass(prog, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # prepare_userspace_fallback(prog, info)
@@ -337,7 +338,8 @@ def generate_offload(io_ctx):
 
     # Verifier
     debug('[3rd] Verifier', tag=MODULE_TAG)
-    prog = verifier_pass(prog, info, PassObject())
+    with log_silent():
+        prog = verifier_pass(prog, info, PassObject())
     debug('~~~~~~~~~~~~~~~~~~~~~', tag=MODULE_TAG)
 
     # debug('Program Complexity Pass', tag=MODULE_TAG)

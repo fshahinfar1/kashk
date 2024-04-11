@@ -1,4 +1,5 @@
 from sys import stderr, stdout
+from contextlib import contextmanager
 
 """
 Color Table (16 bit)
@@ -20,6 +21,7 @@ REPORT = 2
 g_counter = 0
 g_last_line = (None, '')
 g_filter = None
+g_silent = False
 
 
 colors = {
@@ -63,7 +65,24 @@ def filter_log(*args):
     g_filter = set(args)
 
 
+def set_silent(val):
+    global g_silent
+    g_silent = val
+
+
+@contextmanager
+def log_silent(val=True):
+    tmp = g_silent
+    try:
+        set_silent(val)
+        yield None
+    finally:
+        set_silent(tmp)
+
+
 def core_print_fn(mode, *args, **kwargs):
+    if g_silent:
+        return
     tag = kwargs.get('tag')
     if 'tag' in kwargs:
         del kwargs['tag']
