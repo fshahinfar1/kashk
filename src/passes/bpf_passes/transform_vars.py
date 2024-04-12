@@ -133,7 +133,7 @@ class TransformVars(Pass):
         top_owner.kind = clang.CursorKind.MEMBER_REF_EXPR
         top_owner.owner.append(shared)
         assert len(top_owner.owner) == 1
-        return inst, True
+        return new_inst, True
 
     def _check_if_sock_state(self, inst):
         sym, scope = self.info.sym_tbl.lookup2(inst.name)
