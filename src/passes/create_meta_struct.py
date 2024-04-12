@@ -65,6 +65,6 @@ def create_fallback_meta_structure(info):
             continue
         meta.is_used_in_bpf_code = True
         info.prog.add_declaration(meta)
-        gs = info.sym_tbl.global_scope
-        with info.sym_tbl.with_scope(gs):
+        ss = info.sym_tbl.sk_state_scope
+        with info.sym_tbl.with_scope(ss):
             meta.update_symbol_table(info.sym_tbl)

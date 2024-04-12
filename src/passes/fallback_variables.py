@@ -22,9 +22,9 @@ class FindFailureVariables(Pass):
         self.sym_tbl = SymbolTable()
         # Bring global symbols from the main symbol table
         self.sym_tbl.shared_scope.symbols = dict(info.sym_tbl.shared_scope.symbols.items())
-        self.sym_tbl.global_scope.symbols = dict(info.sym_tbl.global_scope.symbols.items())
+        self.sym_tbl.sk_state_scope.symbols = dict(info.sym_tbl.sk_state_scope.symbols.items())
         # Create an empty event-loop scope
-        self.sym_tbl.current_scope = Scope(self.sym_tbl.global_scope)
+        self.sym_tbl.current_scope = Scope(self.sym_tbl.sk_state_scope)
 
     def _handle_reference(self, inst, more):
         sym, scope = self.sym_tbl.lookup2(inst.name)
@@ -67,9 +67,9 @@ class FindFailureVariables(Pass):
         # Create the internal pass symbol table here so we can initialize it
         tbl = SymbolTable()
         tbl.shared_scope.symbols = dict(self.info.sym_tbl.shared_scope.symbols.items())
-        tbl.global_scope.symbols = dict(self.info.sym_tbl.global_scope.symbols.items())
-        gs = tbl.global_scope
-        with tbl.with_scope(gs):
+        tbl.sk_state_scope.symbols = dict(self.info.sym_tbl.sk_state_scope.symbols.items())
+        ss = tbl.sk_state_scope
+        with tbl.with_scope(ss):
             func.update_symbol_table(tbl)
         tbl.current_scope = tbl.scope_mapping[func.name]
         tmp = FindFailureVariables.do(func.body, self.info, func=orig_func,

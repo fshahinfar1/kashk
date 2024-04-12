@@ -187,9 +187,9 @@ class SimplifyCode(Pass):
                 if sym is None:
                     debug('Did not found the symbol for', sym, tag=MODULE_TAG)
                     return inst
-                is_global = scope == self.info.sym_tbl.global_scope
+                is_sk_state = scope == self.info.sym_tbl.sk_state_scope
                 is_shared = scope == self.info.sym_tbl.shared_scope
-                if not is_shared and not is_global:
+                if not is_shared and not is_sk_state:
                     # It is fine
                     return inst
             # Move the indexing calculation out

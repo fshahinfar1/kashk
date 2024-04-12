@@ -137,7 +137,7 @@ class TransformVars(Pass):
 
     def _check_if_sock_state(self, inst):
         sym, scope = self.info.sym_tbl.lookup2(inst.name)
-        is_sock_state = scope == self.info.sym_tbl.global_scope
+        is_sock_state = scope == self.info.sym_tbl.sk_state_scope
         if not is_sock_state:
             return inst, False
 
@@ -151,6 +151,7 @@ class TransformVars(Pass):
             sym = self.info.sym_tbl.insert_entry(SOCK_STATE_VAR_NAME,
                     SOCK_STATE_PTR, None, None)
         state = Ref.from_sym(sym)
+        state = state.get_ref_field('state', self.info)
         # Mark the instruction as red, because it will become a lookup from a
         # map
         new_inst = clone_pass(inst)
@@ -161,9 +162,6 @@ class TransformVars(Pass):
         top_owner.owner.append(state)
         assert len(top_owner.owner) == 1
         return new_inst, True
-            
-
-        return inst, True
 
     def process_current_inst(self, inst, more):
         if inst.kind == clang.CursorKind.DECL_REF_EXPR:

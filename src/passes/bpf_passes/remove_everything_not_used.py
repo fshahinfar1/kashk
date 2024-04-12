@@ -78,6 +78,10 @@ def _do_pass(bpf, all_declarations, shared_vars, info):
             if var_name.endswith('_map'):
                 if var_name in all_declarations:
                     keys.append(var_name)
+            # Check if we need the type
+            tmp_type = get_actual_type(inst.type)
+            tmp_k = __keep_this_type(tmp_type)
+            keys.extend(tmp_k)
         elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
             assert len(inst.owner) == 1, f'unexpected length: {len(inst.owner)}'
             owner = inst.owner[-1]
@@ -86,11 +90,17 @@ def _do_pass(bpf, all_declarations, shared_vars, info):
                 # Seems there is nothing to do
                 pass
             elif owner.name == SHARED_REF_NAME:
+                # TODO: I do not remember this
                 var_name = inst.name
                 if var_name in shared_vars:
                     shared_vars.remove(var_name)
                     type_name = get_actual_type(inst.type).spelling
                     keys.append(type_name)
+
+            # Check if we need the type
+            tmp_type = get_actual_type(inst.type)
+            tmp_k = __keep_this_type(tmp_type)
+            keys.extend(tmp_k)
 
             _do_pass(owner, all_declarations, shared_vars, info)
 

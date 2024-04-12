@@ -26,10 +26,10 @@ def set_current_func(func):
 
 def _find_type_decl_class(name, info):
     scope_key = f'class_{name}'
-    entry = info.sym_tbl.global_scope.lookup(scope_key)
+    entry = info.sym_tbl.sk_state_scope.lookup(scope_key)
     if entry is None:
         # debug(f'did not found type: {name}')
-        # debug(list(info.sym_tbl.global_scope.symbols.keys()))
+        # debug(list(info.sym_tbl.sk_state_scope.symbols.keys()))
         return []
     cursor = entry.ref
     if cursor is None or not should_process_this_cursor(cursor):

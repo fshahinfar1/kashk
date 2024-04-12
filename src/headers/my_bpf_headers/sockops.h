@@ -5,23 +5,9 @@
 #include "commons.h"
 #include <linux/tcp.h>
 
-struct connection_state;
 
 #include "sockops_shared.h"
-
-struct __five_tuple {
-	__u32 proto;
-	__u16 src_port;
-	__u16 dst_port;
-	__u32 src_ip;
-	__u32 dst_ip;
-} __attribute__((packed));
-
-/* Context of a socket */
-struct sock_context {
-	__u32 sock_map_index;
-	struct connection_state state;
-};
+#include "internal_types.h"
 
 struct {
 	__uint(type,  BPF_MAP_TYPE_ARRAY);

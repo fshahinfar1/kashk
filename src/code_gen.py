@@ -99,17 +99,7 @@ def handle_ref_expr(inst, info, more):
         text = indent(text, lvl)
         return text
 
-    # Check if the variable is shared globally or per_connection.
-    # These variables are placed on a MAP.
-    sym, scope = info.sym_tbl.lookup2(inst.name)
-    is_global = scope == info.sym_tbl.global_scope
-    is_shared = scope == info.sym_tbl.shared_scope
-    if is_global and not sym.type.is_enum():
-        text = 'sock_ctx->state.' + inst.name
-    elif is_shared:
-        text = 'shared->' + inst.name
-    else:
-        text = inst.name
+    text = inst.name
     text = indent(text, lvl)
     return text
 

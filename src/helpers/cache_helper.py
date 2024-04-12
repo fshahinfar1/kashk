@@ -290,7 +290,7 @@ def declare_cache_item_if_needed(info):
     decl = Record(CACHE_ITEM_STRUCT_NAME, fields)
     decl.is_used_in_bpf_code = True
      
-    gs = info.sym_tbl.global_scope
+    gs = info.sym_tbl.sk_state_scope
     with info.sym_tbl.with_scope(gs):
         decl.update_symbol_table(info.sym_tbl)
     return decl

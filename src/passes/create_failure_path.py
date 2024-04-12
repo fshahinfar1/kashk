@@ -203,7 +203,7 @@ class FindFailurePaths(Pass):
             new_func.body.extend_inst(internal_path)
             new_func.based_on = func
             sym_tbl = self.info.sym_tbl
-            gs = sym_tbl.global_scope
+            gs = sym_tbl.sk_state_scope
             with sym_tbl.with_scope(gs):
                 new_func.update_symbol_table(sym_tbl)
 

@@ -129,12 +129,12 @@ class Scope:
 
 
 class SymbolTable:
-    __slots__ = ('shared_scope', 'global_scope', 'current_scope', 'scope_mapping',)
+    __slots__ = ('shared_scope', 'sk_state_scope', 'current_scope', 'scope_mapping',)
     def __init__(self):
         # State that is shared between connection
         self.shared_scope = Scope()
         # State which is maintained between packets of the same connection
-        self.global_scope = Scope(self.shared_scope)
+        self.sk_state_scope = Scope(self.shared_scope)
         self.current_scope = self.shared_scope
         # Expose the global/static scope maping table as part of this class
         self.scope_mapping = ScopeMapping()
@@ -196,7 +196,7 @@ class SymbolTable:
         # pointesr.
 
         shared_scp_num = self.shared_scope.number
-        glb_scp_num = self.global_scope.number
+        glb_scp_num = self.sk_state_scope.number
         cur_scp_num = self.current_scope.number
 
 
@@ -207,7 +207,7 @@ class SymbolTable:
             book[scp.number] = scp
             q.extend(reversed(scp.children))
 
-        new_tbl.global_scope = book[glb_scp_num]
+        new_tbl.sk_state_scope = book[glb_scp_num]
 
         # Clone the scope mapping
         for name, scope in self.scope_mapping.scope_mapping.items():

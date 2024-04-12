@@ -309,11 +309,16 @@ class Record(TypeDefinition):
         T = self.type
         scope_key = f'class_{T.spelling}'
         sym_tbl.insert_entry(scope_key, T, clang.CursorKind.CLASS_DECL, None)
-        with sym_tbl.new_scope() as scope:
-            sym_tbl.scope_mapping[scope_key] = scope
-            for f in self.fields:
-                sym_tbl.insert_entry(f.name, f.type,
-                        clang.CursorKind.FIELD_DECL, None)
+        ss = sym_tbl.shared_scope
+        with sym_tbl.with_scope(ss):
+            with sym_tbl.new_scope() as scope:
+                sym_tbl.scope_mapping[scope_key] = scope
+                sym_tbl.insert_entry(scope_key, T, clang.CursorKind.CLASS_DECL,
+                        None)
+                for f in self.fields:
+                    e = sym_tbl.insert_entry(f.name, f.type,
+                            clang.CursorKind.FIELD_DECL, None)
+                    e.is_bpf_ctx = False
 
     def __repr__(self):
         return f'<Record {self.name} >'

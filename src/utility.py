@@ -50,6 +50,7 @@ def parse_file(file_path, args):
     _, ext = os.path.splitext(file_path)
     curdir = os.path.abspath(os.path.dirname(__file__))
     args += f' -include {curdir}/headers/annotation.h'
+    args += f' -include {curdir}/headers/my_bpf_headers/internal_types.h'
     if ext == '.c':
         # This is a C file
         compiler_args = (args + ' -DHAVE_CONFIG_H=1').split()
@@ -434,3 +435,9 @@ def get_tmp_var_name():
     name = f'_tmp_{tmp_num}'
     tmp_num += 1
     return name
+
+
+def introduce_internal_struct(name, fields, info):
+    from data_structure import Record
+    rec = Record(name, fields)
+    rec.update_symbol_table(info.sym_tbl)

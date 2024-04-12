@@ -244,7 +244,7 @@ def generate_user_prog(main, info):
     # Find the entry function again and replace the event loop
     index, tu, cursor = parse_file(info.io_ctx.input_file, info.io_ctx.cflags)
     _, entry_func = get_entry_code(cursor, info)
-    gs = sym_tbl.global_scope
+    gs = sym_tbl.sk_state_scope
     with sym_tbl.with_scope(gs):
         f = __add_func_definition2(USER_EVENT_LOOP_ENTRY, entry_func, info)
         f.update_symbol_table(sym_tbl)

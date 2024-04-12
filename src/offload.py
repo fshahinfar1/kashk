@@ -82,13 +82,13 @@ def _prepare_event_handler_args(cursor, info):
         entry_func = Function.directory[info.io_ctx.entry_func]
         for arg in entry_func.get_arguments():
             # TODO: global scope is shared_scope
-            # the global_scope is the per connection scope
+            # the sk_state_scope is the per connection scope
             # This is crazy. Why did I not fix this before. I should correct it
 
             # NOTE: the arguments of the event handler function are put on a
             # map for future access (connection context)
             assert not arg.type_ref.is_pointer(), 'Putting a pointer on the shared map is incorrect'
-            info.sym_tbl.global_scope.insert_entry(arg.name,
+            info.sym_tbl.sk_state_scope.insert_entry(arg.name,
                     arg.type_ref, clang.CursorKind.PARM_DECL, None)
     # No instructions to be added
     return []
@@ -202,7 +202,7 @@ def generate_offload(io_ctx):
     process_source_file(cursor, info)
     load_other_sources(io_ctx, info)
     # Build and select the entry function scope
-    scope = Scope(info.sym_tbl.global_scope)
+    scope = Scope(info.sym_tbl.sk_state_scope)
     info.sym_tbl.scope_mapping[MAIN] = scope
     info.sym_tbl.current_scope = scope
     info.prog.add_args_to_scope(scope)

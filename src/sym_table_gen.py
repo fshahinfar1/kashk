@@ -1,9 +1,10 @@
 from dfs import DFSPass
 from log import debug, error, report
 from prune import should_process_this_cursor
-from utility import report_on_cursor, PRIMITIVE_TYPES, try_get_definition
+from utility import (report_on_cursor, PRIMITIVE_TYPES, try_get_definition, introduce_internal_struct)
 
-from data_structure import Function, Enum
+from data_structure import StateObject, Function, Enum
+from helpers.instruction_helper import UINT
 
 from my_type import MyType
 import clang.cindex as clang
@@ -196,7 +197,7 @@ def __pass_over_source_file(cursor, info):
                 key = c.spelling
                 assert key
                 T = MyType.from_cursor_type(c.type)
-                info.sym_tbl.global_scope.insert_entry(key, T, c.kind, c)
+                info.sym_tbl.sk_state_scope.insert_entry(key, T, c.kind, c)
                 # debug('Elaborate Type:', key)
             continue
 
@@ -213,12 +214,12 @@ def process_source_file(cursor, info):
     later.
     """
     # NOTE: there is a very silly but important note about global scopes:
-    #   global_scope: the scope used for keep a state for a single connection. Information not shared with other connections.
+    #   sk_state_scope: the scope used for keep a state for a single connection. Information not shared with other connections.
     #   shared scope: the scope shared between all connections
     # Global variables belong to the shared scope
     info.sym_tbl.current_scope = info.sym_tbl.shared_scope
     __pass_over_global_variables(cursor, info)
-    info.sym_tbl.current_scope = info.sym_tbl.global_scope
+    info.sym_tbl.current_scope = info.sym_tbl.sk_state_scope
     __pass_over_source_file(cursor, info)
 
 
@@ -227,6 +228,11 @@ def build_sym_table(info):
     Boot strap the symbol table
     """
     # Define the field of BPF context
-    info.sym_tbl.current_scope = info.sym_tbl.global_scope
+    info.sym_tbl.current_scope = info.sym_tbl.sk_state_scope
     info.sym_tbl.scope_mapping['__global__'] = info.sym_tbl.current_scope
     info.prog.set_bpf_context_struct_sym_tbl(info.sym_tbl)
+
+    # introduce_internal_struct('sock_context', [
+    #     StateObject.build('sock_map_index', UINT),
+    #     StateObject.build('state', MyType.make_simple('struct connection_state', clang.TypeKind.RECORD)),
+    #     ], info)

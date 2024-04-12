@@ -187,7 +187,7 @@ def _known_function_substitution(inst, info, more):
             info.prog.add_declaration(value_type)
 
             __scope = info.sym_tbl.current_scope
-            info.sym_tbl.current_scope = info.sym_tbl.global_scope
+            info.sym_tbl.current_scope = info.sym_tbl.sk_state_scope
             value_type.update_symbol_table(info.sym_tbl)
             info.sym_tbl.current_scope = __scope
             # report('Declare', value_type, 'as malloc object')
@@ -346,7 +346,7 @@ def _process_var_decl(inst, info):
     info.prog.add_declaration(struct_decl)
     # Update symbol table
     __scope = info.sym_tbl.current_scope
-    info.sym_tbl.current_scope = info.sym_tbl.global_scope
+    info.sym_tbl.current_scope = info.sym_tbl.sk_state_scope
     struct_decl.update_symbol_table(info.sym_tbl)
     info.sym_tbl.current_scope = __scope
     # Define the BPF map
