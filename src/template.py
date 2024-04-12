@@ -13,7 +13,7 @@ from internal_types import *
 SHARED_MAP_PTR = Literal(f'&{SHARED_MAP_NAME}', CODE_LITERAL)
 
 
-def bpf_map_lookup_elem(map_name: str, index: Instruction, out: Ref):
+def bpf_map_lookup_elem(map_name: str, index: Instruction, out: Ref, current_func):
     insts = []
     decl = []
     lookup = Call(None)
@@ -24,6 +24,13 @@ def bpf_map_lookup_elem(map_name: str, index: Instruction, out: Ref):
     lookup.set_modified(InstructionColor.MAP_LOOKUP)
     assign = BinOp.build(out, '=', lookup, red=True)
     insts.append(assign)
+    # check if return value is null
+    null_cond = BinOp.build(out, '==', NULL)
+    null_check = ControlFlowInst.build_if_inst(null_cond)
+    fail = ToUserspace.from_func_obj(current_func)
+    null_check.body.add_inst(fail)
+    null_check.set_modified(InstructionColor.CHECK)
+    insts.append(null_check)
     return insts, decl
 
 
@@ -191,7 +198,8 @@ def prepare_sock_state_var(cur_func, info):
     insts.extend(tmp_inst)
 
     flow_id_ref = UnaryOp.build('&', flow_id)
-    tmp_inst, tmp_decl = bpf_map_lookup_elem(SOCK_STATE_MAP_NAME, flow_id_ref, ref)
+    tmp_inst, tmp_decl = bpf_map_lookup_elem(SOCK_STATE_MAP_NAME, flow_id_ref,
+            ref, cur_func)
     insts.extend(tmp_inst)
     decl.extend(tmp_decl)
 

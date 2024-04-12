@@ -37,7 +37,10 @@ struct {
 sinline
 int __get_conn_id(struct bpf_sock *sk, struct __five_tuple *id)
 {
-	id->proto = sk->protocol;
+	/* id->proto = sk->protocol; */
+	/* NOTE: for some reason accessing the protocol casuse is limited by
+	 * verifier */
+	id->proto = 0x06;
 	id->src_port = sk->src_port; /* host byte order */
 	id->dst_port = sk->dst_port; /* network byte order */
 	id->src_ip = sk->src_ip4;
@@ -51,8 +54,8 @@ int __new_connection(struct bpf_sock_ops *skops, struct tcphdr *tcp,
 {
 	int ret;
 	struct conn_monitor_config *conf;
-	struct sock_context ctx;
-	memset(&ctx, 0, sizeof(ctx));
+	/* struct sock_context ctx; */
+	/* memset(&ctx, 0, sizeof(ctx)); */
 	ret = 0;
 	conf = bpf_map_lookup_elem(&conn_monitor_config_map, &ret);
 	if (!conf) {
@@ -75,7 +78,7 @@ int __new_connection(struct bpf_sock_ops *skops, struct tcphdr *tcp,
 			BPF_SOCK_OPS_STATE_CB_FLAG);
 
 	/* Initialize socket context */
-	bpf_map_update_elem(&conn_ctx_map, id, &ctx, BPF_NOEXIST);
+	/* bpf_map_update_elem(&conn_ctx_map, id, &ctx, BPF_NOEXIST); */
 	return 0;
 }
 
