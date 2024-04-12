@@ -1,8 +1,9 @@
 from dfs import DFSPass
 from log import debug, error, report
+from sym_table import Scope
 from prune import should_process_this_cursor
-from utility import (report_on_cursor, PRIMITIVE_TYPES, try_get_definition, introduce_internal_struct)
-
+from utility import (report_on_cursor, PRIMITIVE_TYPES, try_get_definition,
+        introduce_internal_struct, parse_file)
 from data_structure import StateObject, Function, Enum
 from helpers.instruction_helper import UINT
 
@@ -219,18 +220,40 @@ def process_source_file(cursor, info):
     # Global variables belong to the shared scope
     info.sym_tbl.current_scope = info.sym_tbl.shared_scope
     __pass_over_global_variables(cursor, info)
-    info.sym_tbl.current_scope = info.sym_tbl.sk_state_scope
+    # info.sym_tbl.current_scope = info.sym_tbl.sk_state_scope
     __pass_over_source_file(cursor, info)
 
 
-def build_sym_table(info):
+def load_other_sources(io_ctx, info):
+    # This is the AST generated with Clang
+    others = []
+    for path in io_ctx.other_source_files:
+        report('Load:', path)
+        _, _, other_cursor = parse_file(path, io_ctx.cflags)
+        others.append(other_cursor)
+        process_source_file(other_cursor, info)
+
+
+def build_sym_table(main_file_cursor, info):
     """
     Boot strap the symbol table
     """
+    io_ctx = info.io_ctx
+
     # Define the field of BPF context
-    info.sym_tbl.current_scope = info.sym_tbl.sk_state_scope
-    info.sym_tbl.scope_mapping['__global__'] = info.sym_tbl.current_scope
+    info.sym_tbl.current_scope = info.sym_tbl.shared_scope
+    info.sym_tbl.scope_mapping['__global__'] = info.sym_tbl.shared_scope
     info.prog.set_bpf_context_struct_sym_tbl(info.sym_tbl)
+
+    process_source_file(main_file_cursor, info)
+    load_other_sources(io_ctx, info)
+
+    # Create the entry function scope
+    MAIN = '[[main]]'
+    scope = Scope(info.sym_tbl.sk_state_scope)
+    info.sym_tbl.scope_mapping[MAIN] = scope
+    info.sym_tbl.current_scope = scope
+    # info.prog.add_args_to_scope(scope)
 
     # introduce_internal_struct('sock_context', [
     #     StateObject.build('sock_map_index', UINT),

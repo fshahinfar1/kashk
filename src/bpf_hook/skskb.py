@@ -11,7 +11,6 @@ from internal_types import FLOW_ID_TYPE, FLOW_ID_PTR
 class SK_SKB_PROG(BPF_PROG):
     def __init__(self):
         super().__init__()
-        self.connection_state = []
         self.parser_code = None
         self.verdict_code = None
         self.headers += [
@@ -46,14 +45,17 @@ class SK_SKB_PROG(BPF_PROG):
     def set_code(self, code):
         self.verdict_code = code
 
-    def add_connection_state(self, state):
-        self.connection_state.append(state)
-
-    def _per_connection_state(self):
+    def _per_connection_state(self, info):
+        fields = []
+        for sym in info.sym_tbl.sk_state_scope.symbols.values():
+            # TODO: probably I want to have another highlevel scope just for the type definitions
+            if sym.kind in (clang.CursorKind.CLASS_DECL, clang.CursorKind.TYPEDEF_DECL):
+                continue
+            fields.append(StateObject.build(sym.name, sym.type))
         return ([
                 '/* Put state of each socket in this struct (This will be used in sockops.h as',
                 ' * part of per socket metadata) */',
-                generate_struct_with_fields('connection_state', self.connection_state)+';',
+                generate_struct_with_fields('connection_state', fields),
                 '#include "sockops.h"',
                 ])
 
@@ -101,7 +103,7 @@ class SK_SKB_PROG(BPF_PROG):
                 )
 
     def gen_code(self, info):
-        per_conn = info.prog._per_connection_state()
+        per_conn = info.prog._per_connection_state(info)
         parser_code, _ = gen_code(self.parser_code, info)
         parser_code = indent(parser_code, 1)
         verdict_code, _ = gen_code(self.verdict_code, info)

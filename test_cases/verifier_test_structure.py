@@ -3,7 +3,8 @@ import subprocess
 import clang.cindex as clang
 from basic_test_structure import BasicTest
 from utility import parse_file, find_elem
-from sym_table_gen import build_sym_table, process_source_file
+from sym_table_gen import (build_sym_table, process_source_file,
+        load_other_sources)
 from parser.understand_logic import gather_instructions_under
 from parser.understand_logic_handler import create_func_objs, add_known_func_objs
 
@@ -11,7 +12,7 @@ from data_structure import *
 from instruction import BODY, Block
 from framework_support import InputOutputContext
 
-from offload import (load_other_sources, _prepare_event_handler_args,
+from offload import (_prepare_event_handler_args,
         move_vars_before_event_loop_to_shared_scope, MAIN)
 from parser.find_ev_loop import get_entry_code
 from sym_table import Scope
@@ -64,15 +65,7 @@ class VerifierTest(BasicTest):
         index, tu, cursor = parse_file(info.io_ctx.input_file,
                                                     info.io_ctx.cflags)
         # Collect information about classes, functions, variables, ...
-        build_sym_table(info)
-        process_source_file(cursor, info)
-        # Load other source files
-        load_other_sources(info.io_ctx, info)
-        # Select the main scope
-        scope = Scope(info.sym_tbl.sk_state_scope)
-        info.sym_tbl.scope_mapping[MAIN] = scope
-        info.sym_tbl.current_scope = scope
-        info.prog.add_args_to_scope(scope)
+        build_sym_table(cursor, info)
         # Find the entry function
         main, entry_func = get_entry_code(cursor, info)
         assert main is not None

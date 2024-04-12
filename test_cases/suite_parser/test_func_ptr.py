@@ -25,7 +25,11 @@ class TestCase(BasicTest):
         # show_insts(insts)
         # print(self.info.prog.connection_state)
 
-        assert len(self.info.prog.connection_state) == 0, 'There is no per connection shared state'
+        sk_state = [sym
+                for sym in self.info.sym_tbl.sk_state_scope.symbols.values()
+                if sym.kind not in (clang.CursorKind.CLASS_DECL,
+                    clang.CursorKind.TYPEDEF_DECL)]
+        assert len(sk_state) == 0, f'There must be no per connection shared state {sk_state}'
 
         refs = find_elems_of_kind(insts, clang.CursorKind.DECL_REF_EXPR)
 

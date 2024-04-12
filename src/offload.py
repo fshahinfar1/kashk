@@ -9,7 +9,7 @@ from utility import (parse_file, find_elem, report_user_program_graph,
         draw_tree, find_elems_of_kind)
 from parser.find_ev_loop import get_entry_code
 from sym_table import Scope
-from sym_table_gen import build_sym_table, process_source_file
+from sym_table_gen import build_sym_table
 from parser.understand_logic import  (gather_instructions_from,
         get_variable_declaration_before_elem)
 from parser.understand_logic_handler import create_func_objs, add_known_func_objs
@@ -104,16 +104,6 @@ def move_vars_before_event_loop_to_shared_scope(entry_func, main, info):
         var.update_symbol_table(info.sym_tbl.shared_scope)
 
 
-def load_other_sources(io_ctx, info):
-    # This is the AST generated with Clang
-    others = []
-    for path in io_ctx.other_source_files:
-        report('Load:', path)
-        _, _, other_cursor = parse_file(path, io_ctx.cflags)
-        others.append(other_cursor)
-        process_source_file(other_cursor, info)
-
-
 def prepare_userspace_fallback(prog, info):
     debug('Create Failure Paths', tag=MODULE_TAG)
     create_failure_paths(prog, info, None)
@@ -196,16 +186,9 @@ def generate_offload(io_ctx):
     #         '[User Code]', '[Select Userspace]')
 
     info = Info.from_io_ctx(io_ctx)
-    build_sym_table(info)
     # Parse source files
     index, tu, cursor = parse_file(info.io_ctx.input_file, io_ctx.cflags)
-    process_source_file(cursor, info)
-    load_other_sources(io_ctx, info)
-    # Build and select the entry function scope
-    scope = Scope(info.sym_tbl.sk_state_scope)
-    info.sym_tbl.scope_mapping[MAIN] = scope
-    info.sym_tbl.current_scope = scope
-    info.prog.add_args_to_scope(scope)
+    build_sym_table(cursor, info)
     # Find the entry function
     main, entry_func = get_entry_code(cursor, info)
     #

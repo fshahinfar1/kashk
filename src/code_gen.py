@@ -446,18 +446,17 @@ def __generate_code_type_definition(inst, info):
         return text
 
 
-def __generate_global_shared_state(info):
+def __generate_shared_state(info):
     fields = []
     for x in info.sym_tbl.shared_scope.symbols.values():
-        # debug(MODULE_TAG, x)
         o = StateObject(None)
         o.name = x.name
         o.type_ref = x.type
-
         fields.append(o)
     # If there are any global state, declare the shared_map
     if fields:
         shared_state = Record('shared_state', fields)
+        shared_state.update_symbol_table(info.sym_tbl)
         shared_state_struct_decl = (
                 '/* The globaly shared state is in this structure */\n'
                 + shared_state.get_c_code()
@@ -519,7 +518,7 @@ def __sort_declarations(decls, ignore_self_dep=True):
 
 
 def generate_bpf_prog(info):
-    shared_state_struct_decl = __generate_global_shared_state(info)
+    shared_state_struct_decl = __generate_shared_state(info)
 
     decs = list(info.prog.declarations)
     non_func_decs = list(filter(lambda d: not isinstance(d, Function), decs))
