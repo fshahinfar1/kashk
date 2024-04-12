@@ -38,7 +38,7 @@ class BasicTest:
         # Load other source files
         load_other_sources(self.info.io_ctx, self.info)
         # Select the main scope
-        scope = Scope(self.info.sym_tbl.global_scope)
+        scope = Scope(self.info.sym_tbl.sk_state_scope)
         self.info.sym_tbl.scope_mapping[MAIN] = scope
         self.info.sym_tbl.current_scope = scope
         self.info.prog.add_args_to_scope(scope)

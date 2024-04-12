@@ -69,7 +69,7 @@ class VerifierTest(BasicTest):
         # Load other source files
         load_other_sources(info.io_ctx, info)
         # Select the main scope
-        scope = Scope(info.sym_tbl.global_scope)
+        scope = Scope(info.sym_tbl.sk_state_scope)
         info.sym_tbl.scope_mapping[MAIN] = scope
         info.sym_tbl.current_scope = scope
         info.prog.add_args_to_scope(scope)
