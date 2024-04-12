@@ -98,7 +98,7 @@ class TransformVars(Pass):
         new_inst.set_modified()
         return new_inst
 
-    def _check_if_ref_is_global_state(self, inst):
+    def _check_if_ref_is_shared_state(self, inst):
         """
         @return (inst, bool) the new instruction and a flag indicating if it
         was a match or not
@@ -163,27 +163,31 @@ class TransformVars(Pass):
         assert len(top_owner.owner) == 1
         return new_inst, True
 
+    def _process_ref(self, inst, more):
+        if self._is_packet_pointer(inst):
+            # is packet pointer
+            assert inst.type.is_mem_ref(), f'Unexpected type {inst.type}'
+            new_inst = clone_pass(inst)
+            new_inst.type = CHAR_PTR
+            inst = new_inst
+            # TODO: maybe I also need to update the type set in the symbol
+            # table
+        inst, ret = self._check_if_ref_is_shared_state(inst)
+        if ret:
+            return inst
+        inst, ret = self._check_if_sock_state(inst)
+        return inst
+
     def process_current_inst(self, inst, more):
         if inst.kind == clang.CursorKind.DECL_REF_EXPR:
-            if self._is_packet_pointer(inst):
-                # is packet pointer
-                assert inst.type.is_mem_ref(), f'Unexpected type {inst.type}'
-                new_inst = clone_pass(inst)
-                new_inst.type = CHAR_PTR
-                inst = new_inst
-                # TODO: maybe I also need to update the type set in the symbol
-                # table
-            inst, ret = self._check_if_ref_is_global_state(inst)
-            if ret:
-                return inst
-            inst, ret = self._check_if_sock_state(inst)
-            return inst
+            return self._process_ref(inst, more)
         elif inst.kind == clang.CursorKind.MEMBER_REF_EXPR:
             assert len(inst.owner) != 0, 'I do not expect a member with out an owner (which probably means an owner from the current class but I am not doing c++)'
             assert len(inst.owner) == 1, 'I expect the instruction to have only one owner (previously more than one was allowed)'
-            parent = inst.owner[-1]
-            self.process_current_inst(parent, more)
-            return inst
+            parent = inst.owner[0]
+            tmp = self.process_current_inst(parent, more)
+            inst.owner[0] = tmp
+            return self._process_ref(inst, more)
         elif inst.kind == clang.CursorKind.VAR_DECL:
             if self._is_packet_pointer(inst):
                 # This will become a packet pointer, change the type if needed!

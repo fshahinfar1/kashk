@@ -29,21 +29,18 @@ class XDP_PROG(BPF_PROG):
         """
         This adds the definition of the BPF context to the symbol table
         """
-        T = self.ctx_type.under_type
-        scope_key = f'class_{T.spelling}'
-        entry = sym_tbl.shared_scope.insert_entry(scope_key, T, clang.CursorKind.CLASS_DECL, None)
-        entry.is_bpf_ctx = False
-        with sym_tbl.new_scope() as scope:
-            sym_tbl.scope_mapping[scope_key] = scope
-            U32 = BASE_TYPES[clang.TypeKind.UINT]
-            entry = sym_tbl.insert_entry('data', U32, clang.CursorKind.FIELD_DECL, None)
+        struct_name = 'xdp_md'
+        fields = [StateObject.build('data', UINT),
+                StateObject.build('data_end', UINT),]
+        rec = Record(struct_name, fields)
+        rec.update_symbol_table(sym_tbl)
+        scope_key = f'class_struct {struct_name}'
+        scope = sym_tbl.scope_mapping[scope_key]
+        is_bpf_ctx = ['data', 'data_end']
+        for field in is_bpf_ctx:
+            entry = scope.lookup(field)
+            assert entry is not None
             entry.is_bpf_ctx = True
-            entry = sym_tbl.insert_entry('data_end', U32, clang.CursorKind.FIELD_DECL, None)
-            entry.is_bpf_ctx = True
-            # Just creat a record object for the sk_skb context
-            fields = [StateObject.build('data', U32),
-                    StateObject.build('data_end', U32),]
-            rec = Record('xdp_md', fields)
 
     def set_code(self, code):
         self.main_code = code

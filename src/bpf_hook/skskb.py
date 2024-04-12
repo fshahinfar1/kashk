@@ -26,31 +26,22 @@ class SK_SKB_PROG(BPF_PROG):
         self.ctx_type = MyType.make_pointer(MyType.make_simple('struct __sk_buff', clang.TypeKind.RECORD))
 
     def set_bpf_context_struct_sym_tbl(self, sym_tbl):
-        T = self.ctx_type.under_type
-        scope_key = f'class_{T.spelling}'
-        sym_tbl.shared_scope.insert_entry(scope_key, T, clang.CursorKind.CLASS_DECL, None)
-        with sym_tbl.new_scope() as scope:
-            sym_tbl.scope_mapping[scope_key] = scope
-            # # map __class__ identifier to the class representing current scope -
-            # e = info.sym_tbl.insert_entry('__class__', None, clang.CursorKind.CLASS_DECL, None)
-            # # override the name form __class__ to actual class name
-            # e.name = struct_name
-            # # -------------------------------------------------------------------
-            U32 = BASE_TYPES[clang.TypeKind.UINT]
-            entry = sym_tbl.insert_entry('data', U32, clang.CursorKind.FIELD_DECL, None)
+        struct_name = '__sk_buff'
+        fields = [StateObject.build('data', UINT),
+                StateObject.build('data_end', UINT),
+                StateObject.build('len', UINT),
+                StateObject.build('sk', U64),]
+        rec = Record(struct_name, fields)
+        rec.update_symbol_table(sym_tbl)
+
+        scope_key = f'class_struct {struct_name}'
+        scope = sym_tbl.scope_mapping[scope_key]
+
+        is_bpf_ctx = ['data', 'data_end']
+        for field in is_bpf_ctx:
+            entry = scope.lookup(field)
+            assert entry is not None
             entry.is_bpf_ctx = True
-            entry = sym_tbl.insert_entry('data_end', U32, clang.CursorKind.FIELD_DECL, None)
-            entry.is_bpf_ctx = True
-            entry = sym_tbl.insert_entry('len', U32, clang.CursorKind.FIELD_DECL, None)
-            entry.is_bpf_ctx = False
-            entry = sym_tbl.insert_entry('sk', U64, clang.CursorKind.FIELD_DECL, None)
-            entry.is_bpf_ctx = False
-            # Just creat a record object for the sk_skb context
-            fields = [StateObject.build('data', U32),
-                    StateObject.build('data_end', U32),
-                    StateObject.build('len', U32),
-                    StateObject.build('sk', U64),]
-            rec = Record('__sk_buff', fields)
 
     def set_code(self, code):
         self.verdict_code = code
