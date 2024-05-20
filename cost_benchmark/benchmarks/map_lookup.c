@@ -1,11 +1,20 @@
 #include "./commons.h"
 #define REPEAT 10000
 
+/* #define ARRAY 1 */
+#define HASH 1
+
+/* #define KEY_8 */
+/* #define KEY_16 */
+#define KEY_32
+
+
 struct item {
 	char data[256];
 	/* char data[4096]; */
 };
 
+#ifdef ARRAY
 struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);
 	/* __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY); */
@@ -13,10 +22,48 @@ struct {
 	__type(value, struct item);
 	__uint(max_entries, 1);
 } a_map SEC(".maps");
+#endif
+#ifdef HASH
+struct key {
+#ifdef KEY_8
+	char data[8];
+#endif
+#ifdef KEY_16
+	char data[16];
+#endif
+#ifdef KEY_32
+	char data[32];
+#endif
+};
+struct {
+	/* __uint(type, BPF_MAP_TYPE_HASH); */
+	/* __uint(type, BPF_MAP_TYPE_PERCPU_HASH); */
+	__uint(type, BPF_MAP_TYPE_LRU_HASH);
+	/* __uint(type, BPF_MAP_TYPE_PERCPU_LRU_HASH); */
+	__type(key,  struct key);
+	__type(value, struct item);
+	__uint(max_entries, 1);
+} a_map SEC(".maps");
+#endif
 
 static long prog_loop(__u32 ii, void *_ctx)
 {
+#ifdef ARRAY
 	const int zero = 0;
+#endif
+#ifdef HASH
+	const struct key zero =  {
+#ifdef KEY_8
+		.data = "ilbcetep",
+#endif
+#ifdef KEY_16
+		.data = "ilbcetepljnmqrpa",
+#endif
+#ifdef KEY_32
+		.data = "ilbcetepljnmqrpazmuiujzknmjddqfk",
+#endif
+	};
+#endif
 	struct item *it;
 	it = bpf_map_lookup_elem(&a_map, &zero);
 	if (it  == NULL) return XDP_ABORTED;
