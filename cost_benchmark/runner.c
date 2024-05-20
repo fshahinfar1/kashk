@@ -157,7 +157,7 @@ int main(int argc, char *argv[])
 {
 	cpu_set_t cpu_cores;
 	CPU_ZERO(&cpu_cores);
-	CPU_SET(2, &cpu_cores);
+	CPU_SET(args.cpu_core, &cpu_cores);
 	pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpu_cores);
 	parse_args(argc, argv);
 	if (args.cross_test == 1) {
@@ -171,7 +171,7 @@ int main(int argc, char *argv[])
 		run_cross_test();
 	} else if (args.xdp == 1) {
 		run_xdp();
-	}else {
+	} else {
 		run_test();
 	}
 	bpf_object__close(context.bpfobj);
