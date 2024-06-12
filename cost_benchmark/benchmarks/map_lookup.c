@@ -2,7 +2,8 @@
 #define REPEAT 10000
 
 /* #define ARRAY 1 */
-#define HASH 1
+/* #define HASH 1 */
+#define ON_STACK 1
 
 /* #define KEY_8 */
 /* #define KEY_16 */
@@ -46,6 +47,7 @@ struct {
 } a_map SEC(".maps");
 #endif
 
+#ifndef ON_STACK
 static long prog_loop(__u32 ii, void *_ctx)
 {
 #ifdef ARRAY
@@ -66,7 +68,16 @@ static long prog_loop(__u32 ii, void *_ctx)
 #endif
 	struct item *it;
 	it = bpf_map_lookup_elem(&a_map, &zero);
-	if (it  == NULL) return XDP_ABORTED;
+	if (it  == NULL) return 1;
+	it->data[127] = 'f';
+	return 0;
+}
+#endif
+
+static long prog_loop_stack(__u32 ii, void *_ctx)
+{
+	struct item *it = _ctx;
+	if (it == NULL) return 1;
 	it->data[127] = 'f';
 	return 0;
 }
@@ -74,7 +85,13 @@ static long prog_loop(__u32 ii, void *_ctx)
 SEC("xdp")
 int prog(struct xdp_md *xdp)
 {
+#ifdef ON_STACK
+	struct item it;
+	__builtin_memset(&it, 0, sizeof(it));
+	bpf_loop(REPEAT, prog_loop_stack, &it, 0);
+#else
 	bpf_loop(REPEAT, prog_loop, NULL, 0);
+#endif
 	return XDP_DROP;
 }
 

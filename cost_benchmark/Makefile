@@ -1,5 +1,7 @@
 CC = clang
 CFLAGS = -O2 -g -Wall
+LOADER_CFLAGS=$(shell pkg-config --cflags libbpf)
+LOADER_LDFLAGS=$(shell pkg-config --libs libbpf)
 OUTDIR = ./build
 RUNNER = $(OUTDIR)/runner
 RUNNER_HEADERS = $(wildcard *.h)
@@ -17,7 +19,7 @@ $(SERVER): server.c
 
 $(RUNNER): runner.c $(RUNNER_HEADERS)
 	if [ ! -d $(OUTDIR) ]; then mkdir -p $(OUTDIR) ; fi
-	$(CC) $(CFLAGS) -o $(RUNNER) runner.c -lbpf -lrt
+	$(CC) $(CFLAGS) $(LOADER_CFLAGS) -o $(RUNNER) runner.c $(LOADER_LDFLAGS) -lrt
 
 bpf:
 	for file in $(BPF_FILES); do \

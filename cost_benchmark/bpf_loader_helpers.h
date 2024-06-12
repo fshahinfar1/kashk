@@ -99,14 +99,18 @@ int send_packet(int prog_fd, const char *input, size_t in_size,
 	if (context.live == 1) {
 		/* printf("trying live flag...\n"); */
 		test_opts.flags = BPF_F_TEST_XDP_LIVE_FRAMES;
+#ifdef KERENL_v5_18
 		test_opts.batch_size = 0;
+#endif
 		/* test_opts.batch_size = 1; */
 		ctx_in.ingress_ifindex = args.ifindex;
 		/* printf("ifindex is %d\n", args.ifindex); */
 		assert(args.ifindex > 0);
 	} else {
 		test_opts.flags = 0;
+#ifdef KERENL_v5_18
 		test_opts.batch_size = 0;
+#endif
 		test_opts.data_out = output;
 		test_opts.data_size_out = out_size;
 		/* test_opts.ctx_out = &ctx_out; */
