@@ -7,8 +7,10 @@
  *  zero), it would be bad be cause we would be doing more work.
  * */
 
+#define VALUE_SIZE 256
+
 struct item {
-	char data[256];
+	char data[VALUE_SIZE];
 };
 
 struct {
@@ -28,24 +30,18 @@ int prog_1(struct xdp_md *xdp)
 {
 	void *data = (void *)(__u64)xdp->data;
 	void *data_end = (void *)(__u64)xdp->data_end;
-	char obj[256];
+	char obj[VALUE_SIZE];
 	__u64 res;
 	int i;
 	/* memset(obj, 0, sizeof(obj)); */
-	for (i = 0; i < 256; i++) {
-		obj[i] = (i * i) % 256;
+	for (i = 0; i < VALUE_SIZE; i++) {
+		obj[i] = (i * i) % VALUE_SIZE;
 	}
-	res = *((__u64 *)&obj[127]);
+	res = *((__u64 *)&obj[0]);
 	if (data + 8 > data_end)
 		return XDP_DROP;
 	memcpy(data, &res, 8);
 	return XDP_DROP;
-}
-
-static long prog_2_loop(__u32 ii, void *_ctx)
-{
-	struct loop_ctx *ctx = _ctx;
-	return 0;
 }
 
 SEC("xdp")
@@ -62,11 +58,11 @@ int prog_2(struct xdp_md *xdp)
 	if (it == NULL)
 		return XDP_DROP;
 	obj = it->data;
-	/* memset(obj, 0, 256); */
-	for (i = 0; i < 256; i++) {
-		obj[i] = (i * i) % 256;
+	/* memset(obj, 0, VALUE_SIZE); */
+	for (i = 0; i < VALUE_SIZE; i++) {
+		obj[i] = (i * i) % VALUE_SIZE;
 	}
-	res = *((__u64 *)&obj[127]);
+	res = *((__u64 *)&obj[0]);
 	if (data + 8 > data_end)
 		return XDP_DROP;
 	memcpy(data, &res, 8);
