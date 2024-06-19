@@ -1,13 +1,13 @@
 #include "./commons.h"
-#define REPEAT 10000
+#define REPEAT 1000
 
-/* #define ARRAY 1 */
+#define ARRAY 1
 /* #define HASH 1 */
-#define ON_STACK 1
+/* #define ON_STACK 1 */
 
 /* #define KEY_8 */
 /* #define KEY_16 */
-#define KEY_32
+/* #define KEY_32 */
 
 
 struct item {
@@ -74,6 +74,7 @@ static long prog_loop(__u32 ii, void *_ctx)
 }
 #endif
 
+#ifdef ON_STACK
 static long prog_loop_stack(__u32 ii, void *_ctx)
 {
 	struct item *it = _ctx;
@@ -81,6 +82,7 @@ static long prog_loop_stack(__u32 ii, void *_ctx)
 	it->data[127] = 'f';
 	return 0;
 }
+#endif
 
 SEC("xdp")
 int prog(struct xdp_md *xdp)
