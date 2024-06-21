@@ -100,7 +100,6 @@ int run_test(void)
 		/* resp += DATA_OFFSET; */
 		/* printf("Response:\n%s\n", resp); */
 	}
-out:
 	free(output);
 	return ret;
 }
@@ -167,7 +166,7 @@ static void prepare_map(void)
 	int valsz = 0;
 
 	struct bpf_map *m = bpf_object__find_map_by_name(context.bpfobj, "a_map");
-	assert (m != NULL);
+	if (m == NULL) return;
 	enum bpf_map_type type = bpf_map__type(m);
 	if (type != BPF_MAP_TYPE_HASH) {
 		if (type != BPF_MAP_TYPE_PERCPU_HASH)

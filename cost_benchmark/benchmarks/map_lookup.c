@@ -2,8 +2,8 @@
 #define REPEAT 100000
 
 /* #define ARRAY 1 */
-#define HASH 1
-/* #define ON_STACK 1 */
+/* #define HASH 1 */
+#define ON_STACK 1
 
 /* #define KEY_8 */
 /* #define KEY_16 */
