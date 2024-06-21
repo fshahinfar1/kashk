@@ -6,9 +6,12 @@
 #include <sched.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <string.h>
 #include <stdio.h>
+#include <libgen.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <assert.h>
 #include <errno.h>
 #include <signal.h>
 #include <string.h>
@@ -29,6 +32,7 @@
 #include "shared_map.h"
 #include "bpf_loader_helpers.h"
 
+static int F_map_lookup_bench = 0;
 struct parameters args = {};
 struct program_context context = {};
 
@@ -78,6 +82,7 @@ int run_test(void)
 	char *payload = read_payload();
 	char *output = calloc(1, MAX_BUF);
 	ret = send_payload(context.prog_fd, payload, output, MAX_BUF);
+
 	/* bpf_read_fdinfo(context.prog_fd, &info); */
 	printf("benchmark res: %f\n", context.last_test_duration);
 	/* tmp_ns = (double)info.run_time_ns / (double)info.run_cnt; */
@@ -95,6 +100,7 @@ int run_test(void)
 		/* resp += DATA_OFFSET; */
 		/* printf("Response:\n%s\n", resp); */
 	}
+out:
 	free(output);
 	return ret;
 }
@@ -153,6 +159,57 @@ void interrupt_handler(int sig)
 	exit(EXIT_FAILURE);
 }
 
+static void prepare_map(void)
+{
+	int ret = 0;
+	int percpu = 0;
+	int keysz = 0;
+	int valsz = 0;
+
+	struct bpf_map *m = bpf_object__find_map_by_name(context.bpfobj, "a_map");
+	assert (m != NULL);
+	enum bpf_map_type type = bpf_map__type(m);
+	if (type != BPF_MAP_TYPE_HASH) {
+		if (type != BPF_MAP_TYPE_PERCPU_HASH)
+			return;
+		percpu = 1;
+	}
+	keysz = bpf_map__key_size(m);
+	valsz = bpf_map__value_size(m);
+	assert (keysz == 8 || keysz == 16 || keysz == 32);
+
+	/* Farbod:
+	 * This random piece of code is used in map_lookup benchmark
+	 * when using a hashmap
+	 * */
+
+	char *key = calloc(1, keysz);
+	void *val = malloc(valsz);
+	memset(val, 0xab, valsz);
+	memcpy(key, "ilbcetepljnmqrpazmuiujzknmjddqfk", keysz);
+	printf("Key (%d): %s\n", keysz, key);
+	if (percpu) {
+		printf("PERCPU map!\n");
+		const int count_core = libbpf_num_possible_cpus();
+		const int percpu_valsz = count_core * valsz;
+		void *percpu_val = calloc(count_core, valsz);
+		assert (percpu_val != NULL);
+		memset(percpu_val, 0, percpu_valsz);
+		for (int i = 0; i < count_core; i++)
+			 memcpy(percpu_val + (i * valsz), val, valsz);
+		ret = bpf_map__update_elem(m, key, keysz,
+				percpu_val, percpu_valsz, BPF_NOEXIST);
+		free(percpu_val);
+	} else {
+		ret = bpf_map__update_elem(m, key, keysz, val, valsz,
+				BPF_NOEXIST);
+	}
+	assert (ret == 0);
+	printf("Inserted key!\n");
+	free(key);
+	free(val);
+}
+
 int main(int argc, char *argv[])
 {
 	cpu_set_t cpu_cores;
@@ -165,6 +222,13 @@ int main(int argc, char *argv[])
 	}
 	printf("BPF binary: %s\n", args.binary_path);
 	load_bpf_binary_and_get_program();
+	char *tmp = strdup(args.binary_path);
+	char *file_name = basename(tmp);
+	if (strncmp(file_name, "map_lookup.o", 12) == 0) {
+		/* This benchmark may need map preparation */
+		F_map_lookup_bench = 1;
+		prepare_map();
+	}
 	printf("Program fd: %d\n", context.prog_fd);
 	signal(SIGINT, interrupt_handler);
 	if (args.cross_test == 1) {

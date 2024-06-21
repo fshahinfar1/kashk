@@ -1,24 +1,29 @@
 #include "./commons.h"
-#define REPEAT 1000
+#define REPEAT 100000
 
-#define ARRAY 1
-/* #define HASH 1 */
+/* #define ARRAY 1 */
+#define HASH 1
 /* #define ON_STACK 1 */
 
 /* #define KEY_8 */
 /* #define KEY_16 */
-/* #define KEY_32 */
+#define KEY_32
+
+/* #define PERCPU 1 */
 
 
 struct item {
 	char data[256];
 	/* char data[4096]; */
-};
+} __attribute__((packed));
 
 #ifdef ARRAY
 struct {
+#ifdef PERCPU
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+#else
 	__uint(type, BPF_MAP_TYPE_ARRAY);
-	/* __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY); */
+#endif
 	__type(key,  __u32);
 	__type(value, struct item);
 	__uint(max_entries, 1);
@@ -35,11 +40,14 @@ struct key {
 #ifdef KEY_32
 	char data[32];
 #endif
-};
+} __attribute__((packed));
 struct {
-	/* __uint(type, BPF_MAP_TYPE_HASH); */
-	/* __uint(type, BPF_MAP_TYPE_PERCPU_HASH); */
-	__uint(type, BPF_MAP_TYPE_LRU_HASH);
+#ifdef PERCPU
+	__uint(type, BPF_MAP_TYPE_PERCPU_HASH);
+#else
+	__uint(type, BPF_MAP_TYPE_HASH);
+#endif
+	/* __uint(type, BPF_MAP_TYPE_LRU_HASH); */
 	/* __uint(type, BPF_MAP_TYPE_PERCPU_LRU_HASH); */
 	__type(key,  struct key);
 	__type(value, struct item);
@@ -66,6 +74,8 @@ static long prog_loop(__u32 ii, void *_ctx)
 #endif
 	};
 #endif
+	/* struct key zero; */
+	/* memcpy(&zero, "ilbcetepljnmqrpazmuiujzknmjddqfk", sizeof(zero)); */
 	struct item *it;
 	it = bpf_map_lookup_elem(&a_map, &zero);
 	if (it  == NULL) return 1;
