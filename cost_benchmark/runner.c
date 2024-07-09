@@ -88,6 +88,10 @@ int run_test(void)
 	/* tmp_ns = (double)info.run_time_ns / (double)info.run_cnt; */
 	/* printf("benchmark res: %f\n", tmp_ns); */
 	printf("return value: %d\n", ret);
+	if (ret == 127) {
+		printf("!!! Warning: Experiment failed! !!!");
+	}
+
 	if (ret == XDP_DROP) {
 		printf("XDP_DROP\n");
 	} else if (ret == XDP_PASS) {
@@ -125,7 +129,7 @@ int run_cross_test()
 	attach_xdp_program();
 	ret = launch_server();
 	context.server_pid = ret;
-	const size_t repeat = 10000;
+	const size_t repeat = 100;
 	ret = _send_payload(context.prog_fd, payload, output, MAX_BUF, repeat);
 	kill(context.server_pid, SIGINT);
 	detach_xdp_program();
@@ -168,18 +172,26 @@ static void prepare_map(void)
 	struct bpf_map *m = bpf_object__find_map_by_name(context.bpfobj, "a_map");
 	if (m == NULL) return;
 	enum bpf_map_type type = bpf_map__type(m);
-	if (type != BPF_MAP_TYPE_HASH) {
-		if (type != BPF_MAP_TYPE_PERCPU_HASH)
+
+	switch(type) {
+		case BPF_MAP_TYPE_HASH:
+		case BPF_MAP_TYPE_LRU_HASH:
+			break;
+		case BPF_MAP_TYPE_PERCPU_HASH:
+		case BPF_MAP_TYPE_LRU_PERCPU_HASH:
+			percpu = 1;
+			break;
+		default:
+			/* Nothing to do */
 			return;
-		percpu = 1;
 	}
 	keysz = bpf_map__key_size(m);
 	valsz = bpf_map__value_size(m);
-	assert (keysz == 8 || keysz == 16 || keysz == 32);
+	assert (keysz == 4 || keysz == 8 || keysz == 16 || keysz == 32);
 
 	/* Farbod:
 	 * This random piece of code is used in map_lookup benchmark
-	 * when using a hashmap
+	 * when using a map that need to be initialized.
 	 * */
 
 	char *key = calloc(1, keysz);
