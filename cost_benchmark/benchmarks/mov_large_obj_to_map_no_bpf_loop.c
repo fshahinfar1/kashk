@@ -1,5 +1,4 @@
 #include "./commons.h"
-#define REPEAT 10000
 /* Moving a large object from stack to the BPF map */
 /*  Moving large objects to BPF map seems to be good :) ?!
  *  Probably because the same memory region is reused multiple times.
@@ -8,6 +7,7 @@
  * */
 
 #define VALUE_SIZE 256
+/* #define INITIALIZE_VALUE 1 */
 
 struct item {
 	char data[VALUE_SIZE];
@@ -25,6 +25,7 @@ struct loop_ctx {
 	__u8 err;
 };
 
+/* When it is on stack */
 SEC("xdp")
 int prog_1(struct xdp_md *xdp)
 {
@@ -33,17 +34,20 @@ int prog_1(struct xdp_md *xdp)
 	char obj[VALUE_SIZE];
 	__u64 res;
 	int i;
-	/* memset(obj, 0, sizeof(obj)); */
+#ifdef INITIALIZE_VALUE
+	memset(obj, 0, sizeof(obj));
+#endif
 	for (i = 0; i < VALUE_SIZE; i++) {
 		obj[i] = (i * i) % VALUE_SIZE;
 	}
 	res = *((__u64 *)&obj[0]);
-	if (data + 8 > data_end)
+	if ((void *)((__u8 *)data + 8) > data_end)
 		return XDP_DROP;
 	memcpy(data, &res, 8);
 	return XDP_DROP;
 }
 
+/* When it is on MAP */
 SEC("xdp")
 int prog_2(struct xdp_md *xdp)
 {
@@ -58,12 +62,14 @@ int prog_2(struct xdp_md *xdp)
 	if (it == NULL)
 		return XDP_DROP;
 	obj = it->data;
-	/* memset(obj, 0, VALUE_SIZE); */
+#ifdef INITIALIZE_VALUE
+	memset(obj, 0, VALUE_SIZE);
+#endif
 	for (i = 0; i < VALUE_SIZE; i++) {
 		obj[i] = (i * i) % VALUE_SIZE;
 	}
 	res = *((__u64 *)&obj[0]);
-	if (data + 8 > data_end)
+	if ((void *)((__u8 *)data + 8) > data_end)
 		return XDP_DROP;
 	memcpy(data, &res, 8);
 	return XDP_DROP;

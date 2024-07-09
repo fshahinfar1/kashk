@@ -6,9 +6,9 @@
  * */
 
 /* -- Map type -- */
-/* #define ARRAY 1 */
+#define ARRAY 1
 /* #define HASH 1 */
-#define LRU 1
+/* #define LRU 1 */
 /* #define ON_STACK 1 */
 
 /* -- Key size -- */
@@ -18,7 +18,7 @@
 /* #define KEY_32 */
 
 /* -- Use per cpu -- */
-/* #define PERCPU 1 */
+#define PERCPU 1
 
 /* ---------------------------------------- */
 
@@ -78,7 +78,8 @@ struct {
 	__type(value, struct item);
 	__uint(max_entries, 1);
 } a_map SEC(".maps");
-#endif
+#elif defined RING
+#endif /* End of selecting the map type */
 
 #ifndef ON_STACK
 static long prog_loop(__u32 ii, void *_ctx)
@@ -133,7 +134,7 @@ int prog(struct xdp_md *xdp)
 #ifdef ON_STACK
 	struct item it;
 	__builtin_memset(&it, 0, sizeof(it));
-	c->i = &it;
+	c.i = &it;
 	bpf_loop(REPEAT, prog_loop_stack, &c, 0);
 #else
 	bpf_loop(REPEAT, prog_loop, &c, 0);
