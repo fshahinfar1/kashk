@@ -14,7 +14,7 @@ BPF_FILES = $(wildcard ./benchmarks/*.c)
 # Useful when the globally installed libbpf is old
 BPF_CFLAGS = -I /home/farbod/auto_kern_offload_bench/deps/usr/include
 
-default: $(SERVER) $(RUNNER) bpf
+default: $(SERVER) $(RUNNER) bpf $(OUTDIR)/memcpy_bench
 
 # .SILENT:
 
@@ -32,3 +32,7 @@ bpf:
 		echo "$$file --> $$out" ;\
 		sudo CFLAGS="$(BPF_CFLAGS) " bash $(COMPILE_SCRIPT) $$file $$out > /dev/null ;\
 	done
+
+$(OUTDIR)/memcpy_bench: ./memcpy.c
+	if [ ! -d $(OUTDIR) ]; then mkdir -p $(OUTDIR) ; fi
+	$(CC) $(CFLAGS) -o $@ $<

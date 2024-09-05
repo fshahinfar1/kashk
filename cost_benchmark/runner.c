@@ -221,6 +221,32 @@ static void prepare_map(void)
 	free(val);
 }
 
+static void prepare_memcpy_map(void)
+{
+	printf("Preparing memcpy benchmark map!\n");
+	int ret;
+	struct bpf_map *m = bpf_object__find_map_by_name(context.bpfobj, "a_map");
+	if (m == NULL) {
+		printf("Did not found the map for memcpy benchmark!\n");
+		return;
+	}
+	enum bpf_map_type type = bpf_map__type(m);
+	assert (type == BPF_MAP_TYPE_ARRAY);
+
+	size_t valsz = bpf_map__value_size(m);
+	char *d = malloc(valsz);
+	for (int i = 0; i < valsz; i++) {
+		d[i] = 'a' + (i % 26);
+	}
+	/* printf("%s\n", d); */
+	int zero = 0;
+	ret = bpf_map__update_elem(m, &zero, sizeof(int), d, valsz, BPF_ANY);
+	if (ret != 0) {
+		printf("Failed to update map!\n");
+		return;
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	cpu_set_t cpu_cores;
@@ -239,6 +265,9 @@ int main(int argc, char *argv[])
 		/* This benchmark may need map preparation */
 		F_map_lookup_bench = 1;
 		prepare_map();
+	}
+	if (strncmp(file_name, "memcpy.o", 8) == 0) {
+		prepare_memcpy_map();
 	}
 	printf("Program fd: %d\n", context.prog_fd);
 	signal(SIGINT, interrupt_handler);
