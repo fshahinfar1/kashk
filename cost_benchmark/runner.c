@@ -225,7 +225,13 @@ static void prepare_memcpy_map(void)
 {
 	printf("Preparing memcpy benchmark map!\n");
 	int ret;
-	struct bpf_map *m = bpf_object__find_map_by_name(context.bpfobj, "a_map");
+	struct bpf_map *m;
+	struct bpf_object *obj = context.bpfobj;
+	bpf_object__for_each_map(m, obj) {
+		printf("map name: %s\n", bpf_map__name(m));
+	}
+
+	m = bpf_object__find_map_by_name(context.bpfobj, "a_map");
 	if (m == NULL) {
 		printf("Did not found the map for memcpy benchmark!\n");
 		return;

@@ -18,6 +18,9 @@ typedef struct {
 	int err;
 } loop_ctx_t;
 
+/* static struct item a; */
+/* static struct item b; */
+
 static long exp_loop(__u32 i, void *_ctx)
 {
 	loop_ctx_t *ctx = _ctx;
@@ -39,11 +42,22 @@ int prog(struct xdp_md *xdp)
 	i = 0;
 	d = bpf_map_lookup_elem(&a_map, &i);
 	if (d == NULL) { return -1; }
+
 	loop_ctx_t c = {
 		.d = d,
 		.err = 0,
 	};
 	bpf_loop(REPEAT, exp_loop, &c, 0);
 	if (c.err != 0) { return -1; }
+
+	i = 1;
+	struct item *it = bpf_map_lookup_elem(&a_map, &i);
+	if (it == NULL) { return -1; }
+	/* memcpy(&it->data, d->data, 1000); */
+	/* memcpy(&b, d->data, 1000); */
+	/* memcpy(it->data, &a, 1000); */
+	/* memcpy(&b, &a, 1000); */
+
+	/* if (b.data[2] == 'c') return 1; */
 	return 0;
 }
