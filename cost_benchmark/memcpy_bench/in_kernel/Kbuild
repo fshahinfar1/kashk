@@ -1,0 +1,4 @@
+MODNAME = memcpy_bench
+
+obj-m += $(MODNAME).o
+$(MODNAME)-y += bench.o
