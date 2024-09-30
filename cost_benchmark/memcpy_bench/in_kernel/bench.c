@@ -117,5 +117,5 @@ static void myexit(void)
 	debugfs_remove_recursive(dir);
 }
 
-	module_init(myinit)
+module_init(myinit)
 module_exit(myexit)

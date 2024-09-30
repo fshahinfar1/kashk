@@ -1,4 +1,5 @@
 *.o
 runner
 server
+vmlinux.h
 build/

@@ -11,18 +11,33 @@ COMPILE_SCRIPT = ../compile_scripts/compile_bpf_source.sh
 BPF_FILES = $(wildcard ./benchmarks/*.c)
 BPF_OUT = $(addprefix $(OUTDIR)/, $(addsuffix .o, $(basename $(notdir $(BPF_FILES)))))
 
+KFUNC_MEMCPY_DIR = ./memcpy_bench/kfunc_memcpy/
+KFUNC_MEMCPY_TARGET = ./memcpy_bench/kfunc_memcpy/build/kfunc_memcpy.ko
+VMLINUX = vmlinux.h
+
 # Use a locally installed libbpf when compiling BPF benchmarks
 # Useful when the globally installed libbpf is old
 BPF_CFLAGS = -I /home/farbod/auto_kern_offload_bench/deps/usr/include
 
 .PHONY: default bpf clean
 
-default: $(SERVER) $(RUNNER) bpf $(OUTDIR)/memcpy_bench
+default: $(KFUNC_MEMCPY_TARGET) $(VMLINUX) $(SERVER) $(RUNNER) bpf $(OUTDIR)/memcpy_bench
 
 clean:
-	rm -r $(OUTDIR)
+	rm -r $(OUTDIR) $(VMLINUX)
 
 # .SILENT:
+
+$(KFUNC_MEMCPY_TARGET): $(wildcard $(KFUNC_MEMCPY_DIR)/*.c)
+	$(MAKE) -C $(KFUNC_MEMCPY_DIR)
+
+$(VMLINUX): $(KFUNC_MEMCPY_TARGET)
+	# Remove the old vmlinux.h
+	if [ -f $@ ]; then rm $@; fi
+	# Load the kfunc_memcpy kernel module before generating the vmlinux.h
+	lsmod | grep kfunc_memcpy &> /dev/null; if [ $$? -eq 0 ]; then sudo rmmod kfunc_memcpy; fi
+	sudo insmod $(KFUNC_MEMCPY_TARGET)
+	bpftool btf dump file /sys/kernel/btf/vmlinux format c > $@
 
 $(SERVER): server.c
 	if [ ! -d $(OUTDIR) ]; then mkdir -p $(OUTDIR) ; fi

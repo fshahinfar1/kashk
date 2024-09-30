@@ -1,6 +1,20 @@
+#define USE_KFUNC 1
+
+#ifdef USE_KFUNC
+#include "../vmlinux.h"
+#include <bpf/bpf_helpers.h>
+#else
 #include "./commons.h"
+#endif
 
 #define REPEAT 100
+
+#ifdef USE_KFUNC
+extern void *my_kfunc_memcpy(void *dst, void *src, __u32 n) __ksym;
+#define MEMCPY(...) my_kfunc_memcpy(__VA_ARGS__)
+#else
+#define MEMCPY(...) memcpy(__VA_ARGS__)
+#endif
 
 struct item {
 	char data[1000];
@@ -30,7 +44,7 @@ static long exp_loop(__u32 i, void *_ctx)
 		ctx->err = 1;
 		return 1;
 	}
-	memcpy(it->data, ctx->d->data, 1000);
+	MEMCPY(it->data, ctx->d->data, 1000);
 	return 0;
 }
 
@@ -61,3 +75,5 @@ int prog(struct xdp_md *xdp)
 	/* if (b.data[2] == 'c') return 1; */
 	return 0;
 }
+
+char _license[] SEC("license") = "GPL";

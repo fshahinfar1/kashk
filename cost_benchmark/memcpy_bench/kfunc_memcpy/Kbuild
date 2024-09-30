@@ -1,0 +1,4 @@
+MODNAME = kfunc_memcpy
+
+obj-m += $(MODNAME).o
+$(MODNAME)-y += memcpy_kfunc.o
