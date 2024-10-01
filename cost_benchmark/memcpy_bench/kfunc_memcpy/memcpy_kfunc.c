@@ -7,9 +7,9 @@ MODULE_LICENSE("GPL");
 /* Define a kfunc function */
 __bpf_kfunc_start_defs();
 
-__bpf_kfunc void *my_kfunc_memcpy(void *dst, void *src, __u32 n)
+__bpf_kfunc void *my_kfunc_memcpy(void *dst, void *src, __u32 src__sz)
 {
-	return memcpy(dst, src, n);
+	return memcpy(dst, src, src__sz);
 }
 
 __bpf_kfunc_end_defs();

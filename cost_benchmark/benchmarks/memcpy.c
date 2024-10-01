@@ -10,7 +10,7 @@
 #define REPEAT 100
 
 #ifdef USE_KFUNC
-extern void *my_kfunc_memcpy(void *dst, void *src, __u32 n) __ksym;
+extern void *my_kfunc_memcpy(void *dst, void *src, __u32 src__sz) __ksym;
 #define MEMCPY(...) my_kfunc_memcpy(__VA_ARGS__)
 #else
 #define MEMCPY(...) memcpy(__VA_ARGS__)
