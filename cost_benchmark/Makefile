@@ -24,18 +24,21 @@ BPF_CFLAGS = -I /home/farbod/auto_kern_offload_bench/deps/usr/include
 default: $(KFUNC_MEMCPY_TARGET) $(VMLINUX) $(SERVER) $(RUNNER) bpf $(OUTDIR)/memcpy_bench
 
 clean:
-	rm -r $(OUTDIR) $(VMLINUX)
+	rm -rf $(OUTDIR) $(VMLINUX)
+	cd $(KFUNC_MEMCPY_DIR); \
+		$(MAKE) clean
 
 # .SILENT:
 
 $(KFUNC_MEMCPY_TARGET): $(wildcard $(KFUNC_MEMCPY_DIR)/*.c)
-	$(MAKE) -C $(KFUNC_MEMCPY_DIR)
+	cd $(KFUNC_MEMCPY_DIR); \
+		$(MAKE)
 
 $(VMLINUX): $(KFUNC_MEMCPY_TARGET)
 	# Remove the old vmlinux.h
 	if [ -f $@ ]; then rm $@; fi
 	# Load the kfunc_memcpy kernel module before generating the vmlinux.h
-	lsmod | grep kfunc_memcpy &> /dev/null; if [ $$? -eq 0 ]; then sudo rmmod kfunc_memcpy; fi
+	lsmod | grep kfunc_memcpy ; if [ $$? -eq 0 ]; then sudo rmmod kfunc_memcpy; fi
 	sudo insmod $(KFUNC_MEMCPY_TARGET)
 	bpftool btf dump file /sys/kernel/btf/vmlinux format c > $@
 
@@ -51,7 +54,7 @@ $(BPF_OUT): $(OUTDIR)/%.o:./benchmarks/%.c
 	echo "$< --> $@" ;\
 	CFLAGS="$(BPF_CFLAGS) " bash $(COMPILE_SCRIPT) $< $@ > /dev/null ;
 
-bpf: $(BPF_OUT)
+bpf: $(BPF_OUT) $(VMLINUX)
 # for file in $(BPF_FILES); do \
 # 	out="$(OUTDIR)/$$(basename $$file | cut -d '.' -f 1).o" ; \
 # 	echo "$$file --> $$out" ;\
