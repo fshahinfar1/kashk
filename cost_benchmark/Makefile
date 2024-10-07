@@ -1,8 +1,8 @@
 CC = clang
 CFLAGS = -O2 -g -Wall
 
-LOADER_CFLAGS=$(shell pkg-config --cflags libbpf)
-LOADER_LDFLAGS=$(shell pkg-config --libs libbpf)
+LOADER_CFLAGS=$(shell pkg-config --cflags libbpf --static)
+LOADER_LDFLAGS=$(shell pkg-config --libs libbpf --static)
 OUTDIR = ./build
 RUNNER = $(OUTDIR)/runner
 RUNNER_HEADERS = $(wildcard *.h)
@@ -17,7 +17,8 @@ VMLINUX = vmlinux.h
 
 # Use a locally installed libbpf when compiling BPF benchmarks
 # Useful when the globally installed libbpf is old
-BPF_CFLAGS = -I /home/farbod/auto_kern_offload_bench/deps/usr/include
+# BPF_CFLAGS = -I /home/farbod/auto_kern_offload_bench/deps/usr/include
+BPF_CFLAGS = $(shell pkg-config --cflags libbpf)
 
 .PHONY: default bpf clean
 
@@ -25,20 +26,19 @@ default: $(KFUNC_MEMCPY_TARGET) $(VMLINUX) $(SERVER) $(RUNNER) bpf $(OUTDIR)/mem
 
 clean:
 	rm -rf $(OUTDIR) $(VMLINUX)
-	cd $(KFUNC_MEMCPY_DIR); \
-		$(MAKE) clean
+	cd $(KFUNC_MEMCPY_DIR) && $(MAKE) clean
 
 # .SILENT:
 
 $(KFUNC_MEMCPY_TARGET): $(wildcard $(KFUNC_MEMCPY_DIR)/*.c)
-	cd $(KFUNC_MEMCPY_DIR); \
+	cd $(KFUNC_MEMCPY_DIR) && \
 		$(MAKE)
 
 $(VMLINUX): $(KFUNC_MEMCPY_TARGET)
 	# Remove the old vmlinux.h
 	if [ -f $@ ]; then rm $@; fi
 	# Load the kfunc_memcpy kernel module before generating the vmlinux.h
-	lsmod | grep kfunc_memcpy ; if [ $$? -eq 0 ]; then sudo rmmod kfunc_memcpy; fi
+	lsmod | grep kfunc_memcpy 2> /dev/null 1> /dev/null ; if [ $$? -eq 0 ]; then sudo rmmod kfunc_memcpy; fi
 	sudo insmod $(KFUNC_MEMCPY_TARGET)
 	bpftool btf dump file /sys/kernel/btf/vmlinux format c > $@
 

@@ -10,8 +10,10 @@
 #define REPEAT 100
 
 #ifdef USE_KFUNC
-extern void *my_kfunc_memcpy(void *dst, void *src, __u32 src__sz) __ksym;
-#define MEMCPY(...) my_kfunc_memcpy(__VA_ARGS__)
+/* NOTE: please do not forget to add __ksym :) */
+extern long my_kfunc_memcpy(void *dst, __u32 dst__sz, void *src, __u32 src__sz) __ksym;
+/* #define MEMCPY(...) my_kfunc_memcpy(__VA_ARGS__) */
+char _license[] SEC("license") = "GPL";
 #else
 #define MEMCPY(...) memcpy(__VA_ARGS__)
 #endif
@@ -44,7 +46,11 @@ static long exp_loop(__u32 i, void *_ctx)
 		ctx->err = 1;
 		return 1;
 	}
+#ifdef USE_KFUNC
+	my_kfunc_memcpy(it->data, sizeof(it->data), ctx->d->data, sizeof(ctx->d->data));
+#else
 	MEMCPY(it->data, ctx->d->data, 1000);
+#endif
 	return 0;
 }
 
@@ -75,5 +81,3 @@ int prog(struct xdp_md *xdp)
 	/* if (b.data[2] == 'c') return 1; */
 	return 0;
 }
-
-char _license[] SEC("license") = "GPL";

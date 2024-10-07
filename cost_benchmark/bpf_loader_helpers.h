@@ -38,13 +38,24 @@ void attach_xdp_program(void)
 	}
 }
 
+int my_libbpf_print(enum libbpf_print_level lvl, const char *c, va_list ap)
+{
+	vprintf(c, ap);
+	return 0;
+}
+
 int load_bpf_binary_and_get_program(void)
 {
 	int ret;
 	struct bpf_object *bpfobj;
 	struct bpf_program *prog;
 	int prog_fd;
-	bpfobj = bpf_object__open_file(args.binary_path, NULL);
+	struct bpf_object_open_opts open_opts;
+	memset(&open_opts, 0, sizeof(open_opts));
+	open_opts.sz = sizeof(open_opts);
+	open_opts.kernel_log_level = 0;
+	libbpf_set_print(my_libbpf_print);
+	bpfobj = bpf_object__open_file(args.binary_path, &open_opts);
 	if (!bpfobj) {
 		fprintf(stderr, "Failed to open the BPF binary!\n    %s\n",
 				args.binary_path);

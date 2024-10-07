@@ -7,9 +7,10 @@ MODULE_LICENSE("GPL");
 /* Define a kfunc function */
 __bpf_kfunc_start_defs();
 
-__bpf_kfunc void *my_kfunc_memcpy(void *dst, void *src, __u32 src__sz)
+__bpf_kfunc long my_kfunc_memcpy(void *dst, __u32 dst__sz, void *src, __u32 src__sz)
 {
-	return memcpy(dst, src, src__sz);
+	memcpy(dst, src, src__sz);
+	return 0;
 }
 
 __bpf_kfunc_end_defs();
@@ -34,8 +35,11 @@ static const struct btf_kfunc_id_set my_kfunc_memcpy_kfunc_set = {
 
 static int myinit(void)
 {
+	int ret;
 	/* Register the BTF */
-	register_btf_kfunc_id_set(BPF_PROG_TYPE_XDP, &my_kfunc_memcpy_kfunc_set);
+	ret = register_btf_kfunc_id_set(BPF_PROG_TYPE_XDP, &my_kfunc_memcpy_kfunc_set);
+	if (ret != 0)
+		return ret;
 	pr_info("Load memcpy kfunc\n");
 	return 0;
 }
