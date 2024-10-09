@@ -1,4 +1,4 @@
-#define USE_KFUNC 1
+// #define USE_KFUNC 1
 
 #ifdef USE_KFUNC
 #include "../vmlinux.h"

@@ -54,7 +54,7 @@ int load_bpf_binary_and_get_program(void)
 	memset(&open_opts, 0, sizeof(open_opts));
 	open_opts.sz = sizeof(open_opts);
 	open_opts.kernel_log_level = 0;
-	libbpf_set_print(my_libbpf_print);
+	/* libbpf_set_print(my_libbpf_print); */
 	bpfobj = bpf_object__open_file(args.binary_path, &open_opts);
 	if (!bpfobj) {
 		fprintf(stderr, "Failed to open the BPF binary!\n    %s\n",
